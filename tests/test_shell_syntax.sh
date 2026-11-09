@@ -9,6 +9,7 @@ for f in \
   "$root/config/includes.chroot/usr/local/sbin/prestium-i2p-reseed" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-clockfix" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-timesync" \
+  "$root/config/includes.chroot/usr/local/bin/claws-mail-i2p" \
   "$root/config/includes.chroot/usr/local/bin/prestium-irc" \
   "$root/config/includes.chroot/usr/local/bin/prestium-i2p-console" \
   "$root/config/includes.chroot/usr/local/bin/prestium-localfox" \

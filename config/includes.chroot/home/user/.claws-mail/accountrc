@@ -1,7 +1,6 @@
 [Account: 1]
 account_name=mail.i2p
 is_default=1
-name=
 address=username@mail.i2p
 organization=
 protocol=0

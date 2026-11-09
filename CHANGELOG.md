@@ -32,6 +32,17 @@ Enhanced security and new features. Changes will be listed here as they land.
   off, when apparmor.service isn't active (not while it's still starting), or when one of Prestium's
   profiles isn't loaded in enforce mode.
 
+### Fixes
+- **Claws Mail can generate PGP keys.** "Generate a new key pair" failed with "General error": Prestium's
+  mail account has no full name (mail goes out from the @mail.i2p address alone), Claws reads the
+  empty `name=` line as an empty name rather than none, and passes it to GnuPG, which refuses an empty
+  name. The account no longer has that line, and the new `claws-mail-i2p` launcher (menu entry and
+  mail links) drops it again before each start, since Claws writes it back whenever the account is
+  saved. Claws then names the key after the address. The AppArmor profile is unchanged: generating,
+  using an imported key, signing and verifying were tested with the profile enforced
+  (`tests/test_claws_pgp_keygen.sh`). The key choices on the account's Privacy page stay greyed out
+  until a secret key exists, which is how Claws works. To use your own key, import it with Kleopatra.
+
 ## 2.0: changes since Prestium 1.9.1.3
 
 Prestium 2.0 is the base of PrestiumOS. Its goal was to fully modernize

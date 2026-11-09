@@ -1,0 +1,17 @@
+#!/bin/sh
+# Prestium 2.1: start Claws Mail ("Mail (I2P)").
+# Claws reads an empty "name=" in accountrc as an empty full name rather than none, and its "Generate a
+# new key pair" then hands GnuPG an empty Name-Real, which gpg rejects, so key generation fails with
+# "General error". Prestium's account deliberately has no full name (mail goes out from the
+# @mail.i2p address alone) and Claws writes "name=" back on every save, so the empty line is dropped
+# before each start. With no name line Claws uses the address, as it does for an account that never
+# had one. Nothing else in the file is touched. Claws itself runs confined (usr.bin.claws-mail).
+rc="$HOME/.claws-mail/accountrc"
+if [ -f "$rc" ] && [ ! -L "$rc" ] && [ -O "$rc" ] && grep -qx 'name=' "$rc"; then
+  tmp=$(mktemp "$rc.XXXXXX") && {
+    if grep -vx 'name=' "$rc" > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$rc"; then :; else
+      rm -f "$tmp"; logger -t prestium "claws-mail-i2p: could not clear the empty account name" 2>/dev/null
+    fi
+  }
+fi
+exec /usr/bin/claws-mail "$@"

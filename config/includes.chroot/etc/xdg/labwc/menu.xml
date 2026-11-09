@@ -100,7 +100,7 @@
       <action name="Execute" command="prestium-run onionshare" />
     </item>
     <item label="Mail (I2P)">
-      <action name="Execute" command="prestium-run claws-mail" />
+      <action name="Execute" command="prestium-run claws-mail-i2p" />
     </item>
   </menu>
   <separator />
