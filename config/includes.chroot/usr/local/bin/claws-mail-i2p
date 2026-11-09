@@ -28,9 +28,12 @@ first_start(){
   msg="Set up your I2P mail account (postman, hq.postman.i2p).
 Your password is asked for the first time Mail connects."
   while :; do
+    zr=0
     out=$(zenity --forms --title "$T" --text "$msg" --separator '
 ' --add-entry "Your name (optional, shown to recipients)" --add-entry "Address (name@mail.i2p)" 2>/dev/null) \
-      || return 2                                  # cancelled
+      || zr=$?
+    [ $zr = 1 ] && return 2                        # Cancel or window closed
+    [ $zr = 0 ] || { log "account form failed (zenity exit $zr); opening the Claws wizard"; return 1; }
     name=$(printf '%s\n' "$out" | sed -n 1p)
     addr=$(printf '%s\n' "$out" | sed -n 2p | tr 'A-Z' 'a-z' | tr -d ' ')
     [ "$(printf '%s\n' "$out" | wc -l)" -le 2 ] || { msg="Please enter one line per field."; continue; }
@@ -80,7 +83,7 @@ harden(){
     }
     /^\[/ { flush(); print; next }
     $0 == "name=" { next }
-    { buf[++n] = $0; if ($0 ~ /^address=.*@mail\.i2p$/) i2p = 1 }
+    { buf[++n] = $0; if (tolower($0) ~ /^address=.*@mail\.i2p[ \t\r]*$/) i2p = 1 }
     END { flush() }
   ' "$rc" > "$tmp" && chmod 600 "$tmp"; then
     if cmp -s "$tmp" "$rc"; then rm -f "$tmp"; else mv -f "$tmp" "$rc" || { rm -f "$tmp"; log "could not update the account"; }; fi

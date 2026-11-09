@@ -63,13 +63,13 @@ Enhanced security and new features. Changes will be listed here as they land.
   password store; the launcher never handles it. Claws' own wizard isn't used because it can't set
   those privacy options, and an account it creates keeps Claws' defaults for the whole session, which
   without persistence is every session. The launcher also re-applies those three settings to any
-  @mail.i2p account on each start. Cancelling the form leaves Mail closed. If the form can't be shown,
+  @mail.i2p account on each start (the address is matched case-insensitively). Cancelling the form
+  leaves Mail closed. If the form can't be shown (zenity missing or failing; the error is logged),
   Claws' wizard opens with the same servers filled in (`accountrc.tmpl`, ports as `server:port`, which
   is the only form Claws reads there).
 - **Kleopatra's self-test passes.** Kleopatra opened with "scdaemon Configuration Check: Failed" at
   every start: its check runs `gpgconf --list-options scdaemon`, and scdaemon (the smartcard daemon)
-  wasn't installed, since gpg-agent only suggests it and the image is built without recommended
-  packages. scdaemon is now installed (pcscd already was). "Compliance Check: Skipped" is normal: it
+  wasn't installed: gpg-agent only suggests it, and apt never installs suggested packages. scdaemon is now installed (pcscd already was). "Compliance Check: Skipped" is normal: it
   only applies when GnuPG is set to de-vs compliance (`tests/test_kleopatra_selftest.sh`).
 
 ## 2.0: changes since Prestium 1.9.1.3
