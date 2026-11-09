@@ -43,22 +43,29 @@ Enhanced security and new features. Changes will be listed here as they land.
   profiles isn't loaded in enforce mode.
 
 ### Fixes
-- **Claws Mail can generate PGP keys.** "Generate a new key pair" failed with "General error": Prestium's
-  mail account has no full name (mail goes out from the @mail.i2p address alone), Claws reads the
-  empty `name=` line as an empty name rather than none, and passes it to GnuPG, which refuses an empty
-  name. The preset account is gone (see below), and the new `claws-mail-i2p` launcher (menu entry and
-  mail links) drops an empty `name=` line before each start, for accounts kept on persistent storage,
-  since Claws writes it back whenever the account is saved. Claws then names the key after the address. The AppArmor profile is unchanged: generating,
-  using an imported key, signing and verifying were tested with the profile enforced
-  (`tests/test_claws_pgp_keygen.sh`). The key choices on the account's Privacy page stay greyed out
-  until a secret key exists, which is how Claws works. To use your own key, import it with Kleopatra.
+- **Claws Mail can generate PGP keys.** "Generate a new key pair" failed with "General error": an
+  account with no full name had an empty `name=` line, Claws reads that as an empty name rather than
+  none and passes it to GnuPG, which refuses an empty name. Accounts are now written without the line,
+  and the `claws-mail-i2p` launcher (menu entry and mail links) drops an empty one before each start,
+  since Claws writes it back whenever the account is saved; Claws then names the key after the address.
+  The AppArmor profile is unchanged. Generating a key, using a key imported outside Claws, signing and
+  verifying were checked by hand in a Debian 13 VM with the profile enforced (no denials);
+  `tests/test_claws_pgp_keygen.sh` covers the launcher and the GnuPG side, not Claws or AppArmor. The
+  key choices on the account's Privacy page stay greyed out until a secret key exists, which is how
+  Claws works. To use your own key, import it with Kleopatra; both use the same `~/.gnupg`.
 - **Mail (I2P) asks for your account on first start.** Prestium used to ship a ready-made account
-  with the placeholder address `username@mail.i2p`, no name and no password, which had to be found and
-  edited in the account settings. There is no preset account now: on first start Claws opens its setup
-  wizard with I2P mail already filled in (POP3 on 127.0.0.1:7660 and SMTP on 127.0.0.1:7659 through
-  the i2pd tunnels to postman, SMTP login on, no TLS since the tunnel encrypts). You enter your name,
-  your @mail.i2p address and your postman password; the user name follows the address. The wizard's
-  port keys were ignored before (Claws takes a port only as `server:port`).
+  with the placeholder address `username@mail.i2p`, which had to be found and edited in the account
+  settings. Now, when there is no account yet, a short form asks for your name (optional) and your
+  @mail.i2p address, and the launcher writes the account before Claws starts: POP3 on 127.0.0.1:7660
+  and SMTP on 127.0.0.1:7659 through the i2pd tunnels to postman, SMTP login on, no TLS (the tunnel
+  encrypts), no `X-Mailer` header, and `mail.i2p` instead of the hostname in the SMTP greeting and
+  Message-ID. Claws asks for your postman password the first time it connects and keeps it in its
+  password store; the launcher never handles it. Claws' own wizard isn't used because it can't set
+  those privacy options, and an account it creates keeps Claws' defaults for the whole session, which
+  without persistence is every session. The launcher also re-applies those three settings to any
+  @mail.i2p account on each start. Cancelling the form leaves Mail closed. If the form can't be shown,
+  Claws' wizard opens with the same servers filled in (`accountrc.tmpl`, ports as `server:port`, which
+  is the only form Claws reads there).
 
 ## 2.0: changes since Prestium 1.9.1.3
 

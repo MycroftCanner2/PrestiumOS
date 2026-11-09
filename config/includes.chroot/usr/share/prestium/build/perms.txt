@@ -127,6 +127,7 @@
 0755 root root /usr/local/sbin/prestium-usb-watchdog
 0755 root root /usr/local/sbin/prestium-wipe-session
 0644 root root /usr/local/share/applications/claws-mail.desktop
+0644 root root /usr/local/share/prestium-claws/accountrc.in
 0644 root root /usr/local/share/applications/librewolf.desktop
 0644 root root /usr/local/share/applications/pidgin.desktop
 0644 root root /usr/local/share/applications/torbrowser.desktop

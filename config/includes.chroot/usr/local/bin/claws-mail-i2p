@@ -1,17 +1,97 @@
 #!/bin/sh
 # Prestium 2.1: start Claws Mail ("Mail (I2P)").
-# Claws reads an empty "name=" in accountrc as an empty full name rather than none, and its "Generate a
-# new key pair" then hands GnuPG an empty Name-Real, which gpg rejects, so key generation fails with
-# "General error". Prestium's account deliberately has no full name (mail goes out from the
-# @mail.i2p address alone) and Claws writes "name=" back on every save, so the empty line is dropped
-# before each start. With no name line Claws uses the address, as it does for an account that never
-# had one. Nothing else in the file is touched. Claws itself runs confined (usr.bin.claws-mail).
-rc="$HOME/.claws-mail/accountrc"
-if [ -f "$rc" ] && [ ! -L "$rc" ] && [ -O "$rc" ] && grep -qx 'name=' "$rc"; then
-  tmp=$(mktemp "$rc.XXXXXX") && {
-    if grep -vx 'name=' "$rc" > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$rc"; then :; else
-      rm -f "$tmp"; logger -t prestium "claws-mail-i2p: could not clear the empty account name" 2>/dev/null
+#
+# First start (no account yet): a small form asks for the name (optional) and the @mail.i2p address,
+# and the account is written from /usr/local/share/prestium-claws/accountrc.in with the I2P postman
+# servers and Prestium's privacy settings already in it, before Claws starts. Claws' own wizard is
+# not used for this: it cannot set them, and an account it creates keeps Claws' defaults in memory for
+# the whole session (X-Mailer header, hostname "prestium" in the SMTP greeting and Message-ID), which
+# on a live system without persistence is every session. The password is not written anywhere by this
+# script: Claws asks for it on first connect and keeps it in its own password store.
+#
+# Every start, for each account whose address ends in @mail.i2p:
+#   generate_xmailer=0, set_domain=1, domain=mail.i2p   (no X-Mailer; mail.i2p, not the hostname)
+# and for every account an empty "name=" line is dropped: Claws reads it as an empty full name rather
+# than none, and "Generate a new key pair" then hands GnuPG an empty Name-Real, which gpg rejects
+# ("General error"). With no name line Claws names the key after the address.
+# The file is rewritten only if it is a regular file owned by the user (never through a symlink),
+# via a temp file in the same directory, mode 600. Claws itself runs confined (usr.bin.claws-mail).
+d="$HOME/.claws-mail"
+rc="$d/accountrc"
+IN=${PRESTIUM_CLAWS_ACCOUNT_IN:-/usr/local/share/prestium-claws/accountrc.in}
+log(){ logger -t prestium "claws-mail-i2p: $*" 2>/dev/null; echo "claws-mail-i2p: $*" >&2; }
+T="Mail (I2P)"
+
+first_start(){
+  command -v zenity >/dev/null 2>&1 || return 1   # no form: Claws' wizard runs (template defaults)
+  [ -r "$IN" ] || { log "missing $IN"; return 1; }
+  msg="Set up your I2P mail account (postman, hq.postman.i2p).
+Your password is asked for the first time Mail connects."
+  while :; do
+    out=$(zenity --forms --title "$T" --text "$msg" --separator '
+' --add-entry "Your name (optional, shown to recipients)" --add-entry "Address (name@mail.i2p)" 2>/dev/null) \
+      || return 2                                  # cancelled
+    name=$(printf '%s\n' "$out" | sed -n 1p)
+    addr=$(printf '%s\n' "$out" | sed -n 2p | tr 'A-Z' 'a-z' | tr -d ' ')
+    [ "$(printf '%s\n' "$out" | wc -l)" -le 2 ] || { msg="Please enter one line per field."; continue; }
+    case "$addr" in *@*) ;; ?*) addr="$addr@mail.i2p" ;; esac
+    if ! printf '%s' "$addr" | grep -Eqx '[a-z0-9][a-z0-9._-]{0,63}@mail\.i2p'; then
+      msg="The address must look like name@mail.i2p (letters, digits, . _ -)."; continue
     fi
-  }
+    if printf '%s' "$name" | LC_ALL=C grep -q '[[:cntrl:]]' || [ ${#name} -gt 80 ]; then
+      msg="The name can't contain control characters or be longer than 80 characters."; continue
+    fi
+    break
+  done
+  mkdir -p "$d" && chmod 700 "$d" || return 1
+  [ -e "$rc" ] || [ -L "$rc" ] && return 0          # appeared meanwhile: leave it alone
+  tmp=$(mktemp "$d/accountrc.XXXXXX") || return 1
+  # values reach awk through the environment, never through the program text
+  if PA_ADDR="$addr" PA_USER="${addr%@*}" PA_NAME="$name" awk '
+       /^#/ { next }
+       { gsub(/@ADDRESS@/, ENVIRON["PA_ADDR"]); gsub(/@USER@/, ENVIRON["PA_USER"]); print }
+       /^\[Account: 1\]$/ && ENVIRON["PA_NAME"] != "" { print "name=" ENVIRON["PA_NAME"] }
+     ' "$IN" > "$tmp" && chmod 600 "$tmp" && mv -f "$tmp" "$rc"; then
+    return 0
+  fi
+  rm -f "$tmp"; log "could not write the account"; return 1
+}
+
+harden(){
+  [ -f "$rc" ] && [ ! -L "$rc" ] && [ -O "$rc" ] || return 0
+  tmp=$(mktemp "$rc.XXXXXX") || return 0
+  if awk '
+    function flush(   i, k) {
+      if (n == 0) return
+      if (i2p) {
+        for (i = 1; i <= n; i++) {
+          k = buf[i]; sub(/=.*/, "", k)
+          if (k == "generate_xmailer") buf[i] = "generate_xmailer=0"
+          else if (k == "set_domain") buf[i] = "set_domain=1"
+          else if (k == "domain") buf[i] = "domain=mail.i2p"
+          seen[k] = 1
+        }
+        if (!seen["generate_xmailer"]) buf[++n] = "generate_xmailer=0"
+        if (!seen["set_domain"]) buf[++n] = "set_domain=1"
+        if (!seen["domain"]) buf[++n] = "domain=mail.i2p"
+      }
+      for (i = 1; i <= n; i++) print buf[i]
+      n = 0; i2p = 0; delete seen
+    }
+    /^\[/ { flush(); print; next }
+    $0 == "name=" { next }
+    { buf[++n] = $0; if ($0 ~ /^address=.*@mail\.i2p$/) i2p = 1 }
+    END { flush() }
+  ' "$rc" > "$tmp" && chmod 600 "$tmp"; then
+    if cmp -s "$tmp" "$rc"; then rm -f "$tmp"; else mv -f "$tmp" "$rc" || { rm -f "$tmp"; log "could not update the account"; }; fi
+  else
+    rm -f "$tmp"; log "could not update the account"
+  fi
+}
+
+if [ ! -e "$rc" ] && [ ! -L "$rc" ]; then
+  first_start; r=$?
+  [ $r = 2 ] && exit 0                              # cancelled: no account, Mail not started
 fi
+harden
 exec /usr/bin/claws-mail "$@"

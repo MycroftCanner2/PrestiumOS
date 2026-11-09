@@ -1,9 +1,9 @@
 #!/bin/bash
 # Prestium 2.1: Claws Mail key generation. Claws reads an empty "name=" in accountrc as an empty full
 # name and its "Generate a new key pair" passes that to gpg as an empty Name-Real, which gpg rejects
-# ("Couldn't generate a new key pair: General error"). The shipped account has no name line, the
-# launcher drops an empty one (Claws writes it back on save) before each start, and every way into
-# Claws goes through the launcher. Unprivileged; needs gpg for the key-generation part.
+# ("Couldn't generate a new key pair: General error"). There is no shipped account: the launcher writes
+# it from a first-start form, drops an empty name line (Claws writes it back on save) and keeps the
+# @mail.i2p privacy settings before each start, and every way into Claws goes through the launcher. Unprivileged; needs gpg for the key-generation part.
 set -u; T=$(cd "$(dirname "$0")/.." && pwd); C=$T/config/includes.chroot; fail=0
 ok(){ echo "OK $1"; }; no(){ echo "FAIL $1"; fail=1; }
 L=$C/usr/local/bin/claws-mail-i2p
@@ -39,7 +39,7 @@ mk '[Account: 1]' 'account_name=mail.i2p' 'is_default=1' 'name=' 'address=userna
 HOME=$W/h "$W/launcher" --compose 'mailto:a b@mail.i2p' >/dev/null 2>&1
 R=$W/h/.claws-mail/accountrc
 grep -qx 'name=' "$R" && no "empty name lines dropped" || ok "empty name lines dropped"
-[ "$(grep -c . "$R")" = 9 ] && grep -qx 'name=Alice' "$R" && grep -qx 'account_name=' "$R" && grep -qx 'nickname=' "$R" \
+[ "$(grep -c . "$R")" = 15 ] && grep -qx 'name=Alice' "$R" && grep -qx 'account_name=' "$R" && grep -qx 'nickname=' "$R" \
   && ok "other lines untouched (a real name, account_name=, nickname=)" || no "other lines untouched"
 [ "$(stat -c %a "$R")" = 600 ] && ok "accountrc stays 600" || no "accountrc mode $(stat -c %a "$R")"
 [ "$(printf '%s|' $(cat "$W/h/argv" | tr ' ' '_'))" = "--compose|mailto:a_b@mail.i2p|" ] && ok "arguments passed through" || no "arguments passed through"
@@ -47,7 +47,47 @@ ls "$W/h/.claws-mail" | grep -q 'accountrc\.' && no "temp file left" || ok "no t
 # a symlinked accountrc is left alone; no accountrc still starts Claws
 mk 'name=' 'address=x@mail.i2p'; mv "$W/h/.claws-mail/accountrc" "$W/real"; ln -s "$W/real" "$W/h/.claws-mail/accountrc"
 HOME=$W/h "$W/launcher" >/dev/null 2>&1; grep -qx 'name=' "$W/real" && [ -f "$W/h/argv" ] && ok "symlink not followed, Claws still starts" || no "symlink case"
-rm -rf "$W/h"; mkdir -p "$W/h"; HOME=$W/h "$W/launcher" >/dev/null 2>&1; [ -f "$W/h/argv" ] && ok "first start without accountrc" || no "first start without accountrc"
+rm -rf "$W/h"; mkdir -p "$W/h"; PATH=/usr/bin:/bin HOME=$W/h "$W/launcher" >/dev/null 2>&1; [ -f "$W/h/argv" ] && ok "first start without accountrc or form: Claws (wizard) starts" || no "first start without accountrc"
+
+# privacy settings on @mail.i2p accounts: no X-Mailer, mail.i2p (not the hostname) as domain
+sec(){ awk -v n="[Account: $2]" '/^\[/{on=($0==n);next} on' "$1"; }
+mk '[Account: 1]' 'address=a@mail.i2p' 'generate_xmailer=1' 'set_domain=0' 'domain=prestium' \
+   '[Account: 2]' 'address=b@mail.i2p' \
+   '[Account: 3]' 'address=c@example.org' 'generate_xmailer=1' 'set_domain=0'
+HOME=$W/h "$W/launcher" >/dev/null 2>&1
+for n in 1 2; do
+  s=$(sec "$R" $n)
+  printf '%s\n' "$s" | grep -qx generate_xmailer=0 && printf '%s\n' "$s" | grep -qx set_domain=1 && printf '%s\n' "$s" | grep -qx domain=mail.i2p \
+    && [ "$(printf '%s\n' "$s" | grep -c '^\(generate_xmailer\|set_domain\|domain\)=')" = 3 ] \
+    && ok "account $n (@mail.i2p): no X-Mailer, domain mail.i2p" || no "account $n privacy: $s"
+done
+s=$(sec "$R" 3); printf '%s\n' "$s" | grep -qx generate_xmailer=1 && printf '%s\n' "$s" | grep -qx set_domain=0 && ! printf '%s\n' "$s" | grep -q '^domain=' \
+  && ok "other accounts untouched" || no "non-I2P account changed: $s"
+cp "$R" "$W/before"; HOME=$W/h "$W/launcher" >/dev/null 2>&1; cmp -s "$R" "$W/before" && ok "second start changes nothing" || no "not idempotent"
+
+# first start: the form writes the account before Claws starts
+Z=$W/zbin; mkdir -p "$Z"
+cat > "$Z/zenity" <<'S'
+#!/bin/sh
+n=$(cat "$ZN" 2>/dev/null || echo 0); n=$((n+1)); echo $n > "$ZN"
+eval "a=\${ZA$n-}"; [ "$a" = CANCEL ] && exit 1; printf '%b\n' "$a"
+S
+chmod 755 "$Z/zenity"
+fs(){ rm -rf "$W/h" "$W/zn"; mkdir -p "$W/h"; env PATH="$Z:/usr/bin:/bin" HOME="$W/h" ZN="$W/zn" PRESTIUM_CLAWS_ACCOUNT_IN="$C/usr/local/share/prestium-claws/accountrc.in" "$@" "$W/launcher" >/dev/null 2>&1; }
+fs ZA1='Alice Q\nAlice@Mail.I2P'
+[ -f "$W/h/argv" ] && grep -qx 'address=alice@mail.i2p' "$R" && grep -qx 'user_id=alice' "$R" && grep -qx 'name=Alice Q' "$R" \
+  && ok "form: account written (address lowercased, user from address, name), Claws started" || no "form account: $(cat "$R" 2>/dev/null | head -5)"
+grep -qx 'receive_server=127.0.0.1' "$R" && grep -qx 'pop_port=7660' "$R" && grep -qx 'smtp_port=7659' "$R" && grep -qx 'use_smtp_auth=1' "$R" \
+  && grep -qx 'generate_xmailer=0' "$R" && grep -qx 'set_domain=1' "$R" && grep -qx 'domain=mail.i2p' "$R" \
+  && ok "form: I2P servers, SMTP auth, no X-Mailer, domain mail.i2p from the first session" || no "form account settings"
+! grep -q '^#\|^password=\|^smtp_password=\|@ADDRESS@\|@USER@' "$R" && [ "$(stat -c %a "$R")" = 600 ] \
+  && ok "form: no comments, placeholders or password lines; mode 600" || no "form account file"
+fs ZA1='\nbob'; grep -qx 'address=bob@mail.i2p' "$R" && ! grep -q '^name=' "$R" && ok "form: empty name gives no name line; @mail.i2p added" || no "empty name/short address"
+fs ZA1='x\nbob@example.org' ZA2='x\nb\$(id)@mail.i2p' ZA3='x\nbob@mail.i2p'
+[ "$(cat "$W/zn")" = 3 ] && grep -qx 'address=bob@mail.i2p' "$R" && ok "form: other domains and shell syntax refused, asked again" || no "address validation (asked $(cat "$W/zn"))"
+fs ZA1='a\nb\nc@mail.i2p' ZA2='ok\nc@mail.i2p'; [ "$(cat "$W/zn")" = 2 ] && [ "$(grep -c '^name=' "$R")" = 1 ] && grep -qx 'name=ok' "$R" \
+  && ok "form: an extra line (injection) is refused" || no "line injection"
+fs ZA1=CANCEL; [ ! -e "$R" ] && [ ! -f "$W/h/argv" ] && ok "form cancelled: no account, Mail not started" || no "cancel"
 
 # the gpg side: the parameters Claws builds (sgpgme.c), empty name vs. the address it falls back to
 if command -v gpg >/dev/null; then

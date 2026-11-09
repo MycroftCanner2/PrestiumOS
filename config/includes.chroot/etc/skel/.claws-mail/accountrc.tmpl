@@ -1,10 +1,11 @@
-# Prestium: "Mail (I2P)" - Claws Mail first-run wizard defaults.
-# There is no preset account: on first start Claws opens its wizard with I2P mail (postman,
-# hq.postman.i2p) filled in, reached through the i2pd client tunnels on 127.0.0.1:
-# SMTP 7659 -> smtp.postman.i2p, POP3 7660 -> pop.postman.i2p. The tunnels already encrypt
-# end to end, so no SSL/TLS. The user enters their name, their @mail.i2p address and the
-# postman password; the user name follows the address and SMTP uses the same login.
-# Claws has no port keys here: a port is given as server:port.
+# Prestium: "Mail (I2P)" - Claws Mail wizard defaults, used only as a fallback.
+# Normally claws-mail-i2p asks for the name and @mail.i2p address on first start and writes the
+# account itself (with no X-Mailer and mail.i2p as the domain, which the wizard can't set), so Claws'
+# wizard never runs. If it does (the form could not be shown), these fill in I2P mail (postman,
+# hq.postman.i2p) through the i2pd tunnels on 127.0.0.1: SMTP 7659 -> smtp.postman.i2p, POP3 7660 ->
+# pop.postman.i2p, no SSL/TLS (the tunnel encrypts); claws-mail-i2p applies the privacy settings from
+# the next start. Claws has no port keys here: a port is given as server:port. mailbox=Mail matches the
+# shipped folder list (~/Mail) and the AppArmor profile.
 [AccountTemplate]
 domain=mail.i2p
 name=
@@ -20,4 +21,4 @@ recvserver=127.0.0.1:7660
 recvuser=
 recvpass=
 recvssl=0
-mailbox=Mailbox
+mailbox=Mail
