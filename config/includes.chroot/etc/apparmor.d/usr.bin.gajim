@@ -1,0 +1,49 @@
+# Prestium 2.0 r9: Gajim (XMPP over Tor/I2P proxies), ENFORCED.
+# Gajim may use its own config, data and cache directories and ~/Downloads (file transfers).
+# It can't run sudo or Prestium's helpers, read other apps' data, or open the system bus.
+# Links open in Tor Browser (its own sandbox); other programs can't be started from Gajim.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile gajim /usr/bin/gajim {
+  include <abstractions/prestium-app-base>
+  include <abstractions/python>
+  include if exists <abstractions/enchant>
+  include if exists <abstractions/aspell>
+  include <abstractions/nameservice>
+
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  network netlink raw,
+
+  /usr/bin/gajim r,
+  /usr/bin/python3* ix,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.*/** mr,
+  /usr/local/lib/python3*/** r,
+  /usr/lib/@{multiarch}/gstreamer-1.0/gst-plugin-scanner ix,
+  /usr/libexec/gstreamer-1.0/gst-plugin-scanner ix,
+
+  owner @{HOME}/.config/gajim/ rw,
+  owner @{HOME}/.config/gajim/** rwk,
+  owner @{HOME}/.local/share/gajim/ rw,
+  owner @{HOME}/.local/share/gajim/** rwk,
+  owner @{HOME}/.cache/gajim/ rw,
+  owner @{HOME}/.cache/gajim/** rwk,
+  owner @{HOME}/.cache/gstreamer-1.0/** rwk,
+  # 2.0 r20: Gajim 2.x starts a multiprocessing pool at start. Python's SemLock uses POSIX semaphores;
+  # glibc's sem_open writes /dev/shm/sem.XXXXXX and then link()s it to its name, which needs "l".
+  # Without it Gajim exits with PermissionError (Errno 13) in multiprocessing/synchronize.py.
+  owner /dev/shm/sem.* rwkl,
+  owner @{HOME}/Downloads/ r,
+  owner @{HOME}/Downloads/** rwk,
+
+  # links: Tor Browser, which runs in its own sandbox
+  /usr/bin/xdg-open ix,
+  /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut} ix,
+  /usr/local/bin/tor-browser Ux,
+
+  include if exists <local/usr.bin.gajim>
+}

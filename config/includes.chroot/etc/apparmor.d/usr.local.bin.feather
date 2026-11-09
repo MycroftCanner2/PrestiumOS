@@ -1,0 +1,32 @@
+# Prestium 2.0 r9: Feather (Monero wallet, I2P-only settings), ENFORCED.
+# Feather may use its own settings and wallet directories. No other files in $HOME, no sudo, no
+# Prestium helpers, no Tor control socket, no system bus. Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile feather /usr/local/bin/feather {
+  include <abstractions/prestium-app-base>
+  include <abstractions/nameservice>
+
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  network netlink raw,
+
+  /usr/local/bin/feather mr,
+  # some Feather builds unpack their Qt runtime to a temporary directory
+  owner /tmp/** mrwk,
+
+  owner @{HOME}/.config/feather/ rw,
+  owner @{HOME}/.config/feather/** rwk,
+  owner @{HOME}/.local/share/feather/ rw,
+  owner @{HOME}/.local/share/feather/** rwk,
+  owner @{HOME}/.cache/feather/** rwk,
+  owner @{HOME}/Monero/ rw,
+  owner @{HOME}/Monero/** rwk,
+  owner @{HOME}/Documents/ r,
+  owner @{HOME}/Documents/Feather/ rw,
+  owner @{HOME}/Documents/Feather/** rwk,
+
+  include if exists <local/usr.local.bin.feather>
+}

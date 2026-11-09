@@ -1,0 +1,2 @@
+# signed-by: live-build installs prestium-i2pd.key.chroot (binary) as /etc/apt/trusted.gpg.d/<name>.gpg
+deb [signed-by=/etc/apt/trusted.gpg.d/prestium-i2pd.key.chroot.gpg] https://repo.i2pd.xyz/debian trixie main

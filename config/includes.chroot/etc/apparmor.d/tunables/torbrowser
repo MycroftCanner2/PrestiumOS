@@ -1,0 +1,4 @@
+# Prestium 1.9.1: Tor Browser is installed read-only in /opt/tor-browser
+@{torbrowser_installation_dir}=/opt/tor-browser
+@{torbrowser_home_dir}=/opt/tor-browser/Browser
+@{torbrowser_user_dir}=@{HOME}/.tor-browser

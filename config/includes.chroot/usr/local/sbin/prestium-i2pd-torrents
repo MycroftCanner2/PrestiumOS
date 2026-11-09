@@ -1,0 +1,78 @@
+#!/bin/sh
+# Prestium: set up i2pd's built-in torrent client (i2pd 3.0) each boot (ExecStartPre=+, as root).
+# - downloads go to /home/user/Downloads/Torrents (shared with "user" through
+#   the i2ptorrents group)
+# - the RPC/web page sits on 127.0.0.1 behind a random per-boot path, because
+#   i2pd answers RPC with "Access-Control-Allow-Origin: *": without the secret
+#   path any web page could add or delete torrents.
+# 2.0 r4 (security audit): root never creates, chowns or chmods anything under /home/user by path
+# any more (a ~/Downloads symlink made root re-own its target: user -> root). The user's folders
+# are created as the user (runuser; user is in i2ptorrents, so it can set that group and the
+# setgid bit itself), and a symlink or non-directory is refused. /var/lib/i2pd belongs to i2pd,
+# so tunnels.conf.d is root:i2pd 0750 and written only through file descriptors
+# (/usr/local/lib/prestium/safefile: O_NOFOLLOW, temp file + rename), never by path.
+# A refusal skips the torrent client (no torrents.conf) but lets i2pd itself start.
+# 2.0 r6: after the real Torrents directory exists, bind-mount it onto itself so the live user
+# cannot replace it with a symlink for the rest of the boot (confused-deputy into /var/lib/i2pd).
+# Status is published under /run/prestium-torrents/status: ready | disabled:<reason>.
+set -e
+D=/home/user/Downloads/Torrents
+SAFE=/usr/local/lib/prestium/safefile
+TD=/var/lib/i2pd/tunnels.conf.d
+RUN=/run/prestium-torrents
+
+# tunnels.conf.d: a real directory, root:i2pd 0750 (refuses a planted symlink)
+$SAFE mkdir /var/lib/i2pd tunnels.conf.d 0 i2pd 0750
+
+status() {
+  install -d -o root -g user -m 0750 "$RUN"
+  printf '%s\n' "$1" | $SAFE write "$RUN" status 0 user 0640 --dir-owner 0
+}
+
+skip() {
+  echo "prestium-i2pd-torrents: $1; I2P Torrents is disabled until this is fixed and I2P restarted" >&2
+  rm -f "$TD/torrents.conf" 2>/dev/null || true
+  rm -f "$RUN/url" 2>/dev/null || true
+  # drop bind mount if we had one from a previous start
+  if mountpoint -q "$D" 2>/dev/null; then umount "$D" 2>/dev/null || true; fi
+  status "disabled:$1"
+  exit 0
+}
+
+# /home/user cannot be replaced by user (/home is root's); still refuse anything unexpected.
+# Debian 13 creates homes 0700 (1.8/Debian 12: 0755); i2pd must be able to traverse /home/user to
+# reach the torrent dir. 1.9.1: search permission for group i2ptorrents (user, i2pd) only.
+[ -d /home/user ] && [ ! -L /home/user ] || skip "/home/user is not a real directory"
+chgrp -h i2ptorrents /home/user
+chmod 0710 /home/user
+
+for p in /home/user/Downloads "$D"; do
+  if [ -L "$p" ]; then skip "refusing symlink $p"; fi
+  if [ -e "$p" ] && [ ! -d "$p" ]; then skip "refusing $p: not a directory"; fi
+done
+runuser -u user -- install -d -m 0755 /home/user/Downloads || skip "cannot create /home/user/Downloads"
+runuser -u user -- install -d -g i2ptorrents -m 2770 "$D" || skip "cannot create $D"
+# Refuse a race that swapped in a symlink between create and bind.
+[ -d "$D" ] && [ ! -L "$D" ] || skip "refusing $D after create: not a real directory"
+if ! mountpoint -q "$D" 2>/dev/null; then
+  mount --bind "$D" "$D" || skip "cannot bind-mount $D"
+  mount --make-private "$D" 2>/dev/null || true
+fi
+# Mounted: still must be a directory (not a symlink covering the mount).
+[ -d "$D" ] || skip "Torrents mount is not a directory"
+
+TOKEN=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+$SAFE write "$TD" torrents.conf 0 i2pd 0640 --dir-owner 0 <<CONF
+[Torrents]
+type = torrents
+torrentsdir = $D
+keys = transient-torrents
+dht = true
+web = true
+rpcaddress = 127.0.0.1
+rpcport = 7685
+rpcpath = $TOKEN
+CONF
+install -d -o root -g user -m 0750 "$RUN"
+printf 'http://127.0.0.1:7685/%s/\n' "$TOKEN" | $SAFE write "$RUN" url 0 user 0640 --dir-owner 0
+status "ready"

@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Packages for The Lounge (Prestium). No network installs: this list is local only.",
+  "dependencies": {
+    "thelounge-prestium-autologin": "1.0.0"
+  }
+}

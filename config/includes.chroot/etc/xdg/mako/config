@@ -1,0 +1,11 @@
+# Prestium 2.0 r10: notifications (mako, replaces notification-daemon)
+anchor=top-right
+default-timeout=8000
+background-color=#202020
+text-color=#ffffff
+border-color=#606060
+border-size=1
+max-visible=5
+[urgency=critical]
+default-timeout=0
+border-color=#ff4444

@@ -1,0 +1,24 @@
+#!/usr/bin/python3 -I
+"""Prestium 2.0 r11: ask the Wayland broker (root) for something that needs the compositor's full
+socket: start | panel | menu | lock | osk | display-settings | scale | screenshot | screenshot-area |
+status. The caller never gets that socket; see /usr/local/sbin/prestium-wl-broker."""
+import os, socket, sys
+OK = ("start", "panel", "menu", "lock", "osk", "display-settings", "scale", "screenshot", "screenshot-area", "status")
+if len(sys.argv) != 2 or sys.argv[1] not in OK:
+    print("usage: prestium-wl " + "|".join(OK), file=sys.stderr); sys.exit(2)
+s = socket.socket(socket.AF_UNIX)
+try:
+    s.connect(os.path.join(os.environ.get("PRESTIUM_WL_BASE", "/run/prestium-wl"), "broker"))
+except OSError as e:
+    print("prestium-wl: the Wayland broker is not running (%s)" % e, file=sys.stderr); sys.exit(1)
+s.sendall(sys.argv[1].encode() + b"\n")
+s.settimeout(None if sys.argv[1].startswith("screenshot") else 60)
+reply = b""
+while not reply.endswith(b"\n"):
+    d = s.recv(4096)
+    if not d:
+        break
+    reply += d
+reply = reply.decode(errors="replace").strip()
+print(reply)
+sys.exit(0 if reply.startswith(("ok", "session", "none")) else 1)

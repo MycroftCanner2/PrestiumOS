@@ -1,0 +1,38 @@
+# Prestium 2.0 r9: LibreOffice, ENFORCED, with no network at all (documents are a common exploit
+# vector, and an office suite doesn't need to go online here). It may open and save documents in
+# the usual user folders and its own profile. No sudo, no Prestium helpers, no system bus.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
+  include <abstractions/prestium-app-base>
+  include if exists <abstractions/enchant>
+  include if exists <abstractions/aspell>
+  include <abstractions/cups-client>
+
+  network unix stream,
+  network unix dgram,
+  deny network inet,
+  deny network inet6,
+
+  /usr/lib/libreoffice/** mr,
+  /usr/lib/libreoffice/program/{oosplash,soffice.bin,soffice,xpdfimport,gengal.bin,ui-previewer} ix,
+  /{,usr/}bin/{sh,dash,bash,uname,sed,grep,dirname,basename,readlink,ls,cat} ix,
+  /etc/libreoffice/** r,
+  /var/lib/libreoffice/** r,
+  /etc/papersize r,
+
+  owner @{HOME}/.config/libreoffice/ rw,
+  owner @{HOME}/.config/libreoffice/** rwk,
+  owner @{HOME}/.cache/libreoffice/** rwk,
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/ r,
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/** rwk,
+  # unlocked VeraCrypt/LUKS volumes
+  /media/** rwk,
+
+  # no Java, no macros helpers outside the suite, no other programs
+  deny /usr/lib/jvm/** x,
+
+  include if exists <local/usr.lib.libreoffice.program>
+}

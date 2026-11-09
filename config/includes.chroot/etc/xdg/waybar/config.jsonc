@@ -1,0 +1,54 @@
+// Prestium 2.0 r10: panel (replaces tint2): windows, tray, volume, battery, clock.
+// Menu: the "Menu" button at the left, right-click the desktop, or Super+Space.
+// The button asks the Wayland broker (prestium-wl menu) to press Super+Space, which labwc answers
+// with its root menu at the pointer; labwc has no command to open a menu directly.
+{
+  "layer": "top",
+  "position": "bottom",
+  "height": 30,
+  "spacing": 6,
+  "modules-left": ["custom/menu", "wlr/taskbar"],
+  "modules-center": [],
+  "modules-right": ["tray", "pulseaudio", "battery", "clock"],
+  "custom/menu": {
+    "format": "\u2630  Menu",
+    "tooltip-format": "Applications and settings (Super+Space)",
+    // 2.0 r20: waybar's children only get the restricted Wayland socket, where labwc offers no
+    // virtual keyboard, so wtype run from here did nothing. The broker presses Super+Space on a
+    // full-socket connection instead. The short wait lets the click finish first (labwc closes a
+    // menu on a button release outside it).
+    "on-click": "sleep 0.3; exec /usr/local/bin/prestium-wl menu",
+    "on-click-right": "sleep 0.3; exec /usr/local/bin/prestium-wl menu"
+  },
+  "wlr/taskbar": {
+    // 2.0 r20: icons only, so many open windows no longer push the tray, volume and clock off screen.
+    // The title shows on hover; Alt+Tab lists every window with its title.
+    "format": "{icon}",
+    "icon-size": 20,
+    "tooltip-format": "{title}",
+    "on-click": "activate",
+    "on-click-middle": "close",
+    "ignore-list": ["wvkbd"]
+  },
+  "tray": { "icon-size": 18, "spacing": 8 },
+  "pulseaudio": {
+    "format": "Vol {volume}%",
+    "format-muted": "Muted",
+    "scroll-step": 5,
+    "max-volume": 150,
+    "on-click": "prestium-run pavucontrol",
+    "on-click-right": "/usr/local/bin/prestium-media-key mute"
+  },
+  "battery": {
+    "states": { "warning": 20, "critical": 10 },
+    "format": "Bat {capacity}%",
+    "format-charging": "Bat {capacity}% +",
+    "format-plugged": "AC {capacity}%",
+    "tooltip-format": "{timeTo}"
+  },
+  "clock": {
+    "format": "{:%H:%M}",
+    "tooltip-format": "{:%A %Y-%m-%d}  (UTC; Prestium keeps the clock in UTC)",
+    "timezone": "Etc/UTC"
+  }
+}

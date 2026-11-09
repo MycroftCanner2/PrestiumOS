@@ -1,0 +1,2 @@
+# signed-by: live-build installs prestium-librewolf.key.chroot (binary) as /etc/apt/trusted.gpg.d/<name>.gpg
+deb [signed-by=/etc/apt/trusted.gpg.d/prestium-librewolf.key.chroot.gpg] https://repo.librewolf.net librewolf main

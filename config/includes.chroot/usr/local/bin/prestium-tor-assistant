@@ -1,0 +1,667 @@
+#!/usr/bin/python3
+# Prestium 2.0: Tor Connection Assistant.
+# Shows Tor's bootstrap progress (one persistent, read-only connection through the onion-grater
+# control-port filter, refreshed every second, plus Tor's NOTICE/WARN events in "Details") and lets
+# the user pick how Tor connects: Direct (default at boot), Snowflake, WebTunnel, obfs4 or meek.
+# Opening the assistant never stops or restarts Tor. "Apply and connect" runs the root helper
+# /usr/local/sbin/prestium-tor-mode (sudo, validated input), which stops Tor, resolves the host names
+# the transport needs (DNS-over-HTTPS through the I2P outproxy, parallel, cached), writes the
+# configuration and starts Tor again, so the progress bar runs from 0 %. "Cancel" aborts at any
+# point: the previous configuration is put back and Tor stays stopped (Retry / Revert offered).
+# Choices are remembered in ~/.config/prestium/tor-assistant.json; the mode shown on start is the
+# one in Tor's active drop-in (/etc/tor/torrc.d/50-prestium-assistant.conf).
+import json, os, re, socket, subprocess, sys, threading, time
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk, GLib, Gio, Pango
+
+APP_ID = "org.prestium.TorConnectionAssistant"
+CONTROL = "/run/onion-grater/control"
+HELPER = ["/usr/bin/sudo", "-n", "/usr/local/sbin/prestium-tor-mode"]
+DROPIN = "/etc/tor/torrc.d/50-prestium-assistant.conf"
+STATE = "/run/prestium/tor-mode.json"
+BUILTIN = "/usr/share/prestium/tor-bridges-builtin.json"
+CONF = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"),
+                    "prestium", "tor-assistant.json")
+
+MODES = [
+    ("direct", "Direct connection (default)",
+     "Connect to the Tor network directly. Works on most networks."),
+    ("snowflake", "Snowflake",
+     "Looks like a video call (WebRTC) to volunteer proxies. Good when Tor is blocked. Uses the "
+     "built-in Snowflake bridges from Tor Browser; their front and STUN host names are resolved "
+     "through the I2P outproxy (DNS-over-HTTPS)."),
+    ("webtunnel", "WebTunnel bridges",
+     "Looks like ordinary HTTPS to a web site. Paste WebTunnel bridge lines below (from "
+     "bridges.torproject.org or the Tor Project's Telegram bot). The bridge host names are resolved "
+     "through the I2P outproxy."),
+    ("obfs4", "obfs4 bridges",
+     "Obfuscated bridges. Use the built-in ones and/or paste your own bridge lines below."),
+    ("meek", "meek (Azure/CDN)",
+     "Slow but hard to block: traffic goes through a CDN. Uses Tor Browser's built-in meek bridge."),
+]
+TITLES = dict((k, t) for k, t, _ in MODES)
+INFO_MAX = 600          # characters of a message shown in the window; the full text goes to Details
+
+def wrap_label(lines=0, selectable=False):
+    """A label that wraps anywhere (long bridge lines / host names have no spaces), never asks for
+    more than ~60 characters of width, and with lines > 0 is cut to that many lines (full text in
+    the tooltip), so no text can make the window wider or taller."""
+    l = Gtk.Label(xalign=0)
+    l.set_line_wrap(True); l.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+    l.set_width_chars(10); l.set_max_width_chars(60)
+    if lines:
+        l.set_lines(lines); l.set_ellipsize(Pango.EllipsizeMode.END)
+    if selectable:
+        l.set_selectable(True)
+    return l
+
+def workarea(win=None):
+    """Usable area of the window's monitor (or the primary one): without the taskbar (tint2 reserves
+    its strut, so the work area excludes it; if a WM reports none, 30 px are kept free anyway)."""
+    disp = Gdk.Display.get_default()
+    mon = None
+    if win is not None and win.get_window() is not None:
+        mon = disp.get_monitor_at_window(win.get_window())
+    mon = mon or disp.get_primary_monitor() or disp.get_monitor(0)
+    if mon is None:
+        return 1024, 738
+    wa, geo = mon.get_workarea(), mon.get_geometry()
+    h = wa.height - (30 if wa.height >= geo.height else 0)
+    return wa.width, h
+
+FP = r"[0-9A-Fa-f]{40}"
+ADDR = r"(?:\d{1,3}(?:\.\d{1,3}){3}|\[[0-9a-fA-F:]+\]):\d{1,5}"
+KV = r"(?:[A-Za-z0-9_-]{1,32}=[A-Za-z0-9+/=:.,_~%@\[\]-]{0,2000})"
+PATTERNS = {
+    "obfs4": re.compile(r"^obfs4 %s %s(?: %s)+$" % (ADDR, FP, KV)),
+    "webtunnel": re.compile(r"^webtunnel %s %s(?: %s)+$" % (ADDR, FP, KV)),
+    "snowflake": re.compile(r"^snowflake %s %s(?: %s)+$" % (ADDR, FP, KV)),
+    "meek": re.compile(r"^meek_lite %s(?: %s)?(?: %s)+$" % (ADDR, FP, KV)),
+}
+EXAMPLES = {
+    "obfs4": "obfs4 1.2.3.4:443 FINGERPRINT cert=... iat-mode=0",
+    "webtunnel": "webtunnel [2001:db8::1]:443 FINGERPRINT url=https://example.org/path ver=0.0.1",
+    "snowflake": "(optional) snowflake 192.0.2.3:80 FINGERPRINT fingerprint=... url=... fronts=... ice=...",
+    "meek": "(optional) meek_lite 192.0.2.20:80 url=https://... front=...",
+}
+
+def user_lines(text):
+    ls = [l.strip() for l in text.splitlines() if l.strip() and not l.strip().startswith("#")]
+    return [re.sub(r"^Bridge\s+", "", l) for l in ls]
+
+def validate(mode, text):
+    """Return a list of human-readable problems (empty = fine)."""
+    if mode == "direct":
+        return []
+    bad = []
+    for i, l in enumerate(user_lines(text), 1):
+        if not PATTERNS[mode].match(l):
+            bad.append("line %d is not a valid %s bridge line" % (i, mode))
+        elif mode == "webtunnel" and not re.search(r"(?:^| )url=https?://[A-Za-z0-9.-]+", l):
+            bad.append("line %d has no url=https://... (needed by WebTunnel)" % i)
+    return bad
+
+def read_dropin():
+    """(mode, [bridge lines]) from Tor's active drop-in."""
+    mode, lines = "direct", []
+    try:
+        for l in open(DROPIN):
+            m = re.search(r"Mode:\s*(\w+)", l)
+            if m and l.startswith("#"):
+                mode = m.group(1)
+            if l.startswith("Bridge "):
+                lines.append(l[7:].strip())
+    except OSError:
+        pass
+    return (mode if mode in TITLES else "direct"), lines
+
+def read_json(path, default):
+    try:
+        with open(path) as f:
+            return json.load(f)
+    except Exception:
+        return default
+
+class ControlMonitor(threading.Thread):
+    """One persistent connection to the onion-grater filter: GETINFO every second, async events."""
+    def __init__(self, cb_status, cb_log):
+        super().__init__(daemon=True)
+        self.cb_status, self.cb_log = cb_status, cb_log
+        self.stop = threading.Event()
+
+    def unit_state(self):
+        try:
+            r = subprocess.run(["/usr/bin/systemctl", "is-active", "tor@default.service"],
+                               capture_output=True, text=True, timeout=3)
+            return r.stdout.strip() or "unknown"
+        except Exception:
+            return "unknown"
+
+    def run(self):
+        while not self.stop.is_set():
+            st = self.unit_state()
+            if st not in ("active", "reloading"):
+                GLib.idle_add(self.cb_status, None, {"inactive": "Tor is stopped", "failed": "Tor failed to start",
+                                                     "activating": "Tor is starting ...",
+                                                     "deactivating": "Tor is stopping ..."}.get(st, "Tor: " + st), False)
+                self.stop.wait(1.0); continue
+            try:
+                self.session()
+            except Exception as e:
+                GLib.idle_add(self.cb_status, None, "Tor is starting (control port: %s) ..." % e.__class__.__name__, False)
+            self.stop.wait(1.0)
+
+    def session(self):
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        s.settimeout(5)
+        s.connect(CONTROL)
+        f = s.makefile("rwb", buffering=0)
+        def send(c):
+            f.write((c + "\r\n").encode())
+        send("AUTHENTICATE")
+        l = f.readline().decode(errors="replace")
+        if not l.startswith("250"):
+            raise ConnectionError(l.strip()[:60])
+        send("SETEVENTS STATUS_CLIENT NOTICE WARN ERR")
+        s.settimeout(0.5)
+        buf, info, last = b"", {}, 0.0
+        while not self.stop.is_set():
+            now = time.monotonic()
+            if now - last >= 1.0:
+                send("GETINFO status/bootstrap-phase status/circuit-established")
+                last = now
+            try:
+                chunk = s.recv(65536)
+                if not chunk:
+                    raise ConnectionError("closed")
+                buf += chunk
+            except socket.timeout:
+                pass
+            while b"\r\n" in buf:
+                raw, buf = buf.split(b"\r\n", 1)
+                line = raw.decode(errors="replace")
+                if line.startswith("650"):
+                    body = line[4:]
+                    if body.startswith(("NOTICE", "WARN", "ERR")):
+                        GLib.idle_add(self.cb_log, "tor " + body)
+                elif line.startswith("250-status/bootstrap-phase="):
+                    info["phase"] = line.split("=", 1)[1]
+                elif line.startswith("250-status/circuit-established="):
+                    info["circ"] = line.endswith("=1")
+                elif line.startswith("250 OK") and "phase" in info:
+                    phase = info.pop("phase"); circ = info.pop("circ", False)
+                    m = re.search(r"PROGRESS=(\d+)", phase)
+                    summ = re.search(r'SUMMARY="([^"]*)"', phase)
+                    warn = re.search(r'WARNING="([^"]*)"', phase)
+                    pct = int(m.group(1)) if m else 0
+                    text = summ.group(1) if summ else "Starting"
+                    if warn and pct < 100:
+                        text += " (%s)" % warn.group(1)
+                    GLib.idle_add(self.cb_status, pct, text, circ)
+                elif line.startswith(("5", "4")):
+                    raise ConnectionError(line[:60])
+
+class Assistant(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Tor Connection Assistant")
+        # never larger than the screen minus the taskbar and the title bar (fits 1024x768 and 1366x768);
+        # content that does not fit scrolls instead of growing the window
+        ww, wh = workarea()
+        self.set_default_size(min(620, ww - 16), min(640, wh - 40))
+        self.connect("realize", lambda *_: self.fit_screen())
+        self.get_screen().connect("monitors-changed", lambda *_: self.fit_screen())
+        self.set_border_width(12)
+        self.phase = "idle"            # idle | applying | connecting | cancelling
+        self.last_request = None
+        self.texts = {}
+        self.cur_mode = None
+        self.helper_proc = None
+        self.conf = read_json(CONF, {})
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.add(outer)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_propagate_natural_height(True)
+        outer.pack_start(scroll, True, True, 0)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        scroll.add(box)
+
+        frame = Gtk.Frame(label=" Tor status ")
+        fb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6); fb.set_border_width(8)
+        self.progress = Gtk.ProgressBar(show_text=True)
+        self.status = wrap_label(lines=3, selectable=True)
+        self.mode_label = wrap_label(lines=4)
+        fb.pack_start(self.progress, False, False, 0)
+        fb.pack_start(self.status, False, False, 0)
+        fb.pack_start(self.mode_label, False, False, 0)
+        frame.add(fb); box.pack_start(frame, False, False, 0)
+
+        # messages and errors: a read-only text area of a fixed height (4 lines, scrolls), so a long
+        # error never resizes the window; long details are in "Details (log)"
+        self.info = Gtk.InfoBar(); self.info.set_no_show_all(True)
+        self.info_view = Gtk.TextView(); self.info_view.set_editable(False); self.info_view.set_cursor_visible(False)
+        self.info_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        lh = self.info_view.create_pango_layout("Ag").get_pixel_size()[1] or 17
+        isw = Gtk.ScrolledWindow(); isw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        isw.set_shadow_type(Gtk.ShadowType.IN)
+        isw.set_size_request(-1, 4 * lh + 8); isw.set_propagate_natural_height(False)
+        isw.add(self.info_view); isw.show_all()
+        self.info.get_content_area().pack_start(isw, True, True, 0)
+        self.retry_btn = self.info.add_button("Retry", 1)
+        self.revert_btn = self.info.add_button("Revert to previous", 2)
+        self.info.add_button("Dismiss", 3)
+        self.info.connect("response", self.on_info)
+        box.pack_start(self.info, False, False, 0)
+
+        frame2 = Gtk.Frame(label=" How to connect ")
+        mb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4); mb.set_border_width(8)
+        self.radios = {}
+        group = None
+        for key, title, help_ in MODES:
+            rb = Gtk.RadioButton.new_with_label_from_widget(group, title)
+            group = group or rb
+            rb.set_tooltip_text(help_)
+            self.radios[key] = rb
+            mb.pack_start(rb, False, False, 0)
+        self.help = wrap_label()
+        mb.pack_start(self.help, False, False, 4)
+        self.builtin = Gtk.CheckButton(label="Also use Prestium's built-in bridges (from Tor Browser 16)")
+        self.builtin.set_active(True)
+        mb.pack_start(self.builtin, False, False, 0)
+        self.lines_label = wrap_label(lines=2)
+        mb.pack_start(self.lines_label, False, False, 0)
+        sw = Gtk.ScrolledWindow(); sw.set_min_content_height(100)
+        self.text = Gtk.TextView(); self.text.set_wrap_mode(Gtk.WrapMode.CHAR); self.text.set_monospace(True)
+        self.text.get_buffer().connect("changed", self.on_text_changed)
+        sw.add(self.text); mb.pack_start(sw, True, True, 0)
+        self.valid = wrap_label(lines=2)
+        mb.pack_start(self.valid, False, False, 0)
+        frame2.add(mb); box.pack_start(frame2, True, True, 0)
+        self.builtin.get_child().set_line_wrap(True)
+
+        self.details = Gtk.Expander(label="Details (log)")
+        lsw = Gtk.ScrolledWindow(); lsw.set_min_content_height(130)
+        self.log_view = Gtk.TextView(); self.log_view.set_editable(False); self.log_view.set_monospace(True)
+        self.log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        lsw.add(self.log_view); self.details.add(lsw)
+        box.pack_start(self.details, False, False, 0)
+
+        bb = Gtk.Box(spacing=6)
+        self.apply_btn = Gtk.Button(label="Apply and connect"); self.apply_btn.connect("clicked", self.on_apply)
+        self.cancel_btn = Gtk.Button(label="Cancel"); self.cancel_btn.connect("clicked", self.on_cancel)
+        self.reconnect_btn = Gtk.Button(label="Reconnect"); self.reconnect_btn.connect("clicked", self.on_reconnect)
+        self.reconnect_btn.set_tooltip_text("Restart Tor with the current settings (new connections)")
+        close = Gtk.Button(label="Close"); close.connect("clicked", lambda *_: self.close())
+        bb.pack_start(self.apply_btn, False, False, 0)
+        bb.pack_start(self.cancel_btn, False, False, 0)
+        bb.pack_start(self.reconnect_btn, False, False, 0)
+        bb.pack_end(close, False, False, 0)
+        outer.pack_start(bb, False, False, 0)
+
+        self.connect("delete-event", self.on_delete)
+        self.load_state()
+        for rb in self.radios.values():
+            rb.connect("toggled", self.on_mode)
+        self.on_mode(None)
+        self.set_phase("idle")
+        self.monitor = ControlMonitor(self.show_status, self.log)
+        self.monitor.start()
+
+    def fit_screen(self):
+        ww, wh = workarea(self)
+        g = Gdk.Geometry(); g.max_width = max(320, ww - 16); g.max_height = max(240, wh - 40)
+        self.set_geometry_hints(None, g, Gdk.WindowHints.MAX_SIZE)
+        w, h = self.get_size()
+        if w > g.max_width or h > g.max_height:
+            self.resize(min(w, g.max_width), min(h, g.max_height))
+
+    # ------------------------------------------------------------- state
+    def load_state(self):
+        mode, lines = read_dropin()
+        st = read_json(STATE, {})
+        bset = set()
+        for v in read_json(BUILTIN, {}).values():
+            if isinstance(v, list): bset |= set(v)
+        self.texts = dict(self.conf.get("bridges") or {})
+        own = [l for l in lines if l not in bset]
+        if own and not self.texts.get(mode, "").strip():
+            self.texts[mode] = "\n".join(own) + "\n"
+        builtin = st.get("builtin", self.conf.get("builtin", True))
+        if mode != "direct" and lines:
+            builtin = any(l in bset for l in lines) or builtin
+        self.builtin.set_active(bool(builtin))
+        self.radios[mode].set_active(True)
+        self.cur_mode = mode
+        self.text.get_buffer().set_text(self.texts.get(mode, ""))
+        self.describe(dict(st, mode=mode, bridges=len(lines)))
+        if self.conf.get("mode") and self.conf["mode"] != mode:
+            self.log("last time you chose %s; Tor is currently set to %s" % (self.conf["mode"], mode))
+
+    def save_conf(self):
+        self.texts[self.selected()] = self.get_text()
+        self.conf.update({"mode": self.selected(), "builtin": self.builtin.get_active(),
+                          "bridges": {k: v for k, v in self.texts.items() if v.strip()}})
+        try:
+            os.makedirs(os.path.dirname(CONF), exist_ok=True)
+            tmp = CONF + ".tmp"
+            with open(tmp, "w") as f:
+                json.dump(self.conf, f, indent=1)
+            os.chmod(tmp, 0o600); os.replace(tmp, CONF)
+        except OSError as e:
+            self.log("could not save settings: %s" % e)
+
+    def describe(self, st):
+        mode = st.get("mode", "direct")
+        txt = "Current setting: %s" % TITLES.get(mode, mode)
+        if mode != "direct":
+            n = st.get("bridges", 0)
+            txt += " (%d bridge line%s)" % (n, "" if n == 1 else "s")
+        pins = st.get("pinned") or {}
+        if pins and mode != "direct":
+            txt += "\nResolved through the I2P outproxy: %d host name%s" % (len(pins), "" if len(pins) == 1 else "s")
+        if st.get("dns_errors"):
+            txt += "\nNot resolved (optional): " + ", ".join(sorted(st["dns_errors"]))[:300]
+        self.mode_label.set_text(txt)
+
+    def selected(self):
+        return next(k for k, rb in self.radios.items() if rb.get_active())
+
+    def get_text(self):
+        b = self.text.get_buffer()
+        return b.get_text(b.get_start_iter(), b.get_end_iter(), False)
+
+    # ------------------------------------------------------------- UI events
+    def on_mode(self, w):
+        if w is not None and not w.get_active():
+            return
+        m = self.selected()
+        if self.cur_mode and self.cur_mode != m:
+            self.texts[self.cur_mode] = self.get_text()
+            self.text.get_buffer().set_text(self.texts.get(m, ""))
+        self.cur_mode = m
+        self.help.set_text(dict((k, h) for k, _, h in MODES)[m])
+        self.builtin.set_sensitive(m in ("obfs4", "snowflake", "meek") and self.phase == "idle")
+        self.text.set_sensitive(m != "direct" and self.phase == "idle")
+        self.lines_label.set_text("" if m == "direct" else "Bridge lines, one per line, e.g. " + EXAMPLES[m])
+        self.on_text_changed(None)
+
+    def on_text_changed(self, _b):
+        m = self.selected()
+        bad = validate(m, self.get_text())
+        self.valid.set_tooltip_text(None)
+        if m == "webtunnel" and not user_lines(self.get_text()):
+            self.valid.set_markup("<i>WebTunnel needs at least one bridge line.</i>")
+        elif bad:
+            self.valid.set_markup('<span foreground="#c01c28">%s</span>' % GLib.markup_escape_text("; ".join(bad[:4])))
+            self.valid.set_tooltip_text("\n".join(bad))
+        elif m != "direct" and user_lines(self.get_text()):
+            n = len(user_lines(self.get_text()))
+            self.valid.set_text("%d bridge line%s look valid." % (n, "" if n == 1 else "s"))
+        else:
+            self.valid.set_text("")
+        self.update_buttons()
+
+    def can_apply(self):
+        m = self.selected()
+        t = self.get_text()
+        if validate(m, t):
+            return False
+        if m == "webtunnel" and not user_lines(t):
+            return False
+        if m == "obfs4" and not user_lines(t) and not self.builtin.get_active():
+            return False
+        return True
+
+    def set_phase(self, p):
+        self.phase = p
+        idle = p == "idle"
+        for rb in self.radios.values():
+            rb.set_sensitive(idle)
+        m = self.selected()
+        self.builtin.set_sensitive(idle and m in ("obfs4", "snowflake", "meek"))
+        self.text.set_sensitive(idle and m != "direct")
+        self.update_buttons()
+
+    def update_buttons(self):
+        idle = self.phase == "idle"
+        self.apply_btn.set_sensitive(idle and self.can_apply())
+        self.reconnect_btn.set_sensitive(idle)
+        self.cancel_btn.set_sensitive(self.phase in ("applying", "connecting"))
+
+    def show_info(self, text, kind=Gtk.MessageType.WARNING, retry=True, revert=True):
+        self.info.set_message_type(kind)
+        if len(text) > INFO_MAX:
+            self.log("message: " + text)
+            text = text[:INFO_MAX].rstrip() + " ... (full text in Details)"
+        self.info_view.get_buffer().set_text(text)
+        self.retry_btn.set_visible(retry and self.last_request is not None)
+        self.revert_btn.set_visible(revert)
+        self.info.show()
+
+    def on_info(self, _bar, resp):
+        self.info.hide()
+        if resp == 1 and self.last_request:
+            self.start_apply(self.last_request)
+        elif resp == 2:
+            self.run_simple("revert", "Reverting to the previous settings and starting Tor ...")
+
+    def log(self, msg):
+        b = self.log_view.get_buffer()
+        b.insert(b.get_end_iter(), time.strftime("%H:%M:%S ") + msg.rstrip() + "\n")
+        if b.get_line_count() > 600:
+            b.delete(b.get_start_iter(), b.get_iter_at_line(b.get_line_count() - 500))
+        self.log_view.scroll_to_iter(b.get_end_iter(), 0, False, 0, 1)
+        return False
+
+    def show_status(self, pct, text, circ):
+        # Poller is independent of apply/cancel; never drive phase while applying/cancelling.
+        if self.phase in ("applying", "cancelling"):
+            if pct is not None:
+                self.progress.set_fraction(pct / 100.0)
+                self.progress.set_text("%d %%" % pct)
+            return False
+        if pct is None:
+            self.progress.set_fraction(0); self.progress.set_text("0 % - " + ("Stopped" if "stopped" in text else "not connected"))
+            # External stop while we thought we were connecting: return to idle so the user can act.
+            if self.phase == "connecting" and "stopped" in (text or "").lower():
+                self.set_phase("idle")
+                self.log("Tor stopped outside the assistant")
+        else:
+            self.progress.set_fraction(pct / 100.0)
+            self.progress.set_text("%d %%%s" % (pct, " - connected" if pct >= 100 and circ else ""))
+            if self.phase == "connecting" and pct >= 100:
+                self.set_phase("idle")
+                self.log("Tor is connected")
+                self.save_conf()
+        if self.phase == "idle" or self.phase == "connecting":
+            self.status.set_text(text)
+            self.status.set_tooltip_text(text if len(text) > 120 else None)
+        return False
+
+    # ------------------------------------------------------------- helper calls (never on the GUI thread)
+    def on_apply(self, _b):
+        if not self.can_apply():
+            return
+        req = {"mode": self.selected(), "bridges": self.get_text() if self.selected() != "direct" else "",
+               "builtin": self.builtin.get_active()}
+        self.save_conf()
+        self.start_apply(req)
+
+    def start_apply(self, req):
+        self.last_request = req
+        self.info.hide()
+        self.set_phase("applying")
+        self.status.set_text("Applying %s ..." % TITLES[req["mode"]])
+        self.log("apply: %s" % TITLES[req["mode"]])
+        def work():
+            final = None
+            try:
+                p = subprocess.Popen(HELPER + ["apply"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, text=True)
+                self.helper_proc = p
+                p.stdin.write(json.dumps(req)); p.stdin.close()
+                for line in p.stdout:
+                    try:
+                        d = json.loads(line)
+                    except ValueError:
+                        continue
+                    if "event" in d:
+                        GLib.idle_add(self.on_helper_event, d)
+                    else:
+                        final = d
+                err = p.stderr.read()
+                p.wait()
+                if final is None:
+                    final = {"ok": False, "error": (err or "the helper stopped unexpectedly").strip()[-300:]}
+            except Exception as e:
+                final = {"ok": False, "error": str(e)}
+            self.helper_proc = None
+            GLib.idle_add(self.on_apply_done, final)
+        threading.Thread(target=work, daemon=True).start()
+
+    def on_helper_event(self, d):
+        ev = d.get("event")
+        if ev == "phase":
+            if self.phase == "applying":
+                self.status.set_text(d.get("message", ""))
+            self.log(d.get("message", ""))
+        elif ev == "resolved":
+            self.log("resolved %s -> %s (via %s)" % (d.get("host"), ", ".join(d.get("ips") or []), d.get("via")))
+        elif ev == "log":
+            self.log(d.get("message", ""))
+        return False
+
+    def on_apply_done(self, res):
+        if self.phase == "cancelling" or res.get("cancelled"):
+            return False      # on_cancel_done handles the UI
+        if res.get("ok"):
+            self.describe(res)
+            self.set_phase("connecting")
+            self.status.set_text("Tor started; connecting ...")
+            self.log("configuration applied; Tor is connecting")
+        else:
+            self.set_phase("idle")
+            msg = res.get("error") or "unknown error"
+            self.log("error: " + msg)
+            if res.get("firewall_error"):
+                msg += ("\nThe firewall could not be reloaded (%s), so Tor was left STOPPED. "
+                        "Restart the computer before going online." % res["firewall_error"])
+            elif res.get("reverted") and res.get("tor_started", True):
+                msg += "\nThe previous settings were restored and Tor was started again."
+            elif res.get("reverted"):
+                msg += "\nThe previous settings were restored, but Tor did not start: " + (res.get("tor_error") or "")
+            elif res.get("tor_stopped"):
+                msg += "\nTor is stopped."
+            self.show_info("Could not apply the change: " + msg, Gtk.MessageType.ERROR, retry=True, revert=False)
+            self.describe(dict(read_json(STATE, {}), mode=read_dropin()[0], bridges=len(read_dropin()[1])))
+        return False
+
+    def on_cancel(self, _b):
+        if self.phase not in ("applying", "connecting"):
+            return
+        self.set_phase("cancelling")
+        self.status.set_text("Cancelling ...")
+        self.log("cancel requested")
+        def work():
+            try:
+                r = subprocess.run(HELPER + ["cancel"], capture_output=True, text=True, timeout=60)
+                lines = r.stdout.strip().splitlines()
+                res = json.loads(lines[-1]) if lines else {"ok": False, "error": r.stderr.strip()[-300:]}
+            except Exception as e:
+                res = {"ok": False, "error": str(e)}
+            GLib.idle_add(self.on_cancel_done, res)
+        threading.Thread(target=work, daemon=True).start()
+
+    def on_cancel_done(self, res):
+        self.set_phase("idle")
+        mode, lines = read_dropin()
+        self.describe(dict(read_json(STATE, {}), mode=mode, bridges=len(lines)))
+        if res.get("ok"):
+            if res.get("restored"):
+                self.status.set_text("Cancelled. Tor is stopped.")
+                self.log("cancelled while applying; previous settings restored, Tor stopped")
+                self.show_info("Cancelled while applying. The previous settings (%s) are back and Tor is stopped. "
+                               "Retry the change, or revert/reconnect as needed." % TITLES.get(mode, mode))
+            else:
+                self.status.set_text("Cancelled. Tor is stopped; configuration kept.")
+                self.log("cancelled while connecting; configuration kept, Tor stopped")
+                self.show_info("Tor was stopped; the new configuration was kept. "
+                               "Use Reconnect to start Tor again, Retry to re-apply, or Revert for the previous settings.",
+                               retry=True, revert=True)
+        elif res.get("firewall_error"):
+            self.status.set_text("Tor is stopped: firewall reload failed.")
+            self.log("cancel: firewall reload failed: " + res["firewall_error"])
+            self.show_info("The firewall could not be reloaded (%s), so Tor was left stopped. "
+                           "Restart the computer before going online." % res["firewall_error"],
+                           Gtk.MessageType.ERROR, retry=False, revert=False)
+        else:
+            # Connected: cancel is a no-op by design
+            err = res.get("error") or "unknown error"
+            self.log("cancel: " + err)
+            self.show_info(err, Gtk.MessageType.INFO, retry=False, revert=True)
+        return False
+
+    def run_simple(self, cmd, label):
+        self.set_phase("applying")
+        self.status.set_text(label)
+        self.log(label)
+        def work():
+            try:
+                r = subprocess.run(HELPER + [cmd], capture_output=True, text=True, timeout=180)
+                lines = r.stdout.strip().splitlines()
+                res = json.loads(lines[-1]) if lines else {"ok": False, "error": r.stderr.strip()[-300:]}
+            except Exception as e:
+                res = {"ok": False, "error": str(e)}
+            GLib.idle_add(self.on_simple_done, cmd, res)
+        threading.Thread(target=work, daemon=True).start()
+
+    def on_simple_done(self, cmd, res):
+        if res.get("ok"):
+            self.set_phase("connecting")
+            self.status.set_text("Tor restarted; connecting ...")
+            mode, lines = read_dropin()
+            self.describe(dict(read_json(STATE, {}), mode=mode, bridges=len(lines)))
+            if cmd == "revert":
+                self.radios[mode].set_active(True)
+        else:
+            self.set_phase("idle")
+            self.log("error: %s" % res.get("error"))
+            self.show_info("%s failed: %s" % (cmd.capitalize(), res.get("error") or "unknown error"),
+                           Gtk.MessageType.ERROR, retry=False, revert=(cmd != "revert"))
+        return False
+
+    def on_reconnect(self, _b):
+        self.run_simple("reconnect", "Restarting Tor ...")
+
+    def on_delete(self, *_a):
+        self.save_conf()
+        self.monitor.stop.set()
+        return False
+
+class App(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.win = None
+
+    def do_activate(self):
+        if self.win is None:
+            self.win = Assistant(self)
+            self.win.show_all()
+        self.win.present()
+
+def main():
+    app = App()
+    rt = os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+    if not os.environ.get("DBUS_SESSION_BUS_ADDRESS") and not os.path.exists(os.path.join(rt, "bus")):
+        app.set_flags(Gio.ApplicationFlags.NON_UNIQUE)    # no session bus: still usable, just not single-instance
+    else:
+        try:
+            app.register(None)
+        except GLib.Error:
+            app.set_flags(Gio.ApplicationFlags.NON_UNIQUE)
+    return app.run(sys.argv)
+
+if __name__ == "__main__":
+    sys.exit(main())

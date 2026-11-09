@@ -1,0 +1,11 @@
+// Prestium: let the logged-in user unlock and mount encrypted (VeraCrypt)
+// partitions on internal disks through udisks2. udisks mounts them under
+// /media/user with nosuid,nodev, so this grants no root access.
+polkit.addRule(function(action, subject) {
+    if ((action.id == "org.freedesktop.udisks2.encrypted-unlock-system" ||
+         action.id == "org.freedesktop.udisks2.filesystem-mount-system" ||
+         action.id == "org.freedesktop.udisks2.loop-setup") &&
+        subject.user == "user" && subject.local && subject.active) {
+        return polkit.Result.YES;
+    }
+});

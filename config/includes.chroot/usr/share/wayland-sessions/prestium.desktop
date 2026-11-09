@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Prestium
+Comment=Prestium desktop (labwc, Wayland)
+Exec=/usr/local/bin/prestium-session
+Type=Application
+DesktopNames=labwc;wlroots

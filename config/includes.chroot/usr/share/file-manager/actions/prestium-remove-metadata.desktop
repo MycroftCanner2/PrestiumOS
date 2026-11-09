@@ -1,0 +1,14 @@
+# Prestium 1.9.1: PCManFM (libfm) custom action: right-click a file > "Remove metadata".
+# Runs mat2 through /usr/local/bin/prestium-remove-metadata (cleaned copies, originals kept).
+[Desktop Entry]
+Type=Action
+Name=Remove metadata
+Tooltip=Write a copy of the file without metadata (mat2)
+Icon=edit-clear
+Profiles=prestium-files;
+
+[X-Action-Profile prestium-files]
+Name=Remove metadata
+MimeTypes=all/allfiles;
+SelectionCount=>0
+Exec=/usr/local/bin/prestium-remove-metadata %F

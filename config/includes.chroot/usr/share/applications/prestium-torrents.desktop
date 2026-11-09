@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=I2P Torrents
+Comment=Download and share torrents over I2P (i2pd built-in client)
+Exec=/usr/local/bin/prestium-torrents %u
+Icon=folder-download
+Categories=Network;FileTransfer;P2P;
+MimeType=application/x-bittorrent;x-scheme-handler/magnet;
+Terminal=false

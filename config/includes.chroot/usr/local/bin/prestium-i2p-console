@@ -1,0 +1,10 @@
+#!/bin/sh
+# Prestium: i2pd web console (127.0.0.1:7070) in the local-only Firefox.
+# 2.0 r6: per-boot HTTP basic auth (password in /run/prestium/i2pd-console.pass).
+PASS=$(cat /run/prestium/i2pd-console.pass 2>/dev/null | tr -d '\n')
+case "$PASS" in
+  ""|*[!A-Za-z0-9_-]*)
+    exec /usr/local/bin/prestium-localfox "http://127.0.0.1:7070/" ;;
+esac
+# user is always "i2pd" (set by prestium-i2pd-port)
+exec /usr/local/bin/prestium-localfox "http://i2pd:${PASS}@127.0.0.1:7070/"

@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Name=I2P Browser
+GenericName=Web Browser
+Comment=LibreWolf through the I2P HTTP proxy (127.0.0.1:4444)
+Exec=librewolf-i2p %u
+Icon=librewolf
+Terminal=false
+Type=Application
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;
+StartupNotify=true
+StartupWMClass=librewolf
+Categories=Network;WebBrowser;

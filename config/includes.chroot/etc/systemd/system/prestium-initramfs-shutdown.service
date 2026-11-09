@@ -1,0 +1,16 @@
+# Prestium 1.9.1 (Tails: initramfs-shutdown.service): prepare the memory-wipe
+# shutdown environment in /run/initramfs
+[Unit]
+Description=Prestium memory wipe at shutdown (unpack initramfs to /run/initramfs)
+DefaultDependencies=no
+After=local-fs.target
+Before=shutdown.target
+Conflicts=shutdown.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/prestium-initramfs-unpack
+
+[Install]
+WantedBy=multi-user.target

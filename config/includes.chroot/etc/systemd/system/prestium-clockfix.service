@@ -1,0 +1,13 @@
+# Prestium 1.9.1.1: fix a badly wrong clock from the Tor consensus when Tor
+# can't bootstrap because of it (Tails approach, no clearnet)
+[Unit]
+Description=Prestium pre-bootstrap clock fix (Tor consensus time)
+After=tor@default.service
+Wants=tor@default.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/prestium-clockfix
+
+[Install]
+WantedBy=multi-user.target

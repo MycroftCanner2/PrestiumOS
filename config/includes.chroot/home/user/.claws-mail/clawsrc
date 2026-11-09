@@ -1,0 +1,13 @@
+[Common]
+hide_timezone=1
+render_html=1
+invoke_plugin_on_html=0
+promote_html_part=0
+autochk_newmail=0
+use_networkmanager=0
+skip_ssl_cert_check=0
+
+[Plugins_GTK3]
+/usr/lib/x86_64-linux-gnu/claws-mail/plugins/pgpcore.so
+/usr/lib/x86_64-linux-gnu/claws-mail/plugins/pgpmime.so
+/usr/lib/x86_64-linux-gnu/claws-mail/plugins/pgpinline.so

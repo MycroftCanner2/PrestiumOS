@@ -1,0 +1,58 @@
+#!/usr/bin/python3
+# Prestium: open i2pd's torrent client, optionally adding a magnet link or .torrent file.
+#   prestium-torrents [magnet:?...|file.torrent]
+# 2.0 r6: distinguish disabled (status file) from still-starting (no url yet).
+import base64, json, os, subprocess, sys, time, urllib.request
+
+STATUS = "/run/prestium-torrents/status"
+URLF = "/run/prestium-torrents/url"
+
+def base():
+    try:
+        return open(URLF).read().strip()
+    except OSError:
+        return None
+
+def status():
+    try:
+        return open(STATUS).read().strip()
+    except OSError:
+        return ""
+
+def notify(msg):
+    subprocess.run(["zenity", "--title", "I2P Torrents", "--warning", "--no-wrap", "--text", msg])
+
+def add(b, item):
+    args = {"filename": item} if item.startswith("magnet:") else \
+           {"metainfo": base64.b64encode(open(item, "rb").read()).decode()}
+    req = urllib.request.Request(b + "rpc", json.dumps({"method": "torrent-add", "arguments": args}).encode(),
+                                 {"Content-Type": "application/json"})
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    for _ in range(30):
+        try:
+            return json.load(opener.open(req, timeout=10))
+        except OSError:
+            time.sleep(2)
+    raise OSError("i2pd torrent client is not answering")
+
+st = status()
+b = base()
+if st.startswith("disabled:"):
+    notify("I2P Torrents is disabled on this boot:\n%s\n\nFix the problem and restart I2P (Network menu)." % st[9:])
+    sys.exit(1)
+if not b:
+    # No status yet, or ready not written: still starting vs never set up.
+    if st == "ready":
+        notify("The torrent client URL is missing even though setup reported ready. Restart I2P.")
+    else:
+        notify("I2P Torrents isn't ready yet (still starting, or I2P has not finished its start job). Wait for I2P, then try again.")
+    sys.exit(1)
+if len(sys.argv) > 1:
+    item = sys.argv[1]
+    if item.startswith("file://"):
+        item = urllib.request.url2pathname(item[7:])
+    try:
+        add(b, item)
+    except Exception as e:
+        notify("Couldn't add the torrent: %s" % e)
+os.execvp("/usr/local/bin/prestium-localfox", ["prestium-localfox", b + "web/"])

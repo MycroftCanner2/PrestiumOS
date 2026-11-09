@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Unlock VeraCrypt Volume
+Comment=Open VeraCrypt containers and drives without root
+Exec=/usr/local/bin/prestium-unlock-veracrypt
+Icon=drive-harddisk-encrypted
+Categories=Utility;Security;
+Terminal=false

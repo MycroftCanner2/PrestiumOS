@@ -1,0 +1,332 @@
+#!/usr/bin/python3
+# Prestium 1.9.1: Tor control-port filter (in the spirit of Tails' onion-grater).
+#
+# "user" is no longer in group debian-tor, so it can't open Tor's real control
+# socket (/run/tor/control). Apps talk to this filter instead:
+#   /run/onion-grater/control  (unix socket)
+# The filter identifies the connecting process with SO_PEERCRED (uid, gid, pid)
+# and /proc/<pid>/exe + cmdline, picks that app's allow-list and forwards only
+# allowed commands to Tor. Nothing can SETCONF/RESETCONF/LOADCONF, so no app can
+# make Tor connect to an attacker-chosen bridge from the real IP address, turn
+# proxies off, or read Tor's own address guesses.
+#
+# Profiles:
+#   tor-browser  /opt/tor-browser/Browser/firefox.real (root-owned, read-only):
+#                NEWNYM, circuit display (circuit-status, ns/id, ip-to-country,
+#                CIRC events, STREAM events only for SOCKS-authenticated streams,
+#                which is what Tor Browser uses), onion client auth.
+#   onionshare   python3 /usr/bin/onionshare[-cli]: ADD_ONION Port=80 -> 127.0.0.1:17600-17650 only,
+#                DEL_ONION, HS_DESC events, read-only status.
+#   tor-assistant python3 /usr/local/bin/prestium-tor-assistant (2.0): read-only bootstrap
+#                status (GETINFO status/bootstrap-phase etc.), STATUS_CLIENT/NOTICE events.
+#   nyx          python3 /usr/bin/nyx: read-only GETINFO/GETCONF (no address*),
+#                events, SIGNAL NEWNYM/CLEARDNSCACHE.
+# Anything else, and any process whose primary group is prestium-localweb
+# (local-only Firefox) or with a uid other than "user"/root, is refused.
+import asyncio, binascii, grp, os, pwd, re, socket, struct, sys, syslog
+
+LISTEN = "/run/onion-grater/control"
+TOR_SOCK = "/run/tor/control"
+COOKIE = "/run/tor/control.authcookie"
+TB_EXE = "/opt/tor-browser/Browser/firefox.real"
+
+def gid_of(name):
+    try: return grp.getgrnam(name).gr_gid
+    except KeyError: return None
+def uid_of(name):
+    try: return pwd.getpwnam(name).pw_uid
+    except KeyError: return None
+
+USER_UID = uid_of("user")
+LOCALWEB_GID = gid_of("prestium-localweb")
+
+def log(msg):
+    syslog.syslog(syslog.LOG_NOTICE, msg)
+
+FP = r"\$?[0-9A-Fa-f]{40}(?:[=~][A-Za-z0-9_]{1,19})?"
+IP = r"[0-9A-Fa-f:.]{2,45}"
+
+GETINFO_TB = [r"version", r"status/bootstrap-phase", r"status/circuit-established",
+              r"circuit-status", r"net/listeners/socks", r"ns/id/" + FP,
+              r"ip-to-country/" + IP, r"ip-to-country/ipv4-available",
+              r"ip-to-country/ipv6-available", r"onions/current",
+              r"status/version/current", r"ns/purpose/bridge"]
+GETINFO_OS = [r"version", r"status/bootstrap-phase", r"status/circuit-established",
+              r"net/listeners/socks", r"onions/current", r"onions/detached",
+              r"status/version/current", r"config/names", r"features/names",
+              r"events/names", r"info/names", r"signal/names"]
+GETCONF_RO = [r"UseBridges", r"Bridge", r"ClientTransportPlugin", r"Socks4Proxy",
+              r"Socks5Proxy", r"HTTPSProxy", r"ReachableAddresses", r"SocksPort",
+              r"HiddenServiceSingleHopMode", r"HiddenServiceNonAnonymousMode",
+              r"ControlPort", r"ControlSocket", r"__OwningControllerProcess",
+              r"DisableNetwork"]
+# Prestium 2.0: Tor Connection Assistant (read-only bootstrap status)
+GETINFO_TCA = [r"version", r"status/bootstrap-phase", r"status/circuit-established",
+               r"net/listeners/socks", r"status/enough-dir-info", r"network-liveness"]
+GETCONF_TCA = [r"UseBridges", r"ClientTransportPlugin", r"DisableNetwork"]
+DENY_GETINFO_NYX = re.compile(r"^(address(/v[46])?|traffic/.*xx|fingerprint)$", re.I)
+
+PROFILES = {
+    "tor-browser": {
+        "getinfo": [re.compile("^(%s)$" % k, re.I) for k in GETINFO_TB],
+        "getconf": [re.compile("^(%s)$" % k, re.I) for k in GETCONF_RO],
+        "events": {"CIRC", "STREAM", "STATUS_CLIENT", "NOTICE", "WARN", "ERR"},
+        "signals": {"NEWNYM"},
+        "onion_auth": True, "add_onion": False, "nyx": False,
+        "stream_filter": True,
+    },
+    "onionshare": {
+        "getinfo": [re.compile("^(%s)$" % k, re.I) for k in GETINFO_OS],
+        "getconf": [re.compile("^(%s)$" % k, re.I) for k in GETCONF_RO],
+        "events": {"HS_DESC", "STATUS_CLIENT", "NOTICE", "WARN", "ERR"},
+        "signals": set(),
+        "onion_auth": False, "add_onion": True, "nyx": False,
+        "stream_filter": False,
+    },
+    "tor-assistant": {
+        "getinfo": [re.compile("^(%s)$" % k, re.I) for k in GETINFO_TCA],
+        "getconf": [re.compile("^(%s)$" % k, re.I) for k in GETCONF_TCA],
+        "events": {"STATUS_CLIENT", "NOTICE", "WARN", "ERR"},
+        "signals": set(),
+        "onion_auth": False, "add_onion": False, "nyx": False,
+        "stream_filter": False,
+    },
+    "nyx": {
+        "getinfo": None, "getconf": None,   # read-only, see DENY_GETINFO_NYX
+        "events": None,                     # any event type
+        "signals": {"NEWNYM", "CLEARDNSCACHE"},
+        "onion_auth": False, "add_onion": False, "nyx": True,
+        "stream_filter": False,
+    },
+}
+
+def same_file(a, b):
+    """True when both paths are the same file (device and inode), e.g. /proc/PID/exe and the
+    system binary; a bind mount keeps device and inode, a substituted file doesn't."""
+    try:
+        x, y = os.stat(a), os.stat(b)
+    except OSError:
+        return False
+    return (x.st_dev, x.st_ino) == (y.st_dev, y.st_ino)
+
+
+def identify(conn):
+    creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
+    pid, uid, gid = struct.unpack("3i", creds)
+    if uid not in (0, USER_UID):
+        return None, "uid %d" % uid, pid
+    if LOCALWEB_GID is not None:
+        # 1.9.1.1: only the primary group counts (real/effective/saved/fs gid,
+        # as the firewall's gid-owner match). "user" is a supplementary member
+        # of prestium-localweb (needed by sg), so checking "Groups:" refused
+        # every app of "user", Tor Browser included.
+        gids = {gid}
+        try:
+            with open("/proc/%d/status" % pid) as f:
+                for line in f:
+                    if line.startswith("Gid:"):
+                        gids |= {int(x) for x in line.split()[1:]}
+        except OSError:
+            return None, "no /proc entry", pid
+        if LOCALWEB_GID in gids:
+            return None, "local-only Firefox group", pid
+    try:
+        exe = os.readlink("/proc/%d/exe" % pid)
+        with open("/proc/%d/cmdline" % pid, "rb") as f:
+            argv = [a.decode(errors="replace") for a in f.read().split(b"\0") if a]
+    except OSError as e:
+        return None, "cannot inspect pid: %s" % e, pid
+    # 2.0 r9: a path can be faked with an unprivileged mount namespace (bind another file over
+    # /opt/tor-browser/Browser/firefox.real inside it), and Tor Browser now runs in such a
+    # namespace (its sandbox) itself. So the file the process really runs, and the script Python
+    # really reads (through the process's own root), must be the very file of the system.
+    if exe == TB_EXE:
+        if same_file("/proc/%d/exe" % pid, TB_EXE):
+            return "tor-browser", exe, pid
+        return None, "fake %s (different file)" % exe, pid
+    if re.fullmatch(r"/usr/bin/python3(\.\d+)?", exe) and len(argv) >= 2:
+        if not same_file("/proc/%d/exe" % pid, exe):
+            return None, "fake %s (different file)" % exe, pid
+        script = argv[1]
+        if not script.startswith("/") or not same_file("/proc/%d/root%s" % (pid, script), script):
+            return None, "unknown client %s %s (script is not the system file)" % (exe, script), pid
+        if script in ("/usr/bin/onionshare", "/usr/bin/onionshare-cli"):
+            return "onionshare", script, pid
+        if script == "/usr/bin/nyx":
+            return "nyx", script, pid
+        if script == "/usr/local/bin/prestium-tor-assistant":
+            return "tor-assistant", script, pid
+    return None, "unknown client %s %s" % (exe, " ".join(argv[:3])), pid
+
+def split_args(rest):
+    return rest.split() if rest else []
+
+# 2.0 r4 (audit hardening, as Tails' onionshare profile): an onion service may only forward its
+# virtual port 80 to OnionShare's own local port range 127.0.0.1:17600-17650. "Port=1" (virtual
+# and target port 1) is OnionShare's probe for client-auth support, which it removes at once.
+PORT_RE = re.compile(r"^Port=(80,(127\.0\.0\.1:)?(176[0-4][0-9]|17650)|1|1,(127\.0\.0\.1:)?1)$", re.I | re.A)
+KEY_RE = re.compile(r"^(NEW:(BEST|ED25519-V3)|ED25519-V3:[A-Za-z0-9+/=]+)$")
+FLAG_RE = re.compile(r"^Flags=((DiscardPK|Detach|V3Auth|MaxStreamsCloseCircuit|NonAnonymous)(,(DiscardPK|Detach|V3Auth|MaxStreamsCloseCircuit))*)$", re.I)
+
+def check(profile, line):
+    """Return (forward_line or None, local_reply or None)."""
+    p = PROFILES[profile]
+    parts = line.split(None, 1)
+    if not parts:
+        return None, "500 Empty command\r\n"
+    cmd = parts[0].upper()
+    rest = parts[1] if len(parts) > 1 else ""
+    if cmd == "PROTOCOLINFO":
+        return None, ('250-PROTOCOLINFO 1\r\n250-AUTH METHODS=NULL\r\n'
+                      '250-VERSION Tor="0.4.9"\r\n250 OK\r\n')
+    if cmd == "AUTHENTICATE":
+        return None, "250 OK\r\n"
+    if cmd == "QUIT":
+        return line, None
+    if cmd == "GETINFO":
+        keys = split_args(rest)
+        if not keys:
+            return None, "512 Missing argument\r\n"
+        for k in keys:
+            if p["nyx"]:
+                if DENY_GETINFO_NYX.match(k):
+                    return None, '552 Unrecognized key "%s"\r\n' % k
+            elif not any(r.match(k) for r in p["getinfo"]):
+                return None, '552 Unrecognized key "%s"\r\n' % k
+        return line, None
+    if cmd == "GETCONF":
+        keys = split_args(rest)
+        if not p["nyx"]:
+            for k in keys:
+                if not any(r.match(k) for r in p["getconf"]):
+                    return None, '552 Unrecognized configuration key "%s"\r\n' % k
+        return line, None
+    if cmd == "SETEVENTS":
+        evs = split_args(rest)
+        ext = [e for e in evs if e.upper() == "EXTENDED"]
+        evs = [e for e in evs if e.upper() != "EXTENDED"]
+        if p["events"] is not None:
+            evs = [e for e in evs if e.upper() in p["events"]]
+        return " ".join(["SETEVENTS"] + ext + evs), None
+    if cmd == "SIGNAL":
+        sig = rest.strip().upper()
+        if sig in p["signals"]:
+            return "SIGNAL " + sig, None
+        return None, "510 Command filtered\r\n"
+    if cmd in ("ONION_CLIENT_AUTH_ADD", "ONION_CLIENT_AUTH_REMOVE", "ONION_CLIENT_AUTH_VIEW"):
+        if p["onion_auth"] and "Flags=Permanent" not in rest:
+            return line, None
+        return None, "510 Command filtered\r\n"
+    if cmd == "ADD_ONION" and p["add_onion"]:
+        args = split_args(rest)
+        if not args or not KEY_RE.match(args[0]):
+            return None, "510 Command filtered\r\n"
+        ports = 0
+        for a in args[1:]:
+            if PORT_RE.match(a):
+                ports += 1
+            elif FLAG_RE.match(a) and "nonanonymous" not in a.lower():
+                pass
+            elif re.match(r"^MaxStreams=\d{1,5}$", a, re.I):
+                pass
+            elif re.match(r"^ClientAuthV3=[A-Za-z2-7=]+$", a):
+                pass
+            else:
+                return None, "510 Command filtered\r\n"
+        if ports == 0:
+            return None, "510 Command filtered\r\n"
+        return line, None
+    if cmd == "DEL_ONION" and p["add_onion"]:
+        if re.match(r"^[a-z2-7]{56}$", rest.strip()):
+            return line, None
+        return None, "510 Command filtered\r\n"
+    return None, "510 Command filtered\r\n"
+
+def read_cookie():
+    with open(COOKIE, "rb") as f:
+        return binascii.hexlify(f.read()).decode()
+
+async def pump_tor_to_client(treader, cwriter, profile):
+    sf = PROFILES[profile]["stream_filter"]
+    try:
+        while True:
+            line = await treader.readline()
+            if not line:
+                break
+            if sf and line.startswith(b"650 STREAM ") and b"SOCKS_USERNAME=" not in line:
+                continue
+            cwriter.write(line)
+            await cwriter.drain()
+    except (ConnectionError, asyncio.IncompleteReadError):
+        pass
+    finally:
+        try: cwriter.close()
+        except Exception: pass
+
+async def handle(creader, cwriter):
+    sock = cwriter.get_extra_info("socket")
+    profile, why, pid = identify(sock)
+    if profile is None:
+        log("refused pid %s: %s" % (pid, why))
+        cwriter.write(b"510 Prestium onion-grater: client not allowed\r\n")
+        await cwriter.drain(); cwriter.close(); return
+    log("client pid %s: profile %s" % (pid, profile))
+    try:
+        treader, twriter = await asyncio.open_unix_connection(TOR_SOCK)
+        twriter.write(("AUTHENTICATE %s\r\n" % read_cookie()).encode())
+        await twriter.drain()
+        resp = await treader.readline()
+        if not resp.startswith(b"250"):
+            raise ConnectionError("tor auth failed: %r" % resp)
+    except Exception as e:
+        log("cannot reach tor: %s" % e)
+        cwriter.write(b"551 Tor control port unavailable\r\n")
+        await cwriter.drain(); cwriter.close(); return
+    pump = asyncio.ensure_future(pump_tor_to_client(treader, cwriter, profile))
+    try:
+        while True:
+            raw = await creader.readline()
+            if not raw:
+                break
+            if len(raw) > 16384:
+                break
+            line = raw.decode(errors="replace").rstrip("\r\n")
+            if line.startswith("+"):
+                cwriter.write(b"510 Command filtered\r\n"); await cwriter.drain()
+                break
+            fwd, reply = check(profile, line)
+            if fwd is not None:
+                twriter.write((fwd + "\r\n").encode()); await twriter.drain()
+            else:
+                if reply.startswith("510") or reply.startswith("552"):
+                    log("%s pid %s: filtered: %s" % (profile, pid, line.split(None, 1)[0][:32]))
+                cwriter.write(reply.encode()); await cwriter.drain()
+    except (ConnectionError, asyncio.IncompleteReadError):
+        pass
+    finally:
+        pump.cancel()
+        for w in (twriter, cwriter):
+            try: w.close()
+            except Exception: pass
+
+async def main():
+    syslog.openlog("prestium-onion-grater", 0, syslog.LOG_DAEMON)
+    try: os.unlink(LISTEN)
+    except FileNotFoundError: pass
+    server = await asyncio.start_unix_server(handle, path=LISTEN)
+    # 2.0 r6: 0660 — PEERCRED still decides the profile; world no longer connects.
+    # 2.0 r17: group prestium-tbb (the desktop user; the service has it as a supplementary group).
+    # r6-r16 called chown(LISTEN, 0, uid of "user"), which needs CAP_CHOWN the service doesn't have,
+    # so the filter exited with PermissionError at every start (seen on the r16 ISO; the Tor
+    # assistant then showed "control port: FileNotFoundError"). Fail closed if the group is missing.
+    tbb = gid_of("prestium-tbb")
+    if tbb is None:
+        log("group prestium-tbb missing; refusing to start"); sys.exit(1)
+    os.chown(LISTEN, -1, tbb)
+    os.chmod(LISTEN, 0o660)
+    log("listening on %s" % LISTEN)
+    async with server:
+        await server.serve_forever()
+
+if __name__ == "__main__":
+    asyncio.run(main())

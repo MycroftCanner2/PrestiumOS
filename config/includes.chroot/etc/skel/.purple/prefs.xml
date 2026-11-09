@@ -1,0 +1,33 @@
+<?xml version='1.0' encoding='UTF-8' ?>
+<pref version='1' name='/'>
+	<pref name='purple'>
+		<pref name='proxy'>
+			<pref name='type' type='string' value='socks5'/>
+			<pref name='host' type='string' value='127.0.0.1'/>
+			<pref name='port' type='int' value='9050'/>
+			<pref name='username' type='string' value=''/>
+			<pref name='password' type='string' value=''/>
+			<pref name='socks4_remotedns' type='bool' value='1'/>
+		</pref>
+		<pref name='logging'>
+			<pref name='log_ims' type='bool' value='0'/>
+			<pref name='log_chats' type='bool' value='0'/>
+			<pref name='log_system' type='bool' value='0'/>
+		</pref>
+	</pref>
+	<pref name='pidgin'>
+		<pref name='plugins'>
+			<pref name='loaded' type='pathlist'>
+				<item value='/usr/lib/pidgin/pidgin-otr.so'/>
+				<item value='/usr/lib/x86_64-linux-gnu/purple-2/lurch.so'/>
+				<item value='/usr/lib/x86_64-linux-gnu/purple-2/carbons.so'/>
+			</pref>
+		</pref>
+	</pref>
+	<pref name='OTR'>
+		<pref name='enabled' type='bool' value='1'/>
+		<pref name='automatic' type='bool' value='1'/>
+		<pref name='onlyprivate' type='bool' value='1'/>
+		<pref name='avoidloggingotr' type='bool' value='1'/>
+	</pref>
+</pref>

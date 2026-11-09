@@ -1,0 +1,4 @@
+# Prestium: i2pd built-in torrent client downloads
+/home/user/Downloads/Torrents/ rw,
+/home/user/Downloads/Torrents/** rwk,
+/usr/share/i2pd/torrents/** r,

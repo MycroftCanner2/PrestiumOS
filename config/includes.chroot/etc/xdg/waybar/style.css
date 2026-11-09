@@ -1,0 +1,13 @@
+/* Prestium 2.0 r10: panel colours as the tint2 panel (black, white text) */
+* { font-family: sans-serif; font-size: 13px; min-height: 0; }
+window#waybar { background: #000000; color: #ffffff; }
+#taskbar button { padding: 0 4px; min-width: 0; color: #dddddd; border-radius: 0; }
+#taskbar button.active { background: #333333; color: #ffffff; }
+#taskbar button:hover { background: #222222; }
+#tray, #pulseaudio, #battery, #clock { padding: 0 8px; }
+#battery.warning:not(.charging) { color: #ffcc00; }
+#battery.critical:not(.charging) { color: #ff4444; font-weight: bold; }
+#pulseaudio.muted { color: #888888; }
+/* 2.0 r19: menu button */
+#custom-menu { padding: 0 10px; background: #1a1a1a; font-weight: bold; }
+#custom-menu:hover { background: #333333; }

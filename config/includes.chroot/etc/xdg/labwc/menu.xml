@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Prestium 2.0 r10: desktop menu (labwc). Apps start through prestium-run (restricted Wayland
+     socket); the display settings, screen lock and on-screen keyboard need the full socket. -->
+<openbox_menu>
+<menu id="root-menu" label="Prestium">
+  <item label="I2P Browser">
+    <action name="Execute" command="prestium-run librewolf-i2p" />
+  </item>
+  <item label="Tor Browser">
+    <action name="Execute" command="prestium-run tor-browser" />
+  </item>
+  <item label="I2P Router Console">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-console" />
+  </item>
+  <separator />
+  <item label="Text Editor">
+    <action name="Execute" command="prestium-run featherpad" />
+  </item>
+  <item label="File Manager">
+    <action name="Execute" command="prestium-run pcmanfm" />
+  </item>
+  <separator />
+  <menu id="/Office" label="Office">
+    <item label="LibreOffice Writer">
+      <action name="Execute" command="prestium-run libreoffice --writer" />
+    </item>
+    <item label="LibreOffice Calc">
+      <action name="Execute" command="prestium-run libreoffice --calc" />
+    </item>
+    <item label="LibreOffice Math">
+      <action name="Execute" command="prestium-run libreoffice --math" />
+    </item>
+    <item label="LibreOffice Impress">
+      <action name="Execute" command="prestium-run libreoffice --impress" />
+    </item>
+    <item label="LibreOffice Draw">
+      <action name="Execute" command="prestium-run libreoffice --draw" />
+    </item>
+  </menu>
+  <menu id="/Multimedia" label="Multimedia">
+    <item label="Volume Control">
+      <action name="Execute" command="prestium-run pavucontrol" />
+    </item>
+    <item label="Audacity">
+      <action name="Execute" command="prestium-run audacity" />
+    </item>
+    <item label="Gimp">
+      <action name="Execute" command="prestium-run gimp" />
+    </item>
+    <item label="VLC Media player">
+      <action name="Execute" command="prestium-run vlc" />
+    </item>
+  </menu>
+  <menu id="/Accessories" label="Accessories">
+    <item label="Feather Wallet (Monero)">
+      <action name="Execute" command="prestium-run feather" />
+    </item>
+    <item label="Calculator">
+      <action name="Execute" command="prestium-run galculator" />
+    </item>
+    <item label="Archive Manager">
+      <action name="Execute" command="prestium-run file-roller" />
+    </item>
+    <item label="Image Viewer">
+      <action name="Execute" command="prestium-run loupe" />
+    </item>
+    <item label="Metadata Cleaner">
+      <action name="Execute" command="prestium-run metadata-cleaner" />
+    </item>
+    <item label="KeePassXC">
+      <action name="Execute" command="prestium-run keepassxc" />
+    </item>
+    <item label="Unlock VeraCrypt Volume">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-veracrypt" />
+    </item>
+    <item label="Unlock Volume">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-volume" />
+    </item>
+    <item label="Kleopatra (GnuPG)">
+      <action name="Execute" command="prestium-run kleopatra" />
+    </item>
+    <item label="QR Generator">
+      <action name="Execute" command="prestium-run qtqr" />
+    </item>
+  </menu>
+ <menu id="/Communication" label="Communication">
+    <item label="Gajim XMPP">
+      <action name="Execute" command="prestium-run gajim" />
+    </item>
+    <item label="I2P Torrents">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-torrents" />
+    </item>
+    <item label="IRC (The Lounge)">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
+    </item>
+    <item label="Pidgin">
+      <action name="Execute" command="prestium-run /usr/local/bin/pidgin-tor" />
+    </item>
+    <item label="OnionShare">
+      <action name="Execute" command="prestium-run onionshare" />
+    </item>
+    <item label="Mail (I2P)">
+      <action name="Execute" command="prestium-run claws-mail" />
+    </item>
+  </menu>
+  <separator />
+  <menu id="/Network" label="Network">
+    <menu id="/Network/Hops" label="I2P Tunnel Hops">
+      <item label="1 hop">
+        <action name="Execute" command="prestium-run prestium-tunnel-hops 1" />
+      </item>
+      <item label="2 hops">
+        <action name="Execute" command="prestium-run prestium-tunnel-hops 2" />
+      </item>
+      <item label="3 hops (default)">
+        <action name="Execute" command="prestium-run prestium-tunnel-hops 3" />
+      </item>
+      <item label="4 hops">
+        <action name="Execute" command="prestium-run prestium-tunnel-hops 4" />
+      </item>
+      <item label="5 hops">
+        <action name="Execute" command="prestium-run prestium-tunnel-hops 5" />
+      </item>
+      <item label="6 hops">
+        <action name="Execute" command="prestium-run prestium-tunnel-hops 6" />
+      </item>
+      <item label="7 hops">
+        <action name="Execute" command="prestium-run prestium-tunnel-hops 7" />
+      </item>
+    </menu>
+    <item label="Restart I2P (i2pd)">
+      <action name="Execute" command="prestium-run sh -c &quot;systemctl restart i2pd || sudo -n systemctl restart i2pd&quot;" />
+    </item>
+    <item label="Refresh I2P reseed (via Tor)">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-reseed-gui" />
+    </item>
+    <item label="Manual reseed file">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-reseed-gui --manual" />
+    </item>
+    <item label="Tor Connection Assistant">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-tor-assistant" />
+    </item>
+    <item label="Tor Monitor (Nyx)">
+      <action name="Execute" command="prestium-run foot nyx -s /run/onion-grater/control" />
+    </item>
+  </menu>
+  <separator />
+  <menu id="/System" label="System">
+    <item label="Terminal">
+      <action name="Execute" command="prestium-run foot" />
+    </item>
+    <item label="Lock Screen">
+      <action name="Execute" command="/usr/local/bin/prestium-lock-screen" />
+    </item>
+    <item label="Display Settings">
+      <action name="Execute" command="/usr/local/bin/prestium-wl display-settings" />
+    </item>
+    <item label="Display Scale">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-display-scale" />
+    </item>
+    <item label="Brightness">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-brightness" />
+    </item>
+    <item label="Touchpad">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-touchpad" />
+    </item>
+    <menu id="/System/Accessibility" label="Accessibility">
+      <item label="Screen Keyboard">
+        <action name="Execute" command="/usr/local/bin/prestium-osk" />
+      </item>
+    </menu>
+    <separator />
+    <menu id="/Desktop" label="Desktop">
+      <item label="Reload Desktop Settings"><action name="Reconfigure" /></item>
+      <item label="Log Out"><action name="Exit" /></item>
+    </menu>
+  </menu>
+  <separator />
+  <item label="Reboot">
+    <action name="Execute" command="/usr/local/bin/prestium-power reboot" />
+  </item>
+  <item label="Shutdown">
+    <action name="Execute" command="/usr/local/bin/prestium-power poweroff" />
+  </item>
+</menu>
+
+
+<menu id="client-menu">
+  <item label="Minimize"><action name="Iconify" /></item>
+  <item label="Maximize"><action name="ToggleMaximize" /></item>
+  <item label="Always on Top"><action name="ToggleAlwaysOnTop" /></item>
+  <item label="Close"><action name="Close" /></item>
+</menu>
+</openbox_menu>

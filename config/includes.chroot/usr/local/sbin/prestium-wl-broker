@@ -1,0 +1,419 @@
+#!/usr/bin/python3 -I
+"""Prestium 2.0 r11: Wayland broker (root). Keeps the compositor's full socket out of reach of every
+application, including unconfined ones.
+
+At login the session asks "start" (any order, any caller: it only takes privileges away):
+  * the compositor's socket ($XDG_RUNTIME_DIR/wayland-0, created by labwc) is checked to be labwc's
+    and then made root-owned, mode 0600: no process of the user can connect to it any more, and
+    the user can't chmod or chown it back (unlinking or renaming it gains nothing either);
+  * the restricted socket /run/prestium-wl/<uid>/apps is created in a root-owned directory (so it
+    can't be renamed or replaced by a fake that would sit between apps and the compositor) as a
+    wp-security-context-v1 listener: clients of it don't get screen capture, input injection,
+    clipboard managers, the list of other windows, overlays (layer-shell), session lock, output or
+    gamma control. Every application uses it (prestium-run, the browser sandboxes).
+
+The trusted session parts that need the full protocol set are started by this broker, as the user,
+each with one connection to the full socket passed as an inherited file descriptor
+(WAYLAND_SOCKET), and with WAYLAND_DISPLAY pointing at the restricted socket, so anything they
+start in turn is restricted again. Requests (one line on /run/prestium-wl/broker):
+
+  start              lock the full socket, create the restricted one (idempotent)
+  menu               open the labwc root menu (panel Menu button)
+  panel              start the panel, notifications, wallpaper and idle lock (once per session)
+  lock               lock the screen (swaylock); answers when the lock is in place
+  osk                toggle the on-screen keyboard (wvkbd)
+  display-settings   output settings (wdisplays)
+  scale              apply ~/.config/prestium/scale to every output (wlr-randr)
+  screenshot         screenshot of the screen the user then clicks (slurp -o, grim)
+  screenshot-area    screenshot of an area the user then drags (slurp, grim)
+  status             "session <uid> <apps socket>" or "none"
+
+None of them gives the caller anything: the caller never gets a connection to the full socket.
+Screenshots always need a real click or drag on an overlay that only the user can make
+(applications can't inject input), so an application can't take one unnoticed. Trusted tools run
+with an empty, root-owned XDG_CONFIG_HOME/XDG_DATA_HOME and fixed config files, so files the user's
+apps can write can't change what they do.
+"""
+import array, grp, json, os, pwd, re, signal, socket, socketserver, stat, struct, subprocess
+import sys, syslog, threading, time
+
+BASE = os.environ.get("PRESTIUM_WL_BASE", "/run/prestium-wl")
+BROKER = os.path.join(BASE, "broker")
+RUNTIME = os.environ.get("PRESTIUM_WL_RUNTIME", "/run/user/%d")   # %d: uid
+LABWC = os.environ.get("PRESTIUM_WL_LABWC", "/usr/bin/labwc")
+SWAYLOCK_CONF = "/usr/share/prestium/swaylock.conf"
+ETC = os.environ.get("PRESTIUM_WL_ETC", "/etc/xdg")          # override: tests only
+
+def log(msg, crit=False):
+    syslog.syslog(syslog.LOG_CRIT if crit else syslog.LOG_INFO, msg)
+    print(msg, file=sys.stderr, flush=True)
+
+# ---------------- Wayland wire protocol (just enough for wp-security-context-v1) ----------------
+
+def wstring(s):
+    b = s.encode() + b"\0"
+    return struct.pack("=I", len(b)) + b + b"\0" * (-len(b) % 4)
+
+class WlConn:
+    def __init__(self, sock):
+        self.s = sock; self.buf = b""; self.next_id = 2
+
+    def new_id(self):
+        i = self.next_id; self.next_id += 1; return i
+
+    def send(self, obj, op, payload=b"", fds=()):
+        msg = struct.pack("=II", obj, ((8 + len(payload)) << 16) | op) + payload
+        anc = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds))] if fds else []
+        self.s.sendmsg([msg], anc)
+
+    def roundtrip(self, on_event=lambda *a: None, timeout=10):
+        cb = self.new_id()
+        self.send(1, 0, struct.pack("=I", cb))
+        self.s.settimeout(timeout)
+        while True:
+            while len(self.buf) >= 8:
+                obj, so = struct.unpack("=II", self.buf[:8]); size, op = so >> 16, so & 0xffff
+                if len(self.buf) < size:
+                    break
+                body, self.buf = self.buf[8:size], self.buf[size:]
+                if obj == 1 and op == 0:
+                    raise RuntimeError("compositor protocol error")
+                if obj == cb:
+                    return
+                on_event(obj, op, body)
+            d = self.s.recv(65536)
+            if not d:
+                raise ConnectionError("compositor closed the connection")
+            self.buf += d
+
+    def globals(self):
+        reg = self.new_id(); self.send(1, 1, struct.pack("=I", reg)); found = {}
+        def ev(obj, op, body):
+            if obj == reg and op == 0:
+                name, n = struct.unpack("=II", body[:8])
+                iface = body[8:8 + n - 1].decode()
+                ver = struct.unpack("=I", body[8 + n + (-n % 4):][:4])[0]
+                found[iface] = (name, ver)
+        self.roundtrip(ev)
+        return reg, found
+
+def peer_pid(sock):
+    return struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
+
+# ---------------- sessions ----------------
+
+def proc_start(pid):
+    try:
+        return open("/proc/%d/stat" % pid).read().rsplit(")", 1)[1].split()[19]
+    except (OSError, IndexError):
+        return None
+
+def same_exe(pid, path):
+    try:
+        a, b = os.stat("/proc/%d/exe" % pid), os.stat(path)
+        return (a.st_dev, a.st_ino) == (b.st_dev, b.st_ino)
+    except OSError:
+        return False
+
+class Session:
+    def __init__(self, uid):
+        pw = pwd.getpwuid(uid)
+        self.uid, self.gid, self.user = uid, pw.pw_gid, pw.pw_name
+        self.home = os.environ.get("PRESTIUM_WL_HOME") or pw.pw_dir      # override: tests only
+        self.groups = os.getgrouplist(self.user, self.gid)
+        self.rt = RUNTIME % uid
+        self.full = os.path.join(self.rt, "wayland-0")
+        self.dir = os.path.join(BASE, str(uid))
+        self.apps = os.path.join(self.dir, "apps")
+        self.empty = os.path.join(self.dir, "empty")
+        self.labwc = None; self.labwc_start = None
+        self.ctx_conn = None; self.close_w = None
+        self.kids = {}; self.lock = threading.Lock()
+
+    def alive(self):
+        return self.labwc is not None and proc_start(self.labwc) == self.labwc_start
+
+    def connect_full(self):
+        """A new connection to the compositor's full socket (as root), checked to be labwc's."""
+        st = os.lstat(self.full)
+        if not stat.S_ISSOCK(st.st_mode):
+            raise RuntimeError("%s is not a socket" % self.full)
+        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM | socket.SOCK_CLOEXEC)
+        s.connect(self.full)
+        pid, uid, _gid = peer_pid(s)
+        if uid != self.uid or not same_exe(pid, LABWC):
+            s.close()
+            raise RuntimeError("the socket %s is not the user's compositor" % self.full)
+        if self.labwc is not None and pid != self.labwc:
+            s.close()
+            raise RuntimeError("the compositor changed")
+        return s, pid
+
+    def start(self):
+        with self.lock:
+            if self.alive() and os.path.exists(self.apps):
+                return "ok already started"
+            self.stop_locked()
+            s, pid = self.connect_full()
+            self.labwc, self.labwc_start = pid, proc_start(pid)
+            # 1. lock the full socket: root-owned, 0600 (lchown: never follow a link)
+            os.lchown(self.full, 0, 0)
+            os.chmod(self.full, 0o600)
+            st = os.lstat(self.full)
+            if st.st_uid != 0 or stat.S_IMODE(st.st_mode) & 0o077:
+                raise RuntimeError("could not lock %s" % self.full)
+            # 2. the restricted socket, in a root-owned directory
+            os.makedirs(BASE, mode=0o755, exist_ok=True)
+            os.makedirs(self.dir, mode=0o755, exist_ok=True)
+            os.chown(self.dir, 0, 0); os.chmod(self.dir, 0o755)
+            os.makedirs(self.empty, mode=0o555, exist_ok=True)
+            try:
+                os.unlink(self.apps)
+            except FileNotFoundError:
+                pass
+            lis = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            old = os.umask(0o177); lis.bind(self.apps); os.umask(old)
+            os.chown(self.apps, 0, self.gid); os.chmod(self.apps, 0o660)
+            lis.listen(64)
+            c = WlConn(s)
+            reg, found = c.globals()
+            if "wp_security_context_manager_v1" not in found:
+                raise RuntimeError("the compositor has no security-context support")
+            mgr = c.new_id()
+            c.send(reg, 0, struct.pack("=I", found["wp_security_context_manager_v1"][0])
+                   + wstring("wp_security_context_manager_v1") + struct.pack("=II", 1, mgr))
+            close_r, close_w = os.pipe()
+            ctx = c.new_id()
+            c.send(mgr, 1, struct.pack("=I", ctx), fds=(lis.fileno(), close_r))
+            c.send(ctx, 1, wstring("org.prestium.apps"))
+            c.send(ctx, 2, wstring("prestium-apps"))
+            c.send(ctx, 3, wstring(str(self.uid)))
+            c.send(ctx, 4)
+            c.roundtrip()
+            lis.close(); os.close(close_r)
+            self.ctx_conn, self.close_w = c, close_w   # the context lives while close_w is open
+            log("uid %d: full Wayland socket locked, restricted socket %s ready" % (self.uid, self.apps))
+            return "ok started"
+
+    def stop_locked(self):
+        for p in list(self.kids.values()):
+            try:
+                p.terminate()
+            except Exception:
+                pass
+        self.kids.clear()
+        if self.close_w is not None:
+            os.close(self.close_w); self.close_w = None
+        if self.ctx_conn is not None:
+            self.ctx_conn.s.close(); self.ctx_conn = None
+        try:
+            os.unlink(self.apps)
+        except OSError:
+            pass
+        self.labwc = self.labwc_start = None
+
+    def env(self, extra=None):
+        e = {"HOME": self.home, "USER": self.user, "LOGNAME": self.user, "SHELL": "/bin/bash",
+             "PATH": "/usr/local/bin:/usr/bin:/bin", "LANG": "C.UTF-8",
+             "XDG_RUNTIME_DIR": self.rt, "DBUS_SESSION_BUS_ADDRESS": "unix:path=%s/bus" % self.rt,
+             "WAYLAND_DISPLAY": self.apps, "XDG_SESSION_TYPE": "wayland",
+             "XDG_CURRENT_DESKTOP": "labwc:wlroots", "GDK_BACKEND": "wayland",
+             "XDG_CONFIG_HOME": self.empty, "XDG_DATA_HOME": self.empty, "XDG_CACHE_HOME": self.empty,
+             "XDG_CONFIG_DIRS": "/etc/xdg", "XDG_DATA_DIRS": "/usr/local/share:/usr/share"}
+        if extra:
+            e.update(extra)
+        return e
+
+    def spawn(self, argv, wait=False, capture=False, timeout=None, key=None, extra_env=None):
+        """Run argv as the user with one full-socket connection as WAYLAND_SOCKET."""
+        s, _pid = self.connect_full()
+        fd = s.detach()
+        os.set_inheritable(fd, True)
+        try:
+            p = subprocess.Popen(argv, env=self.env(dict(extra_env or {}, WAYLAND_SOCKET=str(fd))),
+                                 user=self.uid, group=self.gid, extra_groups=self.groups,
+                                 pass_fds=(fd,), cwd=self.home, start_new_session=True,
+                                 stdin=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                 stdout=subprocess.PIPE if capture else subprocess.DEVNULL)
+        finally:
+            os.close(fd)
+        if key:
+            self.kids[key] = p
+        if wait or capture:
+            out, _ = p.communicate(timeout=timeout)
+            return p.returncode, (out.decode(errors="replace") if capture else "")
+        return p
+
+    def as_user(self, argv, input=None, timeout=10):
+        r = subprocess.run(argv, env=self.env(), user=self.uid, group=self.gid, extra_groups=self.groups,
+                           cwd=self.home, input=input, capture_output=True, timeout=timeout)
+        return r.returncode, r.stdout.decode(errors="replace")
+
+    def running(self, key):
+        p = self.kids.get(key)
+        return p is not None and p.poll() is None
+
+    # ---------- requests ----------
+    def panel(self):
+        started = []
+        for key, argv in (
+                ("swaybg", ["swaybg", "-c", "#303030"]),
+                ("waybar", ["waybar", "-c", ETC + "/waybar/config.jsonc", "-s", ETC + "/waybar/style.css"]),
+                ("mako", ["mako", "-c", ETC + "/mako/config"]),
+                ("swayidle", ["swayidle", "-w", "timeout", "600", "/usr/local/bin/prestium-lock-screen",
+                              "before-sleep", "/usr/local/bin/prestium-lock-screen",
+                              "lock", "/usr/local/bin/prestium-lock-screen"])):
+            if not self.running(key):
+                self.spawn(argv, key=key); started.append(key)
+        return "ok " + (" ".join(started) or "running")
+
+    def lock_screen(self):
+        rc, _ = self.spawn(["swaylock", "-f", "-C", SWAYLOCK_CONF], wait=True, timeout=30)
+        return "ok locked" if rc == 0 else "error swaylock exit %d" % rc
+
+    def osk(self):
+        if self.running("osk"):
+            self.kids["osk"].terminate(); return "ok hidden"
+        self.spawn(["wvkbd-mobintl", "-L", "280"], key="osk"); return "ok shown"
+
+    def menu(self):
+        # 2.0 r20: open labwc's root menu (Super+Space) for the panel's Menu button. wtype needs the
+        # virtual-keyboard protocol, which labwc does not offer on the restricted socket that waybar's
+        # children get, so the broker runs it on a full-socket connection. Fixed keys only.
+        if self.running("menu"):
+            return "ok running"
+        rc, _ = self.spawn(["wtype", "-M", "logo", "-k", "space", "-m", "logo"], wait=True, timeout=10, key="menu")
+        return "ok" if rc == 0 else "error wtype exit %d" % rc
+
+    def display_settings(self):
+        if not self.running("wdisplays"):
+            self.spawn(["wdisplays"], key="wdisplays")
+        return "ok"
+
+    def scale(self):
+        sys.path.insert(0, "/usr/local/lib/prestium")
+        import importlib.machinery
+        ps = importlib.machinery.SourceFileLoader(
+            "prestium_scale", os.environ.get("PRESTIUM_SCALE", "/usr/local/bin/prestium-scale")).load_module()
+        rc, val = self.as_user(["cat", "--", os.path.join(self.home, ".config/prestium/scale")])
+        setting = ps.parse_setting(val if rc == 0 else "auto")
+        rc, out = self.spawn(["wlr-randr", "--json"], capture=True, timeout=15)
+        if rc != 0:
+            return "error wlr-randr"
+        outs = [o for o in json.loads(out) if o.get("enabled")]
+        for o in outs:
+            name = o.get("name", "")
+            if not re.match(r"^[A-Za-z0-9_.-]{1,64}$", name):
+                continue
+            pct = ps.detect_from([o])[0] if setting == "auto" else setting
+            self.spawn(["wlr-randr", "--output", name, "--scale", "%.2f" % (pct / 100.0)], wait=True, timeout=15)
+        return "ok %s" % setting
+
+    def screenshot(self, area):
+        if self.running("slurp"):
+            return "error a screenshot is already being taken"
+        rc, geom = self.spawn(["slurp"] if area else ["slurp", "-o", "-r"], capture=True, timeout=120, key="slurp")
+        geom = geom.strip()
+        if rc != 0 or not re.match(r"^-?\d+,-?\d+ \d+x\d+$", geom):
+            return "ok cancelled"
+        pics = os.path.join(self.home, "Pictures")
+        self.as_user(["mkdir", "-p", "--", pics])
+        f = os.path.join(pics, time.strftime("Screenshot-%Y-%m-%d-%H%M%S.png", time.gmtime()))
+        rc, _ = self.spawn(["grim", "-g", geom, "--", f], wait=True, timeout=30)
+        if rc != 0:
+            return "error grim exit %d" % rc
+        self.as_user(["notify-send", "-a", "Prestium", "-i", "image-x-generic", "Screenshot saved", f])
+        return "ok " + f
+
+sessions = {}
+sessions_lock = threading.Lock()
+
+def session_for(uid, create=False):
+    with sessions_lock:
+        s = sessions.get(uid)
+        if s is None and create:
+            s = sessions[uid] = Session(uid)
+        return s
+
+class Handler(socketserver.StreamRequestHandler):
+    def handle(self):
+        try:
+            _pid, uid, _gid = peer_pid(self.request)
+            line = self.rfile.readline(200).decode(errors="replace").strip()
+            if uid == 0:
+                reply = "error refusing root"
+            else:
+                reply = dispatch(uid, line)
+        except Exception as e:
+            reply = "error " + str(e).replace("\n", " ")[:300]
+            log("request failed: %s" % reply, crit=True)
+        try:
+            self.wfile.write((reply + "\n").encode())
+        except OSError:
+            pass
+
+def dispatch(uid, cmd):
+    if cmd == "start":
+        return session_for(uid, create=True).start()
+    s = session_for(uid)
+    if cmd == "status":
+        return "session %d %s" % (uid, s.apps) if s and s.alive() else "none"
+    if s is None or not s.alive():
+        return "error no session (run start first)"
+    with s.lock:
+        if cmd == "panel":
+            return s.panel()
+        if cmd == "osk":
+            return s.osk()
+        if cmd == "display-settings":
+            return s.display_settings()
+        if cmd == "menu":
+            return s.menu()
+    if cmd == "lock":
+        return s.lock_screen()
+    if cmd == "scale":
+        return s.scale()
+    if cmd in ("screenshot", "screenshot-area"):
+        return s.screenshot(cmd == "screenshot-area")
+    return "error unknown request"
+
+def reaper():
+    while True:
+        time.sleep(2)
+        with sessions_lock:
+            items = list(sessions.items())
+        for uid, s in items:
+            if s.labwc is not None and not s.alive():
+                with s.lock:
+                    log("uid %d: compositor gone, session closed" % uid)
+                    s.stop_locked()
+        for s in [x for _, x in items]:
+            for k, p in list(s.kids.items()):
+                if p.poll() is not None and k not in ("waybar", "mako", "swaybg", "swayidle"):
+                    s.kids.pop(k, None)
+
+class Server(socketserver.ThreadingMixIn, socketserver.UnixStreamServer):
+    daemon_threads = True
+
+def main():
+    syslog.openlog("prestium-wl-broker")
+    if os.geteuid() != 0:
+        print("prestium-wl-broker must run as root", file=sys.stderr); return 1
+    signal.signal(signal.SIGCHLD, signal.SIG_DFL)
+    os.makedirs(BASE, mode=0o755, exist_ok=True)
+    os.chown(BASE, 0, 0); os.chmod(BASE, 0o755)
+    try:
+        os.unlink(BROKER)
+    except FileNotFoundError:
+        pass
+    old = os.umask(0o111)
+    srv = Server(BROKER, Handler)
+    os.umask(old)
+    os.chmod(BROKER, 0o666)
+    threading.Thread(target=reaper, daemon=True).start()
+    subprocess.run(["systemd-notify", "--ready"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    log("listening on %s" % BROKER)
+    srv.serve_forever()
+
+if __name__ == "__main__":
+    sys.exit(main())

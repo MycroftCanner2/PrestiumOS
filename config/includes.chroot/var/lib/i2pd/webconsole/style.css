@@ -1,0 +1,26 @@
+/* Prestium dark theme for the i2pd webconsole.
+   Rebuilt for Prestium 1.6-update; the original was hosted on Prestium's
+   now-offline git server. i2pd loads <datadir>/webconsole/style.css. */
+:root { --bg:#121417; --panel:#1b1e23; --line:#2c3038; --fg:#d7dae0; --muted:#8a919c; --accent:#8fb3ff; --ok:#7fd18b; --warn:#f0b35a; --bad:#ef6b6b; }
+body { font:100%/1.5em sans-serif; margin:0; padding:1.5em; background:var(--bg); color:var(--fg); }
+a, .slide label { text-decoration:none; color:var(--accent); }
+a:hover, .slide label:hover, button[type=submit]:hover { color:#fff; background:#2a3550; }
+a.button, button[type=submit] { -webkit-appearance:button; -moz-appearance:button; appearance:button; text-decoration:none; padding:0 5px; border:1px solid var(--line); background:var(--panel); color:var(--fg); }
+.header { font-size:2.5em; text-align:center; margin:1em 0; color:var(--accent); }
+.wrapper { margin:0 auto; padding:1em; max-width:64em; }
+.menu { display:block; float:left; overflow:hidden; padding:4px; max-width:12em; white-space:nowrap; text-overflow:ellipsis; }
+.listitem { display:block; font-family:monospace; font-size:1.2em; white-space:nowrap; }
+.tableitem { font-family:monospace; font-size:1.2em; white-space:nowrap; }
+.content { float:left; font-size:1em; margin-left:2em; padding:4px; max-width:50em; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+.tunnel.established { color:var(--ok); } .tunnel.expiring { color:var(--warn); } .tunnel.failed { color:var(--bad); } .tunnel.building { color:var(--muted); }
+caption { font-size:1.5em; text-align:center; color:var(--accent); }
+table { display:table; border-collapse:collapse; text-align:center; } table.extaddr { text-align:left; }
+table.services { width:100%; } th, td { border-bottom:1px solid var(--line); padding:2px 6px; }
+textarea { background:var(--bg); color:var(--fg); border:1px solid var(--line); word-break:break-all; }
+input, select { background:var(--bg); color:var(--fg); border:1px solid var(--line); }
+.streamdest { width:120px; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
+.slide div.slidecontent, .slide [type="checkbox"] { display:none; }
+.slide [type="checkbox"]:checked ~ div.slidecontent { display:block; margin-top:0; padding:0; }
+.disabled { color:var(--bad); } .enabled { color:var(--ok); }
+@media screen and (max-width:1150px) { .wrapper { max-width:58em; } .content { max-width:40em; } }
+@media screen and (max-width:980px) { body { padding:1.5em 0; } .menu { width:100%; max-width:none; float:none; text-align:center; font-size:1.5em; } .content { float:none; margin:0; margin-top:16px; max-width:100%; width:100%; text-align:center; } a, .slide label { display:block; } }

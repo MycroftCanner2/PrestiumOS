@@ -1,0 +1,26 @@
+#!/bin/sh
+# Prestium 2.0: build lurch 0.7.0 (OMEMO for libpurple/Pidgin; bundled axc 0.3.4, libomemo 0.7.1,
+# libsignal-protocol-c, statically linked) from the source staged at pinned commits, install it
+# to Debian's libpurple plugin dir, then purge exactly the build-only packages this hook added.
+# purple-xmpp-carbons and libmxml1 (lurch's runtime library) come from the package lists.
+set -e
+S=/usr/src/prestium-thirdparty/lurch-src.tar
+LP=/usr/lib/x86_64-linux-gnu/purple-2
+[ -f "$S" ] || { echo "E: lurch source missing"; exit 1; }
+export DEBIAN_FRONTEND=noninteractive
+dpkg-query -W -f='${Package}\n' | sort > /tmp/pkgs-before
+apt-get install -y --no-install-recommends gcc g++ make cmake pkg-config libc6-dev libpurple-dev \
+	libmxml-dev libxml2-dev libsqlite3-dev libgcrypt20-dev libglib2.0-dev
+dpkg-query -W -f='${Package}\n' | sort > /tmp/pkgs-after
+rm -rf /tmp/lurch; mkdir -p /tmp/lurch; tar -xf "$S" -C /tmp/lurch
+( cd /tmp/lurch && make -j"$(nproc)" LIBGCRYPT_LDFLAGS=-lgcrypt \
+	CMAKE_FLAGS="-DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS=-fPIC -DCMAKE_POLICY_VERSION_MINIMUM=3.5" )
+install -D -m 644 /tmp/lurch/build/lurch.so "$LP/lurch.so"
+mkdir -p /usr/lib/purple-2; ln -sfn "$LP/lurch.so" /usr/lib/purple-2/lurch.so
+comm -13 /tmp/pkgs-before /tmp/pkgs-after > /tmp/pkgs-build-only
+# shellcheck disable=SC2046
+[ -s /tmp/pkgs-build-only ] && apt-get purge -y $(cat /tmp/pkgs-build-only)
+rm -rf /tmp/lurch /tmp/pkgs-before /tmp/pkgs-after /tmp/pkgs-build-only
+ldd "$LP/lurch.so" | grep 'not found' && { echo "E: lurch.so has unresolved libraries"; exit 1; } || true
+ldd "$LP/lurch.so" | grep -q gcrypt || echo "W: lurch.so not linked to libgcrypt"
+echo "P: lurch installed: $(ls -la $LP/lurch.so $LP/carbons.so 2>&1 | tr '\n' ' ')"

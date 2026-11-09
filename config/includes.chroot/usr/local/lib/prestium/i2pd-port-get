@@ -1,0 +1,9 @@
+#!/bin/sh
+# Prestium 2.0 r5: print i2pd's per-boot port for ferm.conf, or "none" when there is no valid one.
+# /run/prestium/i2pd.port is written only by root (prestium-i2pd-port); anything but a plain number
+# in 10000-30000 is ignored, so ferm never opens a port it was not meant to.
+P=$(head -c 16 /run/prestium/i2pd.port 2>/dev/null | tr -d '\n')
+case "$P" in
+  ''|*[!0-9]*) echo none; exit 0 ;;
+esac
+if [ "$P" -ge 10000 ] && [ "$P" -le 30000 ]; then echo "$P"; else echo none; fi

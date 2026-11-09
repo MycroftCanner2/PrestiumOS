@@ -1,0 +1,44 @@
+#!/bin/sh
+# Prestium: spoof one network device's MAC address (run by 70-prestium-mac-spoof.rules).
+# Argument: the interface index (2.0 r18; stable across udev's rename) or, for manual use, a name.
+# 2.0 r18:
+#  - the name is looked up from the index at run time (the udev rule's %k was the pre-rename name);
+#  - a device whose address already differs from its permanent address is left alone (a second
+#    "add" event, e.g. a later udevadm trigger, must not take a connected device down);
+#  - every outcome is logged, so a failure is visible in the journal.
+# If spoofing fails the device's driver is unbound (fail closed), as before.
+SYS=${PRESTIUM_SYSFS:-/sys}/class/net
+arg="$1"
+case "$arg" in
+  '') logger -t prestium-spoof-mac "no device given"; exit 0 ;;
+  *[!0-9]*) dev="$arg" ;;
+  *) dev=
+     for d in "$SYS"/*; do
+       [ "$(cat "$d/ifindex" 2>/dev/null)" = "$arg" ] && { dev=${d##*/}; break; }
+     done ;;
+esac
+if [ -z "$dev" ] || [ ! -e "$SYS/$dev" ]; then
+  logger -t prestium-spoof-mac "device ${dev:-with index $arg} is gone; nothing to spoof"
+  exit 0
+fi
+old=$(cat "$SYS/$dev/address" 2>/dev/null)
+# iproute2 reports "permaddr" only when the current address differs from the permanent one.
+perm=$(ip -o link show dev "$dev" 2>/dev/null | sed -n 's/.* permaddr \([0-9a-f:]\{17\}\).*/\1/p')
+if [ -n "$perm" ] && [ "$perm" != "$old" ]; then
+  logger -t prestium-spoof-mac "$dev: already spoofed, left alone"
+  exit 0
+fi
+ip link set dev "$dev" down 2>/dev/null
+if /usr/bin/macchanger -e "$dev" >/dev/null 2>&1; then
+  new=$(cat "$SYS/$dev/address" 2>/dev/null)
+  if [ -n "$new" ] && [ "$new" != "$old" ]; then
+    logger -t prestium-spoof-mac "$dev: MAC address spoofed (vendor part kept)"
+    exit 0
+  fi
+fi
+logger -t prestium-spoof-mac "$dev: MAC spoofing FAILED, disabling the device"
+ip link set dev "$dev" down 2>/dev/null
+drv=$(readlink -f "$SYS/$dev/device/driver" 2>/dev/null)
+dvp=$(basename "$(readlink -f "$SYS/$dev/device" 2>/dev/null)")
+[ -n "$drv" ] && [ -n "$dvp" ] && echo "$dvp" > "$drv/unbind" 2>/dev/null
+exit 0

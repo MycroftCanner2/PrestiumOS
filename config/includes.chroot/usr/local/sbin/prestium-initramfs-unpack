@@ -1,0 +1,62 @@
+#!/usr/bin/python3
+# Prestium 1.9.1: unpack this kernel's initramfs into a tmpfs on /run/initramfs
+# (Tails design), so systemd-shutdown can switch to it at the end of shutdown and
+# run /shutdown (memory wipe). Firmware and kernel modules are left out (not
+# needed at shutdown) to keep the RAM cost small.
+import os, subprocess, sys
+# 2.0 r7: any failure is visible: non-zero exit (unit failed) plus a safety flag the desktop shows.
+def fail(msg):
+    print("shutdown memory wipe NOT prepared: " + msg, file=sys.stderr)
+    subprocess.run(["/usr/local/lib/prestium/safety-flag", "set", "shutdown-wipe",
+                    "The shutdown memory wipe could not be prepared (%s). Memory will NOT get a final "
+                    "wipe pass at shutdown." % msg])
+    sys.exit(1)
+def main():
+    kver = os.uname().release
+    src = "/boot/initrd.img-" + kver
+    dst = "/run/initramfs"
+    def sh(*a, **k): return subprocess.run(a, check=True, **k)
+    os.makedirs(dst, exist_ok=True)
+    if not os.path.ismount(dst):
+        sh("mount", "-t", "tmpfs", "-o", "mode=0700,exec,nosuid,nodev,size=256m", "tmpfs", dst)
+    data = open(src, "rb").read()
+    # skip the uncompressed early cpio archive(s) (CPU microcode)
+    off = 0
+    while data[off:off+6] in (b"070701", b"070702"):
+        while True:
+            namesize = int(data[off+94:off+102], 16)
+            filesize = int(data[off+54:off+62], 16)
+            name = data[off+110:off+110+namesize-1]
+            off += 110 + namesize
+            off = (off + 3) & ~3
+            off += filesize
+            off = (off + 3) & ~3
+            if name == b"TRAILER!!!":
+                break
+        while off < len(data) and data[off] == 0:
+            off += 1
+    main = data[off:]
+    magic = main[:4]
+    if magic == b"\x28\xb5\x2f\xfd": dec = ["zstd", "-dcq"]
+    elif main[:2] == b"\x1f\x8b": dec = ["gzip", "-dc"]
+    elif main[:6] == b"\xfd7zXZ\x00": dec = ["xz", "-dc"]
+    else: dec = ["cat"]
+    p1 = subprocess.Popen(dec, stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+    p2 = subprocess.Popen(["cpio", "-idm", "--quiet", "--no-absolute-filenames", "--nonmatching",
+                           "*lib/firmware/*", "*lib/modules/*"], stdin=p1.stdout, cwd=dst)
+    p1.stdout.close()
+    p1.stdin.write(main); p1.stdin.close()
+    r2 = p2.wait(); r1 = p1.wait()
+    ok = os.access(os.path.join(dst, "shutdown"), os.X_OK)
+    print("initramfs unpacked to %s (decompress rc %d, cpio rc %d, /shutdown %s)" % (dst, r1, r2, "present" if ok else "MISSING"))
+    if r1 != 0 or r2 != 0 or not ok:
+        fail("decompress rc %d, cpio rc %d, /shutdown %s" % (r1, r2, "present" if ok else "missing"))
+    subprocess.run(["/usr/local/lib/prestium/safety-flag", "clear", "shutdown-wipe"])
+    sys.exit(0)
+if __name__ == "__main__":
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as e:
+        fail("%s: %s" % (e.__class__.__name__, e))

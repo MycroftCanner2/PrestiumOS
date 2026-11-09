@@ -1,0 +1,27 @@
+# Prestium: each third-party apt repository may only supply its own packages.
+# "origin" is the repository's host name (the i2pd repo's Release file says Origin "debian trixie",
+# so o= cannot be used). Allowed packages keep the default priority (500), so the version chosen is
+# the same as without these pins; everything else from these hosts is never installed (-1).
+Package: i2pd
+Pin: origin repo.i2pd.xyz
+Pin-Priority: 500
+
+Package: librewolf
+Pin: origin repo.librewolf.net
+Pin-Priority: 500
+
+Package: tor tor-geoipdb deb.torproject.org-keyring lyrebird snowflake-client webtunnel
+Pin: origin deb.torproject.org
+Pin-Priority: 500
+
+Package: *
+Pin: origin repo.i2pd.xyz
+Pin-Priority: -1
+
+Package: *
+Pin: origin repo.librewolf.net
+Pin-Priority: -1
+
+Package: *
+Pin: origin deb.torproject.org
+Pin-Priority: -1

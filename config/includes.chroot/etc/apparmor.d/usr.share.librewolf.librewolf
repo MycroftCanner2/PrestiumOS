@@ -1,0 +1,185 @@
+# Prestium 2.0: LibreWolf ("I2P Browser"), ENFORCED.
+# 1.9.1 shipped this profile in complain mode. 2.0 enforces it: LibreWolf may read its own install,
+# the system's shared data, fonts, themes and GPU/audio interfaces, and may write only its own
+# profile/cache/config directories, ~/Downloads and temporary files. Everything else in $HOME is
+# denied (KeePassXC databases, mail, wallets, Tor Browser's data ...). Tor's control socket and the
+# onion-grater filter are denied. Network access is limited further by the firewall (uid "user"
+# may only reach the local I2P/Tor proxy ports). Opening downloads in other applications from
+# inside the browser is not allowed (as in Tails' Tor Browser): open them from the file manager.
+# Local additions: /etc/apparmor.d/local/usr.share.librewolf.librewolf
+abi <abi/4.0>,
+include <tunables/global>
+
+@{librewolf_dir}=/usr/share/librewolf /usr/lib/librewolf
+
+profile librewolf /usr/share/librewolf/librewolf{,-bin} {
+  include <abstractions/base>
+  include <abstractions/audio>
+  include <abstractions/dri-enumerate>
+  include <abstractions/gnome>
+  include <abstractions/ibus>
+  include <abstractions/mesa>
+  include <abstractions/nameservice>
+  include <abstractions/opencl>
+  include if exists <abstractions/vulkan>
+  include if exists <abstractions/dbus-session-strict>
+  include if exists <abstractions/dbus-accessibility-strict>
+  include if exists <abstractions/glycin>
+
+  # content-process sandbox: unprivileged user namespace + chroot inside it
+  userns,
+  capability sys_admin,
+  capability sys_chroot,
+  deny capability sys_ptrace,
+  owner @{PROC}/@{pid}/{gid,uid}_map w,
+  owner @{PROC}/@{pid}/setgroups w,
+
+  network inet stream,
+  network inet dgram,
+  network unix,
+  network netlink raw,
+  deny network inet6,
+
+  ptrace (read, trace) peer=@{profile_name},
+  signal (send, receive) peer=@{profile_name},
+  signal (receive) set=(term, kill, int, hup) peer=unconfined,
+
+  # install (root-owned) and its helpers
+  @{librewolf_dir}/ r,
+  @{librewolf_dir}/** r,
+  @{librewolf_dir}/**.so mr,
+  @{librewolf_dir}/librewolf{,-bin} mrix,
+  @{librewolf_dir}/{glxtest,gfxtest,vaapitest,vulkantest,pingsender} ix,
+  /etc/librewolf/ r,
+  /etc/librewolf/** r,
+  /usr/local/share/prestium-nssdb/** r,
+  /{usr/,}bin/{sh,dash,bash,uname,expr,dirname,basename} rix,
+
+  # profile, config, cache (fixed profile ~/.librewolf/prestium, see /usr/local/bin/librewolf-i2p)
+  owner @{HOME}/ r,
+  owner @{HOME}/.librewolf/ rw,
+  owner @{HOME}/.librewolf/** rwk,
+  owner @{HOME}/.config/librewolf/ rw,
+  owner @{HOME}/.config/librewolf/** rwk,
+  owner @{HOME}/.cache/librewolf/ rw,
+  owner @{HOME}/.cache/librewolf/** rwk,
+  owner @{HOME}/.mozilla/ rw,
+  owner @{HOME}/.mozilla/** rwk,
+  deny @{HOME}/.librewolf/**.so m,
+  owner @{HOME}/.cache/fontconfig/ rw,
+  owner @{HOME}/.cache/fontconfig/** rwkl,
+  owner @{HOME}/.cache/mesa_shader_cache/** rwk,
+  owner @{HOME}/.cache/mesa_shader_cache_db/** rwk,
+  owner @{HOME}/.config/gtk-3.0/ r,
+  owner @{HOME}/.config/gtk-3.0/** r,
+  owner @{HOME}/.config/gtk-2.0/** r,
+  owner @{HOME}/.config/ibus/** r,
+  owner @{HOME}/.cache/ibus/** rw,
+  owner @{HOME}/.Xauthority r,
+  owner @{HOME}/.icons/** r,
+  owner @{HOME}/.themes/** r,
+  owner @{HOME}/.local/share/recently-used.xbel* rw,
+  owner @{HOME}/.local/share/applications/ r,
+  owner @{HOME}/.local/share/applications/** r,
+  owner @{HOME}/.config/mimeapps.list r,
+  deny @{HOME}/.local/share/gvfs-metadata/** rw,
+  owner /run/user/[0-9]*/dconf/ rw,
+  owner /run/user/[0-9]*/dconf/user rwk,
+  owner @{HOME}/.config/dconf/user r,
+  /etc/dconf/** r,   # 2.0 r17: system dconf profile/db (read-only); denial seen on the r16 ISO
+
+  # the only user folder for saving and uploading files
+  owner @{HOME}/Downloads/ rw,
+  owner @{HOME}/Downloads/** rwk,
+  owner @{HOME}/Desktop/ r,
+
+  # temporary files (downloads in progress, sandbox, IPC)
+  owner /tmp/ r,
+  owner /tmp/** rwk,
+  owner /var/tmp/** rwk,
+  owner /{dev,run}/shm/ r,
+  owner /{dev,run}/shm/** rwk,
+  /dev/shm/ r,
+
+  # audio (PipeWire / pipewire-pulse)
+  owner /run/user/[0-9]*/ r,
+  owner /run/user/[0-9]*/pulse/ r,
+  owner /run/user/[0-9]*/pulse/native rw,
+  owner /run/user/[0-9]*/pipewire-0 rw,
+  /etc/pulse/client.conf r,
+  /etc/pulse/client.conf.d/ r,
+  /etc/pulse/client.conf.d/* r,
+  owner @{HOME}/.config/pulse/** r,
+  deny /usr/bin/pulseaudio x,
+
+  # system information Firefox reads (GPU, CPU, memory, cgroups)
+  /etc/machine-id r,
+  /var/lib/dbus/machine-id r,
+  /etc/mailcap r,
+  /etc/mime.types r,
+  /etc/gtk-3.0/** r,
+  /etc/xdg/** r,
+  /etc/igfx_user_feature*.txt r,
+  /etc/glvnd/egl_vendor.d/{,*.json} r,
+  /usr/share/glvnd/egl_vendor.d/{,*.json} r,
+  /usr/share/** r,
+  /usr/share/applications/** rk,
+  owner @{PROC}/@{pid}/** r,
+  owner @{PROC}/@{pid}/oom_score_adj rw,
+  owner @{PROC}/@{pid}/task/*/comm rw,
+  @{PROC}/sys/kernel/random/uuid r,
+  @{PROC}/sys/kernel/yama/ptrace_scope r,
+  @{PROC}/sys/fs/inotify/max_user_watches r,
+  @{PROC}/sys/crypto/fips_enabled r,
+  @{PROC}/meminfo r,
+  @{PROC}/cpuinfo r,
+  @{PROC}/stat r,
+  @{PROC}/pressure/memory r,
+  @{PROC}/sys/kernel/osrelease r,
+  @{sys}/devices/** r,
+  @{sys}/bus/ r,
+  @{sys}/bus/pci/devices/ r,
+  @{sys}/class/ r,
+  @{sys}/class/** r,
+  @{sys}/fs/cgroup/** r,
+  /dev/ r,
+  /dev/dri/ r,
+  /dev/dri/* rw,
+  /run/udev/data/** r,
+  /etc/udev/udev.conf r,
+  deny /dev/udmabuf rw,
+  deny /dev/video* rw,
+  deny @{PROC}/@{pid}/net/route r,
+  deny @{PROC}/[0-9]*/cmdline r,
+  deny /usr/bin/lsb_release x,
+  deny /etc/os-release r,
+  deny /usr/lib/os-release r,
+
+  # session D-Bus: notifications, accessibility, portals (file chooser); nothing else
+  dbus send bus=session path=/org/freedesktop/Notifications interface=org.freedesktop.Notifications,
+  dbus receive bus=session interface=org.freedesktop.Notifications,
+  dbus (send, receive) bus=session path=/org/freedesktop/portal/desktop{,/**},
+  dbus (send, receive) bus=session interface=org.freedesktop.DBus.Properties,
+  dbus (send) bus=session interface=org.freedesktop.DBus.Introspectable,
+
+  # never Tor's control port, directly or through the filter
+  deny /run/tor/** rw,
+  deny /run/onion-grater/** rw,
+  # never other users' data or Prestium's secrets
+  deny @{HOME}/.tor-browser/** rw,
+  deny "@{HOME}/Tor Browser/**" rw,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.claws-mail/** rw,
+  deny @{HOME}/.config/feather/** rw,
+  deny @{HOME}/.local/share/keyrings/** rw,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/.ssh/** rw,
+
+  # 2.0 r10: Wayland only, through the sandbox's own security-context socket
+  owner /run/user/[0-9]*/wayland-0 rw,
+
+  # 2.0 r9: no sudo/su/pkexec, no Prestium helpers, no system bus
+  include <abstractions/prestium-no-admin>
+
+  include if exists <local/usr.share.librewolf.librewolf>
+}

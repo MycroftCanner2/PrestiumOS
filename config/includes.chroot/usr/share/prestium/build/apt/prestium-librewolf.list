@@ -1,0 +1,2 @@
+# Final LibreWolf source (r16: same file name as live-build's build-time list, so the two never coexist)
+deb [arch=amd64 signed-by=/usr/share/keyrings/librewolf.gpg] https://repo.librewolf.net librewolf main

@@ -1,0 +1,31 @@
+# Prestium 1.9.1 Tor configuration (on top of /usr/share/tor/tor-service-defaults-torrc)
+#
+# A SocksPort line here replaces every SocksPort of the defaults file, so the
+# world-writable unix socket /run/tor/socks (which the per-uid firewall can't
+# filter) is gone. Streams to different destination hosts/ports use separate
+# circuits; Tor Browser isolates further by SOCKS username (first-party domain).
+SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort
+# 2.0 r9: Tor Browser runs in a sandbox with no network at all (its own empty network namespace,
+# like Tails' "tbb" namespace but without even a veth); this Unix socket, bound into the sandbox, is
+# its only way out. Only members of prestium-tbb (the desktop user) can use it, the same users the
+# firewall lets reach 9050. No isolation flags: Tor Browser isolates by SOCKS username itself.
+# 2.0 r17: WorldWritable, not GroupWritable. With GroupWritable, Tor requires the directory's group
+# to be its own (debian-tor) or root and silently skipped this socket because /run/prestium-tbb is
+# group prestium-tbb (seen on the r16 ISO: 9050 open, no socket). Access is enforced by the
+# directory instead: /run/prestium-tbb is 2750 debian-tor:prestium-tbb (tmpfiles.d), so only Tor and
+# members of prestium-tbb can reach the socket, the same as Debian's /run/tor/socks model.
+SocksPort unix:/run/prestium-tbb/socks WorldWritable
+# no DNSPort/TransPort: nothing on Prestium resolves names outside Tor/I2P
+AvoidDiskWrites 1
+# Sandbox 1 removed in 1.9.1: Tor refuses managed proxies (ClientTransportPlugin: obfs4/snowflake/webtunnel) in Sandbox mode, so tor@default failed. Tails does not use Sandbox either.
+# IPv6 is disabled on Prestium
+ClientUseIPv6 0
+ClientPreferIPv6ORPort 0
+
+# Pluggable transports: obfs4 (lyrebird), Snowflake and WebTunnel are set up by the Tor Connection
+# Assistant (menu: Network). Snowflake/meek/WebTunnel host names are resolved with DNS-over-HTTPS
+# through the I2P outproxy and pinned for the transports; Tor traffic itself never uses I2P.
+
+# Prestium 2.0: pluggable transports, bridges and UseBridges live in the Tor Connection
+# Assistant's drop-in (/etc/tor/torrc.d/50-prestium-assistant.conf; default = direct connection).
+%include /etc/tor/torrc.d/*.conf

@@ -1,0 +1,26 @@
+#!/bin/sh
+# Prestium: open The Lounge (IRC web client on 127.0.0.1:9000) in the local-only Firefox,
+# signed in automatically. The per-boot login token is readable by "user" only; it is
+# passed in the URL fragment (never sent to the server or written to The Lounge's logs)
+# to a small page on The Lounge's own origin that stores it where The Lounge looks for it.
+# 2.0 r6: token presence alone is not enough — require a hex token of expected length and
+# that thelounge.service is active; otherwise tell the user how to recover.
+if ! systemctl is-active --quiet thelounge.service 2>/dev/null; then
+  zenity --title "IRC (The Lounge)" --warning --no-wrap \
+    --text "The Lounge service is not running. Wait a moment after boot, then try again. If it persists, restart I2P/The Lounge from the Network menu or with: systemctl restart thelounge" 2>/dev/null
+  exit 1
+fi
+T=$(cat /run/prestium-thelounge/token 2>/dev/null | tr -d '\n\r')
+case "$T" in
+  ""|*[!0-9a-f]*)
+    zenity --title "IRC (The Lounge)" --warning --no-wrap \
+      --text "The Lounge sign-in token is missing or invalid. Wait a few seconds after boot for setup to finish, then try again. If it persists: systemctl restart thelounge" 2>/dev/null
+    exit 1 ;;
+esac
+# setup writes 64 random bytes as hex => 128 chars
+if [ "${#T}" -ne 128 ]; then
+  zenity --title "IRC (The Lounge)" --warning --no-wrap \
+    --text "The Lounge sign-in token looks incomplete (${#T} chars). Wait a moment and try again, or: systemctl restart thelounge" 2>/dev/null
+  exit 1
+fi
+exec /usr/local/bin/prestium-localfox "http://127.0.0.1:9000/packages/thelounge-prestium-autologin/autologin.html#$T"

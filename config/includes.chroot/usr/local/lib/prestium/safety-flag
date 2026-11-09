@@ -1,0 +1,17 @@
+#!/bin/sh
+# Prestium 2.0 r7: record (or clear) a failed privacy protection so the desktop shows it.
+#   safety-flag set <name> <message>    safety-flag clear <name>
+# Flags live in /run/prestium/safety (root-owned, world-readable); prestium-safety-notify shows them.
+D=/run/prestium/safety
+case "$2" in ''|*/*|.*) echo "safety-flag: bad name" >&2; exit 2 ;; esac
+case "$1" in
+  set)
+    [ -d "$D" ] || install -d -o root -g root -m 0755 /run/prestium "$D" || exit 1
+    T=$(mktemp "$D/.flag.XXXXXX") || exit 1
+    printf '%s\n' "$3" > "$T" && chmod 0644 "$T" && mv -f "$T" "$D/$2"
+    echo "<3>prestium: SAFETY: $3" > /dev/kmsg 2>/dev/null
+    logger -p auth.crit -t prestium-safety "$2: $3" 2>/dev/null
+    exit 0 ;;
+  clear) rm -f "$D/$2"; exit 0 ;;
+esac
+echo "usage: safety-flag set <name> <message> | clear <name>" >&2; exit 2

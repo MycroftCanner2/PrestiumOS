@@ -1,0 +1,12 @@
+#!/bin/sh
+# Prestium 1.9.1 (Tails: tails-remove-overlayfs-dirs.service): late in shutdown,
+# after the desktop and services have stopped, delete the session's files from
+# RAM: the overlay read-write branch (everything written since boot: home,
+# downloads, browser profiles, keys), /tmp, /var/tmp and /dev/shm. Freed pages
+# are zeroed by the kernel (init_on_free=1).
+for d in /run/live/overlay/rw /tmp /var/tmp /dev/shm; do
+  [ -d "$d" ] || continue
+  find "$d" -xdev -mindepth 1 -delete 2>/dev/null
+done
+echo "prestium: session files deleted" > /dev/kmsg 2>/dev/null
+exit 0

@@ -1,0 +1,50 @@
+# Prestium 1.9.1.1: Pidgin (Tor + OTR).
+# 2.0 r9: ENFORCED (was complain mode, i.e. not confined), with the shared app rules and no sudo,
+# Prestium helpers or system bus. Not yet tested on a booted ISO.
+abi <abi/3.0>,
+include <tunables/global>
+
+profile pidgin /usr/bin/pidgin {
+  include <abstractions/prestium-app-base>
+  include <abstractions/base>
+  include <abstractions/nameservice>
+  include <abstractions/gnome>
+  include <abstractions/fonts>
+  include <abstractions/freedesktop.org>
+  include <abstractions/dbus-session-strict>
+  include <abstractions/audio>
+
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+
+  /usr/bin/pidgin mr,
+  /usr/lib/purple-2/** mr,
+  /usr/lib/pidgin/** mr,
+  /usr/lib/x86_64-linux-gnu/purple-2/** mr,
+  /usr/lib/x86_64-linux-gnu/pidgin/** mr,
+  /usr/share/pidgin/** r,
+  /usr/share/purple/** r,
+  /usr/share/sounds/** r,
+  /etc/ssl/** r,
+  /usr/share/ca-certificates/** r,
+
+  owner @{HOME}/.purple/ rw,
+  owner @{HOME}/.purple/** rwk,
+  owner @{HOME}/.cache/** rw,
+  owner /tmp/** rw,
+
+  deny @{HOME}/.ssh/** rw,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/Tor\ Browser/** rw,
+  # plugins on any architecture, file transfers to ~/Downloads, links in Tor Browser (own sandbox)
+  /usr/lib/@{multiarch}/purple-2/** mr,
+  /usr/lib/@{multiarch}/pidgin/** mr,
+  owner @{HOME}/Downloads/ r,
+  owner @{HOME}/Downloads/** rwk,
+  /usr/bin/xdg-open ix,
+  /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut} ix,
+  /usr/local/bin/tor-browser Ux,
+
+  include if exists <local/usr.bin.pidgin>
+}

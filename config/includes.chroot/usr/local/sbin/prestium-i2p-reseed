@@ -1,0 +1,164 @@
+#!/bin/bash
+# prestium-i2p-reseed: replace i2pd's reseed file and make i2pd reseed from it.
+#   prestium-i2p-reseed               download a fresh .su3 over Tor (StormyCloud, then reseed.onion.im)
+#   prestium-i2p-reseed --file PATH   use a .su3 the user downloaded (e.g. from https://reseed2.i2p.net/)
+# Runs as root (user may run exactly this script through sudo, /etc/sudoers.d/prestium-i2p-reseed).
+# Every file is checked by /usr/local/lib/prestium/verify-su3 against i2pd's reseed certificates
+# (/usr/share/i2pd/certificates/reseed/): SU3 format, signature, routerInfo entries, age (downloads:
+# at most 14 days old; a manual file older than that only gets a warning). Only then is it installed
+# atomically as the file i2pd.conf [reseed] file= names (i2pd 2000:2000, 0644), netDb is cleared and
+# i2pd restarted. On any failure the current file stays and i2pd is not touched.
+# Output lines "STEP: ..." are progress for the GUI (prestium-i2p-reseed-gui).
+# Exit: 0 done, 2 every download source failed (try a manual file), 3 Tor not ready, 1 other error.
+set -u
+umask 022
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+CONF=/var/lib/i2pd/i2pd.conf
+CERTS=/usr/share/i2pd/certificates/reseed
+VERIFY=/usr/local/lib/prestium/verify-su3
+NETDB=/var/lib/i2pd/netDb
+MAXSIZE=10485760
+SAFE=/usr/local/lib/prestium/safefile
+# url  allowed signers (the certificate for each is in $CERTS)
+SOURCES=(
+  "https://reseed.stormycloud.org/i2pseeds.su3 admin@stormycloud.org,idk@stormycloud.org"
+  "https://reseed.onion.im/i2pseeds.su3 lazygravy@mail.i2p"
+)
+# the Tor client runs as this uid: the firewall (ferm.conf) lets it reach 127.0.0.1:9050 and nothing
+# else; root and debian-tor are not used for the download (root is blocked, debian-tor bypasses Tor)
+TORUID=prestium-htp
+
+step(){ echo "STEP: $*"; }
+die(){ echo "ERROR: $2"; exit "$1"; }
+
+if [ "$(id -u)" -ne 0 ]; then exec sudo -n /usr/local/sbin/prestium-i2p-reseed "$@"; fi
+# sudo keeps the caller's working directory: never run (Python) code from it as root
+cd / || exit 1
+MODE=download
+case "$#:${1:-}" in
+  0:) ;;
+  2:--file) MODE=file; SRC=$2 ;;
+  *) die 1 "usage: prestium-i2p-reseed [--file /path/to/file.su3]" ;;
+esac
+
+exec 9>/run/prestium-i2p-reseed.lock
+flock -n 9 || die 1 "another reseed is already running"
+
+# 2.0 r4: i2pd.conf (i2pd's file) is read only if it is a regular file, never through a symlink
+CONFTXT=$(/usr/local/lib/prestium/safefile read /var/lib/i2pd i2pd.conf) || die 1 "$CONF is not a regular file"
+DEST=$(printf '%s\n' "$CONFTXT" | sed -n 's/^[[:space:]]*file[[:space:]]*=[[:space:]]*\(\/var\/lib\/i2pd\/[A-Za-z0-9._-]*\.su3\)[[:space:]]*$/\1/p' | head -n1)
+[ -n "$DEST" ] || die 1 "no [reseed] file = /var/lib/i2pd/....su3 in $CONF"
+T=$(mktemp -d /run/prestium-i2p-reseed.XXXXXX) || die 1 "cannot create a temporary directory"
+trap 'rm -rf "$T"' EXIT
+NEW=$T/new.su3
+
+tor_ready(){ # Tor bootstrapped 100 % (control socket, cookie auth; root may read both)
+  python3 -I - <<'PY'
+import socket, sys
+try:
+    cookie = open("/run/tor/control.authcookie", "rb").read().hex()
+    s = socket.socket(socket.AF_UNIX); s.settimeout(10); s.connect("/run/tor/control")
+    s.sendall(("AUTHENTICATE %s\r\nGETINFO status/bootstrap-phase\r\nQUIT\r\n" % cookie).encode())
+    r = b""
+    while True:
+        b = s.recv(4096)
+        if not b: break
+        r += b
+except Exception as e:
+    print("cannot ask Tor (%s)" % e); sys.exit(1)
+t = r.decode(errors="replace")
+if "PROGRESS=100" in t and "TAG=done" in t: sys.exit(0)
+print(t.split("status/bootstrap-phase=")[-1].split("\r\n")[0][:160] if "status/bootstrap-phase=" in t else t[:160])
+sys.exit(1)
+PY
+}
+
+if [ "$MODE" = download ]; then
+  step "Checking that Tor is connected"
+  why=$(tor_ready) || die 3 "Tor is not connected yet ($why). Wait until Tor has connected (Network > Tor Connection Assistant), then try again."
+  # the firewall must let $TORUID reach Tor's SOCKS port (a refused connect fails fast)
+  runuser -u "$TORUID" -- timeout 10 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9050' 2>/dev/null \
+    || die 3 "uid $TORUID cannot reach Tor's SOCKS port 127.0.0.1:9050 (firewall or Tor not listening)"
+  ok=0
+  for s in "${SOURCES[@]}"; do
+    url=${s%% *}; signers=${s#* }; host=${url#https://}; host=${host%%/*}
+    step "Downloading from $host over Tor"
+    rm -f "$NEW"
+    # own Tor circuit per attempt (SOCKS user name); reseed servers only answer I2P's user agent
+    if ! runuser -u "$TORUID" -- curl -sfL --proto =https --max-redirs 3 --max-filesize $MAXSIZE \
+         --retry 2 --retry-delay 5 --retry-max-time 120 --connect-timeout 60 -m 180 -A "Wget/1.11.4" \
+         --proxy "socks5h://prestium-reseed-$$-$RANDOM:x@127.0.0.1:9050" "$url" > "$NEW"; then
+      echo "WARN: download from $host failed"; continue
+    fi
+    step "Checking the signature of the file from $host"
+    if out=$(python3 -I "$VERIFY" --max-age 14 --signers "$signers" "$NEW" "$CERTS"); then
+      echo "$out"; ok=1; FROM=$host; break
+    fi
+    echo "$out"; echo "WARN: the file from $host was rejected"
+  done
+  [ "$ok" = 1 ] || die 2 "the automatic download failed (StormyCloud and reseed.onion.im). The current reseed file is kept and i2pd was not restarted. Download a reseed file by hand from https://reseed2.i2p.net/ in Tor Browser, then use the menu entry \"Manual reseed file\"."
+else
+  # the path comes from the user: never let root open it. Checks first, then the file is read as the
+  # invoking user (so a symlink or a race can only reach what that user may read anyway), size-capped.
+  RU=${SUDO_USER:-root}
+  case "$SRC" in /*) ;; *) die 1 "the file path must be absolute" ;; esac
+  case "$SRC" in *$'\n'*) die 1 "bad file name" ;; esac
+  [ -L "$SRC" ] && die 1 "$SRC is a symbolic link; choose the file itself"
+  runuser -u "$RU" -- test -f "$SRC" || die 1 "$SRC is not a regular file (or cannot be read)"
+  step "Copying $(basename -- "$SRC")"
+  runuser -u "$RU" -- head -c $((MAXSIZE + 1)) -- "$SRC" > "$NEW" || die 1 "cannot read $SRC"
+  [ "$(stat -c %s "$NEW")" -le $MAXSIZE ] || die 1 "the file is larger than 10 MB, so it is not a reseed file"
+  step "Checking the signature"
+  out=$(python3 -I "$VERIFY" --max-age 14 --warn-only-age --signers any "$NEW" "$CERTS") \
+    || die 1 "$(echo "$out" | sed -n 's/^ERROR: //p' | head -n1) - the file was not installed"
+  echo "$out"; FROM="file $(basename -- "$SRC")"
+fi
+
+step "Installing the reseed file"
+# 2.0 r7: the shipped/previous reseed file is the fallback (it may be stale, but it is usable), and the
+# existing netDb is the router's knowledge of the network. Neither is destroyed until i2pd has started
+# with the freshly verified file. If anything fails, both come back and the message says the fallback
+# is in use (never that the network data is fresh).
+OLD=$T/old.su3
+HAVE_OLD=0
+if [ -e "$DEST" ] || [ -L "$DEST" ]; then
+  "$SAFE" read "$(dirname "$DEST")" "$(basename "$DEST")" > "$OLD" \
+    || die 1 "cannot back up the current reseed file $DEST, so nothing was changed"
+  HAVE_OLD=1
+fi
+NDB_OLD="$NETDB.prestium-old"
+if [ -L "$NDB_OLD" ]; then die 1 "$NDB_OLD is a symbolic link; nothing was changed"; fi
+rm -rf -- "$NDB_OLD"
+# /var/lib/i2pd is owned by i2pd: never install by path. safefile refuses a symlink, directory or
+# special file at DEST and writes through an O_EXCL temp file + fchown/fchmod + renameat.
+"$SAFE" write "$(dirname "$DEST")" "$(basename "$DEST")" 2000 2000 0644 < "$NEW" \
+  || die 1 "cannot install $DEST (the existing entry is not a regular file?)"
+step "Restarting I2P (i2pd) so it reseeds"
+restore_old() {   # $1 = reason; puts the fallback su3 and the previous netDb back, starts i2pd
+  systemctl stop i2pd 2>/dev/null || true
+  r=""
+  if [ "$HAVE_OLD" = 1 ]; then
+    "$SAFE" write "$(dirname "$DEST")" "$(basename "$DEST")" 2000 2000 0644 < "$OLD" || r="$r; the previous reseed file could NOT be restored"
+  fi
+  if [ -d "$NDB_OLD" ] && [ ! -L "$NDB_OLD" ]; then
+    { [ ! -e "$NETDB" ] || [ -L "$NETDB" ] || rm -rf -- "$NETDB"; } && mv -T -- "$NDB_OLD" "$NETDB" || r="$r; the previous netDb could NOT be restored"
+  fi
+  if systemctl start i2pd; then
+    die 1 "$1. The previous (possibly stale) reseed file and network database are back and i2pd is running$r"
+  fi
+  die 1 "$1. Restoring the previous reseed file and network database also left i2pd stopped$r (Network > Restart I2P)"
+}
+systemctl stop i2pd || restore_old "i2pd could not be stopped, so the new reseed file was not used"
+# an empty netDb makes i2pd reseed from the file at start; the old one is kept aside until it works
+if [ -d "$NETDB" ] && [ ! -L "$NETDB" ]; then
+  mv -T -- "$NETDB" "$NDB_OLD" || restore_old "the network database could not be set aside"
+  install -d -o 2000 -g 2000 -m "$(stat -c %a "$NDB_OLD")" "$NETDB" || restore_old "a fresh network database directory could not be created"
+fi
+if ! systemctl start i2pd; then
+  echo "WARN: i2pd did not start with the new reseed file; trying once more" >&2
+  sleep 2
+  systemctl start i2pd || restore_old "i2pd would not start with the new reseed file (two attempts)"
+fi
+rm -rf -- "$NDB_OLD"
+echo "DONE: installed $DEST from $FROM; netDb cleared, i2pd restarted"
+exit 0

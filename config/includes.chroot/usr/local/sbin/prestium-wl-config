@@ -1,0 +1,57 @@
+#!/usr/bin/python3 -I
+"""Prestium 2.0 r11 (root, via sudo): write the compositor's configuration for the calling user to
+/run/prestium-wl/<uid>/labwc (root-owned), from /etc/xdg/labwc plus the user's touchpad settings.
+labwc reads only that directory (labwc -C), never ~/.config/labwc: a file there could add key
+bindings or window rules that run commands, which an application must not be able to do.
+The touchpad settings (~/.config/prestium/touchpad.json) are only read as four checked values."""
+import json, os, pwd, re, sys
+BASE = os.environ.get("PRESTIUM_WL_BASE", "/run/prestium-wl")
+SRC = "/etc/xdg/labwc"
+uid = int(os.environ.get("SUDO_UID", "-1"))
+if os.geteuid() != 0 or uid <= 0:
+    print("prestium-wl-config: run with sudo by the desktop user", file=sys.stderr); sys.exit(2)
+home = pwd.getpwuid(uid).pw_dir
+c = {"tapping": True, "natural_scrolling": True, "disable_while_typing": True, "speed": 0.0}
+try:
+    fd = os.open(os.path.join(home, ".config/prestium/touchpad.json"), os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        if os.fstat(fd).st_uid == uid:
+            raw = json.loads(os.read(fd, 4096).decode())
+            for k in ("tapping", "natural_scrolling", "disable_while_typing"):
+                if isinstance(raw.get(k), bool):
+                    c[k] = raw[k]
+            if isinstance(raw.get("speed"), (int, float)) and not isinstance(raw.get("speed"), bool):
+                c["speed"] = max(-1.0, min(1.0, float(raw["speed"])))
+    finally:
+        os.close(fd)
+except (OSError, ValueError, AttributeError):
+    pass
+yn = lambda v: "yes" if v else "no"
+lib = ('<libinput>\n    <device category="touchpad">\n      <tap>%s</tap>\n      <naturalScroll>%s</naturalScroll>\n'
+       '      <disableWhileTyping>%s</disableWhileTyping>\n      <pointerSpeed>%.2f</pointerSpeed>\n'
+       '    </device>\n  </libinput>' % (yn(c["tapping"]), yn(c["natural_scrolling"]), yn(c["disable_while_typing"]), c["speed"]))
+rc = open(os.path.join(SRC, "rc.xml")).read()
+rc, n = re.subn(r"<libinput>.*?</libinput>", lib, rc, count=1, flags=re.S)
+if n != 1:
+    print("prestium-wl-config: no <libinput> section in %s/rc.xml" % SRC, file=sys.stderr); sys.exit(1)
+d = os.path.join(BASE, str(uid)); out = os.path.join(d, "labwc")
+for p in (BASE, d, out):
+    os.makedirs(p, mode=0o755, exist_ok=True)
+    st = os.lstat(p)
+    if st.st_uid != 0 or not os.path.isdir(p) or os.path.islink(p):
+        print("prestium-wl-config: %s is not root's" % p, file=sys.stderr); sys.exit(1)
+    os.chmod(p, 0o755)
+files = {"rc.xml": rc}
+for f in ("menu.xml", "autostart", "environment"):
+    if os.path.exists(os.path.join(SRC, f)):
+        files[f] = open(os.path.join(SRC, f)).read()
+for f in os.listdir(out):
+    if f not in files:
+        os.unlink(os.path.join(out, f))
+for f, text in files.items():
+    tmp = os.path.join(out, "." + f + ".tmp")
+    with open(tmp, "w") as fh:
+        fh.write(text)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, os.path.join(out, f))
+print(out)

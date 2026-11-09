@@ -1,0 +1,88 @@
+#!/bin/sh
+# Prestium 2.0: install the third-party software staged by scripts/fetch-thirdparty.sh in
+# /usr/src/prestium-thirdparty (each file was checked against its publisher's OpenPGP signature
+# and the SHA-256 pinned in thirdparty/versions.sh before it got here).
+#   Tor Browser  -> /opt/tor-browser (root-owned, read-only; launched by /usr/local/bin/tor-browser
+#                   with the system Tor, TOR_SKIP_LAUNCH) + Prestium policies.json and uBlock Origin
+#   Firefox      -> /opt/firefox (local-only browser for Prestium's own pages) + policies.json
+#   Node.js      -> /opt/nodejs (runtime only: bin/node + LICENSE)
+#   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch
+#   Feather      -> /usr/local/bin/feather
+set -e
+S=/usr/src/prestium-thirdparty
+O=/usr/share/prestium/opt-overlay
+[ -d "$S" ] || { echo "E: $S missing: run scripts/fetch-thirdparty.sh before lb build"; exit 1; }
+T=$(mktemp -d)
+
+# Tor Browser
+rm -rf /opt/tor-browser
+tar -xJf "$S/tor-browser.tar.xz" -C "$T"
+mv "$T/tor-browser" /opt/tor-browser
+cp -a "$O/tor-browser/." /opt/tor-browser/
+touch /opt/tor-browser/Browser/is-packaged-app
+chown -R root:root /opt/tor-browser; chmod -R u+rwX,go+rX,go-w /opt/tor-browser
+grep -q '"version"' /opt/tor-browser/Browser/tbb_version.json 2>/dev/null && echo "P: Tor Browser $(cat /opt/tor-browser/Browser/tbb_version.json)"
+
+# Firefox (local-only)
+rm -rf /opt/firefox
+tar -xJf "$S/firefox.tar.xz" -C /opt
+cp -a "$O/firefox/." /opt/firefox/
+chown -R root:root /opt/firefox; chmod -R u+rwX,go+rX,go-w /opt/firefox
+echo "P: Firefox $(grep -m1 '^Version=' /opt/firefox/application.ini)"
+# 2.0 r20: panel icon for the local-only Firefox (The Lounge, I2P console, torrents); see prestium-localfox.desktop
+for n in 16 32 48 64 128; do
+  f=/opt/firefox/browser/chrome/icons/default/default$n.png
+  [ -f "$f" ] && install -D -m 0644 "$f" /usr/share/icons/hicolor/${n}x${n}/apps/prestium-localfox.png
+done
+command -v gtk-update-icon-cache >/dev/null && gtk-update-icon-cache -q -f /usr/share/icons/hicolor || true
+
+# Node.js runtime
+rm -rf /opt/nodejs "$T/node"; mkdir -p "$T/node"
+tar -xJf "$S/node.tar.xz" -C "$T/node" --strip-components=1
+install -d -m 755 /opt/nodejs /opt/nodejs/bin
+install -m 755 "$T/node/bin/node" /opt/nodejs/bin/node
+install -m 644 "$T/node/LICENSE" /opt/nodejs/LICENSE
+
+# The Lounge
+rm -rf /opt/thelounge; install -d -m 755 /opt/thelounge
+tar -xf "$S/thelounge.tar" -C /opt/thelounge
+P=/opt/thelounge/node_modules/thelounge/dist/server/plugins
+python3 - "$P/changelog.js" "$P/packages/index.js" "$P/../client.js" <<'PY'
+# The Lounge must never contact the Internet itself (its blocked GitHub request crashed it)
+import sys
+c, p, cl = sys.argv[1], sys.argv[2], sys.argv[3]
+# 2.0 r4: networks never connect by themselves (prestium-thelounge-setup marks them disconnected),
+# so the lobby text for a disconnected network says how to connect instead of blaming the user
+s = open(cl).read()
+if 'Prestium' not in s:
+    a = 'You have manually disconnected from this network before, use the /connect command to connect again.'
+    assert s.count(a) == 1
+    s = s.replace(a, 'Not connected (Prestium never connects automatically). When I2P is ready, '
+                     'right-click this network in the list and choose Connect, or type /connect here.')
+    s = s.replace('const msg_1 = ', '// Prestium: lobby text for disconnected networks changed\nconst msg_1 = ', 1)
+    open(cl, 'w').write(s)
+s = open(c).read()
+if 'Prestium' not in s:
+    a = 'async function fetch() {\n'; assert s.count(a) == 1
+    s = s.replace(a, a + '    // Prestium: no external fetches (never contacts api.github.com)\n    return versions;\n')
+    b = 'function checkForUpdates(manager) {\n'; assert s.count(b) == 1
+    s = s.replace(b, b + '    // Prestium: update check disabled (local-only, offline)\n    return;\n')
+    open(c, 'w').write(s)
+s = open(p).read()
+if 'Prestium' not in s:
+    a = 'async function outdated(cacheTimeout = TIME_TO_LIVE) {\n'; assert s.count(a) == 1
+    s = s.replace(a, a + '    // Prestium: never run "yarn outdated" (would contact the npm registry)\n    return false;\n')
+    open(p, 'w').write(s)
+print("P: The Lounge offline patch applied")
+PY
+chown -R root:root /opt/thelounge; chmod -R u+rwX,go+rX,go-w /opt/thelounge
+echo "P: The Lounge $(sed -n 's/.*"version": "\(.*\)".*/\1/p' /opt/thelounge/node_modules/thelounge/package.json | head -1)"
+
+# Feather (Monero wallet; I2P-only settings in ~/.config/feather/settings.json)
+FV=$(cat "$S/feather.version")
+unzip -p "$S/feather.zip" "feather-$FV" > /usr/local/bin/feather 2>/dev/null || {
+	n=$(unzip -Z1 "$S/feather.zip" | grep -E '^feather(-[0-9.]+)?$' | head -1); unzip -p "$S/feather.zip" "$n" > /usr/local/bin/feather; }
+chmod 755 /usr/local/bin/feather; [ -s /usr/local/bin/feather ]
+echo "P: Feather $FV"
+
+rm -rf "$T"

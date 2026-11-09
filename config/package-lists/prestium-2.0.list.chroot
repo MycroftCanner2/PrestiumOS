@@ -1,0 +1,50 @@
+# Prestium 2.0 additions
+# audio: PipeWire + WirePlumber + PulseAudio compatibility, SOF firmware, UCM profiles, tray icon
+pipewire
+pipewire-bin
+pipewire-pulse
+pipewire-alsa
+pipewire-audio
+wireplumber
+libspa-0.2-modules
+rtkit
+alsa-utils
+alsa-ucm-conf
+alsa-topology-conf
+firmware-sof-signed
+pavucontrol
+# Tor Connection Assistant (Python + GTK 3)
+python3
+python3-gi
+gir1.2-gtk-3.0
+# build/verification helpers used by hooks (kept: tiny)
+ca-certificates
+xz-utils
+unzip
+# display settings (hotplug, HiDPI scale), laptop brightness keys/slider, touchpad
+xfce4-settings
+brightnessctl
+xinput
+# accessibility: Onboard on-screen keyboard (Orca was removed: it did not work)
+# 2.0 r10: Wayland desktop (labwc replaces Openbox; waybar tint2; swaylock/swayidle i3lock/xss-lock;
+# mako notification-daemon; grim/slurp scrot; wvkbd Onboard; foot the X terminal; wdisplays and
+# wlr-randr the X display settings). Xwayland runs the remaining X11-only programs.
+labwc
+waybar
+swaylock
+swayidle
+swaybg
+mako-notifier
+grim
+slurp
+wvkbd
+wtype
+foot
+wlr-randr
+wdisplays
+xwayland
+wayland-utils
+qt6-wayland
+libreoffice-gtk3
+# 2.0 r10: relay for LibreWolf's sandbox (I2P HTTP proxy over a Unix socket)
+socat

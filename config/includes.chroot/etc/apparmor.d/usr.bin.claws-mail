@@ -1,0 +1,103 @@
+# Prestium 2.0 r12: Claws Mail ("Mail (I2P)": postman SMTP/POP3 through the i2pd client tunnels on
+# 127.0.0.1:7659/7660). ENFORCED. Like the other apps it gets the shared Prestium rules: no sudo, su
+# or pkexec, no Prestium helpers (Tor mode, tunnel hops, reseed, date), no Tor control socket, no
+# system bus, no full Wayland socket, no other apps' data. Of $HOME it may use only ~/.claws-mail,
+# its mailbox ~/Mail and ~/Downloads (saving and attaching files), so a compromise of Claws cannot
+# change Tor, I2P or desktop settings, add autostart entries, or read browser and wallet data.
+# GnuPG (pgpcore/pgpmime/pgpinline) runs in a child profile that may use ~/.gnupg and nothing else:
+# Claws itself can't read the keyring files. Not yet tested on a booted ISO.
+abi <abi/3.0>,
+include <tunables/global>
+
+profile claws-mail /usr/bin/claws-mail {
+  include <abstractions/prestium-app-base>
+  include <abstractions/nameservice>
+  include if exists <abstractions/enchant>
+
+  # postman's tunnels are on 127.0.0.1; which ports a user may reach is ferm's per-user allowlist
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  network netlink raw,
+
+  /usr/bin/claws-mail mr,
+  /usr/lib/@{multiarch}/claws-mail/** mr,
+  /usr/share/claws-mail/** r,
+
+  owner @{HOME}/.claws-mail/ rw,
+  owner @{HOME}/.claws-mail/** rwkl,
+  owner @{HOME}/Mail/ rw,
+  owner @{HOME}/Mail/** rwkl,
+  # 2.0 r20: Claws Mail 4.x keeps its single-instance control socket in $XDG_RUNTIME_DIR/claws-mail/
+  # (older versions used /tmp); without this it can't create the directory and exits at start
+  owner @{run}/user/[0-9]*/claws-mail/ rw,
+  owner @{run}/user/[0-9]*/claws-mail/* rwk,
+  owner @{HOME}/Downloads/ r,
+  owner @{HOME}/Downloads/** rwk,
+
+  # OpenPGP: gpg and its tools in their own profile (below)
+  /usr/bin/gpg Cx -> gpg,
+  /usr/bin/gpgsm Cx -> gpg,
+  /usr/bin/gpgconf Cx -> gpg,
+  /usr/bin/gpg-connect-agent Cx -> gpg,
+  /usr/bin/gpg-agent Cx -> gpg,
+
+  # links open in the sandboxed browsers (each in its own empty network namespace and profile)
+  /usr/bin/xdg-open ix,
+  /usr/bin/xdg-mime ix,
+  /usr/bin/gio ix,
+  /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut,awk,mawk} ix,
+  /usr/bin/x-www-browser ix,
+  /etc/alternatives/x-www-browser ix,
+  /usr/local/bin/librewolf-i2p Ux,
+  /usr/local/bin/tor-browser Ux,
+
+  # never: anonymity and session settings, even read-write by name (default deny covers them too)
+  deny @{HOME}/.config/prestium/** w,
+  deny @{HOME}/.config/labwc/** w,
+  deny @{HOME}/.config/systemd/** w,
+  deny @{HOME}/.local/share/applications/** w,
+  deny @{HOME}/.librewolf/** rw,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.local/share/gajim/** rw,
+  deny @{HOME}/.feather/** rw,
+  deny @{HOME}/.config/feather/** rw,
+  deny /etc/i2pd/** w,
+  deny /var/lib/i2pd/** rw,
+  deny /etc/tor/** w,
+  deny /var/lib/tor/** rw,
+  deny ptrace,
+
+  profile gpg {
+    include <abstractions/base>
+    include <abstractions/prestium-no-admin>
+    network unix stream,
+
+    /usr/bin/gpg mr,
+    /usr/bin/gpgsm mr,
+    /usr/bin/gpgconf mrix,
+    /usr/bin/gpg-connect-agent mrix,
+    /usr/bin/gpg-agent mrix,
+    /usr/bin/dirmngr mrix,
+    /usr/lib/gnupg/* mrix,
+    /usr/share/gnupg/** r,
+    /etc/gcrypt/** r,
+    /etc/gnupg/** r,
+    @{PROC}/sys/crypto/** r,
+    owner @{PROC}/@{pid}/fd/ r,
+    owner @{PROC}/@{pid}/** r,
+
+    owner @{HOME}/.gnupg/ rw,
+    owner @{HOME}/.gnupg/** rwkl,
+    owner @{run}/user/[0-9]*/gnupg/ rw,
+    owner @{run}/user/[0-9]*/gnupg/** rwk,
+    owner /tmp/** rw,
+    owner @{HOME}/.claws-mail/** r,
+
+    # the passphrase prompt (gpg-agent from the session normally owns it; this covers an agent
+    # started by Claws), unconfined with a scrubbed environment
+    /usr/bin/pinentry* Ux,
+  }
+
+  include if exists <local/usr.bin.claws-mail>
+}

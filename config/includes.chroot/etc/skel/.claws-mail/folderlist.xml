@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<folderlist>
+    <folder type="mh" name="Mailbox" path="Mail" sort="0" collapsed="0">
+        <folderitem type="normal" name="Mailbox" path="" sort_key="0" />
+        <folderitem type="inbox" name="inbox" path="inbox" />
+        <folderitem type="outbox" name="sent" path="sent" />
+        <folderitem type="queue" name="queue" path="queue" />
+        <folderitem type="draft" name="draft" path="draft" />
+        <folderitem type="trash" name="trash" path="trash" />
+    </folder>
+</folderlist>

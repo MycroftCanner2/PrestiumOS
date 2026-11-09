@@ -1,0 +1,6 @@
+#!/bin/sh
+# Prestium 2.0 (build only): config/includes.chroot/etc/resolv.conf is Prestium's final one
+# (nameserver 127.0.0.1, no system DNS). The hooks below still need the build host's resolver for
+# apt, so build.sh stages it here; live-build puts Prestium's file back when the chroot stage ends.
+[ -s /usr/share/prestium/build/host-resolv.conf ] && cp /usr/share/prestium/build/host-resolv.conf /etc/resolv.conf
+exit 0

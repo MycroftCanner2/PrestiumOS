@@ -1,0 +1,16 @@
+# Prestium 1.9.1 (Tails): spoof the MAC address of every physical network
+# device as soon as it appears, before NetworkManager sees it. macchanger -e
+# keeps the vendor part (looks like an ordinary card) and randomises the rest.
+# If spoofing fails the device is disabled. Boot option "nomacspoof" turns it off.
+#
+# 2.0 r18: two fixes.
+#  - udev sorts the keys of one rule line by type and tests ENV{} before it runs
+#    IMPORT{cmdline} (systemd udev-rules.c sort_tokens), so the old one-line rule never saw
+#    "nomacspoof" and spoofed anyway. The import now has a line of its own.
+#  - RUN+= is expanded when this rule is read, before 80-net-setup-link.rules renames the
+#    device (eth0 -> enp1s0), so "%k" handed the script a name that no longer existed; it
+#    exited without spoofing, and prestium-mac-guard then cut the device off for using its
+#    real address ("NetworkManager runs but won't connect"). The interface index survives
+#    the rename, so the script now gets $env{IFINDEX} and looks the name up itself.
+ACTION=="add", SUBSYSTEM=="net", KERNEL!="lo", DEVPATH!="/devices/virtual/*", IMPORT{cmdline}="nomacspoof"
+ACTION=="add", SUBSYSTEM=="net", KERNEL!="lo", DEVPATH!="/devices/virtual/*", ENV{nomacspoof}!="?*", ENV{IFINDEX}=="?*", RUN+="/usr/local/lib/prestium-spoof-mac $env{IFINDEX}"

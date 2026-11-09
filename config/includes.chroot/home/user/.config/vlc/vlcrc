@@ -1,0 +1,5 @@
+# Prestium 1.9.1: no album art / metadata lookups on the network, no privacy prompt
+[qt]
+qt-privacy-ask=0
+[core]
+metadata-network-access=0

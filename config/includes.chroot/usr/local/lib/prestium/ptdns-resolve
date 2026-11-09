@@ -1,0 +1,218 @@
+#!/usr/bin/python3
+# Prestium 2.0: resolve the few host names Tor's pluggable transports need (Snowflake fronts and
+# STUN servers, the meek front, WebTunnel bridge hosts) with DNS-over-HTTPS, tunnelled through I2P:
+# every HTTPS connection goes to i2pd's HTTP proxy (127.0.0.1:4444, CONNECT), which hands it to the
+# configured I2P outproxy. Tor traffic itself never goes through I2P; only these look-ups do, so a
+# local network that blocks or poisons DNS for Tor infrastructure cannot stop the transports.
+#
+# Runs as the unprivileged user "prestium-ptdns" (the firewall lets that uid reach 127.0.0.1:4444
+# and nothing else), started by /usr/local/sbin/prestium-tor-mode.
+#
+# 2.0 design (fast): all names x several DoH providers are queried IN PARALLEL. Each provider gets
+# two worker threads, each with its own persistent (keep-alive) HTTPS connection through the proxy,
+# so one CONNECT/TLS handshake through I2P serves many queries. Per-request timeout is short
+# (default 7 s); a provider that fails twice in a row is dropped; the first valid answer (public
+# IPv4 addresses only) wins; the whole run stops at a deadline (default 25 s) or as soon as every
+# name has an answer. Providers that are known to work through HTTP-CONNECT outproxies on port 443
+# only: Cloudflare and Google (also by IP address, which saves the outproxy a DNS look-up), Quad9,
+# AdGuard and Mullvad (RFC 8484 wire format). Quad9's JSON endpoint (port 5053) is not used: the
+# outproxy only allows port 443, which is why 2.0's first version got URLError from it every time.
+#
+# Output: JSON lines on stdout.
+#   {"event": "resolved", "host": h, "ips": [...], "ttl": n, "via": provider}
+#   {"event": "provider-down", "provider": p, "error": e}
+#   {"done": true, "resolved": {h: {"ips": [...], "ttl": n, "via": p}}, "errors": {...}, "seconds": s}
+import base64, http.client, ipaddress, json, os, queue, random, re, ssl, struct, sys, threading, time
+
+PROXY_HOST, PROXY_PORT = "127.0.0.1", 4444
+HOST_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$", re.I)
+# name, TLS host (also CONNECT target), path, format
+PROVIDERS = [
+    ("cloudflare-ip", "1.1.1.1", "/dns-query", "json"),
+    ("google-ip", "8.8.8.8", "/resolve", "json"),
+    ("cloudflare", "cloudflare-dns.com", "/dns-query", "json"),
+    ("google", "dns.google", "/resolve", "json"),
+    ("quad9", "dns.quad9.net", "/dns-query", "wire"),
+    ("adguard", "unfiltered.adguard-dns.com", "/dns-query", "wire"),
+    ("mullvad", "dns.mullvad.net", "/dns-query", "wire"),
+]
+WORKERS_PER_PROVIDER = 2
+MAX_FAILS = 2
+
+out_lock = threading.Lock()
+def emit(obj):
+    with out_lock:
+        sys.stdout.write(json.dumps(obj) + "\n"); sys.stdout.flush()
+
+def wire_query(host):
+    q = struct.pack(">HHHHHH", 0, 0x0100, 1, 0, 0, 0)
+    for label in host.split("."):
+        q += bytes([len(label)]) + label.encode("ascii")
+    q += b"\0" + struct.pack(">HH", 1, 1)
+    return base64.urlsafe_b64encode(q).rstrip(b"=").decode()
+
+def _skip_name(buf, off):
+    while True:
+        n = buf[off]
+        if n == 0:
+            return off + 1
+        if n & 0xC0 == 0xC0:
+            return off + 2
+        off += 1 + n
+
+def wire_parse(buf):
+    _id, flags, qd, an, _ns, _ar = struct.unpack(">HHHHHH", buf[:12])
+    if flags & 0x000F:
+        raise ValueError("rcode %d" % (flags & 0xF))
+    off = 12
+    for _ in range(qd):
+        off = _skip_name(buf, off) + 4
+    res = []
+    for _ in range(an):
+        off = _skip_name(buf, off)
+        typ, _cls, ttl, rdlen = struct.unpack(">HHIH", buf[off:off + 10]); off += 10
+        if typ == 1 and rdlen == 4:
+            res.append((".".join(str(b) for b in buf[off:off + 4]), ttl))
+        off += rdlen
+    return res
+
+def json_parse(data):
+    d = json.loads(data.decode())
+    if d.get("Status", 0) != 0:
+        raise ValueError("status %s" % d.get("Status"))
+    return [(a.get("data", ""), int(a.get("TTL", 300))) for a in d.get("Answer", []) or [] if a.get("type") == 1]
+
+def public_v4(pairs):
+    ips, ttl = [], 3600
+    for ip, t in pairs:
+        try:
+            a = ipaddress.IPv4Address(ip)
+        except ValueError:
+            continue
+        if a.is_global and str(a) not in ips:
+            ips.append(str(a)); ttl = min(ttl, t)
+    return ips[:4], ttl
+
+class Run:
+    def __init__(self, hosts, timeout, deadline):
+        self.hosts = hosts
+        self.timeout = timeout
+        self.end = time.monotonic() + deadline
+        self.lock = threading.Lock()
+        self.resolved = {}
+        self.errors = {}
+        self.fails = {}
+        self.dead = set()
+        self.all_done = threading.Event()
+        self.ctx = ssl.create_default_context()
+
+    def remaining(self):
+        return self.end - time.monotonic()
+
+    def worker(self, prov, q):
+        name, tls_host, path, fmt = prov
+        conn = None
+        while not self.all_done.is_set() and self.remaining() > 0:
+            with self.lock:
+                if name in self.dead:
+                    break
+            try:
+                host = q.get_nowait()
+            except queue.Empty:
+                break
+            with self.lock:
+                if host in self.resolved:
+                    continue
+            try:
+                if conn is None:
+                    conn = http.client.HTTPSConnection(PROXY_HOST, PROXY_PORT, context=self.ctx,
+                                                       timeout=max(1.0, min(self.timeout, self.remaining())))
+                    conn.set_tunnel(tls_host, 443)
+                if fmt == "json":
+                    url = "%s?name=%s&type=A" % (path, host)
+                    hdr = {"Accept": "application/dns-json"}
+                else:
+                    url = "%s?dns=%s" % (path, wire_query(host))
+                    hdr = {"Accept": "application/dns-message"}
+                hdr["Connection"] = "keep-alive"
+                conn.request("GET", url, headers=hdr)
+                r = conn.getresponse()
+                body = r.read(65536)
+                if r.status != 200:
+                    raise ValueError("HTTP %d" % r.status)
+                ips, ttl = public_v4(json_parse(body) if fmt == "json" else wire_parse(body))
+                with self.lock:
+                    self.fails[name] = 0
+                    if ips and host not in self.resolved:
+                        self.resolved[host] = {"ips": ips, "ttl": ttl, "via": name}
+                        emit({"event": "resolved", "host": host, "ips": ips, "ttl": ttl, "via": name})
+                        if len(self.resolved) == len(self.hosts):
+                            self.all_done.set()
+                    elif not ips:
+                        self.errors.setdefault(host, []).append("%s: no public IPv4" % name)
+            except Exception as e:
+                err = "%s: %s" % (e.__class__.__name__, str(e)[:120])
+                try:
+                    if conn: conn.close()
+                except Exception:
+                    pass
+                conn = None
+                q.put(host)      # let the other worker of this provider (or a retry) have it
+                with self.lock:
+                    self.fails[name] = self.fails.get(name, 0) + 1
+                    if self.fails[name] >= MAX_FAILS and name not in self.dead:
+                        self.dead.add(name)
+                        self.errors.setdefault("_providers", {})[name] = err
+                        emit({"event": "provider-down", "provider": name, "error": err})
+        try:
+            if conn: conn.close()
+        except Exception:
+            pass
+
+    def go(self):
+        threads = []
+        for i, prov in enumerate(PROVIDERS):
+            q = queue.Queue()
+            hs = self.hosts[:]
+            # each provider starts at a different name, so the first answers arrive for all names
+            k = i % len(hs)
+            for h in hs[k:] + hs[:k]:
+                q.put(h)
+            for _ in range(WORKERS_PER_PROVIDER):
+                t = threading.Thread(target=self.worker, args=(prov, q), daemon=True)
+                t.start(); threads.append(t)
+        while not self.all_done.is_set() and self.remaining() > 0:
+            if not any(t.is_alive() for t in threads):
+                break
+            self.all_done.wait(0.1)
+        self.all_done.set()
+
+def main(argv):
+    timeout, deadline, hosts = 7.0, 25.0, []
+    it = iter(argv)
+    for a in it:
+        if a == "--timeout":
+            timeout = max(2.0, min(20.0, float(next(it))))
+        elif a == "--deadline":
+            deadline = max(5.0, min(120.0, float(next(it))))
+        else:
+            h = a.strip().lower().rstrip(".")
+            if HOST_RE.match(h) and h not in hosts:
+                hosts.append(h)
+    t0 = time.monotonic()
+    if not hosts:
+        emit({"done": True, "resolved": {}, "errors": {}, "seconds": 0}); return 0
+    random.seed()
+    run = Run(hosts, timeout, deadline)
+    run.go()
+    with run.lock:
+        res = dict(run.resolved)
+        errs = {h: run.errors.get(h, ["no answer before the deadline"]) for h in hosts if h not in res}
+        if "_providers" in run.errors:
+            errs["_providers"] = run.errors["_providers"]
+    emit({"done": True, "resolved": res, "errors": errs, "seconds": round(time.monotonic() - t0, 1)})
+    sys.stdout.flush()
+    os._exit(0 if res else 1)   # do not wait for workers still blocked in a socket read
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

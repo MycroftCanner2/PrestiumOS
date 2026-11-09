@@ -1,0 +1,15 @@
+#!/bin/sh
+# Prestium 2.0 r10/r11: start an application on the restricted Wayland socket
+# (/run/prestium-wl/<uid>/apps, a security context): it can't capture the screen, inject keyboard or
+# mouse input, read the clipboard in the background or see other windows. The compositor's full
+# socket is root-owned (prestium-wl-broker), so no application can use it, whatever it does.
+# If the restricted socket is missing, it gets no Wayland at all and falls back to Xwayland, where
+# it can't touch Wayland windows either.
+[ $# -gt 0 ] || { echo "usage: prestium-run COMMAND [ARG...]" >&2; exit 2; }
+S=/run/prestium-wl/$(id -u)/apps
+if [ -S "$S" ]; then
+  export WAYLAND_DISPLAY="$S"
+else
+  export WAYLAND_DISPLAY=prestium-no-wayland GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb MOZ_ENABLE_WAYLAND=0
+fi
+exec "$@"

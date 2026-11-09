@@ -1,0 +1,6 @@
+# Prestium 1.9.1: "user" may set the clock as root, and nothing else with date.
+# The old rule (NOPASSWD: /usr/bin/date with any arguments) allowed
+# "sudo date -f FILE", which prints any root-only file (GTFOBins). Now only
+#   sudo date -s "2026-10-24 12:00:00"   (also: -u first, or --set)
+# is accepted: the date words must not start with "-" and contain no "/".
+user	ALL=(root) NOPASSWD: /usr/bin/date ^(-u )?(-s|--set) [0-9][0-9A-Za-z.+_\:-]*( [0-9A-Za-z.+_\:][0-9A-Za-z.+_\:-]*)*$

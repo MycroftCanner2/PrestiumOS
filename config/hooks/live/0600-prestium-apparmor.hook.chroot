@@ -1,0 +1,27 @@
+#!/bin/sh
+# Prestium 2.0: AppArmor. Every profile Prestium ships is enforced, LibreWolf's included (1.9.1.3
+# had it in complain mode). Profiles are compiled once here to catch syntax errors at build time.
+set -e
+# 2.0 r9: Debian's "firefox" profile (flags=unconfined) attaches to /opt/firefox/firefox too, which
+# would conflict with Prestium's confined profile for the local-only Firefox; drop it (no other
+# Firefox is installed).
+rm -f /etc/apparmor.d/firefox /etc/apparmor.d/local/firefox
+# 2.0 r12: Claws Mail (I2P mail) is confined too
+# 2.0 r9: Gajim, OnionShare, Feather, LibreOffice, The Lounge and the local-only Firefox are confined too
+for p in usr.share.librewolf.librewolf torbrowser.Browser.firefox usr.bin.pidgin system_tor usr.bin.i2pd \
+	usr.bin.gajim usr.bin.onionshare usr.local.bin.feather usr.lib.libreoffice.program prestium.thelounge \
+	opt.firefox.firefox usr.bin.claws-mail; do
+	f=/etc/apparmor.d/$p
+	[ -e "$f" ] || { echo "W: no profile $p"; continue; }
+	sed -i 's/ flags=(complain)//; s/flags=(complain) //' "$f"
+	rm -f "/etc/apparmor.d/force-complain/$p" "/etc/apparmor.d/disable/$p"
+	apparmor_parser -Q -K "$f" >/dev/null 2>&1 && echo "P: apparmor $p parses" || { echo "E: apparmor $p does not parse"; apparmor_parser -Q -K "$f"; exit 1; }
+done
+grep -q 'flags=(complain)' /etc/apparmor.d/usr.share.librewolf.librewolf && { echo "E: LibreWolf profile still in complain mode"; exit 1; }
+touch /etc/apparmor.d/local/usr.share.librewolf.librewolf
+# 2.0 r9: every confined app denies sudo/su/pkexec and Prestium's helpers
+for p in usr.share.librewolf.librewolf usr.bin.pidgin usr.bin.gajim usr.bin.onionshare usr.local.bin.feather \
+	usr.lib.libreoffice.program prestium.thelounge opt.firefox.firefox local/torbrowser.Browser.firefox \
+	usr.bin.claws-mail; do
+	grep -q 'prestium-no-admin\|prestium-app-base' "/etc/apparmor.d/$p" || { echo "E: $p does not deny sudo"; exit 1; }
+done

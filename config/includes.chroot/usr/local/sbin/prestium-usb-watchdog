@@ -1,0 +1,85 @@
+#!/bin/bash
+# Prestium 1.9.1: emergency shutdown when the boot medium is removed (Tails-style).
+# Pulling the USB stick (or ejecting the DVD) powers the machine off at once.
+# "systemctl --force poweroff" kills every process without running the normal
+# shutdown units; the freed RAM is zeroed by the kernel (init_on_free=1 on the
+# boot line), which is the same memory-erasure mechanism Tails relies on.
+# Only bash builtins run in the polling loop, and memlockd keeps bash,
+# systemctl locked in RAM, so this still works once the medium is gone.
+# Not armed when booted with "toram" (the medium may then be removed safely).
+#
+# 1.9.1: the independent fallback is started when the watchdog is ARMED (while
+# the medium is still there), not when the medium disappears, so nothing has
+# to be exec'd from the vanished medium at emergency time. It sleeps on a
+# builtin until it gets SIGUSR1, then gives systemd 3 s to power off cleanly,
+# SIGKILLs every process except itself and PID 1 (their memory is freed and
+# so zeroed, init_on_free=1), waits 2 s and powers off through the sysrq trigger
+# (root writes to /proc/sysrq-trigger work whatever kernel.sysrq says).
+# Its argv[0] starts with '@', so systemd-shutdown's killing spree spares it.
+# Worst case from removal to power-off: about 1 s (poll) + 3 s + 2 s.
+#
+# 1.9.1: before the SIGKILL and again before sysrq o, the fallback deletes the
+# session's files (overlay read-write branch, /tmp, /var/tmp, /dev/shm) with a
+# memlocked find, so their RAM is freed and zeroed (A2). During suspend the
+# watchdog is paused (/usr/lib/systemd/system-sleep/prestium-usb-watchdog).
+
+# 2.0 r7: only "toram" is an expected reason not to arm. Anything else is a failure the user must see:
+# exit 3 (unit failed, no restart loop: RestartPreventExitStatus=3) and a safety flag for the desktop.
+FLAG=/usr/local/lib/prestium/safety-flag
+not_armed() {
+  echo "NOT ARMED: $1" >&2
+  $FLAG set usb-watchdog "The boot-medium watchdog did not arm: $1. Pulling the USB stick will NOT power the computer off. Shut down normally when you are done."
+  exit 3
+}
+grep -qw toram /proc/cmdline && { echo "toram boot: watchdog not armed (expected)"; $FLAG clear usb-watchdog; exit 0; }
+
+src=$(findmnt -n -o SOURCE /run/live/medium 2>/dev/null)
+[ -n "$src" ] || not_armed "no live boot medium is mounted at /run/live/medium"
+dev=${src#/dev/}
+disk=$(lsblk -ndo PKNAME "$src" 2>/dev/null)
+[ -n "$disk" ] || disk=$dev
+[ -e "/sys/block/$disk" ] || not_armed "the boot medium $src could not be resolved to a disk"
+case $disk in sr*) optical=1 ;; *) optical= ;; esac
+
+# fallback, started now; only builtins inside
+( exec -a @prestium-emergency /bin/bash -c '
+    go=; trap "go=1" USR1
+    exec 4<> <(:)
+    until [ -n "$go" ]; do read -r -t 1 -u 4; done
+    read -r -t 3 -u 4
+    # 1.9.1 (A2): delete the session files from RAM first (memlocked find:
+    # the medium is gone), then SIGKILL everything so open files are freed too;
+    # freed pages are zeroed by the kernel (init_on_free=1)
+    /usr/bin/find /run/live/overlay/rw /tmp /var/tmp /dev/shm -xdev -mindepth 1 -delete 2>/dev/null
+    kill -KILL -1 2>/dev/null
+    read -r -t 1 -u 4
+    /usr/bin/find /run/live/overlay/rw /tmp /var/tmp /dev/shm -xdev -mindepth 1 -delete 2>/dev/null
+    read -r -t 1 -u 4
+    echo o > /proc/sysrq-trigger' ) </dev/null >/dev/null 2>&1 &
+fallback=$!
+sleep 0.3
+kill -0 "$fallback" 2>/dev/null || not_armed "the emergency fallback process did not start"
+$FLAG clear usb-watchdog
+echo "armed on /dev/$disk (live medium $src), fallback pid $fallback"
+
+emergency() {
+  [ -n "$fired" ] && return
+  fired=1
+  kill -USR1 "$fallback" 2>/dev/null
+  echo "<0>prestium: boot medium removed, emergency shutdown" > /dev/kmsg 2>/dev/null
+  systemctl --force poweroff &
+}
+
+exec 3<> <(:)   # a pipe nothing writes to: "read -t" on it is a builtin sleep
+while :; do
+  if [ ! -e "/sys/block/$disk" ]; then emergency; fi
+  # DVD: the kernel only notices an ejected disc when the drive is opened, so
+  # open it each second (": <" is a builtin; it opens without reading).
+  if [ -n "$optical" ] && ! : < "/dev/$disk" 2>/dev/null; then emergency; fi
+  if read -r size < "/sys/block/$disk/size" 2>/dev/null; then
+    [ "$size" = 0 ] && emergency
+  else
+    emergency
+  fi
+  read -r -t 1 -u 3 || true
+done

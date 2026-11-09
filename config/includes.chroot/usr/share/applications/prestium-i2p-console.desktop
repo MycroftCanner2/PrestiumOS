@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=I2P Router Console
+Comment=i2pd web console (opens in the local-only Firefox)
+Exec=/usr/local/bin/prestium-i2p-console
+Icon=network-workgroup
+Categories=Network;
+Terminal=false

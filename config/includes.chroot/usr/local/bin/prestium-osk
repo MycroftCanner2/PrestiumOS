@@ -1,0 +1,4 @@
+#!/bin/sh
+# Prestium 2.0 r10/r11: on-screen keyboard (wvkbd; replaces Onboard), on and off. It needs the full
+# Wayland socket (virtual keyboard), so the Wayland broker starts it.
+exec /usr/local/bin/prestium-wl osk

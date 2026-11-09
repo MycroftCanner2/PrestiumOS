@@ -1,0 +1,6 @@
+# Prestium 1.9.1: boot option "prestium.nocammic" (boot menu "camera and
+# microphone off"): no account may open cameras or sound capture devices.
+# Sound output keeps working. Runs before the seat rules (73-*) so no
+# desktop-user ACL is added.
+SUBSYSTEM=="video4linux", IMPORT{cmdline}="prestium.nocammic", ENV{prestium.nocammic}=="?*", MODE="0000", GROUP="root", TAG-="uaccess", TAG-="seat"
+SUBSYSTEM=="sound", KERNEL=="pcmC[0-9]*D[0-9]*c", IMPORT{cmdline}="prestium.nocammic", ENV{prestium.nocammic}=="?*", MODE="0000", GROUP="root", TAG-="uaccess", TAG-="seat"

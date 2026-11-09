@@ -1,0 +1,56 @@
+#!/bin/sh
+# Prestium 2.0: users and groups (same names, uids and memberships as 1.9.1.3).
+#   user (1000)          the live user: empty password until set (prestium-session-password), autologin
+#   i2pd (2000)          i2pd runs as uid/gid 2000 (ferm.conf, file ownership)
+#   thelounge            The Lounge IRC web client (127.0.0.1:9000)
+#   onion-grater         Tor control-port filter
+#   prestium-htp         Tor-only clock sync
+#   prestium-ptdns       (2.0) DoH look-ups for Tor's pluggable transports, via the I2P outproxy
+# groups: autologin, i2ptorrents, prestium-localweb
+set -e
+grp() { getent group "$1" >/dev/null || groupadd --system "$1"; }
+sysuser() { # name home comment
+	getent passwd "$1" >/dev/null || useradd --system --user-group --home-dir "$2" --no-create-home \
+		--shell /usr/sbin/nologin --comment "$3" "$1"
+}
+
+# i2pd: the package created a system user with some uid; move it to 2000 (as in every Prestium)
+if getent passwd i2pd >/dev/null; then
+	old_u=$(id -u i2pd); old_g=$(getent group i2pd | cut -d: -f3)
+	[ "$old_g" = 2000 ] || groupmod -g 2000 i2pd
+	[ "$old_u" = 2000 ] || usermod -u 2000 -g 2000 i2pd
+	for d in /var/lib/i2pd /var/log/i2pd /run/i2pd; do
+		[ -e "$d" ] && chown -R --from="$old_u" 2000 "$d" && chown -R --from=":$old_g" :2000 "$d" || true
+	done
+else
+	groupadd --gid 2000 i2pd
+	useradd --uid 2000 --gid 2000 --home-dir /var/lib/i2pd --no-create-home --shell /usr/sbin/nologin i2pd
+fi
+usermod -d /var/lib/i2pd -s /usr/sbin/nologin i2pd
+
+sysuser thelounge /var/lib/thelounge ""
+sysuser onion-grater /nonexistent "Prestium Tor control filter"
+sysuser prestium-htp /nonexistent ""
+sysuser prestium-ptdns /nonexistent "Prestium DoH lookups for Tor bridges (via I2P)"
+grp autologin; grp i2ptorrents; grp prestium-localweb
+grp prestium-tbb   # 2.0 r9: may use Tor's SOCKS socket for the Tor Browser sandbox
+
+if ! getent passwd user >/dev/null; then
+	groupadd --gid 1000 user
+	useradd --uid 1000 --gid 1000 --home-dir /home/user --no-create-home --shell /bin/bash user
+fi
+passwd -d user >/dev/null          # empty until the user sets a session password
+usermod -aG i2pd,autologin,i2ptorrents,prestium-localweb user
+usermod -aG prestium-tbb user       # 2.0 r9
+usermod -aG video user              # 2.0: backlight (brightnessctl, 90-prestium-backlight.rules)
+usermod -aG i2pd,i2ptorrents i2pd 2>/dev/null || true
+gpasswd -a i2pd i2ptorrents >/dev/null
+# home: files from config/includes.chroot plus anything else from /etc/skel
+mkdir -p /home/user
+cp -an /etc/skel/. /home/user/
+for d in Downloads Downloads/Torrents Desktop Documents; do mkdir -p "/home/user/$d"; done
+chown -R user:user /home/user; chmod 700 /home/user
+
+# root: locked (1.8+); no root login at all
+passwd -l root >/dev/null
+echo "P: users: $(getent passwd user i2pd thelounge onion-grater prestium-htp prestium-ptdns | cut -d: -f1,3 | tr '\n' ' ')"

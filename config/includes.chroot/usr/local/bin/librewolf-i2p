@@ -1,0 +1,39 @@
+#!/bin/bash
+# Prestium: "I2P Browser" - LibreWolf through the
+# I2P HTTP proxy 127.0.0.1:4444. .i2p sites go through I2P; other (clearnet)
+# sites go through ONE I2P outproxy (acetone, http://proxy4uwdijqxac2bvdx4fuhem6njmiwukuk2gelejv2nzxka2xq.b32.i2p:3128), which sees every
+# clearnet site you visit. HTTPS-Only mode is off on purpose (I2P sites are http).
+# 1.9.1: fixed profile ~/.librewolf/prestium, seeded with an NSS database that
+# distrusts the eMudhra (emSign) roots.
+# 2.0 r10: LibreWolf runs in the same sandbox as Tor Browser (/usr/local/lib/prestium/browser-sandbox.sh):
+# its own empty network namespace, Wayland only in its own security context, of $HOME only
+# ~/.librewolf and ~/Downloads, no D-Bus, no_new_privs. Its only way out is i2pd's HTTP proxy: a
+# relay outside the sandbox (this script, socat) listens on a Unix socket that is bound in, and a
+# relay inside the sandbox listens on the sandbox's own 127.0.0.1:4444 and forwards to it, so
+# LibreWolf's proxy settings stay as they are. No other address is reachable from inside.
+if [ "$(id -u)" -eq 0 ]; then echo "LibreWolf must not run as root." >&2; exit 1; fi
+P="$HOME/.librewolf/prestium"
+DL="$HOME/Downloads"
+umask 077
+if [ ! -e "$P/cert9.db" ]; then
+  mkdir -p "$P" && cp /usr/local/share/prestium-nssdb/cert9.db /usr/local/share/prestium-nssdb/key4.db "$P/"
+fi
+mkdir -p "$DL" || exit 1
+. ${PRESTIUM_SANDBOX_LIB:-/usr/local/lib/prestium/browser-sandbox.sh}
+command -v socat >/dev/null || sbx_fail "I2P Browser" "socat is missing. The browser was not started."
+sbx_init "I2P Browser"
+PROXY_SOCK="$SBX_DIR/i2p-http-$$"
+INNER_SOCK=/run/prestium-i2p/http
+rm -f "$PROXY_SOCK"
+socat UNIX-LISTEN:"$PROXY_SOCK",fork,umask=0177 TCP:127.0.0.1:${PRESTIUM_I2P_HTTP_PORT:-4444} &
+RELAY=$!
+trap 'kill $RELAY 2>/dev/null; rm -f "$PROXY_SOCK"' EXIT
+for i in $(seq 50); do [ -S "$PROXY_SOCK" ] && break; sleep 0.1; done
+[ -S "$PROXY_SOCK" ] || sbx_fail "I2P Browser" "The I2P proxy relay did not start. The browser was not started."
+B+=(--dir /run/prestium-i2p --bind "$PROXY_SOCK" "$INNER_SOCK"
+    --bind "$HOME/.librewolf" "$HOME/.librewolf" --bind "$DL" "$DL"
+    --chdir "$HOME")
+sbx_run librewolf /bin/bash -c '
+  socat TCP-LISTEN:4444,bind=127.0.0.1,fork,reuseaddr UNIX-CONNECT:'"$INNER_SOCK"' &
+  i=0; while [ $i -lt 50 ] && ! (exec 3<>/dev/tcp/127.0.0.1/4444) 2>/dev/null; do sleep 0.1; i=$((i+1)); done
+  exec '"${PRESTIUM_LIBREWOLF:-/usr/bin/librewolf}"' --profile "$0" "$@"' "$P" "$@"

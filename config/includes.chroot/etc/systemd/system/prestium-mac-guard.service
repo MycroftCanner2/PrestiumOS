@@ -1,0 +1,21 @@
+[Unit]
+Description=Prestium: keep the real MAC address off the network (NetworkManager guard)
+# 2.0 r10: see /usr/local/sbin/prestium-mac-guard
+After=dbus.service NetworkManager.service
+BindsTo=NetworkManager.service
+ConditionKernelCommandLine=!nomacspoof
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=/usr/local/sbin/prestium-mac-guard
+Restart=always
+RestartSec=1
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+ReadWritePaths=/run/prestium/safety
+PrivateTmp=yes
+
+[Install]
+WantedBy=NetworkManager.service

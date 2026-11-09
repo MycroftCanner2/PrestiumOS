@@ -1,0 +1,25 @@
+#!/bin/sh
+# Prestium: pause the boot-medium watchdog during suspend (Tails #11729).
+# USB devices can briefly disappear or be re-enumerated while the machine
+# sleeps, which the watchdog would take for a removed medium.
+# 1.8 stopped the watchdog before sleep and started it again after resume, but
+# a medium pulled DURING suspend then went unnoticed (the restarted watchdog
+# finds no medium and doesn't arm). 1.9.1: the watchdog is frozen (SIGSTOP)
+# before sleep; after resume we wait up to 10 s for the medium:
+#  - back: restart the watchdog (re-armed on the possibly renamed device);
+#  - gone: unfreeze it, so it sees the missing medium and powers off at once.
+U=prestium-usb-watchdog.service
+case "$1" in
+  pre)
+    systemctl kill --kill-whom=main --signal=SIGSTOP $U 2>/dev/null ;;
+  post)
+    src=$(findmnt -n -o SOURCE /run/live/medium 2>/dev/null)
+    i=0
+    while [ -n "$src" ] && [ ! -b "$src" ] && [ $i -lt 10 ]; do sleep 1; i=$((i+1)); done
+    if [ -n "$src" ] && [ -b "$src" ]; then
+      systemctl restart $U
+    else
+      systemctl kill --kill-whom=main --signal=SIGCONT $U 2>/dev/null
+    fi ;;
+esac
+exit 0

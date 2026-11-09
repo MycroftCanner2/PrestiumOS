@@ -1,0 +1,21 @@
+{
+  "policies": {
+    "DisableAppUpdate": true,
+    "ExtensionSettings": {
+      "{73a6fe31-595d-460b-a920-fcc0f8843232}": {
+        "default_area": "navbar",
+        "private_browsing": true
+      },
+      "uBlock0@raymondhill.net": {
+        "default_area": "navbar",
+        "private_browsing": true
+      }
+    },
+    "Preferences": {
+      "extensions.hideNoScript": {
+        "Value": false,
+        "Status": "default"
+      }
+    }
+  }
+}

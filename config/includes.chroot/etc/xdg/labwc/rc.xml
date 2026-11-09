@@ -1,0 +1,86 @@
+<?xml version="1.0"?>
+<!--
+  Prestium 2.0 r10: labwc (Wayland compositor) configuration, replacing Openbox.
+  Same key bindings as the Openbox desktop. Applications started from here go through
+  prestium-run, which connects them to the restricted Wayland socket (no screen capture, no input
+  injection, no clipboard snooping, no reading other windows). Trusted session parts (panel,
+  screen lock, on-screen keyboard, screenshots, display settings) use the full socket.
+  Touchpad settings: ~/.config/prestium/touchpad.json (prestium-touchpad), copied as checked values
+  into the root-owned copy of this file that labwc reads (prestium-wl-config); ~/.config/labwc is not read.
+-->
+<labwc_config>
+  <core>
+    <decoration>server</decoration>
+    <gap>0</gap>
+    <xwaylandPersistence>no</xwaylandPersistence>
+  </core>
+  <placement><policy>center</policy></placement>
+  <theme>
+    <name>Fresh-Theme</name>
+    <titlebar><layout>icon:iconify,max,close</layout></titlebar>
+    <cornerRadius>0</cornerRadius>
+    <font place="ActiveWindow"><name>sans</name><size>10</size><weight>bold</weight></font>
+    <font place="InactiveWindow"><name>sans</name><size>10</size><weight>bold</weight></font>
+    <font place="MenuItem"><name>sans</name><size>10</size></font>
+    <font place="OnScreenDisplay"><name>sans</name><size>10</size><weight>bold</weight></font>
+  </theme>
+  <focus><followMouse>no</followMouse><raiseOnFocus>no</raiseOnFocus></focus>
+  <desktops number="4"><popupTime>875</popupTime></desktops>
+  <windowSwitcher show="yes" preview="yes" outlines="yes" />
+
+  <keyboard>
+    <default />
+    <keybind key="C-A-Left"><action name="GoToDesktop" to="left" wrap="no" /></keybind>
+    <keybind key="C-A-Right"><action name="GoToDesktop" to="right" wrap="no" /></keybind>
+    <keybind key="S-A-Left"><action name="SendToDesktop" to="left" wrap="no" /></keybind>
+    <keybind key="S-A-Right"><action name="SendToDesktop" to="right" wrap="no" /></keybind>
+    <keybind key="W-F1"><action name="GoToDesktop" to="1" /></keybind>
+    <keybind key="W-F2"><action name="GoToDesktop" to="2" /></keybind>
+    <keybind key="W-F3"><action name="GoToDesktop" to="3" /></keybind>
+    <keybind key="W-F4"><action name="GoToDesktop" to="4" /></keybind>
+    <keybind key="A-F4"><action name="Close" /></keybind>
+    <keybind key="A-Escape"><action name="Lower" /></keybind>
+    <keybind key="A-space"><action name="ShowMenu" menu="client-menu" /></keybind>
+    <keybind key="W-space"><action name="ShowMenu" menu="root-menu" /></keybind>
+    <keybind key="A-Tab"><action name="NextWindow" /></keybind>
+    <keybind key="A-S-Tab"><action name="PreviousWindow" /></keybind>
+    <keybind key="W-Up"><action name="ToggleMaximize" /></keybind>
+    <keybind key="W-Left"><action name="SnapToEdge" direction="left" /></keybind>
+    <keybind key="W-Right"><action name="SnapToEdge" direction="right" /></keybind>
+    <keybind key="W-l"><action name="Execute" command="/usr/local/bin/prestium-lock-screen" /></keybind>
+    <keybind key="W-e"><action name="Execute" command="prestium-run pcmanfm" /></keybind>
+    <keybind key="W-t"><action name="Execute" command="prestium-run foot" /></keybind>
+    <keybind key="Print"><action name="Execute" command="/usr/local/bin/prestium-screenshot" /></keybind>
+    <keybind key="A-Print"><action name="Execute" command="/usr/local/bin/prestium-screenshot --area" /></keybind>
+    <keybind key="XF86AudioRaiseVolume"><action name="Execute" command="/usr/local/bin/prestium-media-key volume-up" /></keybind>
+    <keybind key="XF86AudioLowerVolume"><action name="Execute" command="/usr/local/bin/prestium-media-key volume-down" /></keybind>
+    <keybind key="XF86AudioMute"><action name="Execute" command="/usr/local/bin/prestium-media-key mute" /></keybind>
+    <keybind key="XF86AudioMicMute"><action name="Execute" command="/usr/local/bin/prestium-media-key mic-mute" /></keybind>
+    <keybind key="XF86MonBrightnessUp"><action name="Execute" command="/usr/local/bin/prestium-media-key brightness-up" /></keybind>
+    <keybind key="XF86MonBrightnessDown"><action name="Execute" command="/usr/local/bin/prestium-media-key brightness-down" /></keybind>
+    <keybind key="XF86Display"><action name="Execute" command="/usr/local/bin/prestium-wl display-settings" /></keybind>
+  </keyboard>
+
+  <mouse><default /></mouse>
+
+  <libinput>
+    <device category="touchpad">
+      <tap>yes</tap>
+      <naturalScroll>yes</naturalScroll>
+      <disableWhileTyping>yes</disableWhileTyping>
+      <pointerSpeed>0</pointerSpeed>
+    </device>
+  </libinput>
+
+  <windowRules>
+    <!-- zenity 4 draws title-less dialogs; give them a frame and open them centred -->
+    <windowRule identifier="zenity" serverDecoration="yes">
+      <action name="AutoPlace" policy="center" />
+    </windowRule>
+    <!-- apps on the restricted socket (browsers included): always keep the frame (title bar with
+         minimise, maximise, close) so a window can't pose as the desktop. 2.0 r19: the engine name
+         is the one prestium-wl-broker registers ("org.prestium.apps"); the old "org.prestium.bwrap"
+         matched nothing, so Firefox-based browsers drew their own title bar without buttons. -->
+    <windowRule sandboxEngine="org.prestium.apps" serverDecoration="yes" />
+  </windowRules>
+</labwc_config>

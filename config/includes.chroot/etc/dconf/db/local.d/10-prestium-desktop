@@ -1,0 +1,11 @@
+# Prestium 2.0 r10: desktop look under Wayland (GTK reads these; under Openbox xfsettingsd set them)
+[org/gnome/desktop/interface]
+gtk-theme='Adwaita'
+icon-theme='Prestium'
+font-name='Sans 10'
+font-antialiasing='grayscale'
+font-hinting='slight'
+cursor-theme='Adwaita'
+cursor-size=24
+color-scheme='default'
+clock-format='24h'

@@ -1,0 +1,143 @@
+#!/usr/bin/python3
+# prestium-i2p-reseed-gui: menu front end for /usr/local/sbin/prestium-i2p-reseed (run through sudo).
+#   prestium-i2p-reseed-gui           Network > Refresh I2P reseed (via Tor)
+#   prestium-i2p-reseed-gui --manual  Network > Manual reseed file (pick a .su3 you downloaded)
+# Shows the helper's progress, then a success or failure dialog.
+# 2.0 r4: GTK 3 instead of zenity. zenity 4 (GTK 4/libadwaita) dialogs have no window-manager title
+# bar or border under Openbox, cannot ask to be centred, and were drawn four times too big at 200 %
+# scale. GTK 3 windows get Openbox's normal decorations, open centred and follow the display scale
+# (GDK_SCALE + XSETTINGS from prestium-scale) like the rest of the desktop.
+import glob, html, os, re, subprocess, sys, threading
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib, Pango
+
+HELPER = "/usr/local/sbin/prestium-i2p-reseed"
+MANUAL_URL = "https://reseed2.i2p.net/"
+WIDTH_CHARS = 56
+
+def esc(s):
+    return html.escape(s, quote=False)
+
+def message(kind, title, markup, buttons=None):
+    """Modal, centred message window. kind: info|question|error. Returns the response id."""
+    mtype = {"info": Gtk.MessageType.INFO, "question": Gtk.MessageType.QUESTION,
+             "error": Gtk.MessageType.ERROR}[kind]
+    d = Gtk.MessageDialog(message_type=mtype, buttons=Gtk.ButtonsType.NONE, title=title)
+    d.set_markup(markup)
+    d.set_position(Gtk.WindowPosition.CENTER)
+    d.set_resizable(False)
+    d.set_skip_taskbar_hint(False)
+    d.get_message_area().set_size_request(400, -1)
+    for lbl in d.get_message_area().get_children():
+        if isinstance(lbl, Gtk.Label):
+            lbl.set_max_width_chars(WIDTH_CHARS); lbl.set_line_wrap(True)
+            lbl.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR); lbl.set_selectable(True)
+    for text, rid in (buttons or [("_OK", Gtk.ResponseType.OK)]):
+        d.add_button(text, rid)
+    d.set_default_response((buttons or [(None, Gtk.ResponseType.OK)])[-1][1])
+    r = d.run(); d.destroy()
+    while Gtk.events_pending():
+        Gtk.main_iteration()
+    return r
+
+def pick_file():
+    home = os.path.expanduser("~")
+    tbd, dl = os.path.join(home, "Tor Browser"), os.path.join(home, "Downloads")
+    # start where the newest .su3 is (Tor Browser saves to ~/Tor Browser), else in Tor Browser's folder
+    cands = glob.glob(os.path.join(glob.escape(tbd), "*.su3")) + glob.glob(os.path.join(glob.escape(dl), "*.su3"))
+    start = None
+    if cands:
+        start = max(cands, key=lambda p: os.stat(p).st_mtime)
+    d = Gtk.FileChooserDialog(title="Choose an I2P reseed file (.su3)", action=Gtk.FileChooserAction.OPEN)
+    d.add_buttons("_Cancel", Gtk.ResponseType.CANCEL, "_Open", Gtk.ResponseType.ACCEPT)
+    d.set_default_response(Gtk.ResponseType.ACCEPT)
+    d.set_position(Gtk.WindowPosition.CENTER)
+    d.set_local_only(True)
+    for name, pat in (("I2P reseed files (*.su3)", "*.su3"), ("All files", "*")):
+        f = Gtk.FileFilter(); f.set_name(name); f.add_pattern(pat); d.add_filter(f)
+    if start:
+        d.set_filename(start)
+    else:
+        for p in (tbd, dl, home):
+            if os.path.isdir(p):
+                d.set_current_folder(p); break
+    r = d.run(); fn = d.get_filename(); d.destroy()
+    while Gtk.events_pending():
+        Gtk.main_iteration()
+    return fn if r == Gtk.ResponseType.ACCEPT and fn else None
+
+class Progress(Gtk.Window):
+    """Pulsating progress window fed by the helper's "STEP: ..." lines (no Cancel, as before)."""
+    def __init__(self, title, args):
+        super().__init__(title=title)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.set_resizable(False); self.set_deletable(False); self.set_border_width(18)
+        self.connect("delete-event", lambda *a: True)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12); self.add(box)
+        self.label = Gtk.Label(label="Starting...", xalign=0)
+        self.label.set_width_chars(WIDTH_CHARS); self.label.set_max_width_chars(WIDTH_CHARS)
+        self.label.set_ellipsize(Pango.EllipsizeMode.END)
+        box.pack_start(self.label, False, False, 0)
+        self.bar = Gtk.ProgressBar(); box.pack_start(self.bar, False, False, 0)
+        self.lines, self.rc = [], 1
+        GLib.timeout_add(120, self.pulse)
+        threading.Thread(target=self.work, args=(args,), daemon=True).start()
+
+    def pulse(self):
+        if self.rc is None:
+            return False
+        self.bar.pulse(); return True
+
+    def work(self, args):
+        try:
+            p = subprocess.Popen(["sudo", "-n", HELPER] + args, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, errors="replace")
+            for line in p.stdout:
+                line = line.rstrip("\n"); self.lines.append(line)
+                if line.startswith("STEP: "):
+                    GLib.idle_add(self.label.set_text, line[6:])
+            rc = p.wait()
+        except OSError as e:
+            self.lines.append("ERROR: cannot run the reseed helper (%s)" % e); rc = 1
+        GLib.idle_add(self.finish, rc)
+
+    def finish(self, rc):
+        self.rc = None; self.result = rc
+        self.destroy(); Gtk.main_quit()
+        return False
+
+def main():
+    if os.getuid() == 0:
+        print("run this as the desktop user, not root", file=sys.stderr); return 1
+    title, args = "I2P reseed", []
+    if len(sys.argv) > 1 and sys.argv[1] == "--manual":
+        title = "Manual reseed file"
+        f = pick_file()
+        if not f:
+            return 0
+        args = ["--file", f]
+    w = Progress(title, args); w.show_all(); Gtk.main()
+    rc, out = w.result, w.lines
+    msg = [re.sub(r"^(ERROR|WARN|DONE|OK): ", "", l) for l in out if re.match(r"^(ERROR|WARN|DONE|OK): ", l)][-6:]
+    if rc == 0:
+        warn = [l[len("WARN: su3: "):] for l in out if l.startswith("WARN: su3: ")]
+        note = ("\n\nNote: " + esc(" ".join(warn))) if warn else ""
+        message("info", title, "The reseed file was checked and installed. I2P (i2pd) was restarted and is "
+                "now reseeding from it; it can take a few minutes to build tunnels." + note)
+    elif rc == 2:
+        r = message("question", title,
+                    "The automatic download failed (StormyCloud and reseed.onion.im, both over Tor). Your current "
+                    "reseed file is kept and I2P was not restarted.\n\nDownload a reseed file by hand from:\n\n"
+                    "    <tt>%s</tt>\n\nthen choose it with the menu entry Network &gt; Manual reseed file." % esc(MANUAL_URL),
+                    [("_Close", Gtk.ResponseType.CLOSE), ("_Open in Tor Browser", Gtk.ResponseType.YES)])
+        if r == Gtk.ResponseType.YES:
+            subprocess.Popen(["setsid", "tor-browser", MANUAL_URL], stdin=subprocess.DEVNULL,
+                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    else:
+        text = "\n".join(msg) if msg else "the helper failed (exit %d)" % rc
+        message("error", title, "The reseed file was not changed.\n\n" + esc(text))
+    return rc
+
+if __name__ == "__main__":
+    sys.exit(main())

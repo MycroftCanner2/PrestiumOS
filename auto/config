@@ -1,0 +1,48 @@
+#!/bin/sh
+# Prestium 2.0 live-build configuration (Debian 13 "trixie", amd64).
+# Run "lb config" (or ./build.sh) from the top of the repository; this file is the source of truth
+# for the generated config/{bootstrap,chroot,binary,common,source} files.
+set -e
+APPEND="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 apparmor=1 security=apparmor quiet splash"
+lb config noauto \
+	--mode debian \
+	--distribution trixie \
+	--architecture amd64 \
+	--archive-areas "main contrib non-free-firmware" \
+	--parent-archive-areas "main contrib non-free-firmware" \
+	--mirror-bootstrap https://deb.debian.org/debian/ \
+	--mirror-chroot https://deb.debian.org/debian/ \
+	--mirror-binary https://deb.debian.org/debian/ \
+	--mirror-chroot-security https://security.debian.org/debian-security/ \
+	--mirror-binary-security https://security.debian.org/debian-security/ \
+	--security true \
+	--updates true \
+	--backports true \
+	--apt-recommends false \
+	--debootstrap-options "--include=ca-certificates,gnupg" \
+	--apt-indices false \
+	--firmware-chroot false \
+	--firmware-binary false \
+	--linux-flavours amd64 \
+	--initsystem systemd \
+	--binary-images iso-hybrid \
+	--bootloaders "grub-efi,syslinux" \
+	--uefi-secure-boot enable \
+	--memtest none \
+	--debian-installer none \
+	--win32-loader false \
+	--checksums sha256 \
+	--zsync false \
+	--chroot-squashfs-compression-type zstd \
+	--chroot-squashfs-compression-level 6 \
+	--hdd-label PRESTIUM \
+	--iso-volume "PRESTIUM" \
+	--iso-application "Prestium" \
+	--iso-publisher "Prestium" \
+	--iso-preparer "Prestium live-build" \
+	--image-name Prestium-2.0 \
+	--bootappend-live "$APPEND" \
+	--bootappend-live-failsafe "$APPEND nomodeset" \
+	--cache-packages true \
+	--cache-stages "bootstrap" \
+	"${@}"

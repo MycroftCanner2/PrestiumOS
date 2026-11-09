@@ -1,0 +1,10 @@
+[Desktop Entry]
+# 2.0 r20: lets the panel show an icon for prestium-localfox windows (app_id / WM class below).
+# Hidden from menus; open it through IRC (The Lounge), the I2P console or I2P Torrents.
+Type=Application
+Name=Local Firefox (Prestium pages)
+Exec=/usr/local/bin/prestium-localfox
+Icon=prestium-localfox
+StartupWMClass=PrestiumLocalFirefox
+NoDisplay=true
+Terminal=false

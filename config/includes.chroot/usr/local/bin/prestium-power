@@ -1,0 +1,6 @@
+#!/bin/sh
+# Prestium 2.0 r10: Reboot/Shut down from the menu, with a confirmation (labwc has no prompt).
+case "$1" in reboot) t="Restart the computer?" ;; poweroff) t="Shut down the computer?" ;;
+  *) echo "usage: prestium-power reboot|poweroff" >&2; exit 2 ;; esac
+prestium-run zenity --question --title Prestium --text "$t" 2>/dev/null || exit 0
+systemctl "$1" || sudo -n systemctl "$1"

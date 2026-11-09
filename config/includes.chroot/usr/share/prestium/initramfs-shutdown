@@ -1,0 +1,32 @@
+#!/bin/sh
+# Prestium 1.9.1 (Tails memory-erasure design): this script is part of the
+# initramfs. At boot prestium-initramfs-shutdown.service unpacks the initramfs
+# into the /run/initramfs tmpfs; at the very end of shutdown systemd-shutdown
+# switches root to /run/initramfs and runs /shutdown <poweroff|reboot|halt|kexec>.
+# The old root is at /oldroot. We delete every file of the session (overlay
+# read-write branch, tmpfs mounts) and detach the old root, so the RAM holding
+# them is freed, and so zeroed by the kernel (init_on_free=1), before power-off.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+ACTION="${1:-poweroff}"
+mkdir -p /proc /sys /dev
+mount -t proc proc /proc 2>/dev/null
+echo "prestium: wiping session memory before $ACTION" > /dev/kmsg 2>/dev/null
+for d in /oldroot/run/live/overlay/rw /oldroot/run/live/overlay/work \
+         /oldroot/tmp /oldroot/var/tmp /oldroot/dev/shm; do
+  [ -d "$d" ] || continue
+  rm -rf "$d"/* "$d"/.[!.]* "$d"/..?* 2>/dev/null
+done
+# detach the old root and everything below it (tmpfs pages are freed once unused)
+grep ' /oldroot' /proc/mounts | cut -d' ' -f2 | sort -r | while read -r m; do
+  umount "$m" 2>/dev/null || umount -l "$m" 2>/dev/null
+done
+umount -l /oldroot 2>/dev/null
+sync
+echo "prestium: memory wipe done" > /dev/kmsg 2>/dev/null
+case "$ACTION" in
+  reboot|kexec) reboot -f ;;
+  halt) halt -f ;;
+  *) poweroff -f ;;
+esac
+# last resort
+echo o > /proc/sysrq-trigger

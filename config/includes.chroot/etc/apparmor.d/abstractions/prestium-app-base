@@ -1,0 +1,79 @@
+# Prestium 2.0 r9: what every confined desktop app needs (X11, GTK/Qt, fonts, audio, GPU, locale),
+# and nothing in $HOME beyond the app's own directories (each profile adds those). Includes
+# prestium-no-admin: no sudo/su/pkexec, no Prestium helpers, no Tor control socket, no system bus.
+  include <abstractions/base>
+  include <abstractions/fonts>
+  include <abstractions/freedesktop.org>
+  include <abstractions/X>
+  include <abstractions/gtk>
+  include <abstractions/gnome>
+  include if exists <abstractions/qt5>
+  include if exists <abstractions/qt6>
+  include <abstractions/audio>
+  include <abstractions/dri-enumerate>
+  include <abstractions/mesa>
+  include <abstractions/ibus>
+  include <abstractions/dconf>
+  include <abstractions/dbus-session-strict>
+  include <abstractions/ssl_certs>
+  include <abstractions/prestium-no-admin>
+
+  # shared system data and libraries (read-only; the live system is read-only anyway)
+  /usr/share/** r,
+  /usr/lib/@{multiarch}/** mr,
+  /usr/lib/locale/** r,
+  /etc/fonts/** r,
+  /etc/gtk-3.0/** r,
+  /etc/xdg/** r,
+  /etc/machine-id r,
+  /var/lib/dbus/machine-id r,
+  /etc/mime.types r,
+  /etc/mailcap r,
+
+  # own process information only
+  owner @{PROC}/@{pid}/** r,
+  @{PROC}/sys/kernel/** r,
+  @{PROC}/meminfo r,
+  @{PROC}/cpuinfo r,
+  @{PROC}/stat r,
+  /sys/devices/system/cpu/** r,
+  /sys/devices/system/node/** r,
+  /sys/fs/cgroup/** r,
+
+  # desktop settings and caches of the session
+  owner @{HOME}/ r,
+  owner @{HOME}/.Xauthority r,
+  owner @{HOME}/.config/gtk-3.0/** r,
+  owner @{HOME}/.config/fontconfig/** r,
+  owner @{HOME}/.cache/fontconfig/** rwk,
+  owner @{HOME}/.local/share/recently-used.xbel* rw,
+  owner @{HOME}/.local/share/mime/** r,
+  owner @{HOME}/.icons/** r,
+  owner @{HOME}/.themes/** r,
+  owner @{run}/user/[0-9]*/ r,
+  owner @{run}/user/[0-9]*/dconf/** rwk,
+  owner /tmp/ r,
+  owner /tmp/** rwk,
+  owner /var/tmp/** rwk,
+  owner /dev/shm/** rwk,
+
+  # 2.0 r10: Wayland only through the restricted socket (security context: no screen capture, no
+  # input injection, no clipboard snooping, no other windows); never the session's full socket
+  @{run}/prestium-wl/[0-9]*/apps rw,
+  deny @{run}/user/[0-9]*/wayland-[0-9]* rw,
+  deny @{run}/prestium-wl/broker rw,
+  deny @{run}/user/[0-9]*/prestium-sandbox/** rw,
+
+  # never: other apps' secrets (KeePassXC databases, wallets, browser and mail profiles, keys)
+  deny @{HOME}/.ssh/** rw,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/.tor-browser/** rw,
+  deny @{HOME}/Tor\ Browser/** rw,
+  deny @{HOME}/.librewolf/** rw,
+  deny @{HOME}/.mozilla/** rw,
+  deny @{HOME}/**.kdbx rw,
+  deny @{HOME}/.local/share/keyrings/** rw,
+  deny @{HOME}/.config/autostart/** w,
+  deny @{HOME}/.bashrc w,
+  deny @{HOME}/.profile w,
+  deny @{HOME}/.config/openbox/** w,

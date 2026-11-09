@@ -1,0 +1,21 @@
+# Prestium: additions to Debian's system_tor profile (tor@default and the pluggable transports it
+# starts; abstractions/tor runs /usr/bin/lyrebird and /usr/bin/snowflake-client with "Pix", i.e.
+# inside this profile).
+# 1.9.1: WebTunnel pluggable transport (not in the Debian tor abstraction yet)
+/usr/bin/webtunnel-client Pix,
+# 2.0: the transports make their own TLS connections (Snowflake broker via the domain front,
+# WebTunnel bridge, meek front) and need the system CA bundle; the profile did not allow it, so
+# certificate verification failed inside the confinement.
+#include <abstractions/ssl_certs>
+# 2.0: Snowflake (pion WebRTC/ICE) enumerates network interfaces and reads network sysctls
+network netlink raw,
+@{PROC}/sys/net/** r,
+@{PROC}/@{pid}/net/** r,
+/sys/class/net/ r,
+/sys/devices/**/net/** r,
+# Go runtime of the transports
+@{PROC}/sys/kernel/osrelease r,
+/sys/kernel/mm/transparent_hugepage/hpage_pmd_size r,
+# 2.0 r9: SOCKS Unix socket for the Tor Browser sandbox
+/run/prestium-tbb/ r,
+/run/prestium-tbb/socks rw,

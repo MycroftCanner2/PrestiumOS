@@ -1,0 +1,2 @@
+# signed-by: live-build installs prestium-tor.key.chroot (binary) as /etc/apt/trusted.gpg.d/<name>.gpg
+deb [signed-by=/etc/apt/trusted.gpg.d/prestium-tor.key.chroot.gpg] https://deb.torproject.org/torproject.org trixie main

@@ -1,0 +1,17 @@
+#!/bin/sh
+# Prestium 2.0: git does not keep owners or modes; restore them for every file from
+# config/includes.chroot (manifest taken from the 1.9.1.3 rootfs, plus 2.0's new files).
+set -e
+M=/usr/share/prestium/build/perms.txt
+grep -v '^#' "$M" | while read -r mode owner group path; do
+	case "$path" in /usr/share/prestium/build/*) continue ;; esac
+	p=${path%/}
+	[ -e "$p" ] || [ -L "$p" ] || { echo "W: perms: missing $p"; continue; }
+	[ -L "$p" ] && continue
+	chown "$owner:$group" "$p" && chmod "$mode" "$p"
+done
+# directories created by includes that the manifest does not list keep root:root 0755
+chmod 0440 /etc/sudoers.d/*
+visudo -c >/dev/null
+chown -R user:user /home/user
+echo "P: permissions restored"

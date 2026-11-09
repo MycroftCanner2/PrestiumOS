@@ -1,0 +1,569 @@
+#!/usr/bin/python3
+# Prestium 2.0: root helper of the Tor Connection Assistant (run through sudo by "user" only).
+#   prestium-tor-mode apply      read a JSON request on stdin; STOP Tor, resolve the transport's
+#                                host names (DoH via the I2P outproxy, cached in /run), write the
+#                                firewall include, /etc/hosts pins and Tor's drop-in, START Tor.
+#                                Progress is printed as JSON lines; the last line is the result.
+#   prestium-tor-mode cancel     abort a running "apply" (or a connection attempt that is still
+#                                bootstrapping): put the previous configuration back, Tor stays stopped
+#   prestium-tor-mode revert     put the previous configuration back and start Tor
+#   prestium-tor-mode reconnect  restart Tor (new guard/bridge connections), same configuration
+#   prestium-tor-mode status     print the current mode as JSON
+#   prestium-tor-mode features   print which transports are installed (JSON)
+# Request: {"mode": "direct|snowflake|webtunnel|obfs4|meek", "bridges": "<lines>" (optional),
+#           "builtin": true|false}
+# Everything from the request is validated against strict patterns; nothing is passed to a shell.
+# Opening the assistant never stops or restarts Tor: only apply/cancel/revert/reconnect do.
+import fcntl, json, os, re, shutil, signal, socket, subprocess, sys, tempfile, time
+
+DROPIN = "/etc/tor/torrc.d/50-prestium-assistant.conf"
+FERM_INC = "/etc/ferm/prestium-tor-pt.conf"
+RUN = "/run/prestium"
+STATE = RUN + "/tor-mode.json"
+PIDFILE = RUN + "/tor-mode-apply.pid"
+LOCK = RUN + "/tor-mode.lock"
+PREV = RUN + "/tor-mode.prev"
+CACHE = RUN + "/ptdns-cache.json"
+CACHE_TTL = 1800                     # seconds a DoH answer is reused for (re-applying is instant)
+BUILTIN = "/usr/share/prestium/tor-bridges-builtin.json"
+HOSTS = "/etc/hosts"
+RESOLVER = ["/usr/sbin/runuser", "-u", "prestium-ptdns", "--", "/usr/bin/python3",
+            "/usr/local/lib/prestium/ptdns-resolve", "--timeout", "7", "--deadline", "25"]
+TOR_UNIT = "tor@default.service"
+BEGIN, END = "# BEGIN prestium-ptdns (Tor Connection Assistant)", "# END prestium-ptdns"
+MODES = ("direct", "snowflake", "webtunnel", "obfs4", "meek")
+
+FP = r"[0-9A-Fa-f]{40}"
+# 2.0 r4 (audit hardening): [0-9], not \d (which also matches non-ASCII digits)
+ADDR = r"(?:[0-9]{1,3}(?:\.[0-9]{1,3}){3}|\[[0-9a-fA-F:]+\]):[0-9]{1,5}"
+KV = r"(?:[A-Za-z0-9_-]{1,32}=[A-Za-z0-9+/=:.,_~%@\[\]-]{0,2000})"
+PATTERNS = {
+    "obfs4": re.compile(r"^obfs4 %s %s(?: %s)+$" % (ADDR, FP, KV)),
+    "webtunnel": re.compile(r"^webtunnel %s %s(?: %s)+$" % (ADDR, FP, KV)),
+    "snowflake": re.compile(r"^snowflake %s %s(?: %s)+$" % (ADDR, FP, KV)),
+    "meek": re.compile(r"^meek_lite %s(?: %s)?(?: %s)+$" % (ADDR, FP, KV)),
+}
+HOST_RE = re.compile(r"^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$", re.I)
+IP4_RE = re.compile(r"^[0-9]{1,3}(\.[0-9]{1,3}){3}$")
+
+# Pluggable transports: Debian packages from deb.torproject.org, in /usr/bin (allowed by Debian's
+# system_tor AppArmor abstraction + Prestium's local include). See tor-bridges-builtin.json.
+PT_LINES = ["ClientTransportPlugin meek_lite,obfs2,obfs3,obfs4,scramblesuit exec /usr/bin/lyrebird",
+            "ClientTransportPlugin webtunnel exec /usr/bin/webtunnel-client",
+            "ClientTransportPlugin snowflake exec /usr/bin/snowflake-client"]
+
+resolver_proc = None
+cancelled = False
+
+def out(obj):
+    sys.stdout.write(json.dumps(obj) + "\n"); sys.stdout.flush()
+
+def event(phase, msg, **kw):
+    out(dict({"event": "phase", "phase": phase, "message": msg}, **kw))
+
+def die(msg, code=1):
+    out({"ok": False, "error": msg}); sys.exit(code)
+
+def atomic_write(path, text, mode=0o644):
+    d = os.path.dirname(path); os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, prefix=".prestium-")
+    with os.fdopen(fd, "w") as f:
+        f.write(text)
+    os.chmod(tmp, mode); os.replace(tmp, path)
+
+def kv(line, key):
+    m = re.search(r"(?:^| )%s=([^ ]+)" % re.escape(key), line)
+    return m.group(1) if m else None
+
+def url_host(u):
+    m = re.match(r"^https?://([^/:\[\]]+)", u or "")
+    return m.group(1).lower() if m else None
+
+def hosts_for(mode, lines):
+    """Host names the transport itself looks up. Domain fronting: Snowflake's and meek's
+    url= host is only sent inside TLS (HTTP Host header); the TCP connection goes to the front,
+    so only the fronts are resolved and the url= host is never pinned (to any IP)."""
+    need, opt = set(), set()
+    for l in lines:
+        if mode == "snowflake":
+            for f in (kv(l, "fronts") or kv(l, "front") or "").split(","):
+                if f: need.add(f.lower())
+            for s in (kv(l, "ice") or "").split(","):
+                m = re.match(r"^stuns?:([^:]+)(?::[0-9]+)?$", s)
+                if m: opt.add(m.group(1).lower())
+            if not (kv(l, "fronts") or kv(l, "front")):
+                h = url_host(kv(l, "url"))      # no front: the url host is contacted directly
+                if h: need.add(h)
+        elif mode == "meek":
+            f = kv(l, "front") or url_host(kv(l, "url"))
+            if f: need.add(f.lower())
+        elif mode == "webtunnel":
+            h = url_host(kv(l, "url"))
+            if h: need.add(h)
+            s = kv(l, "servername")
+            if s: need.add(s.lower())
+    ok = lambda h: HOST_RE.match(h) and not IP4_RE.match(h)
+    need = sorted(h for h in need if ok(h))
+    opt = sorted(h for h in opt if ok(h) and h not in need)
+    return need, opt
+
+# ---------------------------------------------------------------- DoH cache + resolver
+def load_cache():
+    try:
+        c = json.load(open(CACHE))
+        now = time.time()
+        return {h: v for h, v in c.items() if v.get("exp", 0) > now and HOST_RE.match(h)}
+    except Exception:
+        return {}
+
+def save_cache(c):
+    atomic_write(CACHE, json.dumps(c), 0o600)
+
+def resolve(hosts):
+    """Return {host: [ips]}, errors. Uses the cache; asks the resolver only for missing names."""
+    global resolver_proc
+    cache = load_cache()
+    pins = {h: cache[h]["ips"] for h in hosts if h in cache}
+    missing = [h for h in hosts if h not in pins]
+    if pins:
+        event("resolving", "%d host name(s) from the cache" % len(pins))
+    if not missing:
+        return pins, {}
+    event("resolving", "Resolving %d host name(s) through the I2P outproxy (DNS-over-HTTPS, "
+          "several providers in parallel) ..." % len(missing), hosts=missing)
+    errs = {}
+    try:
+        resolver_proc = subprocess.Popen(RESOLVER + missing, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                                         text=True, start_new_session=True)
+        final = None
+        for line in resolver_proc.stdout:
+            try:
+                d = json.loads(line)
+            except ValueError:
+                continue
+            if d.get("event") == "resolved":
+                out({"event": "resolved", "host": d.get("host"), "ips": d.get("ips"), "via": d.get("via")})
+            elif d.get("event") == "provider-down":
+                out({"event": "log", "message": "DoH provider %s skipped (%s)" % (d.get("provider"), d.get("error"))})
+            elif d.get("done"):
+                final = d
+        resolver_proc.wait(timeout=10)
+    except Exception as e:
+        final = None; errs["*"] = str(e)
+    finally:
+        resolver_proc = None
+    if final:
+        now = time.time()
+        for h, v in (final.get("resolved") or {}).items():
+            h = str(h).lower()
+            if h not in missing:
+                continue
+            ips = [i for i in v.get("ips", []) if IP4_RE.match(str(i))]
+            if ips:
+                pins[h] = ips
+                cache[h] = {"ips": ips, "exp": now + CACHE_TTL, "via": v.get("via")}
+        errs.update({h: e for h, e in (final.get("errors") or {}).items()})
+        save_cache(cache)
+    return pins, errs
+
+# ---------------------------------------------------------------- files
+def write_hosts(pins):
+    try:
+        cur = open(HOSTS).read()
+    except FileNotFoundError:
+        cur = "127.0.0.1\tlocalhost prestium\n"
+    cur = re.sub(r"\n?%s.*?%s\n?" % (re.escape(BEGIN), re.escape(END)), "\n", cur, flags=re.S).rstrip("\n") + "\n"
+    if pins:
+        block = [BEGIN, "# DoH answers fetched through the I2P outproxy; used by Tor's pluggable transports."]
+        for h in sorted(pins):
+            for ip in pins[h]:
+                block.append("%s\t%s" % (ip, h))
+        block.append(END)
+        cur += "\n".join(block) + "\n"
+    atomic_write(HOSTS, cur)
+
+def ferm_text(mode):
+    rules = ["# Prestium 2.0: written by prestium-tor-mode (Tor Connection Assistant); included by ferm.conf",
+             "# inside chain OUTPUT. Default: nothing extra (Tor may use TCP only)."]
+    if mode == "snowflake":
+        rules.append("# Snowflake: WebRTC/STUN need UDP; only Tor's uid (its PT child) and never to loopback")
+        rules.append("outerface ! lo mod owner uid-owner $tor_uid proto udp ACCEPT;")
+    return "\n".join(rules) + "\n"
+
+class FirewallError(RuntimeError):
+    pass
+
+def ferm_reload():
+    """2.0 r7: the result matters. A failed reload means the firewall may not match the files on disk,
+    so callers must never report success (or start Tor) after one."""
+    try:
+        r = subprocess.run(["/usr/bin/systemctl", "reload-or-restart", "ferm.service"], timeout=60,
+                           capture_output=True, text=True)
+    except Exception as e:
+        raise FirewallError("the firewall reload did not run: %s" % e.__class__.__name__)
+    if r.returncode != 0:
+        raise FirewallError("the firewall reload failed (ferm.service): %s" % (r.stderr or "").strip()[-300:])
+
+def torrc_text(mode, lines):
+    t = ["# Prestium 2.0: written by the Tor Connection Assistant (prestium-tor-mode). Mode: %s" % mode]
+    t += PT_LINES
+    if mode == "direct":
+        t.append("UseBridges 0")
+    else:
+        t.append("UseBridges 1")
+        for l in lines:
+            t.append("Bridge " + l)
+    return "\n".join(t) + "\n"
+
+def backup():
+    """Snapshot the live config into PREV at apply start (one step back for revert/cancel-during-apply).
+    Not refreshed after success; cancel-after-success no longer restores PREV (see cmd_cancel)."""
+    # 2.0 r7: PREV is only trusted when complete; a file that did not exist is recorded as absent so
+    # restore() removes it again (complete previous state, not "previous files laid over new ones").
+    os.makedirs(PREV, exist_ok=True)
+    try: os.unlink(os.path.join(PREV, ".complete"))
+    except FileNotFoundError: pass
+    for src, name in ((DROPIN, "dropin"), (FERM_INC, "ferm"), (HOSTS, "hosts"), (STATE, "state")):
+        dst = os.path.join(PREV, name)
+        for p in (dst, dst + ".absent"):
+            if os.path.exists(p):
+                os.unlink(p)
+        if os.path.exists(src):
+            shutil.copy2(src, dst)
+        else:
+            open(dst + ".absent", "w").close()
+    atomic_write(os.path.join(PREV, ".complete"), "1\n")
+
+def restore():
+    """Put the complete previous configuration back. Returns False when there is no complete snapshot.
+    Raises FirewallError when the files are back but the firewall could not be reloaded."""
+    if not os.path.exists(os.path.join(PREV, ".complete")):
+        return False
+    for dst, name, mode in ((DROPIN, "dropin", 0o644), (FERM_INC, "ferm", 0o644), (HOSTS, "hosts", 0o644),
+                            (STATE, "state", 0o644)):
+        src = os.path.join(PREV, name)
+        if os.path.exists(src):
+            atomic_write(dst, open(src).read(), mode)
+        elif os.path.exists(src + ".absent") and os.path.exists(dst) and name != "hosts":
+            os.unlink(dst)
+    ferm_reload()
+    return True
+
+def fail_closed(msg):
+    """Firewall state is unknown: Tor stays stopped and the state file says why."""
+    tor("stop")
+    st = {}
+    try: st = json.load(open(STATE))
+    except Exception: pass
+    st.update({"tor_stopped": True, "firewall_error": msg})
+    try: write_state(st)
+    except Exception: pass
+
+def tor(action):
+    r = subprocess.run(["/usr/bin/systemctl", action, TOR_UNIT], capture_output=True, text=True, timeout=120)
+    return r.returncode == 0, (r.stderr or "").strip()[-400:]
+
+def tor_verify_config():
+    # same check as tor@default's ExecStartPre
+    r = subprocess.run(["/usr/bin/tor", "--defaults-torrc", "/usr/share/tor/tor-service-defaults-torrc",
+                        "-f", "/etc/tor/torrc", "--RunAsDaemon", "0", "--verify-config"],
+                       capture_output=True, text=True, timeout=60)
+    msg = [l for l in (r.stdout + r.stderr).splitlines() if "[warn]" in l or "[err]" in l]
+    return r.returncode == 0, " ".join(msg)[-400:]
+
+def write_state(st):
+    atomic_write(STATE, json.dumps(st), 0o644)
+
+# ---------------------------------------------------------------- commands
+def parse_request():
+    try:
+        req = json.loads(sys.stdin.read(200000))
+    except Exception:
+        die("bad request")
+    mode = req.get("mode")
+    if mode not in MODES:
+        die("unknown mode")
+    builtin = bool(req.get("builtin", True))
+    lines, user = [], []
+    if mode != "direct":
+        user = [l.strip() for l in str(req.get("bridges", "")).splitlines() if l.strip() and not l.strip().startswith("#")]
+        user = [re.sub(r"^Bridge\s+", "", l) for l in user]
+        if len(user) > 64:
+            die("too many bridge lines")
+        pat = PATTERNS[mode]
+        for l in user:
+            if not pat.match(l):
+                die("invalid %s bridge line: %s" % (mode, l[:80]))
+            if mode == "webtunnel" and not url_host(kv(l, "url")):
+                die("WebTunnel bridge line without url=https://...: %s" % l[:80])
+        lines = list(user)
+        if (builtin or not lines) and mode in ("obfs4", "snowflake", "meek"):
+            b = json.load(open(BUILTIN))
+            lines += [l for l in b.get(mode, []) if pat.match(l) and l not in lines]
+        if not lines:
+            die("%s needs at least one bridge line" % mode)
+    return mode, builtin, lines, len(user)
+
+def on_term(signum, frame):
+    global cancelled
+    cancelled = True
+    p = resolver_proc
+    if p is not None:
+        try: os.killpg(p.pid, signal.SIGKILL)
+        except Exception: pass
+    raise KeyboardInterrupt
+
+def cmd_apply():
+    mode, builtin, lines, n_user = parse_request()
+    os.makedirs(RUN, exist_ok=True)
+    lk = open(LOCK, "w")
+    try:
+        fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        die("another change is already being applied")
+    atomic_write(PIDFILE, str(os.getpid()))
+    signal.signal(signal.SIGTERM, on_term)
+    signal.signal(signal.SIGINT, on_term)
+    signal.signal(signal.SIGHUP, on_term)
+    backup()
+    try:
+        event("stopping", "Stopping Tor ...")
+        ok, err = tor("stop")
+        if not ok:
+            raise RuntimeError("Tor could not be stopped: %s" % err)
+        event("stopped", "Tor is stopped.")
+        need, opt = hosts_for(mode, lines)
+        pins, errs = resolve(need + opt) if (need or opt) else ({}, {})
+        if mode in ("snowflake", "meek", "webtunnel"):
+            missing = [h for h in need if h not in pins]
+            if mode == "webtunnel":
+                # drop only the bridges whose host could not be resolved
+                keep = [l for l in lines if all(h in pins for h in hosts_for("webtunnel", [l])[0])]
+                if not keep:
+                    raise RuntimeError("could not resolve the WebTunnel bridge host(s): %s" % ", ".join(missing))
+                if len(keep) < len(lines):
+                    out({"event": "log", "message": "skipping %d WebTunnel bridge(s) whose host did not resolve"
+                         % (len(lines) - len(keep))})
+                lines = keep
+            elif need and len(missing) == len(need):
+                raise RuntimeError("could not resolve %s through the I2P outproxy (is I2P connected?)"
+                                   % ", ".join(need))
+            if mode == "snowflake" and opt and not any(h in pins for h in opt):
+                raise RuntimeError("could not resolve any STUN server for Snowflake")
+        event("writing", "Writing the configuration ...")
+        write_hosts(pins)
+        atomic_write(FERM_INC, ferm_text(mode))
+        ferm_reload()
+        atomic_write(DROPIN, torrc_text(mode, lines))
+        ok, err = tor_verify_config()
+        if not ok:
+            raise RuntimeError("Tor rejected the configuration: %s" % err)
+        event("starting", "Starting Tor ...")
+        ok, err = tor("start")
+        if not ok:
+            raise RuntimeError("Tor did not start: %s" % err)
+        state = {"mode": mode, "builtin": builtin, "bridges": len(lines), "user_bridges": n_user,
+                 "pinned": pins, "dns_errors": {h: e for h, e in errs.items() if h != "_providers"},
+                 "applied": int(time.time())}
+        write_state(state)
+        out(dict(state, ok=True))
+        return 0
+    except KeyboardInterrupt:
+        for sg in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            signal.signal(sg, signal.SIG_IGN)
+        tor("stop")
+        try:
+            restored = restore()
+        except FirewallError as fe:
+            fail_closed(str(fe))
+            out({"ok": False, "cancelled": True, "firewall_error": str(fe), "tor_stopped": True,
+                 "error": "cancelled, but the firewall could not be reloaded; Tor stays stopped"})
+            return 4
+        st = {}
+        try: st = json.load(open(STATE))
+        except Exception: pass
+        st.update({"cancelled": True, "tor_stopped": True})
+        write_state(st)
+        out({"ok": False, "cancelled": True, "restored": restored,
+             "error": "cancelled; the previous configuration is back, Tor is stopped" if restored
+                      else "cancelled; no previous configuration to restore, Tor is stopped"})
+        return 3
+    except Exception as e:
+        # a failed change must not leave the user offline: previous configuration, Tor started again --
+        # but only when the previous firewall is verifiably back (2.0 r7: never start Tor on a failed reload)
+        signal.signal(signal.SIGTERM, signal.SIG_DFL)
+        try:
+            restored = restore()
+        except FirewallError as fe:
+            fail_closed(str(fe))
+            out({"ok": False, "error": str(e), "reverted": False, "tor_stopped": True, "firewall_error": str(fe)})
+            return 4
+        if not restored:
+            tor("stop")
+            out({"ok": False, "error": str(e), "reverted": False, "tor_stopped": True,
+                 "message": "no complete previous configuration; Tor stays stopped"})
+            return 1
+        started, serr = tor("start")
+        out({"ok": False, "error": str(e), "reverted": True, "tor_started": started,
+             "tor_error": "" if started else serr})
+        return 1
+    finally:
+        try: os.unlink(PIDFILE)
+        except OSError: pass
+
+def running_apply():
+    try:
+        pid = int(open(PIDFILE).read().strip())
+        cmd = open("/proc/%d/cmdline" % pid, "rb").read().split(b"\0")
+        if any(b"prestium-tor-mode" in c for c in cmd) and b"apply" in cmd:
+            return pid
+    except Exception:
+        pass
+    return None
+
+
+def tor_bootstrap():
+    """Return (progress:int|None, circuit:bool). None progress => control port unavailable."""
+    try:
+        cookie = open("/run/tor/control.authcookie", "rb").read().hex()
+        s = socket.socket(socket.AF_UNIX)
+        s.settimeout(3)
+        s.connect("/run/tor/control")
+        s.sendall(("AUTHENTICATE %s\r\nGETINFO status/bootstrap-phase status/circuit-established\r\nQUIT\r\n" % cookie).encode())
+        r = b""
+        while True:
+            b = s.recv(4096)
+            if not b:
+                break
+            r += b
+        text = r.decode(errors="replace")
+        pct = None
+        m = re.search(r"status/bootstrap-phase=.*?PROGRESS=(\d+)", text)
+        if m:
+            pct = int(m.group(1))
+        circ = "status/circuit-established=1" in text
+        return pct, circ
+    except Exception:
+        return None, False
+
+def apply_holds_lock():
+    try:
+        lk = open(LOCK, "a+")
+        try:
+            fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(lk, fcntl.LOCK_UN)
+            return False
+        except OSError:
+            return True
+        finally:
+            lk.close()
+    except Exception:
+        return False
+
+def wait_running_apply(timeout=2.0):
+    """PID file can lag the lock by a moment; wait briefly if the lock is held."""
+    pid = running_apply()
+    if pid:
+        return pid
+    if not apply_holds_lock():
+        return None
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        pid = running_apply()
+        if pid:
+            return pid
+        time.sleep(0.1)
+    return running_apply()
+
+def cmd_cancel():
+    # 2.0 r6: never restore a successful apply when Tor is already connected.
+    # cancel during apply: signal the apply (it restores PREV and leaves Tor stopped).
+    # cancel while connecting (no apply): stop Tor, keep the new config (reconnect/revert).
+    # cancel when connected: refuse — use revert to undo configuration.
+    pid = wait_running_apply()
+    if pid:
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(100):
+            if not os.path.exists("/proc/%d" % pid):
+                break
+            time.sleep(0.1)
+        st = {}
+        try: st = json.load(open(STATE))
+        except Exception: pass
+        if st.get("firewall_error"):
+            out({"ok": False, "tor": "stopped", "firewall_error": st["firewall_error"],
+                 "error": "cancelled, but the firewall could not be reloaded; Tor stays stopped"})
+            return 4
+        if os.path.exists("/proc/%d" % pid):
+            out({"ok": False, "error": "the change did not stop within 10 s; Tor state unknown"})
+            return 1
+        out({"ok": True, "tor": "stopped", "message": "cancelled while applying", "restored": True})
+        return 0
+    pct, circ = tor_bootstrap()
+    if (pct is not None and pct >= 100) or circ:
+        out({"ok": False, "error": "Tor is already connected; cancel does nothing. Use revert to undo the configuration.",
+             "bootstrap": pct, "circuit": circ})
+        return 1
+    tor("stop")
+    st = {}
+    try: st = json.load(open(STATE))
+    except Exception: pass
+    st.update({"cancelled": True, "tor_stopped": True})
+    # Keep current drop-in/ferm/hosts (successful apply). PREV stays for explicit revert.
+    write_state(st)
+    out({"ok": True, "tor": "stopped", "restored": False,
+         "message": "Tor stopped; current configuration kept. Use reconnect or revert."})
+    return 0
+
+def cmd_revert():
+    if wait_running_apply():
+        die("a change is still being applied; cancel it first")
+    try:
+        restored = restore()
+    except FirewallError as fe:
+        fail_closed(str(fe))
+        out({"ok": False, "error": str(fe) + "; Tor stays stopped", "firewall_error": str(fe), "tor_stopped": True})
+        return 4
+    try:
+        st = json.load(open(STATE)); st.pop("cancelled", None); st.pop("tor_stopped", None)
+        st.pop("firewall_error", None); write_state(st)
+    except Exception:
+        pass
+    ok, err = tor("restart")
+    out({"ok": ok, "error": err, "restored": restored})
+    return 0 if ok else 1
+
+def cmd_status():
+    try:
+        st = json.load(open(STATE))
+    except Exception:
+        st = {"mode": "direct", "builtin": True, "bridges": 0, "pinned": {}}
+    out(st)
+    return 0
+
+def main():
+    if os.geteuid() != 0:
+        die("must run as root (sudo)")
+    a = sys.argv[1] if len(sys.argv) > 1 else ""
+    if a == "apply":
+        return cmd_apply()
+    if a == "cancel":
+        return cmd_cancel()
+    if a == "revert":
+        return cmd_revert()
+    if a == "reconnect":
+        if wait_running_apply():
+            die("a change is still being applied")
+        ok, err = tor("restart")
+        out({"ok": ok, "error": err}); return 0 if ok else 1
+    if a == "status":
+        return cmd_status()
+    if a == "features":
+        out({"webtunnel": os.path.exists("/usr/bin/webtunnel-client"),
+             "snowflake": os.path.exists("/usr/bin/snowflake-client"),
+             "obfs4": os.path.exists("/usr/bin/lyrebird")})
+        return 0
+    die("usage: prestium-tor-mode apply|cancel|revert|reconnect|status|features", 2)
+
+if __name__ == "__main__":
+    sys.exit(main())

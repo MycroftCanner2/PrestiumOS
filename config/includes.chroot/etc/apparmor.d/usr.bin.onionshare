@@ -1,0 +1,39 @@
+# Prestium 2.0 r9: OnionShare (GUI and CLI), ENFORCED.
+# OnionShare talks to Tor only through the onion-grater filter (ADD_ONION / DEL_ONION), serves files
+# on a local port and may read only the folders files are usually shared from. Received files go
+# to ~/OnionShare. No sudo, no Prestium helpers, no Tor control socket, no system bus.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile onionshare /usr/bin/onionshare{,-cli} {
+  include <abstractions/prestium-app-base>
+  include <abstractions/python>
+  include <abstractions/nameservice>
+
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  network netlink raw,
+
+  /usr/bin/onionshare{,-cli} r,
+  /usr/bin/python3* ix,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.*/** mr,
+  /usr/share/onionshare/** r,
+  /usr/share/onionshare_cli/** r,
+
+  # Tor: only the filtered control socket
+  /run/onion-grater/control rw,
+
+  owner @{HOME}/.config/onionshare/ rw,
+  owner @{HOME}/.config/onionshare/** rwk,
+  owner @{HOME}/.local/share/onionshare/** rwk,
+  owner @{HOME}/OnionShare/ rw,
+  owner @{HOME}/OnionShare/** rwk,
+  # files to share
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public}/ r,
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public}/** r,
+
+  include if exists <local/usr.bin.onionshare>
+}

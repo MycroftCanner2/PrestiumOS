@@ -1,0 +1,21 @@
+#!/bin/bash
+# Prestium 1.9.1: "Remove metadata" (PCManFM right-click action, like Tails' Files action).
+# Runs mat2 on the selected files, inside mat2's own bubblewrap sandbox (no network).
+# For each file it writes a cleaned copy "<name>.cleaned.<ext>" next to it; the original
+# is left unchanged. The result is shown in a dialog.
+[ $# -gt 0 ] || exit 0
+out=$(mat2 -- "$@" 2>&1); rc=$?
+if [ $rc -eq 0 ]; then
+	msg="Metadata removed. A cleaned copy (name.cleaned.ext) was written next to each file; the originals are unchanged.
+
+Note: mat2 can't remove information inside the content itself (e.g. faces, text, watermarks)."
+	[ -n "$out" ] && msg="$msg
+
+$out"
+	zenity --info --no-markup --title="Remove metadata" --text="$msg" 2>/dev/null || notify-send "Remove metadata" "Done: cleaned copies written."
+else
+	zenity --error --no-markup --title="Remove metadata" --text="mat2 could not clean every file:
+
+$(printf '%s' "$out" | tail -n 15)" 2>/dev/null || notify-send "Remove metadata" "mat2 failed"
+fi
+exit $rc

@@ -1,0 +1,45 @@
+# Prestium: The Lounge IRC web client (https://thelounge.chat)
+# Web UI on 127.0.0.1:9000 only (private mode, per-boot sign-in token, see
+# /usr/local/sbin/prestium-thelounge-setup). IRC goes only through i2pd client
+# tunnels on 127.0.0.1:6665-6672; ferm lets the "thelounge" user reach nothing else.
+[Unit]
+Description=The Lounge IRC web client (127.0.0.1:9000, IRC via I2P)
+After=network.target ferm.service i2pd.service
+
+[Service]
+Type=simple
+User=thelounge
+Group=thelounge
+Environment=THELOUNGE_HOME=/var/lib/thelounge NODE_ENV=production
+# 1.9.1: io_uring is disabled system-wide (kernel.io_uring_disabled=2); make libuv use its thread pool from the start
+Environment=UV_USE_IO_URING=0
+ExecStartPre=+/usr/local/sbin/prestium-thelounge-setup
+ExecStart=/opt/nodejs/bin/node /opt/thelounge/node_modules/thelounge/index.js start
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/lib/thelounge
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

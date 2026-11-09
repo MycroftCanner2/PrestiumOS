@@ -1,0 +1,25 @@
+#!/bin/sh
+# Prestium: local-only Firefox for Prestium's own web pages:
+#   I2P Router Console  http://127.0.0.1:7070/  (optional http://i2pd:pass@...)
+#   I2P Torrents        http://127.0.0.1:7685/<per-boot secret>/web/
+#   IRC (The Lounge)    http://127.0.0.1:9000/
+# It runs with the primary group "prestium-localweb". The firewall (ferm) lets that
+# group open TCP connections only to 127.0.0.1 ports 7070, 7685 and 9000: no Internet,
+# no Tor or I2P proxies, no IPv6. Prefs/policies (/opt/firefox/distribution/policies.json)
+# add a second layer (no proxy, website filter, no updates/telemetry).
+# For browsing use "I2P Browser" (LibreWolf) or "Tor Browser".
+URL="${1:-http://127.0.0.1:7070/}"
+case "$URL" in
+  http://127.0.0.1:7070/*|http://127.0.0.1:7685/*|http://127.0.0.1:9000/*) ;;
+  http://i2pd:*@127.0.0.1:7070|http://i2pd:*@127.0.0.1:7070/*) ;;
+  *) echo "prestium-localfox: only Prestium's local pages (127.0.0.1:7070, 7685, 9000)" >&2; exit 2 ;;
+esac
+case "$URL" in *[!A-Za-z0-9:/._#?=%@-]*) echo "prestium-localfox: bad URL" >&2; exit 2 ;; esac
+P="$HOME/.local/share/prestium-localfox"
+mkdir -p "$P" && chmod 700 "$P" || exit 1
+cp -f /usr/local/share/prestium-localfox/user.js "$P/user.js"
+# 1.9.1: distrust the eMudhra (emSign) roots built into Firefox
+[ -e "$P/cert9.db" ] || cp /usr/local/share/prestium-nssdb/cert9.db /usr/local/share/prestium-nssdb/key4.db "$P/"
+CMD="exec /opt/firefox/firefox --name prestium-localfox --class PrestiumLocalFirefox --profile '$P' '$URL'"
+if [ "$(id -gn)" = prestium-localweb ]; then exec sh -c "$CMD"; fi
+exec sg prestium-localweb -c "$CMD"

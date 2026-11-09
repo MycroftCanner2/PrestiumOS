@@ -1,0 +1,33 @@
+// Prestium: let the desktop user shut down, reboot, use networking and restart i2pd without a password.
+// 2.0 r5 (audit): NetworkManager is an allow-list now (was every org.freedesktop.NetworkManager.*
+// action). Not granted: Wi-Fi hotspot/connection sharing (wifi.share.*), hostname and global DNS
+// changes, NetworkManager reload, checkpoints, statistics and connectivity-check toggles; those
+// fall back to the default (admin authentication, which the live user cannot give).
+var prestiumNM = [
+    "org.freedesktop.NetworkManager.network-control",
+    "org.freedesktop.NetworkManager.enable-disable-network",
+    "org.freedesktop.NetworkManager.enable-disable-wifi",
+    "org.freedesktop.NetworkManager.enable-disable-wwan",
+    "org.freedesktop.NetworkManager.wifi.scan",
+    "org.freedesktop.NetworkManager.settings.modify.own",
+    "org.freedesktop.NetworkManager.settings.modify.system"
+];
+polkit.addRule(function(action, subject) {
+    if (subject.user != "user" || !subject.local || !subject.active) {
+        return polkit.Result.NOT_HANDLED;
+    }
+    if (action.id == "org.freedesktop.login1.power-off" ||
+        action.id == "org.freedesktop.login1.reboot" ||
+        action.id == "org.freedesktop.login1.suspend" ||
+        action.id == "org.freedesktop.login1.hibernate" ||
+        action.id == "org.freedesktop.login1.halt" ||
+        prestiumNM.indexOf(action.id) >= 0) {
+        return polkit.Result.YES;
+    }
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "i2pd.service" &&
+        ["start", "stop", "restart"].indexOf(action.lookup("verb")) >= 0) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

@@ -1,0 +1,9 @@
+# Prestium 1.9.1: Diodon keeps no clipboard history (passwords copied from
+# KeePassXC must not be kept). recent-items-size is 1, not 0: 0 means
+# "no limit" in Diodon's Zeitgeist query.
+[net/launchpad/diodon/clipboard]
+keep-clipboard-content=false
+recent-items-size=uint32 1
+use-primary=false
+add-images=false
+synchronize-clipboards=false

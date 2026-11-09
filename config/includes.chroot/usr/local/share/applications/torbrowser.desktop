@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Name=Tor Browser
+GenericName=Web Browser
+Comment=Official Tor Browser, through the system Tor
+Exec=tor-browser %u
+Icon=/opt/tor-browser/Browser/browser/chrome/icons/default/default128.png
+Terminal=false
+Type=Application
+StartupNotify=true
+StartupWMClass=Tor Browser
+Categories=Network;WebBrowser;

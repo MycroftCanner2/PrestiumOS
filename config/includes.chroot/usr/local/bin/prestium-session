@@ -1,0 +1,13 @@
+#!/bin/sh
+# Prestium 2.0 r10/r11: Wayland session (labwc). Started by LightDM (autologin, session "prestium").
+export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=labwc:wlroots XDG_SESSION_DESKTOP=prestium
+# native Wayland wherever a toolkit can; X11 programs still run through Xwayland, but they can't
+# see or inject into Wayland windows (the browsers and every GTK/Qt app).
+export MOZ_ENABLE_WAYLAND=1 GDK_BACKEND=wayland,x11 QT_QPA_PLATFORM='wayland;xcb' \
+       SDL_VIDEODRIVER=wayland,x11 CLUTTER_BACKEND=wayland _JAVA_AWT_WM_NONREPARENTING=1 \
+       ELECTRON_OZONE_PLATFORM_HINT=wayland QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+unset DISPLAY
+# 2.0 r11: labwc reads only its root-owned configuration (never ~/.config/labwc)
+C=$(sudo -n /usr/local/sbin/prestium-wl-config 2>/dev/null) || C=/etc/xdg/labwc
+case "$C" in /run/prestium-wl/*/labwc|/etc/xdg/labwc) ;; *) C=/etc/xdg/labwc ;; esac
+exec labwc -C "$C"

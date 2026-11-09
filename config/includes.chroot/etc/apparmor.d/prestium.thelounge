@@ -1,0 +1,47 @@
+# Prestium 2.0 r9: The Lounge (IRC web client, Node.js), ENFORCED. Applied by thelounge.service
+# (AppArmorProfile=thelounge), on top of its systemd sandbox and its own uid. It may read Node,
+# The Lounge and its state directory, listen on 127.0.0.1:9000 and connect to the local I2P IRC
+# tunnels (the firewall allows only those). Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+# 2.0 r20: attach_disconnected. systemd opens the service's stdin (/dev/null) on the host before it
+# moves the process into its private mount namespace (PrivateDevices=, PrivateTmp=), so in there
+# fd 0 is a "disconnected path". Without this flag AppArmor denies Node's fstat(0) with EACCES and
+# Node aborts at once in PlatformInit (SIGABRT, core-dump), which is what the first r18 boot showed.
+# See systemd issue #12302. The profile's path rules are unchanged.
+profile thelounge flags=(attach_disconnected) {
+  include <abstractions/base>
+  include <abstractions/nameservice>
+  include <abstractions/ssl_certs>
+  include <abstractions/prestium-no-admin>
+
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  network netlink raw,
+
+  /opt/nodejs/bin/node mrix,
+  /opt/nodejs/** r,
+  /opt/thelounge/** r,
+  /opt/thelounge/**.node mr,
+  /var/lib/thelounge/ r,
+  /var/lib/thelounge/** rwk,
+  /usr/share/zoneinfo/** r,
+  /etc/thelounge/** r,
+  @{PROC}/@{pid}/** r,
+  @{PROC}/sys/kernel/** r,
+  @{PROC}/meminfo r,
+  @{PROC}/cpuinfo r,
+  @{PROC}/stat r,
+  /sys/fs/cgroup/** r,
+  /sys/devices/system/cpu/** r,
+  /tmp/** rwk,
+  /dev/shm/** rwk,
+
+  # no home directories at all, no other programs
+  deny /home/** rw,
+  deny /root/** rw,
+
+  include if exists <local/prestium.thelounge>
+}

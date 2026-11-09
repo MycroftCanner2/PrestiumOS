@@ -1,0 +1,128 @@
+#!/opt/nodejs/bin/node
+"use strict";
+// Prestium: prepare The Lounge's single user "prestium" (run as root by thelounge.service
+// ExecStartPre=+ on every start).
+// - first start of a boot: user file from /usr/local/share/prestium-thelounge/prestium.json
+//   with one preset per i2pd IRC client tunnel (IRC2P 6668, echelon 6665;
+//   Ilita 6669, r4sas 6670, acetone 6671). Each preset gets its own random nick.
+// - 2.0 r4: no network connects by itself. At boot the I2P tunnels are not up yet, so the old
+//   automatic connect of IRC2P/Ilita only produced errors (EPIPE) in the page. Every network is
+//   set "disconnected" on every start; the user connects with the network's "Connect" menu
+//   entry (or /connect) once I2P is ready.
+// - a random password (bcrypt-hashed in the user file; plain copy in
+//   /run/prestium-thelounge/password, readable by "user" only, needed only after "Sign out")
+// - a new random login token on every start; only its SHA-512 is stored in the user file,
+//   the token itself goes to /run/prestium-thelounge/token (readable by "user" only) for
+//   the "IRC (The Lounge)" launcher
+const fs = require("fs");
+const crypto = require("crypto");
+const bcrypt = require("/opt/thelounge/node_modules/bcryptjs");
+
+const HOME = "/var/lib/thelounge";
+const USERS = HOME + "/users";
+const FILE = USERS + "/prestium.json";
+const TEMPLATE = "/usr/local/share/prestium-thelounge/prestium.json";
+const RUN = "/run/prestium-thelounge";
+
+function ids(file, name) {
+	for (const l of fs.readFileSync(file, "utf8").split("\n")) {
+		const f = l.split(":");
+		if (f[0] === name) return [Number(f[2]), Number(f[3])];
+	}
+	throw new Error(`${name} not found in ${file}`);
+}
+const [luid, lgid] = ids("/etc/passwd", "thelounge");
+const [ugid] = ids("/etc/group", "user");
+
+// 2.0 r4 (security audit): HOME and USERS belong to thelounge, so nothing in them is trusted:
+// both must be real directories (lstat; a symlink is refused), they are re-owned through a file
+// descriptor opened with O_NOFOLLOW, and the user file is read and written with thelounge's own
+// uid/gid (seteuid), exclusively ('wx') to a new temp name, then renamed. A symlink planted there
+// can only reach what thelounge may touch anyway.
+const C = fs.constants;
+function writeAtomic(path, data, mode, uid, gid) {
+	const tmp = path + ".tmp-" + process.pid + "-" + crypto.randomBytes(6).toString("hex");
+	fs.writeFileSync(tmp, data, {mode, flag: "wx"});
+	if (uid !== null) {
+		fs.chownSync(tmp, uid, gid);
+		fs.chmodSync(tmp, mode);
+	}
+	fs.renameSync(tmp, path);
+}
+function realDir(d, uid, gid, mode) {
+	try {
+		fs.mkdirSync(d, {mode: 0o700});
+	} catch (e) {
+		if (e.code !== "EEXIST") throw e;
+	}
+	const st = fs.lstatSync(d);
+	if (st.isSymbolicLink() || !st.isDirectory()) throw new Error(`refusing ${d}: not a real directory`);
+	const fd = fs.openSync(d, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW);
+	try {
+		if (!fs.fstatSync(fd).isDirectory()) throw new Error(`refusing ${d}: not a directory`);
+		fs.fchownSync(fd, uid, gid);
+		fs.fchmodSync(fd, mode);
+	} finally {
+		fs.closeSync(fd);
+	}
+}
+function asThelounge(fn) {
+	const groups = process.getgroups();
+	process.setgroups([lgid]);
+	process.setegid(lgid);
+	process.seteuid(luid);
+	try {
+		return fn();
+	} finally {
+		process.seteuid(0);
+		process.setegid(0);
+		process.setgroups(groups);
+	}
+}
+
+realDir(RUN, 0, ugid, 0o750);       // /run is root's
+realDir(HOME, luid, lgid, 0o700);   // /var/lib is root's; HOME itself belongs to thelounge
+asThelounge(() => {                 // USERS lives inside thelounge's HOME
+	realDir(USERS, luid, lgid, 0o700);
+});
+
+let password = "";
+try {
+	password = fs.readFileSync(RUN + "/password", "utf8").trim();
+} catch (e) {}
+if (!/^[A-Za-z0-9_-]{24,}$/.test(password)) password = crypto.randomBytes(24).toString("base64url");
+
+let user = null;
+try {
+	user = asThelounge(() => {
+		const st = fs.lstatSync(FILE);
+		if (!st.isFile()) throw new Error("not a regular file");
+		return JSON.parse(fs.readFileSync(FILE, {encoding: "utf8", flag: C.O_RDONLY | C.O_NOFOLLOW}));
+	});
+} catch (e) {}
+if (!user || !Array.isArray(user.networks)) {
+	user = JSON.parse(fs.readFileSync(TEMPLATE, "utf8"));
+	// 1.9.1: every network preset gets its own random nick, so the IRC2P and Ilita
+	// presets (and the alternate servers) don't share one nick that would link them
+	const used = new Set();
+	for (const n of user.networks) {
+		let nick;
+		do nick = "anon" + crypto.randomInt(1000, 10000); while (used.has(nick));
+		used.add(nick);
+		n.uuid = crypto.randomUUID();
+		n.nick = nick;
+	}
+}
+if (typeof user.password !== "string" || !user.password.startsWith("$2") ||
+    !bcrypt.compareSync(password, user.password)) {
+	user.password = bcrypt.hashSync(password, 10);
+}
+for (const n of user.networks) n.userDisconnected = true;   // 2.0 r4: connect only on request
+const token = crypto.randomBytes(64).toString("hex");
+const hash = crypto.createHash("sha512").update(token).digest("hex");
+user.sessions = {[hash]: {lastUse: Date.now(), ip: "127.0.0.1", agent: "Prestium launcher"}};
+
+asThelounge(() => writeAtomic(FILE, JSON.stringify(user, null, "\t") + "\n", 0o600, null, null));
+writeAtomic(RUN + "/password", password + "\n", 0o640, 0, ugid);
+writeAtomic(RUN + "/token", token + "\n", 0o640, 0, ugid);
+console.log("prestium-thelounge-setup: user prestium ready, new login token issued");

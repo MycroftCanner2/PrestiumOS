@@ -1,0 +1,3 @@
+# Prestium 2.0 r11: the compositor's configuration is written by root (prestium-wl-config), so
+# that files the user's applications can write never add key bindings or window rules
+user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-wl-config ""

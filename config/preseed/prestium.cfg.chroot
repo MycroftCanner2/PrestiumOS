@@ -1,0 +1,17 @@
+# Prestium 2.0: non-interactive answers needed while the chroot packages install
+firmware-ipw2x00 firmware-ipw2x00/license/accepted boolean true
+firmware-ivtv firmware-ivtv/license/accepted boolean true
+iperf3 iperf3/start_daemon boolean false
+wireshark-common wireshark-common/install-setuid boolean false
+console-setup console-setup/charmap47 select UTF-8
+keyboard-configuration keyboard-configuration/layoutcode string us
+keyboard-configuration keyboard-configuration/modelcode string pc105
+locales locales/default_environment_locale select en_US.UTF-8
+locales locales/locales_to_be_generated multiselect en_US.UTF-8 UTF-8
+tzdata tzdata/Areas select Etc
+tzdata tzdata/Zones/Etc select UTC
+xserver-xorg-legacy xserver-xorg-legacy/xwrapper/allowed_users select Console Users Only
+ferm ferm/enable boolean true
+ferm ferm/fast boolean true
+ferm ferm/cache boolean false
+macchanger macchanger/automatically_run boolean false

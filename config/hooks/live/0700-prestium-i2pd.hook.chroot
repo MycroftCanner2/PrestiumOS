@@ -1,0 +1,32 @@
+#!/bin/sh
+# Prestium 2.0: i2pd keeps its real config in /var/lib/i2pd (the package ships symlinks to
+# /etc/i2pd; Prestium's files from config/includes.chroot replace them), owned by i2pd (2000).
+set -e
+for f in i2pd.conf tunnels.conf; do
+	[ -L /var/lib/i2pd/$f ] && { echo "E: /var/lib/i2pd/$f is still the package symlink"; exit 1; }
+	grep -q '^\[' /var/lib/i2pd/$f
+done
+ln -sfn /usr/share/i2pd/certificates /var/lib/i2pd/certificates
+ln -sfn /usr/share/i2pd/torrents /var/lib/i2pd/torrents
+install -d -o 2000 -g 2000 -m 774 /var/lib/i2pd/tunnels.d
+chown -h 2000:2000 /var/lib/i2pd /var/lib/i2pd/* ; chmod 700 /var/lib/i2pd
+# 2.0 r4 (security audit): tunnels.conf.d (torrents.conf, written by root at every i2pd start) is
+# root:i2pd 0750, so the i2pd uid can read it but not plant files or symlinks in it (perms.txt)
+rm -rf /var/lib/i2pd/tunnels.conf.d
+install -d -o 0 -g 2000 -m 0750 /var/lib/i2pd/tunnels.conf.d
+grep -q 'proxy4uwdijqxac2bvdx4fuhem6njmiwukuk2gelejv2nzxka2xq.b32.i2p' /var/lib/i2pd/i2pd.conf
+# 2.0 r4: Prestium dark theme for the torrent web UI (I2P Torrents), inlined into i2pd's page after
+# its own <style> so it applies by default (i2pd serves the page; nothing else to load)
+python3 - /usr/share/i2pd/torrents/web/index.html /usr/share/prestium/torrents-theme/prestium-dark.css <<'PY'
+import sys
+page, css = sys.argv[1], open(sys.argv[2]).read()
+s = open(page).read()
+if 'id="prestium-dark"' not in s:
+    i = s.index('</style>') + len('</style>')
+    head = '<!-- Prestium 2.0: dark theme (/usr/share/prestium/torrents-theme/prestium-dark.css) -->\n'
+    head += '<meta charset="utf-8">\n<meta name="color-scheme" content="dark">\n<title>I2P Torrents</title>\n'
+    s = head + s[:i] + '\n<style id="prestium-dark">\n' + css + '</style>\n' + s[i:]
+    open(page, 'w').write(s)
+print("P: torrent web UI: Prestium dark theme applied")
+PY
+echo "P: i2pd config in place ($(dpkg-query -W -f='${Version}' i2pd))"

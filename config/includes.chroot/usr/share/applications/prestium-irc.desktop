@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=IRC (The Lounge)
+Comment=Chat on the IRC2P and Ilita networks over I2P (opens in the local-only Firefox)
+Exec=/usr/local/bin/prestium-irc
+Icon=internet-group-chat
+Categories=Network;Chat;IRCClient;
+Terminal=false

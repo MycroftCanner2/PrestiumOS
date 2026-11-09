@@ -1,0 +1,124 @@
+#!/usr/bin/env python3
+"""Prestium 2.0: verify an I2P reseed .su3 file.
+
+  verify-su3 [--max-age DAYS] [--warn-only-age] [--signers a@b,c@d|any] FILE CERTDIR
+
+Used by the build (scripts/fetch-thirdparty.sh, certificates from thirdparty/keys/reseed/, StormyCloud
+signers only) and in the image by prestium-i2p-reseed (certificates from i2pd's
+/usr/share/i2pd/certificates/reseed/). The certificate for signer a@b is CERTDIR/a_at_b.crt, as in i2pd.
+
+Checks (exit 1 with "ERROR: ..." on the first failure):
+  - SU3 magic "I2Psu3", format version 0, file type 0 (zip), content type 3 (reseed data);
+  - signer ID is one of the allowed signers (default: the StormyCloud ones; "any" = any signer that
+    has a certificate in CERTDIR) and its certificate is in CERTDIR;
+  - signature type 6 (RSA-4096 with SHA-512): the signature over header + version + signer + content
+    is checked with openssl against the signer's certificate (I2P signs the raw SHA-512 digest with
+    PKCS#1 v1.5 type 1 padding, without a DigestInfo);
+  - the version (a Unix timestamp) is at most --max-age days (default 14) old and not in the future
+    (with --warn-only-age an older file only prints "WARN: ..." and passes);
+  - the zip opens and holds routerInfo-*.dat entries.
+Needs: python3, openssl.
+"""
+import argparse, io, os, struct, subprocess, sys, tempfile, time, zipfile, hashlib
+
+import re
+DEFAULT_SIGNERS = "admin@stormycloud.org,idk@stormycloud.org"
+MIN_ROUTERINFOS = 20
+
+
+def die(msg):
+    print("ERROR: su3: " + msg)
+    sys.exit(1)
+
+
+def main():
+    ap = argparse.ArgumentParser(prog="verify-su3")
+    ap.add_argument("--max-age", type=float, default=14.0)
+    ap.add_argument("--warn-only-age", action="store_true")
+    ap.add_argument("--signers", default=DEFAULT_SIGNERS)
+    ap.add_argument("file")
+    ap.add_argument("certdir")
+    a = ap.parse_args()
+    path, certdir, max_age = a.file, a.certdir, a.max_age
+    signers = a.signers.split(",")
+    if os.path.getsize(path) > 10 * 1024 * 1024:
+        die("file larger than 10 MB")
+    d = open(path, "rb").read()
+    if len(d) < 40 or d[:6] != b"I2Psu3":
+        die("bad magic (not an SU3 file)")
+    if d[7] != 0:
+        die("unknown SU3 format version %d" % d[7])
+    sigtype, siglen = struct.unpack(">HH", d[8:12])
+    verlen, signerlen = d[13], d[15]
+    contentlen = struct.unpack(">Q", d[16:24])[0]
+    filetype, contenttype = d[25], d[27]
+    if filetype != 0:
+        die("file type %d, expected 0 (zip)" % filetype)
+    if contenttype != 3:
+        die("content type %d, expected 3 (reseed)" % contenttype)
+    if sigtype != 6 or siglen != 512:
+        die("signature type %d/%d bytes, expected 6 (RSA-4096 SHA-512)/512" % (sigtype, siglen))
+    if verlen < 16:
+        die("version field too short")
+    signed_len = 40 + verlen + signerlen + contentlen
+    if len(d) != signed_len + siglen:
+        die("length mismatch: file %d, header says %d" % (len(d), signed_len + siglen))
+    version = d[40:40 + verlen].rstrip(b"\0").decode("ascii", "replace")
+    signer = d[40 + verlen:40 + verlen + signerlen].decode("ascii", "replace")
+    content = d[40 + verlen + signerlen:signed_len]
+    sig = d[signed_len:]
+    if (signer not in signers and signers != ["any"]) or not re.fullmatch(r"[A-Za-z0-9._-]+@[A-Za-z0-9.-]+", signer):
+        die("unexpected signer %r (allowed: %s)" % (signer, ",".join(signers)))
+    cert = os.path.join(certdir, signer.replace("@", "_at_") + ".crt")
+    if not os.path.isfile(cert):
+        die("no certificate %s" % cert)
+
+    # signature: recover the PKCS#1 v1.5 (type 1) payload and compare with SHA-512(signed part)
+    with tempfile.TemporaryDirectory() as t:
+        pub, sf = os.path.join(t, "pub.pem"), os.path.join(t, "sig")
+        r = subprocess.run(["openssl", "x509", "-in", cert, "-noout", "-pubkey"], capture_output=True)
+        if r.returncode:
+            die("cannot read certificate %s" % cert)
+        open(pub, "wb").write(r.stdout)
+        open(sf, "wb").write(sig)
+        r = subprocess.run(["openssl", "pkeyutl", "-verifyrecover", "-pubin", "-inkey", pub,
+                            "-in", sf, "-pkeyopt", "rsa_padding_mode:pkcs1"], capture_output=True)
+        if r.returncode or r.stdout != hashlib.sha512(d[:signed_len]).digest():
+            die("BAD SIGNATURE (signer %s)" % signer)
+        r = subprocess.run(["openssl", "x509", "-in", cert, "-noout", "-checkend", "0"], capture_output=True)
+        if r.returncode:
+            die("certificate %s has expired" % cert)
+
+    try:
+        ts = int(version)
+    except ValueError:
+        die("version %r is not a timestamp" % version)
+    now = time.time()
+    if ts > now + 86400:
+        die("version timestamp %d is in the future" % ts)
+    age = (now - ts) / 86400
+    warn = ""
+    if age > max_age and a.warn_only_age:
+        warn = "WARN: su3: version %s is %.1f days old (more than %g); the router may find fewer live peers" % (
+            time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(ts)), age, max_age)
+    elif age > max_age:
+        die("stale: version %s is %.1f days old (limit %g)" % (time.strftime("%Y-%m-%d %H:%M UTC", time.gmtime(ts)), age, max_age))
+
+    try:
+        z = zipfile.ZipFile(io.BytesIO(content))
+        bad = z.testzip()
+    except zipfile.BadZipFile as e:
+        die("content is not a valid zip: %s" % e)
+    if bad:
+        die("corrupt zip entry %s" % bad)
+    ri = [n for n in z.namelist() if n.startswith("routerInfo-") and n.endswith(".dat")]
+    if len(ri) < MIN_ROUTERINFOS:
+        die("only %d routerInfo entries" % len(ri))
+    if warn:
+        print(warn)
+    print("OK SU3 signer=%s version=%s (%s, %.1f days old) routerInfos=%d sha256=%s"
+          % (signer, version, time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime(ts)), age, len(ri),
+             hashlib.sha256(d).hexdigest()))
+
+
+main()

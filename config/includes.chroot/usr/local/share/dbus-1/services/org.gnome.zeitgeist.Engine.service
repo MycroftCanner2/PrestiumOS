@@ -1,0 +1,5 @@
+# Prestium 1.9.1: Zeitgeist activity logging is off (Diodon would record every
+# clipboard entry there). This file overrides /usr/share/dbus-1/services/org.gnome.zeitgeist.Engine.service.
+[D-BUS Service]
+Name=org.gnome.zeitgeist.Engine
+Exec=/bin/false

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Prestium 1.9.1: default-deny before ferm (legacy xtables backend, as ferm uses)
+for t in iptables-legacy ip6tables-legacy; do
+  command -v $t >/dev/null 2>&1 || continue
+  $t -w -P INPUT DROP; $t -w -P OUTPUT DROP; $t -w -P FORWARD DROP
+  $t -w -F; $t -w -X
+  $t -w -A INPUT -i lo -j ACCEPT
+  $t -w -A OUTPUT -o lo -j ACCEPT
+done
+exit 0

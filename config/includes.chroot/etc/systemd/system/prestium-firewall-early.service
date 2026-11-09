@@ -1,0 +1,16 @@
+# Prestium 1.9.1: drop everything until ferm has loaded the real ruleset, so a
+# ferm failure fails closed (Tails-style). Loopback stays usable.
+[Unit]
+Description=Prestium early drop-all firewall
+DefaultDependencies=no
+After=systemd-modules-load.service
+Before=network-pre.target ferm.service NetworkManager.service
+Wants=network-pre.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/prestium-firewall-early
+
+[Install]
+WantedBy=sysinit.target

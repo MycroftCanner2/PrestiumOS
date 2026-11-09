@@ -1,0 +1,186 @@
+# Prestium 2.0 r9: the local-only Firefox (/opt/firefox, "prestium-localfox") for Prestium's own
+# pages (I2P console, I2P Torrents, The Lounge), ENFORCED. Those pages show content from the I2P
+# network (torrent names, IRC messages), so the browser is confined like LibreWolf: its own profile,
+# ~/Downloads, no other files in $HOME, no sudo or Prestium helpers, no Tor. The firewall already
+# limits it to 127.0.0.1 ports 7070, 7685 and 9000. Derived from the LibreWolf profile.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+@{localfox_dir}=/opt/firefox
+
+profile prestium-localfox /opt/firefox/firefox{,-bin} {
+  include <abstractions/base>
+  include <abstractions/audio>
+  include <abstractions/dri-enumerate>
+  include <abstractions/gnome>
+  include <abstractions/ibus>
+  include <abstractions/mesa>
+  include <abstractions/nameservice>
+  include <abstractions/opencl>
+  include if exists <abstractions/vulkan>
+  include if exists <abstractions/dbus-session-strict>
+  include if exists <abstractions/dbus-accessibility-strict>
+  include if exists <abstractions/glycin>
+
+  # content-process sandbox: unprivileged user namespace + chroot inside it
+  userns,
+  capability sys_admin,
+  capability sys_chroot,
+  deny capability sys_ptrace,
+  owner @{PROC}/@{pid}/{gid,uid}_map w,
+  owner @{PROC}/@{pid}/setgroups w,
+
+  network inet stream,
+  network inet dgram,
+  network unix,
+  network netlink raw,
+  deny network inet6,
+
+  ptrace (read, trace) peer=@{profile_name},
+  signal (send, receive) peer=@{profile_name},
+  signal (receive) set=(term, kill, int, hup) peer=unconfined,
+
+  # install (root-owned) and its helpers
+  @{localfox_dir}/ r,
+  @{localfox_dir}/** r,
+  @{localfox_dir}/**.so mr,
+  @{localfox_dir}/firefox{,-bin} mrix,
+  @{localfox_dir}/{glxtest,gfxtest,vaapitest,vulkantest,pingsender} ix,
+  /usr/local/share/prestium-nssdb/** r,
+  /{usr/,}bin/{sh,dash,bash,uname,expr,dirname,basename} rix,
+
+  # profile (fixed: ~/.local/share/prestium-localfox, see /usr/local/bin/prestium-localfox)
+  owner @{HOME}/ r,
+  owner @{HOME}/.local/share/prestium-localfox/ rw,
+  owner @{HOME}/.local/share/prestium-localfox/** rwk,
+  owner @{HOME}/.cache/mozilla/ rw,
+  owner @{HOME}/.cache/mozilla/** rwk,
+  owner @{HOME}/.mozilla/ rw,
+  owner @{HOME}/.mozilla/** rwk,
+  # 2.0 r17: Firefox 147+ keeps profiles.ini/installs.ini under the XDG dirs when ~/.mozilla doesn't
+  # exist; without these it showed "Profile Missing" on the r16 ISO even with --profile.
+  owner @{HOME}/.config/ r,
+  owner @{HOME}/.config/mozilla/ rw,
+  owner @{HOME}/.config/mozilla/** rwk,
+  owner @{HOME}/.local/share/mozilla/ rw,
+  owner @{HOME}/.local/share/mozilla/** rwk,
+  deny @{HOME}/.local/share/prestium-localfox/**.so m,
+  deny @{HOME}/.librewolf/** rw,
+  owner @{HOME}/.cache/fontconfig/ rw,
+  owner @{HOME}/.cache/fontconfig/** rwkl,
+  owner @{HOME}/.cache/mesa_shader_cache/** rwk,
+  owner @{HOME}/.cache/mesa_shader_cache_db/** rwk,
+  owner @{HOME}/.config/gtk-3.0/ r,
+  owner @{HOME}/.config/gtk-3.0/** r,
+  owner @{HOME}/.config/gtk-2.0/** r,
+  owner @{HOME}/.config/ibus/** r,
+  owner @{HOME}/.cache/ibus/** rw,
+  owner @{HOME}/.Xauthority r,
+  owner @{HOME}/.icons/** r,
+  owner @{HOME}/.themes/** r,
+  owner @{HOME}/.local/share/recently-used.xbel* rw,
+  owner @{HOME}/.local/share/applications/ r,
+  owner @{HOME}/.local/share/applications/** r,
+  owner @{HOME}/.config/mimeapps.list r,
+  deny @{HOME}/.local/share/gvfs-metadata/** rw,
+  owner /run/user/[0-9]*/dconf/ rw,
+  owner /run/user/[0-9]*/dconf/user rwk,
+  owner @{HOME}/.config/dconf/user r,
+  /etc/dconf/** r,   # 2.0 r17
+
+  # the only user folder for saving and uploading files
+  owner @{HOME}/Downloads/ rw,
+  owner @{HOME}/Downloads/** rwk,
+  owner @{HOME}/Desktop/ r,
+
+  # temporary files (downloads in progress, sandbox, IPC)
+  owner /tmp/ r,
+  owner /tmp/** rwk,
+  owner /var/tmp/** rwk,
+  owner /{dev,run}/shm/ r,
+  owner /{dev,run}/shm/** rwk,
+  /dev/shm/ r,
+
+  # audio (PipeWire / pipewire-pulse)
+  owner /run/user/[0-9]*/ r,
+  owner /run/user/[0-9]*/pulse/ r,
+  owner /run/user/[0-9]*/pulse/native rw,
+  owner /run/user/[0-9]*/pipewire-0 rw,
+  /etc/pulse/client.conf r,
+  /etc/pulse/client.conf.d/ r,
+  /etc/pulse/client.conf.d/* r,
+  owner @{HOME}/.config/pulse/** r,
+  deny /usr/bin/pulseaudio x,
+
+  # system information Firefox reads (GPU, CPU, memory, cgroups)
+  /etc/machine-id r,
+  /var/lib/dbus/machine-id r,
+  /etc/mailcap r,
+  /etc/mime.types r,
+  /etc/gtk-3.0/** r,
+  /etc/xdg/** r,
+  /etc/igfx_user_feature*.txt r,
+  /etc/glvnd/egl_vendor.d/{,*.json} r,
+  /usr/share/glvnd/egl_vendor.d/{,*.json} r,
+  /usr/share/** r,
+  /usr/share/applications/** rk,
+  owner @{PROC}/@{pid}/** r,
+  owner @{PROC}/@{pid}/oom_score_adj rw,
+  owner @{PROC}/@{pid}/task/*/comm rw,
+  @{PROC}/sys/kernel/random/uuid r,
+  @{PROC}/sys/kernel/yama/ptrace_scope r,
+  @{PROC}/sys/fs/inotify/max_user_watches r,
+  @{PROC}/sys/crypto/fips_enabled r,
+  @{PROC}/meminfo r,
+  @{PROC}/cpuinfo r,
+  @{PROC}/stat r,
+  @{PROC}/pressure/memory r,
+  @{PROC}/sys/kernel/osrelease r,
+  @{sys}/devices/** r,
+  @{sys}/bus/ r,
+  @{sys}/bus/pci/devices/ r,
+  @{sys}/class/ r,
+  @{sys}/class/** r,
+  @{sys}/fs/cgroup/** r,
+  /dev/ r,
+  /dev/dri/ r,
+  /dev/dri/* rw,
+  /run/udev/data/** r,
+  /etc/udev/udev.conf r,
+  deny /dev/udmabuf rw,
+  deny /dev/video* rw,
+  deny @{PROC}/@{pid}/net/route r,
+  deny @{PROC}/[0-9]*/cmdline r,
+  deny /usr/bin/lsb_release x,
+  deny /etc/os-release r,
+  deny /usr/lib/os-release r,
+
+  # session D-Bus: notifications, accessibility, portals (file chooser); nothing else
+  dbus send bus=session path=/org/freedesktop/Notifications interface=org.freedesktop.Notifications,
+  dbus receive bus=session interface=org.freedesktop.Notifications,
+  dbus (send, receive) bus=session path=/org/freedesktop/portal/desktop{,/**},
+  dbus (send, receive) bus=session interface=org.freedesktop.DBus.Properties,
+  dbus (send) bus=session interface=org.freedesktop.DBus.Introspectable,
+
+  # never Tor's control port, directly or through the filter
+  deny /run/tor/** rw,
+  deny /run/onion-grater/** rw,
+  # never other users' data or Prestium's secrets
+  deny @{HOME}/.tor-browser/** rw,
+  deny "@{HOME}/Tor Browser/**" rw,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.claws-mail/** rw,
+  deny @{HOME}/.config/feather/** rw,
+  deny @{HOME}/.local/share/keyrings/** rw,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/.ssh/** rw,
+
+  # 2.0 r10: the restricted Wayland socket only (see prestium-run)
+  /run/prestium-wl/[0-9]*/apps rw,
+  deny /run/user/[0-9]*/wayland-[0-9]* rw,
+  deny /run/prestium-wl/broker rw,
+  include <abstractions/prestium-no-admin>
+
+  include if exists <local/opt.firefox.firefox>
+}

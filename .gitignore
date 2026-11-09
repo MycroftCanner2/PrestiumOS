@@ -1,0 +1,23 @@
+# Prestium 2.0 live-build: build products, caches and staged downloads (never committed)
+/chroot/
+/binary/
+/.build/
+/cache/
+/local/
+/.lock
+/build.log
+/*.iso
+/*.iso.sha256
+/*.hybrid.iso
+/chroot.files
+/chroot.packages.*
+/*.contents
+/*.files
+/*.packages
+/config/includes.chroot/usr/src/prestium-thirdparty/
+/config/includes.chroot/usr/share/prestium/build/host-resolv.conf
+/config/hooks/normal/
+/config/includes.chroot/var/lib/i2pd/stormycloud-i2pseeds.su3
+/.prestium-build.lock
+__pycache__/
+*.pyc

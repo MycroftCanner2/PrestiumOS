@@ -1,0 +1,23 @@
+# Prestium 1.9.1: "Mail (I2P)" - Claws Mail first-run wizard defaults.
+# I2P mail through postman (hq.postman.i2p), reached through the i2pd client
+# tunnels on 127.0.0.1: SMTP 7659 -> smtp.postman.i2p, POP3 7660 -> pop.postman.i2p.
+# The tunnels already encrypt end to end, so no SSL/TLS. Only your name, your
+# @mail.i2p address and the postman user name/password are left to enter.
+[AccountTemplate]
+domain=mail.i2p
+name=
+email=yourname@mail.i2p
+organization=
+smtpserver=127.0.0.1
+smtpport=7659
+smtpauth=1
+smtpuser=
+smtppass=
+smtpssl=0
+recvtype=0
+recvserver=127.0.0.1
+popport=7660
+recvuser=yourname
+recvpass=
+recvssl=0
+mailbox=Mail

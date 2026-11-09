@@ -1,0 +1,7 @@
+#!/bin/sh
+# Prestium 2.0 r10/r11: screenshot (grim; replaces scrot). Print: click the screen to capture.
+# Alt+Print: drag an area. Saved in ~/Pictures. Screen capture needs the compositor's full socket,
+# which only the Wayland broker uses; it always waits for a real click or drag, which applications
+# can't fake, so no application can take a screenshot unnoticed.
+if [ "$1" = --area ]; then exec /usr/local/bin/prestium-wl screenshot-area; fi
+exec /usr/local/bin/prestium-wl screenshot

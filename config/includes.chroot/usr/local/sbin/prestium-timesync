@@ -1,0 +1,39 @@
+#!/bin/sh
+# Prestium 1.8: set the clock over Tor, never over clearnet (no NTP leak).
+# Like Tails' htpdate: once Tor has bootstrapped, read the HTTPS "Date" header
+# from three random well-known sites through Tor and use the median.
+# The requests run as the unprivileged "prestium-htp" user, which the firewall
+# only lets reach Tor's SOCKS port, on their own isolated Tor circuits.
+# The system time zone stays UTC, so every Prestium looks the same.
+POOL="www.torproject.org www.debian.org www.eff.org www.wikipedia.org www.kernel.org duckduckgo.com tails.net www.mozilla.org"
+PROXY="socks5h://prestium-htp:$$@127.0.0.1:9050"
+
+fetch() {
+  runuser -u prestium-htp -- curl -sI --max-time 60 --proxy "$PROXY" "https://$1/" 2>/dev/null \
+    | tr -d '\r' | sed -n 's/^[Dd]ate: //p' | head -n1
+}
+
+# wait up to 15 minutes for Tor
+i=0
+until runuser -u prestium-htp -- curl -s -o /dev/null --max-time 30 --proxy "$PROXY" https://www.torproject.org/ 2>/dev/null; do
+  i=$((i+1)); [ $i -ge 30 ] && { echo "Tor not ready, clock left as is"; exit 0; }
+  sleep 30
+done
+
+times=""
+for h in $(printf '%s\n' $POOL | shuf -n 3); do
+  d=$(fetch "$h"); [ -n "$d" ] || continue
+  t=$(date -u -d "$d" +%s 2>/dev/null) || continue
+  times="$times $t"
+done
+n=$(printf '%s\n' $times | grep -c .)
+[ "$n" -ge 2 ] || { echo "not enough answers ($n), clock left as is"; exit 0; }
+med=$(printf '%s\n' $times | sort -n | sed -n "$(( (n+1)/2 ))p")
+now=$(date -u +%s); skew=$((med-now)); abs=${skew#-}
+echo "median of $n sources, skew ${skew}s"
+if [ "$abs" -gt 10 ]; then
+  date -u -s "@$med" >/dev/null && echo "clock set"
+  # i2pd needs a correct clock; restart it after a big jump
+  [ "$abs" -gt 60 ] && systemctl try-restart i2pd.service
+fi
+exit 0

@@ -1,0 +1,79 @@
+#!/usr/bin/python3
+# Prestium 2.0: "Display Scale" dialog. Auto (from the screen's physical size) or a fixed
+# 100-200 %. Saved in ~/.config/prestium/scale and applied at every login by prestium-scale
+# (from the session autostart); "Apply" applies it at once (2.0 r10: Wayland scales every app).
+import os, subprocess, sys, threading
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib
+
+CONF_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.expanduser("~/.config"), "prestium")
+SETTING = os.path.join(CONF_DIR, "scale")
+STEPS = (100, 125, 150, 175, 200)
+
+def scale_cmd(arg):
+    try:
+        return subprocess.run(["/usr/local/bin/prestium-scale", arg], capture_output=True, text=True, timeout=15).stdout.strip()
+    except Exception:
+        return ""
+
+class Dialog(Gtk.Window):
+    def __init__(self):
+        super().__init__(title="Display Scale")
+        self.set_border_width(14); self.set_resizable(False)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8); self.add(box)
+        lbl = Gtk.Label(xalign=0); lbl.set_line_wrap(True); lbl.set_max_width_chars(52)
+        lbl.set_text("Make text, icons and windows bigger on high-resolution (HiDPI) screens. "
+                     "Resolution, refresh rate, rotation and multiple monitors are set in Display Settings.")
+        box.pack_start(lbl, False, False, 0)
+        try:
+            cur = open(SETTING).read().strip().lower()
+        except OSError:
+            cur = "auto"
+        self.auto = Gtk.RadioButton.new_with_label_from_widget(None, "Automatic (detecting ...)")
+        box.pack_start(self.auto, False, False, 0)
+        self.radios = {}
+        for s in STEPS:
+            rb = Gtk.RadioButton.new_with_label_from_widget(self.auto, "%d %%" % s)
+            self.radios[s] = rb; box.pack_start(rb, False, False, 0)
+            if cur.rstrip("%") == str(s):
+                rb.set_active(True)
+        if cur in ("", "auto") or not any(r.get_active() for r in self.radios.values()):
+            self.auto.set_active(True)
+        note = Gtk.Label(xalign=0); note.set_line_wrap(True); note.set_max_width_chars(52)
+        note.set_markup("<small>Text and the panel change at once. Some applications (for example Tor Browser, "
+                        "LibreWolf and Qt programs) use the new scale only after you <b>log out and log in again</b> "
+                        "(or restart them in a new session). The choice is remembered for this session.</small>")
+        box.pack_start(note, False, False, 4)
+        self.status = Gtk.Label(xalign=0); box.pack_start(self.status, False, False, 0)
+        bb = Gtk.Box(spacing=6)
+        apply_ = Gtk.Button(label="Apply"); apply_.connect("clicked", self.on_apply)
+        disp = Gtk.Button(label="Display Settings ..."); disp.connect("clicked", lambda *_: subprocess.Popen(["/usr/local/bin/prestium-wl", "display-settings"]))
+        close = Gtk.Button(label="Close"); close.connect("clicked", lambda *_: self.destroy())
+        bb.pack_start(apply_, False, False, 0); bb.pack_start(disp, False, False, 0); bb.pack_end(close, False, False, 0)
+        box.pack_start(bb, False, False, 0)
+        threading.Thread(target=self.detect, daemon=True).start()
+
+    def detect(self):
+        out = scale_cmd("--detect")
+        GLib.idle_add(self.show_detect, out)
+
+    def show_detect(self, out):
+        s, _, why = out.partition("\t")
+        self.auto.set_label("Automatic (%s %%%s)" % (s or "100", (" - " + why) if why else ""))
+        return False
+
+    def on_apply(self, _b):
+        val = "auto" if self.auto.get_active() else str(next(s for s, r in self.radios.items() if r.get_active()))
+        os.makedirs(CONF_DIR, exist_ok=True)
+        with open(SETTING, "w") as f:
+            f.write(val + "\n")
+        self.status.set_text("Applying ...")
+        def work():
+            s = scale_cmd("--apply")
+            GLib.idle_add(self.status.set_text, "Scale %s %% applied." % (s or "?"))
+        threading.Thread(target=work, daemon=True).start()
+
+if __name__ == "__main__":
+    w = Dialog(); w.connect("destroy", Gtk.main_quit); w.show_all(); Gtk.main()

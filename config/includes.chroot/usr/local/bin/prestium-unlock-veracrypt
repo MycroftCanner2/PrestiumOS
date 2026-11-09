@@ -1,0 +1,220 @@
+#!/usr/bin/python3
+# Prestium: unlock VeraCrypt volumes without root.
+#
+# Replaces the VeraCrypt app, which needed a passwordless root (sudo) rule that
+# any program could abuse to become root and turn off the firewall.
+# Unlocking goes through udisks2 + cryptsetup (TCRYPT/VeraCrypt support), the
+# same approach Tails uses. udisks always mounts under /media/user with
+# nosuid,nodev, so a volume can never be used to gain root.
+#
+#   prestium-unlock-veracrypt            choose file or drive, then unlock
+#   prestium-unlock-veracrypt FILE       unlock a file container
+#   prestium-unlock-veracrypt --lock     unmount and lock every unlocked volume
+#   prestium-unlock-veracrypt --cli ...  no dialogs (for testing):
+#        --cli FILE_OR_DEVICE  (password on stdin)  [--pim N] [--hidden] [--system] [--keyfile F]...
+import os, subprocess, sys
+import gi
+gi.require_version("Gio", "2.0")
+from gi.repository import Gio, GLib
+
+UD = "org.freedesktop.UDisks2"
+TITLE = "Unlock VeraCrypt Volume"
+bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+CLI = "--cli" in sys.argv
+
+
+def call(path, iface, method, args, rtype=None, timeout=120000):
+    return bus.call_sync(UD, path, iface, method, args,
+                         GLib.VariantType(rtype) if rtype else None,
+                         Gio.DBusCallFlags.NONE, timeout, None)
+
+
+def objects():
+    r = call("/org/freedesktop/UDisks2", "org.freedesktop.DBus.ObjectManager",
+             "GetManagedObjects", None, "(a{oa{sa{sv}}})")
+    return r.unpack()[0]
+
+
+def devpath(props):
+    return bytes(props["org.freedesktop.UDisks2.Block"]["Device"]).rstrip(b"\0").decode()
+
+
+def block_for_device(dev):
+    dev = os.path.realpath(dev)
+    for p, ifs in objects().items():
+        if "org.freedesktop.UDisks2.Block" in ifs and devpath(ifs) == dev:
+            return p
+    return None
+
+
+def zen(*a, ok=(0,)):
+    r = subprocess.run(["zenity", "--title", TITLE, *a], stdout=subprocess.PIPE, text=True)
+    if r.returncode not in ok:
+        sys.exit(0)
+    return r.stdout.rstrip("\n")
+
+
+def info(msg):
+    if CLI:
+        print(msg)
+    else:
+        subprocess.run(["zenity", "--title", TITLE, "--info", "--no-wrap", "--text", msg])
+
+
+def fail(msg):
+    if CLI:
+        print("ERROR: " + msg, file=sys.stderr)
+    else:
+        subprocess.run(["zenity", "--title", TITLE, "--error", "--no-wrap", "--text", msg])
+    sys.exit(1)
+
+
+def loop_setup(path):
+    fd = os.open(path, os.O_RDWR)
+    fdl = Gio.UnixFDList.new()
+    idx = fdl.append(fd)
+    os.close(fd)
+    r = bus.call_with_unix_fd_list_sync(
+        UD, "/org/freedesktop/UDisks2/Manager", "org.freedesktop.UDisks2.Manager",
+        "LoopSetup", GLib.Variant("(ha{sv})", (idx, {})), GLib.VariantType("(o)"),
+        Gio.DBusCallFlags.NONE, 60000, fdl, None)
+    return r[0].unpack()[0]
+
+
+def wait_iface(path, iface, secs=10):
+    ctx = GLib.MainContext.default()
+    for _ in range(secs * 10):
+        if iface in objects().get(path, {}):
+            return True
+        GLib.usleep(100000)
+        while ctx.pending():
+            ctx.iteration(False)
+    return False
+
+
+def unlock(target, password, pim=0, hidden=False, system=False, keyfiles=()):
+    loop = None
+    if os.path.isfile(target):
+        loop = loop_setup(target)
+        blk = loop
+    else:
+        blk = block_for_device(target)
+        if not blk:
+            fail("Not a drive udisks knows about: %s" % target)
+    if not wait_iface(blk, "org.freedesktop.UDisks2.Encrypted"):
+        if loop:
+            call(loop, "org.freedesktop.UDisks2.Loop", "Delete", GLib.Variant("(a{sv})", ({},)))
+        fail("This doesn't look like a VeraCrypt volume (it has a readable filesystem).")
+    opts = {}
+    if pim:
+        opts["pim"] = GLib.Variant("u", int(pim))
+    if hidden:
+        opts["hidden"] = GLib.Variant("b", True)
+    if system:
+        opts["system"] = GLib.Variant("b", True)
+    if keyfiles:
+        opts["keyfiles"] = GLib.Variant("as", list(keyfiles))
+    try:
+        r = call(blk, "org.freedesktop.UDisks2.Encrypted", "Unlock",
+                 GLib.Variant("(sa{sv})", (password, opts)), "(o)", timeout=600000)
+    except GLib.Error as e:
+        if loop:
+            try:
+                call(loop, "org.freedesktop.UDisks2.Loop", "Delete", GLib.Variant("(a{sv})", ({},)))
+            except GLib.Error:
+                pass
+        fail("Couldn't unlock it. Check the password, PIM, keyfiles and volume type.\n\n" +
+             e.message.split(":")[-1].strip())
+    clear = r.unpack()[0]
+    if not wait_iface(clear, "org.freedesktop.UDisks2.Filesystem"):
+        info("Unlocked as %s, but it has no filesystem udisks can mount." %
+             devpath(objects()[clear]))
+        return None
+    m = call(clear, "org.freedesktop.UDisks2.Filesystem", "Mount",
+             GLib.Variant("(a{sv})", ({},)), "(s)").unpack()[0]
+    return m
+
+
+def lock_all():
+    n = 0
+    objs = objects()
+    for p, ifs in objs.items():
+        enc = ifs.get("org.freedesktop.UDisks2.Encrypted")
+        if not enc or enc.get("CleartextDevice", "/") == "/":
+            continue
+        clear = enc["CleartextDevice"]
+        fs = objs.get(clear, {}).get("org.freedesktop.UDisks2.Filesystem")
+        if fs and fs.get("MountPoints"):
+            call(clear, "org.freedesktop.UDisks2.Filesystem", "Unmount", GLib.Variant("(a{sv})", ({},)))
+        call(p, "org.freedesktop.UDisks2.Encrypted", "Lock", GLib.Variant("(a{sv})", ({},)))
+        if "org.freedesktop.UDisks2.Loop" in ifs:
+            call(p, "org.freedesktop.UDisks2.Loop", "Delete", GLib.Variant("(a{sv})", ({},)))
+        n += 1
+    info("Locked %d volume(s)." % n if n else "No unlocked volumes.")
+
+
+def candidates():
+    rows = []
+    for p, ifs in sorted(objects().items()):
+        b = ifs.get("org.freedesktop.UDisks2.Block")
+        if not b or "org.freedesktop.UDisks2.Encrypted" not in ifs or "org.freedesktop.UDisks2.Loop" in ifs:
+            continue
+        if ifs["org.freedesktop.UDisks2.Encrypted"].get("CleartextDevice", "/") != "/":
+            continue
+        rows += [devpath(ifs), "%.1f GB" % (b["Size"] / 1e9)]
+    return rows
+
+
+def main():
+    a = sys.argv[1:]
+    if "--lock" in a:
+        return lock_all()
+    if CLI:
+        a.remove("--cli")
+        target, pim, hidden, system, kf = None, 0, False, False, []
+        it = iter(a)
+        for x in it:
+            if x == "--pim": pim = int(next(it))
+            elif x == "--hidden": hidden = True
+            elif x == "--system": system = True
+            elif x == "--keyfile": kf.append(next(it))
+            else: target = x
+        m = unlock(target, sys.stdin.readline().rstrip("\n"), pim, hidden, system, kf)
+        print("MOUNTED %s" % m)
+        return
+    target = a[0] if a else None
+    if not target:
+        what = zen("--list", "--radiolist", "--width", "460", "--height", "260",
+                   "--text", "What do you want to unlock?", "--column", "", "--column", "Volume",
+                   "TRUE", "A VeraCrypt file container", "FALSE", "A VeraCrypt partition or drive",
+                   "FALSE", "Lock all unlocked volumes")
+        if what.startswith("Lock"):
+            return lock_all()
+        if what.startswith("A VeraCrypt file"):
+            target = zen("--file-selection", "--filename", os.path.expanduser("~/"))
+        else:
+            rows = candidates()
+            if not rows:
+                fail("No locked encrypted partitions found. Plug in the drive and try again.")
+            target = zen("--list", "--width", "420", "--height", "300", "--text",
+                         "Choose the partition:", "--column", "Device", "--column", "Size", *rows)
+        if not target:
+            return
+    form = zen("--forms", "--width", "420", "--text", os.path.basename(target),
+               "--add-password", "Password", "--add-entry", "PIM (leave empty if none)",
+               "--add-combo", "Volume type", "--combo-values", "Standard|Hidden|Windows system",
+               "--add-combo", "Keyfiles", "--combo-values", "No|Yes", "--separator", "\x1f")
+    f = (form.split("\x1f") + ["", "", "", ""])[:4]
+    pw, pim, vt, usekf = f
+    keyfiles = []
+    if usekf == "Yes":
+        keyfiles = zen("--file-selection", "--multiple", "--separator", "\x1f").split("\x1f")
+    if pim and not pim.isdigit():
+        fail("PIM must be a number.")
+    m = unlock(target, pw, int(pim or 0), vt == "Hidden", vt == "Windows system", keyfiles)
+    if m:
+        subprocess.Popen(["pcmanfm", m], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        info("Unlocked and opened at %s.\nUse \"Lock all unlocked volumes\" when you're done." % m)
+
+
+main()

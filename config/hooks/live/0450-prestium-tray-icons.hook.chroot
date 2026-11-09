@@ -1,0 +1,49 @@
+#!/bin/sh
+# Prestium 2.0: trixie's Adwaita (48) ships the audio-volume-* / audio-card icons only as
+# dark "-symbolic" SVGs, so pasystray's tray icon (AppIndicator -> GtkStatusIcon fallback) was
+# drawn dark grey on tint2's black panel, i.e. invisible. GTK searches the whole current theme
+# (with its symbolic fallbacks) before inherited themes, so copies in hicolor are not enough:
+# add a small "Prestium" icon theme that holds GNOME's full-colour audio icons and inherits
+# Adwaita for everything else, and make it the GTK 3 default icon theme.
+set -e
+G=/usr/share/icons/gnome; P=/usr/share/icons/Prestium
+rm -rf "$P"; mkdir -p "$P"
+dirs=""; sect=""; n=0
+for d in "$G"/*x*/status "$G"/*x*/devices; do
+	[ -d "$d" ] || continue
+	ctx=${d##*/}; size=${d%/*}; size=${size##*/}; px=${size%%x*}
+	found=0
+	for f in "$d"/audio-volume-high.png "$d"/audio-volume-medium.png "$d"/audio-volume-low.png \
+	         "$d"/audio-volume-muted.png "$d"/audio-card.png "$d"/audio-input-microphone.png; do
+		[ -f "$f" ] || continue
+		install -D -m 644 "$f" "$P/$size/$ctx/${f##*/}"; n=$((n+1)); found=1
+	done
+	[ $found = 1 ] || continue
+	case $ctx in status) C=Status ;; *) C=Devices ;; esac
+	dirs="$dirs${dirs:+,}$size/$ctx"
+	sect="$sect
+[$size/$ctx]
+Size=$px
+Context=$C
+Type=Threshold
+"
+done
+[ "$n" -gt 0 ] || { echo "E: no GNOME audio icons found (gnome-icon-theme missing?)"; exit 1; }
+cat > "$P/index.theme" <<EOF
+[Icon Theme]
+Name=Prestium
+Comment=Adwaita with full-colour audio icons for the panel tray
+Inherits=Adwaita,AdwaitaLegacy,hicolor
+Directories=$dirs
+$sect
+EOF
+gtk-update-icon-cache -f -q "$P"
+mkdir -p /etc/gtk-3.0
+if [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^gtk-icon-theme-name' /etc/gtk-3.0/settings.ini; then
+	sed -i 's/^gtk-icon-theme-name.*/gtk-icon-theme-name=Prestium/' /etc/gtk-3.0/settings.ini
+elif [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^\[Settings\]' /etc/gtk-3.0/settings.ini; then
+	sed -i '/^\[Settings\]/a gtk-icon-theme-name=Prestium' /etc/gtk-3.0/settings.ini
+else
+	printf '[Settings]\ngtk-icon-theme-name=Prestium\n' >> /etc/gtk-3.0/settings.ini
+fi
+echo "P: Prestium icon theme with $n full-colour audio icons; GTK 3 default icon theme set"

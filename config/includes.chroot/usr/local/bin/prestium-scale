@@ -1,0 +1,80 @@
+#!/usr/bin/python3
+# Prestium 2.0: display scale (HiDPI). 2.0 r10: Wayland (labwc). 2.0 r11: output management needs the
+# compositor's full socket, so the Wayland broker applies the scale (it imports this file for
+# parse_setting and detect_from). The compositor scales each output
+# (fractional scaling), so every Wayland application, the panel and the browsers follow at once;
+# no X resources, XSETTINGS, environment variables or panel rewrites are needed any more.
+#   prestium-scale --apply      apply the setting to every output now (also run at login)
+#   prestium-scale --login      the same (kept for compatibility)
+#   prestium-scale --effective  print the setting ("auto" or a percentage)
+# Setting: ~/.config/prestium/scale contains "auto" (default) or a percentage.
+# Automatic: DPI of the built-in (else first) output from its physical size (EDID):
+# dpi = pixels / millimetres * 25.4, then the largest step <= dpi/96. Bogus sizes (VMs, projectors)
+# give 100 %.
+import json, os, subprocess, sys
+
+HOME = os.path.expanduser("~")
+CONF_DIR = os.path.join(os.environ.get("XDG_CONFIG_HOME") or os.path.join(HOME, ".config"), "prestium")
+SETTING = os.path.join(CONF_DIR, "scale")
+STEPS = (100, 125, 150, 175, 200)
+
+def detect_from(outs):
+    if not outs:
+        return 100, "no active output"
+    outs = sorted(outs, key=lambda o: not o["name"].startswith(("eDP", "LVDS", "DSI")))
+    o = outs[0]
+    mode = next((m for m in o.get("modes", []) if m.get("current")), None)
+    if not mode:
+        return 100, "%s: no current mode" % o["name"]
+    pw, ph = mode["width"], mode["height"]
+    mw, mh = o.get("physical_size", {}).get("width", 0), o.get("physical_size", {}).get("height", 0)
+    if o.get("transform") in ("90", "270", "flipped-90", "flipped-270"):
+        pw, ph = ph, pw
+    if (pw > ph) != (mw > mh):
+        mw, mh = mh, mw
+    if mw < 100 or mh < 60 or mw > 1000:
+        return 100, "%s: physical size %dx%d mm not plausible" % (o["name"], mw, mh)
+    dpi = pw / mw * 25.4
+    if abs(dpi - ph / mh * 25.4) > dpi * 0.2:
+        return 100, "%s: inconsistent physical size" % o["name"]
+    ratio = dpi / 96.0
+    s = max([x for x in STEPS if x / 100.0 <= ratio + 0.001] or [100])
+    return s, "%s: %dx%d px, %dx%d mm, %.0f dpi" % (o["name"], pw, ph, mw, mh, dpi)
+
+def parse_setting(v):
+    v = (v or "").strip().lower()
+    if v in ("auto", ""):
+        return "auto"
+    try:
+        n = int(v.rstrip("%"))
+        return n if n in STEPS else "auto"
+    except ValueError:
+        return "auto"
+
+def setting():
+    try:
+        return parse_setting(open(SETTING).read())
+    except OSError:
+        return "auto"
+
+def broker(req):
+    try:
+        r = subprocess.run(["/usr/local/bin/prestium-wl", req], capture_output=True, text=True, timeout=60)
+        return r.returncode, r.stdout.strip()
+    except (OSError, subprocess.SubprocessError) as e:
+        return 1, str(e)
+
+def main(a):
+    if a in ("--apply", "--login"):
+        rc, out = broker("scale")
+        if rc != 0:
+            print("prestium-scale: %s" % out, file=sys.stderr)
+            return 1
+        print(setting()); return 0
+    if a == "--effective":
+        print(setting()); return 0
+    print("usage: prestium-scale --apply|--detect|--effective", file=sys.stderr)
+    return 2
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else ""))

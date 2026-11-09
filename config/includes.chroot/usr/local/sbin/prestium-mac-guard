@@ -1,0 +1,252 @@
+#!/usr/bin/python3
+"""Prestium 2.0 r10: keep the real MAC address off the network whatever NetworkManager is told.
+
+The live user may manage NetworkManager connections (Wi-Fi passwords etc.), and so could any
+program running as that user; a connection with cloned-mac-address "permanent" (or an explicit
+address) would make NetworkManager put the card's real address back. This root service:
+
+ 1. checks every connection when it appears or changes, and resets a MAC setting other than the
+    default ("preserve", i.e. keep the address macchanger set at udev time) or "random": the
+    setting is rewritten, an active device using it is disconnected, and a safety flag is raised;
+ 2. checks every device when it starts to connect and whenever its address changes: if the
+    address in use is the card's permanent (real) address, the device is disconnected at once;
+ 3. installs an nftables "egress" filter on each physical device that drops every frame sent
+    with the permanent address as source, so data frames can't leak it even in the moment before
+    (2) acts. (Wi-Fi management frames don't pass netfilter; (1) and (2) cover those.)
+
+Boot option "nomacspoof" turns MAC spoofing off on purpose; then this service does nothing.
+"""
+import os, re, subprocess, sys, syslog
+
+NM = "org.freedesktop.NetworkManager"
+NM_PATH = "/org/freedesktop/NetworkManager"
+SETTINGS_PATH = NM_PATH + "/Settings"
+OK_ASSIGNED = ("", "preserve", "random")
+MAC_SETTINGS = ("802-3-ethernet", "802-11-wireless")
+SECRET_SETTINGS = ("802-11-wireless-security", "802-1x", "wireguard", "vpn")
+NFT_TABLE = "prestium_mac"
+DEV_ACTIVATING = 40   # NM_DEVICE_STATE_PREPARE and above: about to send frames
+MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
+IFNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,15}$")
+
+def log(msg, crit=False):
+    syslog.syslog(syslog.LOG_CRIT if crit else syslog.LOG_INFO, msg)
+    print(msg, file=sys.stderr, flush=True)
+
+def flag(msg):
+    log(msg, crit=True)
+    try:
+        subprocess.run([os.environ.get("PRESTIUM_SAFETY_FLAG", "/usr/local/lib/prestium/safety-flag"),
+                        "set", "mac-address", msg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except OSError as e:
+        log("could not raise the safety flag: %s" % e, crit=True)
+
+# ---------- policy (pure; unit-tested) ----------
+
+def mac_violations(settings):
+    """settings: dict setting-name -> dict key -> python value (as GetSettings unpacks).
+    Returns a list of (setting, reason) for each MAC setting that is not allowed."""
+    out = []
+    for s in MAC_SETTINGS:
+        sec = settings.get(s)
+        if not sec:
+            continue
+        assigned = sec.get("assigned-mac-address")
+        cloned = sec.get("cloned-mac-address")
+        if assigned is not None and str(assigned).lower() not in OK_ASSIGNED:
+            out.append((s, "assigned-mac-address=%s" % assigned))
+        elif assigned is None and cloned:
+            out.append((s, "cloned-mac-address set"))
+        if s == "802-11-wireless" and sec.get("mac-address-randomization") not in (None, 0, 2):
+            out.append((s, "mac-address-randomization=%s" % sec.get("mac-address-randomization")))
+        if sec.get("generate-mac-address-mask"):
+            out.append((s, "generate-mac-address-mask set"))
+    return out
+
+def fixed_settings(settings):
+    """Copy of settings with every MAC setting back to the Prestium default."""
+    new = {k: dict(v) for k, v in settings.items()}
+    for s in MAC_SETTINGS:
+        sec = new.get(s)
+        if sec is None:
+            continue
+        for k in ("cloned-mac-address", "generate-mac-address-mask"):
+            sec.pop(k, None)
+        sec["assigned-mac-address"] = "preserve"
+        if s == "802-11-wireless" and sec.get("mac-address-randomization") not in (None, 0, 2):
+            sec["mac-address-randomization"] = 0
+    return new
+
+def is_real_mac(current, permanent):
+    c, p = (current or "").lower(), (permanent or "").lower()
+    return bool(MAC_RE.match(p)) and p != "00:00:00:00:00:00" and c == p
+
+def nft_rules(ifname, permanent):
+    """nft script that drops frames with the permanent source address on ifname (egress)."""
+    if not IFNAME_RE.match(ifname or "") or not MAC_RE.match((permanent or "").lower()):
+        raise ValueError("bad interface or address")
+    ch = "egress_" + re.sub(r"[^A-Za-z0-9_]", "_", ifname)
+    return ("add table netdev %s\n"
+            "add chain netdev %s %s { type filter hook egress device \"%s\" priority -500 ; policy accept ; }\n"
+            "flush chain netdev %s %s\n"
+            "add rule netdev %s %s ether saddr %s counter drop\n"
+            % (NFT_TABLE, NFT_TABLE, ch, ifname, NFT_TABLE, ch, NFT_TABLE, ch, permanent.lower()))
+
+# ---------- NetworkManager over D-Bus ----------
+
+def main():
+    if "nomacspoof" in open(os.environ.get("PRESTIUM_CMDLINE", "/proc/cmdline")).read().split():
+        log("boot option nomacspoof: MAC guard disabled")
+        return 0
+    import gi
+    gi.require_version("Gio", "2.0")
+    from gi.repository import Gio, GLib
+
+    bus = Gio.bus_get_sync(Gio.BusType.SYSTEM, None)
+
+    def call(path, iface, method, args=None, rtype=None):
+        return bus.call_sync(NM, path, iface, method, args, rtype, Gio.DBusCallFlags.NONE, 30000, None)
+
+    def prop(path, iface, name):
+        try:
+            return call(path, "org.freedesktop.DBus.Properties", "Get",
+                        GLib.Variant("(ss)", (iface, name)), GLib.VariantType("(v)")).unpack()[0]
+        except GLib.Error:
+            return None
+
+    def active_devices_for(conn_path):
+        devs = []
+        for ac in prop(NM_PATH, NM, "ActiveConnections") or []:
+            if prop(ac, NM + ".Connection.Active", "Connection") == conn_path:
+                devs += prop(ac, NM + ".Connection.Active", "Devices") or []
+        return devs
+
+    def disconnect(dev, why):
+        try:
+            call(dev, NM + ".Device", "Disconnect")
+        except GLib.Error as e:
+            log("could not disconnect %s: %s" % (dev, e.message), crit=True)
+        flag(why)
+
+    def check_connection(path):
+        try:
+            v = call(path, NM + ".Settings.Connection", "GetSettings", None, GLib.VariantType("(a{sa{sv}})"))
+        except GLib.Error:
+            return
+        raw = v.get_child_value(0)
+        settings = raw.unpack()
+        bad = mac_violations(settings)
+        if not bad:
+            return
+        cid = settings.get("connection", {}).get("id", path)
+        why = ("The network connection \"%s\" was set to use another MAC address (%s). Prestium put "
+               "it back to the spoofed address and disconnected it. If you didn't change this, a "
+               "program may be trying to reveal your real address." % (cid, ", ".join(r for _, r in bad)))
+        # rebuild with secrets, so rewriting the connection doesn't drop the Wi-Fi password
+        secrets = []
+        for sname in SECRET_SETTINGS:
+            if sname in settings:
+                try:
+                    secrets.append(call(path, NM + ".Settings.Connection", "GetSecrets",
+                                        GLib.Variant("(s)", (sname,)),
+                                        GLib.VariantType("(a{sa{sv}})")).get_child_value(0))
+                except GLib.Error:
+                    pass
+        full = repaired_variant(raw, secrets)
+        for dev in active_devices_for(path):
+            disconnect(dev, why)
+        try:
+            call(path, NM + ".Settings.Connection", "Update", GLib.Variant.new_tuple(full))
+            log("connection %s: MAC setting reset (%s)" % (cid, bad))
+        except GLib.Error as e:
+            try:
+                call(path, NM + ".Settings.Connection", "Delete")
+                why += " The connection could not be repaired and was deleted."
+            except GLib.Error:
+                why += " The connection could not be repaired; don't use it."
+            log("connection %s: reset failed: %s" % (cid, e.message), crit=True)
+        flag(why)
+
+    def check_device(dev):
+        iface = prop(dev, NM + ".Device", "Interface")
+        dtype = prop(dev, NM + ".Device", "DeviceType")
+        sub = {1: ".Device.Wired", 2: ".Device.Wireless"}.get(dtype)
+        if not sub:
+            return
+        perm = prop(dev, NM + sub, "PermHwAddress")
+        # Device.HwAddress (NM >= 1.24); the per-type interfaces still carry it too
+        cur = prop(dev, NM + ".Device", "HwAddress") or prop(dev, NM + sub, "HwAddress")
+        if perm and MAC_RE.match(perm.lower()) and iface not in nft_done:
+            try:
+                r = subprocess.run([os.environ.get("PRESTIUM_NFT", "nft"), "-f", "-"], input=nft_rules(iface, perm), text=True,
+                                   capture_output=True, timeout=10)
+                if r.returncode == 0:
+                    nft_done.add(iface)
+                else:
+                    log("%s: egress filter not installed: %s" % (iface, r.stderr.strip()), crit=True)
+            except (OSError, ValueError, subprocess.SubprocessError) as e:
+                log("%s: egress filter not installed: %s" % (iface, e), crit=True)
+        state = prop(dev, NM + ".Device", "State") or 0
+        if state >= DEV_ACTIVATING and is_real_mac(cur, perm):
+            disconnect(dev, "The network device %s was about to use its real MAC address. Prestium "
+                       "disconnected it. Restart Prestium before connecting again." % iface)
+
+    nft_done = set()
+
+    def on_signal(_c, _sender, path, iface, member, params, _d):
+        if iface == NM + ".Settings" and member == "NewConnection":
+            check_connection(params.unpack()[0])
+        elif iface == NM + ".Settings.Connection" and member == "Updated":
+            check_connection(path)
+        elif iface == NM and member == "DeviceAdded":
+            check_device(params.unpack()[0])
+        elif iface == NM + ".Device" and member == "StateChanged":
+            check_device(path)
+        elif iface == "org.freedesktop.DBus.Properties" and member == "PropertiesChanged":
+            changed = params.unpack()[1]
+            if params.unpack()[0].startswith(NM + ".Device") and ("HwAddress" in changed or "State" in changed):
+                check_device(path)
+
+    bus.signal_subscribe(NM, None, None, None, None, Gio.DBusSignalFlags.NONE, on_signal, None)
+    for c in call(SETTINGS_PATH, NM + ".Settings", "ListConnections", None,
+                  GLib.VariantType("(ao)")).unpack()[0]:
+        check_connection(c)
+    for d in call(NM_PATH, NM, "GetDevices", None, GLib.VariantType("(ao)")).unpack()[0]:
+        check_device(d)
+    log("MAC guard running")
+    subprocess.run(["systemd-notify", "--ready"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    GLib.MainLoop().run()
+    return 1
+
+def _dict_of(v):
+    """a{sv} GLib.Variant -> {key: inner GLib.Variant}"""
+    out = {}
+    if v is None:
+        return out
+    for i in range(v.n_children()):
+        e = v.get_child_value(i)
+        out[e.get_child_value(0).get_string()] = e.get_child_value(1).get_variant()
+    return out
+
+def repaired_variant(raw, secrets=()):
+    """raw: a{sa{sv}} from GetSettings; secrets: a{sa{sv}} from GetSecrets. Returns the a{sa{sv}}
+    to Update with: the same settings and secrets, with the MAC settings back to the default."""
+    from gi.repository import GLib
+    full = {}
+    for v in [raw] + list(secrets):
+        for i in range(v.n_children()):
+            e = v.get_child_value(i)
+            full.setdefault(e.get_child_value(0).get_string(), {}).update(_dict_of(e.get_child_value(1)))
+    for s in MAC_SETTINGS:
+        if s in full:
+            d = full[s]
+            for k in ("cloned-mac-address", "generate-mac-address-mask"):
+                d.pop(k, None)
+            d["assigned-mac-address"] = GLib.Variant("s", "preserve")
+            if "mac-address-randomization" in d and d["mac-address-randomization"].unpack() not in (0, 2):
+                d["mac-address-randomization"] = GLib.Variant("u", 0)
+    return GLib.Variant("a{sa{sv}}", full)
+
+if __name__ == "__main__":
+    syslog.openlog("prestium-mac-guard")
+    sys.exit(main())

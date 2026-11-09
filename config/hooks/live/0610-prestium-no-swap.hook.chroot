@@ -1,0 +1,22 @@
+#!/bin/sh
+# Prestium 2.0 r9 (Tails: config/chroot_local-hooks/05-disable_swapon): never use swap. Memory
+# written to a swap partition or file on the computer's disk would survive shutdown. swapon is
+# replaced by a no-op (dpkg-divert keeps the replacement through package upgrades), so neither
+# systemd's swap units nor anything else can enable swap. The kernel command line also has
+# systemd.gpt_auto=0, so no swap partition is discovered automatically.
+set -e
+B=/usr/sbin/swapon
+if ! dpkg-divert --list "$B" | grep -q prestium-no-swap; then
+	dpkg-divert --quiet --local --rename --divert "$B.prestium-no-swap" --add "$B"
+fi
+cat > "$B" <<'EOF'
+#!/bin/sh
+# Prestium: swap is never used (memory must not reach a disk). This replaces swapon(8).
+echo "prestium: swapon is disabled; swap is never used" >&2
+exit 0
+EOF
+chmod 0755 "$B"
+[ ! -e /sbin/swapon ] || [ "$(readlink -f /sbin/swapon)" = "$B" ] || { echo "E: /sbin/swapon is not $B"; exit 1; }
+"$B" -a 2>/dev/null
+grep -q 'swap is never used' "$B" || { echo "E: swapon not replaced"; exit 1; }
+echo "P: swapon disabled"

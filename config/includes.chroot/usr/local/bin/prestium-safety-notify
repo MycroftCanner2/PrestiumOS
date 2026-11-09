@@ -1,0 +1,48 @@
+#!/bin/bash
+# Prestium 2.0 r7: tell the live user, visibly and persistently, when a privacy protection is not
+# active: the boot-medium watchdog did not arm (or died), or the shutdown memory wipe was not
+# prepared. Started from the session autostart; checks every 20 s and alerts once per new problem.
+D=/run/prestium/safety
+declare -A shown
+alert() {   # $1 key, $2 text
+  [ -n "${shown[$1]}" ] && return
+  shown[$1]=1
+  notify-send -u critical -t 0 "Prestium: protection NOT active" "$2" 2>/dev/null
+  zenity --warning --no-wrap --title "Prestium: protection NOT active" --text "$2" >/dev/null 2>&1 &
+}
+toram=; grep -qw toram /proc/cmdline && toram=1
+sleep 15
+while :; do
+  for f in "$D"/*; do
+    [ -f "$f" ] || continue
+    alert "flag:${f##*/}" "$(head -c 600 "$f")"
+  done
+  if [ -z "$toram" ] && ! systemctl -q is-active prestium-usb-watchdog.service; then
+    st=$(systemctl show -p ActiveState --value prestium-usb-watchdog.service)
+    [ "$st" = activating ] || alert unit:watchdog "The boot-medium watchdog is not running ($st). Pulling the USB stick will NOT power the computer off. Shut down normally when you are done."
+  fi
+  # 2.0 r10: the MAC guard must run while NetworkManager runs (unless booted with nomacspoof)
+  if ! grep -qw nomacspoof /proc/cmdline && systemctl -q is-active NetworkManager.service \
+     && ! systemctl -q is-active prestium-mac-guard.service; then
+    st=$(systemctl show -p ActiveState --value prestium-mac-guard.service)
+    [ "$st" = activating ] || alert unit:macguard "The MAC address guard is not running ($st). A changed network setting could reveal your computer's real MAC address. Disconnect from the network and restart Prestium."
+  fi
+  # 2.0 r11: the compositor's full Wayland socket must be locked (root-owned) by the broker
+  if [ -n "$WAYLAND_DISPLAY" ] || [ -n "$XDG_RUNTIME_DIR" ]; then
+    full="$XDG_RUNTIME_DIR/wayland-0"
+    if [ -S "$full" ] && [ "$(stat -c %u "$full")" != 0 ]; then
+      alert wl:full "The desktop's full Wayland socket is not protected. Any program could capture the screen or type into other windows. Restart Prestium."
+    fi
+    ps=$(cat /proc/sys/kernel/yama/ptrace_scope 2>/dev/null)
+    if [ "${ps:-0}" -lt 2 ]; then
+      alert wl:ptrace "Process isolation (Yama ptrace_scope=${ps:-unavailable}) is weaker than Prestium expects: a program could read other programs' memory and take their connections to the desktop. Restart Prestium."
+    fi
+    if ! systemctl -q is-active prestium-wl-broker.service; then
+      alert wl:broker "The Wayland broker is not running. The screen lock, screenshots and panel may not work, and new windows may lose their protection. Restart Prestium."
+    fi
+  fi
+  if systemctl -q is-failed prestium-initramfs-shutdown.service; then
+    alert unit:wipe "The shutdown memory wipe could not be prepared. Memory will NOT be overwritten at shutdown; the kernel still zeroes freed memory (init_on_free=1), but no final wipe pass runs."
+  fi
+  sleep 20
+done

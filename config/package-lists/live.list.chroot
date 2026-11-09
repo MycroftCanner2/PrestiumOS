@@ -1,0 +1,4 @@
+# live system
+live-boot
+live-boot-initramfs-tools
+systemd-sysv

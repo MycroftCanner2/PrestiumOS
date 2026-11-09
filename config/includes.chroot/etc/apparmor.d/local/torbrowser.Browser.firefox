@@ -1,0 +1,7 @@
+# Prestium 2.0 r9 additions to the Tor Browser profile.
+# No sudo/su/pkexec, no Prestium helpers, no system bus (the sandbox also sets no_new_privs).
+include <abstractions/prestium-no-admin>
+# Tor's SOCKS port for the browser is a Unix socket bound into its network-less sandbox
+/run/prestium-tbb/socks rw,
+# 2.0 r10: Wayland only, through the sandbox's own security-context socket (no X11 socket inside)
+owner /run/user/[0-9]*/wayland-0 rw,

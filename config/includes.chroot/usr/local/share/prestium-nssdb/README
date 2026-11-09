@@ -1,0 +1,7 @@
+Prestium 1.9.1: NSS certificate database that explicitly distrusts the four
+eMudhra emSign roots (G1, C1, ECC C3, ECC G3; certutil trust "p,p,p"), as
+Tails 7.15.1 blocks all eMudhra certificates. Tor Browser, LibreWolf and the
+local-only Firefox carry these roots in their built-in list (libxul), which
+ignores the system CA store, so the launchers copy this cert9.db/key4.db into
+each new profile; a distrust entry in the profile database overrides the
+built-in trust.

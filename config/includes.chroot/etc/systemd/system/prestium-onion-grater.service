@@ -1,0 +1,36 @@
+# Prestium 1.9.1: Tor control-port filter (Tails onion-grater style)
+[Unit]
+Description=Prestium Tor control port filter (onion-grater)
+After=tor@default.service
+Wants=tor@default.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/prestium-onion-grater
+User=onion-grater
+Group=onion-grater
+SupplementaryGroups=debian-tor prestium-tbb
+RuntimeDirectory=onion-grater
+RuntimeDirectoryMode=0755
+# read /proc/<pid>/exe of the connecting app (another uid)
+AmbientCapabilities=CAP_SYS_PTRACE
+CapabilityBoundingSet=CAP_SYS_PTRACE
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

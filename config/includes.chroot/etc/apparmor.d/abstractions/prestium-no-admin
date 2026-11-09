@@ -1,0 +1,21 @@
+# Prestium 2.0 r9: confined apps may never ask for root or reach Prestium's privileged helpers.
+# Included by every Prestium app profile. "deny" wins over any allow rule in the profile, so this
+# also holds if a later edit adds a broad exec rule.
+  deny /{,usr/}{,s}bin/sudo{,edit} mrwx,
+  deny /{,usr/}{,s}bin/su mrwx,
+  deny /{,usr/}{,s}bin/pkexec mrwx,
+  deny /{,usr/}{,s}bin/doas mrwx,
+  deny /{,usr/}{,s}bin/run0 mrwx,
+  deny /{,usr/}{,s}bin/chpasswd mrwx,
+  deny /usr/local/sbin/** mrwx,
+  deny /usr/local/lib/prestium/** mrwx,
+  deny /usr/local/bin/prestium-tunnel-hops mrwx,
+  deny /usr/local/bin/prestium-tor-assistant mrwx,
+  deny /etc/sudoers r,
+  deny /etc/sudoers.d/** r,
+  deny /run/sudo/** rw,
+  # the Tor control socket (only onion-grater may use it), polkit and the system bus
+  deny /run/tor/** rw,
+  deny /run/dbus/system_bus_socket rw,
+  deny /var/run/dbus/system_bus_socket rw,
+  deny /run/polkit-1/** rw,

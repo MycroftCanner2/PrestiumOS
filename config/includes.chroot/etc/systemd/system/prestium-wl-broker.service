@@ -1,0 +1,17 @@
+[Unit]
+Description=Prestium: Wayland broker (keeps the compositor's full socket from applications)
+# 2.0 r11: see /usr/local/sbin/prestium-wl-broker
+Before=display-manager.service
+After=systemd-tmpfiles-setup.service
+
+[Service]
+Type=notify
+NotifyAccess=all
+ExecStart=/usr/local/sbin/prestium-wl-broker
+Restart=always
+RestartSec=1
+# the trusted tools it starts as the user live in this unit; a broker restart must not kill them
+KillMode=process
+
+[Install]
+WantedBy=graphical.target

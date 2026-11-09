@@ -1,0 +1,14 @@
+#!/bin/sh
+# Prestium 1.9.1: put the memory-wipe /shutdown script into the initramfs
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in prereqs) prereqs; exit 0 ;; esac
+. /usr/share/initramfs-tools/hook-functions
+cp /usr/share/prestium/initramfs-shutdown "${DESTDIR}/shutdown"
+chmod 0755 "${DESTDIR}/shutdown"
+# busybox provides sh, rm, umount, grep, cut, sort, sync, poweroff, reboot, halt
+copy_exec /bin/busybox /bin
+for a in rm umount grep cut sort sync poweroff reboot halt mkdir mount; do
+  [ -e "${DESTDIR}/bin/$a" ] || ln -sf busybox "${DESTDIR}/bin/$a"
+done
+exit 0

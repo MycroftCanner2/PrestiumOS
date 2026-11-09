@@ -1,0 +1,127 @@
+#!/usr/bin/python3
+# Prestium 2.0 (r4): symlink-safe file operations for root helpers that act inside directories
+# owned by a lower-trust service uid (i2pd owns /var/lib/i2pd). Every operation works on file
+# descriptors opened with O_NOFOLLOW, so a planted symlink is refused (or replaced by rename),
+# never followed. DIR's final component must be a real directory; its parents must not be
+# writable by the lower-trust uid (/var/lib is root's).
+#
+#   safefile read  DIR NAME                       print NAME (must be a regular file, not a symlink)
+#   safefile write DIR NAME UID GID MODE [--dir-owner UID]
+#                                                 replace NAME with stdin: new file created O_EXCL in
+#                                                 DIR, fchown/fchmod on its fd, fsync, renameat over
+#                                                 NAME. An existing NAME must be a regular file.
+#   safefile mkdir DIR NAME UID GID MODE          make sure DIR/NAME is a real directory (created if
+#                                                 missing) and set owner/mode through its fd
+# UID/GID are numbers or names; MODE is octal. Exit 0 ok, 1 refused/failed (message on stderr).
+import grp, os, pwd, secrets, stat, sys
+
+def die(msg):
+    print("safefile: " + msg, file=sys.stderr)
+    sys.exit(1)
+
+def num_uid(v):
+    return int(v) if v.isdigit() else pwd.getpwnam(v).pw_uid
+
+def num_gid(v):
+    return int(v) if v.isdigit() else grp.getgrnam(v).gr_gid
+
+def check_name(name):
+    if not name or "/" in name or name in (".", ".."):
+        die("bad name %r" % name)
+
+def open_dir(path):
+    if not path.startswith("/"):
+        die("directory must be absolute: %s" % path)
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError as e:
+        die("refusing %s: not a real directory (%s)" % (path, e.strerror))
+    return fd
+
+def entry(dfd, name):
+    try:
+        return os.lstat(name, dir_fd=dfd)
+    except FileNotFoundError:
+        return None
+
+def do_read(d, name):
+    check_name(name)
+    dfd = open_dir(d)
+    st = entry(dfd, name)
+    if st is None:
+        die("%s/%s does not exist" % (d, name))
+    if not stat.S_ISREG(st.st_mode):
+        die("refusing %s/%s: not a regular file (symlink or special file)" % (d, name))
+    fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC, dir_fd=dfd)
+    if not stat.S_ISREG(os.fstat(fd).st_mode):
+        die("refusing %s/%s: not a regular file" % (d, name))
+    with os.fdopen(fd, "rb") as f:
+        sys.stdout.buffer.write(f.read())
+
+def do_write(d, name, uid, gid, mode, dir_owner=None):
+    check_name(name)
+    data = sys.stdin.buffer.read()
+    dfd = open_dir(d)
+    if dir_owner is not None and os.fstat(dfd).st_uid != dir_owner:
+        die("refusing %s: owned by uid %d, expected %d" % (d, os.fstat(dfd).st_uid, dir_owner))
+    st = entry(dfd, name)
+    if st is not None and not stat.S_ISREG(st.st_mode):
+        die("refusing %s/%s: not a regular file (symlink or special file)" % (d, name))
+    tmp = ".%s.prestium-%s" % (name, secrets.token_hex(6))
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600, dir_fd=dfd)
+    try:
+        os.fchown(fd, uid, gid)
+        os.fchmod(fd, mode)
+        view = memoryview(data)
+        while view:
+            view = view[os.write(fd, view):]
+        os.fsync(fd)
+        os.close(fd); fd = -1
+        os.rename(tmp, name, src_dir_fd=dfd, dst_dir_fd=dfd)   # replaces a symlink, never follows it
+    except BaseException:
+        if fd >= 0:
+            os.close(fd)
+        try:
+            os.unlink(tmp, dir_fd=dfd)
+        except OSError:
+            pass
+        raise
+    os.fsync(dfd)
+
+def do_mkdir(d, name, uid, gid, mode):
+    check_name(name)
+    dfd = open_dir(d)
+    try:
+        os.mkdir(name, 0o700, dir_fd=dfd)
+    except FileExistsError:
+        pass
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC, dir_fd=dfd)
+    except OSError as e:
+        die("refusing %s/%s: not a real directory (%s)" % (d, name, e.strerror))
+    os.fchown(fd, uid, gid)
+    os.fchmod(fd, mode)
+    os.close(fd)
+
+def main(a):
+    try:
+        if len(a) == 3 and a[0] == "read":
+            do_read(a[1], a[2])
+        elif len(a) in (6, 8) and a[0] == "write":
+            own = None
+            if len(a) == 8:
+                if a[6] != "--dir-owner":
+                    die("usage")
+                own = num_uid(a[7])
+            do_write(a[1], a[2], num_uid(a[3]), num_gid(a[4]), int(a[5], 8), own)
+        elif len(a) == 6 and a[0] == "mkdir":
+            do_mkdir(a[1], a[2], num_uid(a[3]), num_gid(a[4]), int(a[5], 8))
+        else:
+            die("usage: safefile read DIR NAME | write DIR NAME UID GID MODE [--dir-owner UID] | "
+                "mkdir DIR NAME UID GID MODE")
+    except (OSError, KeyError, ValueError) as e:
+        die(str(e))
+    return 0
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

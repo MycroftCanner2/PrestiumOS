@@ -1,0 +1,41 @@
+#!/bin/sh
+# Prestium 1.9.1.1: pre-bootstrap clock fix (Tails approach, no clearnet).
+# Real PCs often keep the hardware clock in local time (Windows dual boot) or
+# simply wrong. prestium-timesync only works once Tor is up, so if Tor can't
+# bootstrap because of the clock, nothing would ever fix it. Tor still
+# downloads the consensus; when our clock is outside the consensus validity
+# window and Tor still hasn't bootstrapped 2 minutes later, set the clock to
+# valid-after + 90 min (as Tails does) and restart Tor. If Tor copes with the
+# skew on its own, the clock is left alone here.
+# prestium-timesync (After=prestium-clockfix) then sets the exact time over Tor once
+# bootstrap has succeeded; the two units are ordered so they do not fight.
+D=/var/lib/tor
+boot_ok(){ journalctl -b -u tor@default -o cat --no-pager 2>/dev/null | grep -q 'Bootstrapped 100'; }
+i=0; first=-1
+while [ $i -lt 90 ]; do
+  boot_ok && { echo "Tor bootstrapped, clock left as is"; exit 0; }
+  # 2.0 r6: never trust unverified-* consensus as an authoritative clock source
+  for c in $D/cached-microdesc-consensus $D/cached-consensus; do
+    [ -s "$c" ] || continue
+    va=$(sed -n 's/^valid-after \([0-9-]* [0-9:]*\)$/\1/p' "$c" | head -n1)
+    vu=$(sed -n 's/^valid-until \([0-9-]* [0-9:]*\)$/\1/p' "$c" | head -n1)
+    [ -n "$va" ] && [ -n "$vu" ] || continue
+    a=$(date -u -d "$va" +%s 2>/dev/null) || continue
+    u=$(date -u -d "$vu" +%s 2>/dev/null) || continue
+    now=$(date -u +%s)
+    if [ "$now" -lt $((a - 600)) ] || [ "$now" -gt $((u + 600)) ]; then
+      [ "$first" -lt 0 ] && { first=$i; echo "clock $(date -u '+%F %T') UTC outside consensus window $va .. $vu UTC, waiting 2 min for Tor"; }
+      [ $((i - first)) -ge 12 ] || break
+      boot_ok && { echo "Tor bootstrapped despite the skew, clock left as is"; exit 0; }
+      new=$((a + 5400))
+      echo "clock $(date -u -d @$now '+%F %T') outside consensus window $va .. $vu UTC: setting $(date -u -d @$new '+%F %T') UTC"
+      date -u -s "@$new" >/dev/null
+      systemctl restart tor@default.service
+      systemctl try-restart i2pd.service
+      exit 0
+    fi
+  done
+  i=$((i+1)); sleep 10
+done
+echo "no decision after 15 min, clock left as is"
+exit 0

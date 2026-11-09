@@ -1,0 +1,16 @@
+# Prestium 1.8/1.9.1: power off immediately when the boot medium is removed.
+[Unit]
+Description=Prestium emergency shutdown on boot medium removal
+After=local-fs.target memlockd.service
+Wants=memlockd.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/prestium-usb-watchdog
+Restart=on-failure
+# 2.0 r7: exit 3 = could not arm (flagged to the desktop); restarting would not help
+RestartPreventExitStatus=3
+OOMScoreAdjust=-1000
+
+[Install]
+WantedBy=multi-user.target

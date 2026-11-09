@@ -1,0 +1,48 @@
+#!/bin/bash
+# Prestium: official Tor Browser (/opt/tor-browser), using the system Tor
+# (tor@default, SOCKS 127.0.0.1:9050) instead of its own tor, so the ferm rule
+# "only debian-tor and i2pd reach the network" still holds.
+# 1.9.1 (Tails-style):
+#  - /opt/tor-browser is root-owned and read-only ("is-packaged-app" mode); the
+#    profile lives in ~/.tor-browser/profile.default and the browser runs under
+#    the enforced AppArmor profile "torbrowser_firefox".
+#  - Downloads/uploads: ~/Tor Browser (the only place in your home the browser
+#    may read or write).
+#  - The control port is reached through the onion-grater filter
+#    (/run/onion-grater/control: NEWNYM, circuit display, onion auth only).
+TB=/opt/tor-browser
+if [ "$(id -u)" -eq 0 ]; then echo "Tor Browser must not run as root." >&2; exit 1; fi
+P="$HOME/.tor-browser/profile.default"
+D="$HOME/Tor Browser"
+umask 077
+mkdir -p "$P/extensions" "$D" || exit 1
+chmod 700 "$HOME/.tor-browser" "$P"
+# bundled extensions (NoScript) from the read-only install
+for x in "$TB"/Browser/TorBrowser/Data/Browser/profile.default/extensions/*.xpi; do
+  [ -e "$x" ] && cp -f "$x" "$P/extensions/"
+done
+# 1.9.1: distrust the eMudhra (emSign) roots that are built into Tor Browser
+if [ ! -e "$P/cert9.db" ]; then
+  cp /usr/local/share/prestium-nssdb/cert9.db /usr/local/share/prestium-nssdb/key4.db "$P/"
+fi
+# Prestium prefs (download folder etc.), rewritten at every start
+sed "s#@DOWNLOADS@#$D#g" /usr/local/share/prestium-tor-browser/user.js > "$P/user.js"
+# 2.0 r9: Tor Browser runs in a bubblewrap sandbox (Tails runs it in its own network namespace and
+# a Flatpak sandbox); 2.0 r10: Wayland only, in its own security context. The sandbox is described
+# in /usr/local/lib/prestium/browser-sandbox.sh. Its only ways out are Tor's SOCKS Unix socket and
+# the onion-grater control filter.
+SOCKS=/run/prestium-tbb/socks
+CTL=/run/onion-grater/control
+. ${PRESTIUM_SANDBOX_LIB:-/usr/local/lib/prestium/browser-sandbox.sh}
+[ -S "$SOCKS" ] || sbx_fail "Tor Browser" "Tor is not running (no SOCKS socket). Tor Browser was not started."
+sbx_init "Tor Browser"
+B+=(--ro-bind "$TB" "$TB"
+    --dir /run/prestium-tbb --bind "$SOCKS" "$SOCKS"
+    --dir /run/onion-grater --bind-try "$CTL" "$CTL"
+    --bind "$HOME/.tor-browser" "$HOME/.tor-browser" --bind "$D" "$D"
+    --setenv TOR_SKIP_LAUNCH 1 --setenv TOR_SOCKS_IPC_PATH "$SOCKS" --setenv TOR_CONTROL_IPC_PATH "$CTL"
+    --setenv TOR_CONTROL_PASSWD '"prestium"' --setenv TOR_HIDE_UPDATE_CHECK_UI 1
+    --chdir "$TB/Browser")
+# onion-grater accepts any password (access is decided by process identity: the real
+# /opt/tor-browser/Browser/firefox.real, checked by device and inode)
+sbx_exec torbrowser ./start-tor-browser "$@" -profile "$P"
