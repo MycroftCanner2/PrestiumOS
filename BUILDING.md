@@ -1,9 +1,8 @@
-# Building Prestium 2.0 (live-build)
+# Building PrestiumOS (live-build)
 
-Prestium 2.0 is built from scratch with Debian's **live-build**, the same tool Debian's own live
+PrestiumOS is built from scratch with Debian's **live-build**, the same tool Debian's own live
 images use. Everything that makes it Prestium is in this repository: the package lists, the
-customised files, the setup hooks and the pinned third-party downloads. 1.9.x was built by
-upgrading and patching an unpacked root filesystem (kept in the `prestium-1.6-update` branch).
+customised files, the setup hooks and the pinned third-party downloads.
 
 - Base: Debian 13 "trixie", amd64. Archive areas `main contrib non-free-firmware`, plus
   `trixie-updates`, `trixie-security` and `trixie-backports`.
@@ -13,7 +12,7 @@ upgrading and patching an unpacked root filesystem (kept in the `prestium-1.6-up
   20260916 or newer. Extra firmware beyond Tails (network cards, TV tuners, Qualcomm, Samsung) is
   installed when the archive has it (`optional-packages.txt`).
 - Boot: hybrid ISO, BIOS (isolinux) and UEFI, with **Secure Boot** through Debian's signed shim and
-  GRUB (`--uefi-secure-boot enable`). Kernel command line as in 1.9.1.3: hardening options, the
+  GRUB (`--uefi-secure-boot enable`). Kernel command line: hardening options, the
   internal-disk (ahci/libata) blacklist with the patched live-boot fallback, `module.sig_enforce=1`
   and AppArmor.
 
@@ -30,8 +29,8 @@ which works but is several times slower.
 
 ## Build
 
-    git clone -b prestium-2.0 https://github.com/MycroftCanner2/prestium-1.2.1-.git prestium
-    cd prestium
+    git clone https://github.com/MycroftCanner2/PrestiumOS.git
+    cd PrestiumOS
     sudo ./build.sh
 
 `build.sh`:
@@ -54,13 +53,13 @@ starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (mu
 | Path | What it is |
 | --- | --- |
 | `auto/config` | the `lb config` options (distribution, archive areas, boot loaders, Secure Boot, kernel command line, squashfs compression) |
-| `config/package-lists/prestium.list.chroot` | the packages installed by hand in 1.9.1.3 (derived from its dpkg selections, build-only packages removed) |
+| `config/package-lists/prestium.list.chroot` | the packages installed by hand in earlier Prestium releases (derived from their dpkg selections, build-only packages removed) |
 | `config/package-lists/prestium-firmware.list.chroot` | firmware and CPU microcode (Tails parity) |
 | `config/package-lists/prestium-2.0.list.chroot` | 2.0 additions: PipeWire/WirePlumber audio, pasystray, the assistant's GTK bindings |
 | `config/package-lists/live.list.chroot` | live-boot (no live-config: Prestium sets up its user itself) |
 | `config/archives/` | build-time apt sources and keys: Tor Project, PurpleI2P (i2pd), LibreWolf, each `signed-by` its own key (live-build installs `<name>.key.chroot` as `/etc/apt/trusted.gpg.d/<name>.key.chroot.gpg`); origin pins limiting each repo to its own packages; firmware pin to backports |
 | `config/preseed/` | non-interactive answers (firmware licences, locale, keyboard, ferm) |
-| `config/includes.chroot/` | Prestium's own files and the package files it changes, copied from the 1.9.1.3 root filesystem as a diff against the packaged files (see below), plus the 2.0 changes |
+| `config/includes.chroot/` | Prestium's own files and the package files it changes, carried over from the earlier Prestium root filesystem as a diff against the packaged files (see below), plus the 2.0 changes |
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
 | `config/hooks/live/*.hook.chroot` | setup steps, in order (below) |
 | `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels |
@@ -74,11 +73,11 @@ starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (mu
 | Hook | Does |
 | --- | --- |
 | `0001-prestium-build-dns` | build only: gives the hooks a resolver (Prestium's own `resolv.conf` has none) |
-| `0010-prestium-optional-packages` | installs 1.9.1.3's dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
+| `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
 | `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + uBlock Origin), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected), Feather |
 | `0300-prestium-lurch` | builds lurch 0.7.0 (OMEMO for Pidgin) from the pinned source and purges the build tools again |
-| `0400-prestium-system` | the exact set of enabled/masked units from 1.9.1.3 + PipeWire user units, gvfs network backends diverted, alternatives, CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
+| `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives, CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them) |
 | `0600-prestium-apparmor` | enforces all Prestium profiles (LibreWolf included) and compiles them to catch errors |
 | `0700-prestium-i2pd` | i2pd's real config in `/var/lib/i2pd`, owned by uid 2000; `tunnels.conf.d` root:i2pd 0750 (written by root helpers only through `/usr/local/lib/prestium/safefile`); Prestium's dark theme inlined into the torrent web UI |
@@ -86,7 +85,7 @@ starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (mu
 
 ### How `config/includes.chroot/` was made
 
-From the 1.9.1.3 root filesystem: every file not owned by a package, every package file whose
+From the earlier Prestium root filesystem: every file not owned by a package, every package file whose
 checksum differs from the package (`dpkg` md5sums and conffile hashes), and the package symlinks
 Prestium replaced with real files (`/var/lib/i2pd/*.conf`). Generated files (alternatives, caches,
 enablement symlinks, user database, locale data, `ld.so.cache`, `/etc/ssl/certs`) are left to the

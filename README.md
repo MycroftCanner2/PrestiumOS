@@ -6,16 +6,12 @@ PrestiumOS is a privacy-focused live operating system for USB sticks, with Tor a
 is built with Debian's **live-build** on Debian 13 "trixie" (amd64), and it follows Tails for hardware
 support: the same Debian release, kernel line and firmware set, with Secure Boot through shim and GRUB.
 
-**Status:** active development. PrestiumOS continues from **Prestium 2.0**, the final version of the
-original Prestium repository, whose goal was to fully modernize the 2023 Prestium build. This
-repository starts from a copy of that branch:
-https://github.com/MycroftCanner2/prestium-1.2.1-/tree/prestium-2.0 (older releases and the full
-history are kept there).
+**Status:** active development. PrestiumOS starts from **Prestium 2.0**, a full modernization of the
+2023 Prestium build. Version **2.1** is in progress here, with enhanced security and new features.
 
 - **Download:** the 2.0 ISO through [`Prestium-2.0-amd64.iso.torrent`](Prestium-2.0-amd64.iso.torrent)
 - **Build it yourself:** [BUILDING.md](BUILDING.md) (`sudo ./build.sh`)
-- **What changed since 1.9.1.3:** the unified changelog on the
-  [Prestium 2.0 branch](https://github.com/MycroftCanner2/prestium-1.2.1-/blob/prestium-2.0/CHANGELOG.md)
+- **What changed:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Highlights
 
@@ -42,7 +38,7 @@ history are kept there).
 ## Tor Connection Assistant: DNS design
 
 **DNS design.** Prestium has no system DNS on purpose, which is why Snowflake and WebTunnel did not
-work in 1.9.x: they need to look up host names (Snowflake's front domains and STUN servers, meek's
+work in earlier releases: they need to look up host names (Snowflake's front domains and STUN servers, meek's
 front, the WebTunnel bridge's host). In 2.0:
 
 - **Tor traffic is not routed through I2P.** Tor and its pluggable transports connect directly.
