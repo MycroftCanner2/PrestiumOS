@@ -48,3 +48,7 @@ qt6-wayland
 libreoffice-gtk3
 # 2.0 r10: relay for LibreWolf's sandbox (I2P HTTP proxy over a Unix socket)
 socat
+# 2.1: smartcard daemon (only "Suggested" by gpg-agent, so --apt-recommends false left it out). Without it
+# "gpgconf --list-options scdaemon" fails and Kleopatra's self-test reports "scdaemon Configuration Check:
+# Failed" at every start. (Its "Compliance Check: Skipped" is normal: GnuPG isn't in de-vs mode.)
+scdaemon

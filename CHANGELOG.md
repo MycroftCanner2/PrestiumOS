@@ -66,6 +66,11 @@ Enhanced security and new features. Changes will be listed here as they land.
   @mail.i2p account on each start. Cancelling the form leaves Mail closed. If the form can't be shown,
   Claws' wizard opens with the same servers filled in (`accountrc.tmpl`, ports as `server:port`, which
   is the only form Claws reads there).
+- **Kleopatra's self-test passes.** Kleopatra opened with "scdaemon Configuration Check: Failed" at
+  every start: its check runs `gpgconf --list-options scdaemon`, and scdaemon (the smartcard daemon)
+  wasn't installed, since gpg-agent only suggests it and the image is built without recommended
+  packages. scdaemon is now installed (pcscd already was). "Compliance Check: Skipped" is normal: it
+  only applies when GnuPG is set to de-vs compliance (`tests/test_kleopatra_selftest.sh`).
 
 ## 2.0: changes since Prestium 1.9.1.3
 
