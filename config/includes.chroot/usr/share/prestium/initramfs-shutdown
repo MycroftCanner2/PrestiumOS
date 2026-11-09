@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 1.9.1 (Tails memory-erasure design): this script is part of the
+# Prestium (Tails memory-erasure design): this script is part of the
 # initramfs. At boot prestium-initramfs-shutdown.service unpacks the initramfs
 # into the /run/initramfs tmpfs; at the very end of shutdown systemd-shutdown
 # switches root to /run/initramfs and runs /shutdown <poweroff|reboot|halt|kexec>.

@@ -1,4 +1,4 @@
-# Prestium 1.9.1 Tor configuration (on top of /usr/share/tor/tor-service-defaults-torrc)
+# Prestium Tor configuration (on top of /usr/share/tor/tor-service-defaults-torrc)
 #
 # A SocksPort line here replaces every SocksPort of the defaults file, so the
 # world-writable unix socket /run/tor/socks (which the per-uid firewall can't
@@ -17,7 +17,7 @@ SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort
 SocksPort unix:/run/prestium-tbb/socks WorldWritable
 # no DNSPort/TransPort: nothing on Prestium resolves names outside Tor/I2P
 AvoidDiskWrites 1
-# Sandbox 1 removed in 1.9.1: Tor refuses managed proxies (ClientTransportPlugin: obfs4/snowflake/webtunnel) in Sandbox mode, so tor@default failed. Tails does not use Sandbox either.
+# Sandbox 1 removed: Tor refuses managed proxies (ClientTransportPlugin: obfs4/snowflake/webtunnel) in Sandbox mode, so tor@default failed. Tails does not use Sandbox either.
 # IPv6 is disabled on Prestium
 ClientUseIPv6 0
 ClientPreferIPv6ORPort 0

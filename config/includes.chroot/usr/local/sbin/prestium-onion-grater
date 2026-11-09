@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Prestium 1.9.1: Tor control-port filter (in the spirit of Tails' onion-grater).
+# Prestium: Tor control-port filter (in the spirit of Tails' onion-grater).
 #
 # "user" is no longer in group debian-tor, so it can't open Tor's real control
 # socket (/run/tor/control). Apps talk to this filter instead:
@@ -116,7 +116,7 @@ def identify(conn):
     if uid not in (0, USER_UID):
         return None, "uid %d" % uid, pid
     if LOCALWEB_GID is not None:
-        # 1.9.1.1: only the primary group counts (real/effective/saved/fs gid,
+        # only the primary group counts (real/effective/saved/fs gid,
         # as the firewall's gid-owner match). "user" is a supplementary member
         # of prestium-localweb (needed by sg), so checking "Groups:" refused
         # every app of "user", Tor Browser included.

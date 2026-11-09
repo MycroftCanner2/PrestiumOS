@@ -102,7 +102,7 @@ try {
 } catch (e) {}
 if (!user || !Array.isArray(user.networks)) {
 	user = JSON.parse(fs.readFileSync(TEMPLATE, "utf8"));
-	// 1.9.1: every network preset gets its own random nick, so the IRC2P and Ilita
+	// every network preset gets its own random nick, so the IRC2P and Ilita
 	// presets (and the alternate servers) don't share one nick that would link them
 	const used = new Set();
 	for (const n of user.networks) {

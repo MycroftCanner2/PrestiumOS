@@ -3,7 +3,7 @@
 # I2P HTTP proxy 127.0.0.1:4444. .i2p sites go through I2P; other (clearnet)
 # sites go through ONE I2P outproxy (acetone, http://proxy4uwdijqxac2bvdx4fuhem6njmiwukuk2gelejv2nzxka2xq.b32.i2p:3128), which sees every
 # clearnet site you visit. HTTPS-Only mode is off on purpose (I2P sites are http).
-# 1.9.1: fixed profile ~/.librewolf/prestium, seeded with an NSS database that
+# fixed profile ~/.librewolf/prestium, seeded with an NSS database that
 # distrusts the eMudhra (emSign) roots.
 # 2.0 r10: LibreWolf runs in the same sandbox as Tor Browser (/usr/local/lib/prestium/browser-sandbox.sh):
 # its own empty network namespace, Wayland only in its own security context, of $HOME only

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 1.9.1: put the memory-wipe /shutdown script into the initramfs
+# Prestium: put the memory-wipe /shutdown script into the initramfs
 PREREQ=""
 prereqs() { echo "$PREREQ"; }
 case "$1" in prereqs) prereqs; exit 0 ;; esac

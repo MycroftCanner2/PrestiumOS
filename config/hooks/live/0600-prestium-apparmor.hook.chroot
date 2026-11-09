@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.0: AppArmor. Every profile Prestium ships is enforced, LibreWolf's included (1.9.1.3
+# Prestium 2.0: AppArmor. Every profile Prestium ships is enforced, LibreWolf's included (earlier releases
 # had it in complain mode). Profiles are compiled once here to catch syntax errors at build time.
 set -e
 # 2.0 r9: Debian's "firefox" profile (flags=unconfined) attaches to /opt/firefox/firefox too, which

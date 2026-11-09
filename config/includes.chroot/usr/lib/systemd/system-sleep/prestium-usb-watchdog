@@ -4,7 +4,7 @@
 # sleeps, which the watchdog would take for a removed medium.
 # 1.8 stopped the watchdog before sleep and started it again after resume, but
 # a medium pulled DURING suspend then went unnoticed (the restarted watchdog
-# finds no medium and doesn't arm). 1.9.1: the watchdog is frozen (SIGSTOP)
+# finds no medium and doesn't arm). the watchdog is frozen (SIGSTOP)
 # before sleep; after resume we wait up to 10 s for the medium:
 #  - back: restart the watchdog (re-armed on the possibly renamed device);
 #  - gone: unfreeze it, so it sees the missing medium and powers off at once.

@@ -1,4 +1,4 @@
-# Prestium 1.8/1.9.1: power off immediately when the boot medium is removed.
+# Prestium: power off immediately when the boot medium is removed.
 [Unit]
 Description=Prestium emergency shutdown on boot medium removal
 After=local-fs.target memlockd.service

@@ -18,7 +18,7 @@ case "$URL" in *[!A-Za-z0-9:/._#?=%@-]*) echo "prestium-localfox: bad URL" >&2; 
 P="$HOME/.local/share/prestium-localfox"
 mkdir -p "$P" && chmod 700 "$P" || exit 1
 cp -f /usr/local/share/prestium-localfox/user.js "$P/user.js"
-# 1.9.1: distrust the eMudhra (emSign) roots built into Firefox
+# distrust the eMudhra (emSign) roots built into Firefox
 [ -e "$P/cert9.db" ] || cp /usr/local/share/prestium-nssdb/cert9.db /usr/local/share/prestium-nssdb/key4.db "$P/"
 CMD="exec /opt/firefox/firefox --name prestium-localfox --class PrestiumLocalFirefox --profile '$P' '$URL'"
 if [ "$(id -gn)" = prestium-localweb ]; then exec sh -c "$CMD"; fi

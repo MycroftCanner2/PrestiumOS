@@ -1,4 +1,4 @@
-# Prestium 1.9.1.1: Pidgin (Tor + OTR).
+# Prestium: Pidgin (Tor + OTR).
 # 2.0 r9: ENFORCED (was complain mode, i.e. not confined), with the shared app rules and no sudo,
 # Prestium helpers or system bus. Not yet tested on a booted ISO.
 abi <abi/3.0>,

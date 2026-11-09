@@ -1,4 +1,4 @@
-# Prestium 1.9.1.1: fix a badly wrong clock from the Tor consensus when Tor
+# Prestium: fix a badly wrong clock from the Tor consensus when Tor
 # can't bootstrap because of it (Tails approach, no clearnet)
 [Unit]
 Description=Prestium pre-bootstrap clock fix (Tor consensus time)

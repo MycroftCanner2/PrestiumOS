@@ -1,5 +1,5 @@
 # Prestium 2.0: LibreWolf ("I2P Browser"), ENFORCED.
-# 1.9.1 shipped this profile in complain mode. 2.0 enforces it: LibreWolf may read its own install,
+# Earlier releases shipped this profile in complain mode. 2.0 enforces it: LibreWolf may read its own install,
 # the system's shared data, fonts, themes and GPU/audio interfaces, and may write only its own
 # profile/cache/config directories, ~/Downloads and temporary files. Everything else in $HOME is
 # denied (KeePassXC databases, mail, wallets, Tor Browser's data ...). Tor's control socket and the

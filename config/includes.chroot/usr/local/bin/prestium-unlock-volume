@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Prestium 1.9.1.2: "Unlock Volume" - unlock encrypted volumes without root,
+# Prestium: "Unlock Volume" - unlock encrypted volumes without root,
 # like Tails' "Unlock VeraCrypt Volumes", extended to every type cryptsetup knows:
 #   LUKS1/LUKS2   passphrase or one keyfile
 #   BitLocker     passphrase, recovery key (typed as the passphrase) or one keyfile

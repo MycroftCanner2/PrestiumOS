@@ -1,4 +1,4 @@
-# Prestium 1.9.1: drop everything until ferm has loaded the real ruleset, so a
+# Prestium: drop everything until ferm has loaded the real ruleset, so a
 # ferm failure fails closed (Tails-style). Loopback stays usable.
 [Unit]
 Description=Prestium early drop-all firewall

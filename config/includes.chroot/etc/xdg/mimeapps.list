@@ -10,7 +10,7 @@ application/x-compressed-tar=org.gnome.FileRoller.desktop
 application/x-xz-compressed-tar=org.gnome.FileRoller.desktop
 application/x-bzip-compressed-tar=org.gnome.FileRoller.desktop
 application/gzip=org.gnome.FileRoller.desktop
-# Prestium 1.9.1: Image Viewer (Loupe, as in Tails 7), Ristretto as fallback
+# Prestium: Image Viewer (Loupe, as in Tails 7), Ristretto as fallback
 image/jpeg=org.gnome.Loupe.desktop;org.xfce.ristretto.desktop;
 image/png=org.gnome.Loupe.desktop;org.xfce.ristretto.desktop;
 image/gif=org.gnome.Loupe.desktop;org.xfce.ristretto.desktop;

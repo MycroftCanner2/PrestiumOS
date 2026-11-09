@@ -5,7 +5,7 @@ for f in boot/grub/*.cfg isolinux/*.cfg; do
 	sed -i -e 's/Live system (amd64 fail-safe mode)/Prestium 2.0 (nomodeset)/g' \
 	       -e 's/Live system (amd64)/Prestium 2.0/g' -e 's/Live system (autodetect)/Prestium 2.0/g' "$f"
 done
-# boot the default entry after 3 seconds, as 1.9.x did (live-build leaves both menus waiting forever)
+# boot the default entry after 3 seconds, as earlier releases did (live-build leaves both menus waiting forever)
 [ -f isolinux/isolinux.cfg ] && sed -i -e 's/^timeout 0$/timeout 30/' isolinux/isolinux.cfg
 if [ -f boot/grub/config.cfg ] && ! grep -q '^set timeout=' boot/grub/config.cfg; then
 	sed -i -e 's/^set default=0$/set default=0\nset timeout=3/' boot/grub/config.cfg

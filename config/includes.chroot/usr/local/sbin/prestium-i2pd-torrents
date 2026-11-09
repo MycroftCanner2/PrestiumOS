@@ -40,8 +40,8 @@ skip() {
 }
 
 # /home/user cannot be replaced by user (/home is root's); still refuse anything unexpected.
-# Debian 13 creates homes 0700 (1.8/Debian 12: 0755); i2pd must be able to traverse /home/user to
-# reach the torrent dir. 1.9.1: search permission for group i2ptorrents (user, i2pd) only.
+# Debian 13 creates homes 0700 (Debian 12: 0755); i2pd must be able to traverse /home/user to
+# reach the torrent dir. search permission for group i2ptorrents (user, i2pd) only.
 [ -d /home/user ] && [ ! -L /home/user ] || skip "/home/user is not a real directory"
 chgrp -h i2ptorrents /home/user
 chmod 0710 /home/user

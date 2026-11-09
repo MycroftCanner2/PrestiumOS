@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.0: users and groups (same names, uids and memberships as 1.9.1.3).
+# Prestium 2.0: users and groups (same names, uids and memberships as earlier releases).
 #   user (1000)          the live user: empty password until set (prestium-session-password), autologin
 #   i2pd (2000)          i2pd runs as uid/gid 2000 (ferm.conf, file ownership)
 #   thelounge            The Lounge IRC web client (127.0.0.1:9000)

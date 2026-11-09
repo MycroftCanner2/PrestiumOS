@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prestium 1.9.1: emergency shutdown when the boot medium is removed (Tails-style).
+# Prestium: emergency shutdown when the boot medium is removed (Tails-style).
 # Pulling the USB stick (or ejecting the DVD) powers the machine off at once.
 # "systemctl --force poweroff" kills every process without running the normal
 # shutdown units; the freed RAM is zeroed by the kernel (init_on_free=1 on the
@@ -8,7 +8,7 @@
 # systemctl locked in RAM, so this still works once the medium is gone.
 # Not armed when booted with "toram" (the medium may then be removed safely).
 #
-# 1.9.1: the independent fallback is started when the watchdog is ARMED (while
+# the independent fallback is started when the watchdog is ARMED (while
 # the medium is still there), not when the medium disappears, so nothing has
 # to be exec'd from the vanished medium at emergency time. It sleeps on a
 # builtin until it gets SIGUSR1, then gives systemd 3 s to power off cleanly,
@@ -18,7 +18,7 @@
 # Its argv[0] starts with '@', so systemd-shutdown's killing spree spares it.
 # Worst case from removal to power-off: about 1 s (poll) + 3 s + 2 s.
 #
-# 1.9.1: before the SIGKILL and again before sysrq o, the fallback deletes the
+# before the SIGKILL and again before sysrq o, the fallback deletes the
 # session's files (overlay read-write branch, /tmp, /var/tmp, /dev/shm) with a
 # memlocked find, so their RAM is freed and zeroed (A2). During suspend the
 # watchdog is paused (/usr/lib/systemd/system-sleep/prestium-usb-watchdog).
@@ -47,7 +47,7 @@ case $disk in sr*) optical=1 ;; *) optical= ;; esac
     exec 4<> <(:)
     until [ -n "$go" ]; do read -r -t 1 -u 4; done
     read -r -t 3 -u 4
-    # 1.9.1 (A2): delete the session files from RAM first (memlocked find:
+    # delete the session files from RAM first (memlocked find:
     # the medium is gone), then SIGKILL everything so open files are freed too;
     # freed pages are zeroed by the kernel (init_on_free=1)
     /usr/bin/find /run/live/overlay/rw /tmp /var/tmp /dev/shm -xdev -mindepth 1 -delete 2>/dev/null

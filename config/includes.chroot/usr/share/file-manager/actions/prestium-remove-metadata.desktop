@@ -1,4 +1,4 @@
-# Prestium 1.9.1: PCManFM (libfm) custom action: right-click a file > "Remove metadata".
+# Prestium: PCManFM (libfm) custom action: right-click a file > "Remove metadata".
 # Runs mat2 through /usr/local/bin/prestium-remove-metadata (cleaned copies, originals kept).
 [Desktop Entry]
 Type=Action

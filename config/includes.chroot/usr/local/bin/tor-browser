@@ -2,7 +2,7 @@
 # Prestium: official Tor Browser (/opt/tor-browser), using the system Tor
 # (tor@default, SOCKS 127.0.0.1:9050) instead of its own tor, so the ferm rule
 # "only debian-tor and i2pd reach the network" still holds.
-# 1.9.1 (Tails-style):
+# Tails-style:
 #  - /opt/tor-browser is root-owned and read-only ("is-packaged-app" mode); the
 #    profile lives in ~/.tor-browser/profile.default and the browser runs under
 #    the enforced AppArmor profile "torbrowser_firefox".
@@ -21,7 +21,7 @@ chmod 700 "$HOME/.tor-browser" "$P"
 for x in "$TB"/Browser/TorBrowser/Data/Browser/profile.default/extensions/*.xpi; do
   [ -e "$x" ] && cp -f "$x" "$P/extensions/"
 done
-# 1.9.1: distrust the eMudhra (emSign) roots that are built into Tor Browser
+# distrust the eMudhra (emSign) roots that are built into Tor Browser
 if [ ! -e "$P/cert9.db" ]; then
   cp /usr/local/share/prestium-nssdb/cert9.db /usr/local/share/prestium-nssdb/key4.db "$P/"
 fi

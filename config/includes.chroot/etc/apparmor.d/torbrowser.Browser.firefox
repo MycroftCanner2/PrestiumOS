@@ -65,7 +65,7 @@ profile torbrowser_firefox @{torbrowser_firefox_executable} {
   owner @{PROC}/@{pid}/task/*/stat r,
   @{PROC}/sys/kernel/random/uuid r,
 
-  # Prestium 1.9.1: read-only install in /opt/tor-browser (root-owned)
+  # Prestium: read-only install in /opt/tor-browser (root-owned)
   @{torbrowser_installation_dir}/ r,
   @{torbrowser_home_dir}/ r,
   @{torbrowser_home_dir}/** r,
@@ -82,10 +82,10 @@ profile torbrowser_firefox @{torbrowser_firefox_executable} {
   owner @{torbrowser_user_dir}/ rw,
   owner @{torbrowser_user_dir}/** rwk,
   deny @{torbrowser_user_dir}/**.so m,
-  # 1.9.1.1: fontconfig cache locks (hard links) in the browser HOME; no chmod of the system cache
+  # fontconfig cache locks (hard links) in the browser HOME; no chmod of the system cache
   owner @{torbrowser_user_dir}/.cache/fontconfig/** rwkl,
   deny /var/cache/fontconfig/ w,
-  # 1.9.1.1: TB 16 probes these; keep them denied, just silence the log
+  # TB 16 probes these; keep them denied, just silence the log
   deny @{PROC}/[0-9]*/cmdline r,
   deny @{PROC}/pressure/memory r,
   deny /dev/udmabuf rw,

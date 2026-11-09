@@ -1,4 +1,4 @@
-# Prestium 1.9.1: delete the session's files late in shutdown (see the script).
+# Prestium: delete the session's files late in shutdown (see the script).
 # Ordered Before=sysinit.target, so on shutdown it is stopped (ExecStop runs)
 # only after every normal service and the desktop session have stopped.
 [Unit]

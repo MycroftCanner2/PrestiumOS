@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 1.9.1 (Tails: tails-remove-overlayfs-dirs.service): late in shutdown,
+# Prestium (Tails: tails-remove-overlayfs-dirs.service): late in shutdown,
 # after the desktop and services have stopped, delete the session's files from
 # RAM: the overlay read-write branch (everything written since boot: home,
 # downloads, browser profiles, keys), /tmp, /var/tmp and /dev/shm. Freed pages

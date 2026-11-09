@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 1.9.1: lock the screen. 2.0 r10: swaylock (Wayland session lock: the compositor
+# Prestium: lock the screen. 2.0 r10: swaylock (Wayland session lock: the compositor
 # itself blanks every output, nothing else can draw or read input while locked). Started by
 # swayidle (10 minutes idle, logind lock request, before suspend), the "Lock Screen" menu item
 # and Super+L. The live user has no password at boot (autologin), so the first

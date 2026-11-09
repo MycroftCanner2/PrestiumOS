@@ -11,7 +11,7 @@ Type=simple
 User=thelounge
 Group=thelounge
 Environment=THELOUNGE_HOME=/var/lib/thelounge NODE_ENV=production
-# 1.9.1: io_uring is disabled system-wide (kernel.io_uring_disabled=2); make libuv use its thread pool from the start
+# io_uring is disabled system-wide (kernel.io_uring_disabled=2); make libuv use its thread pool from the start
 Environment=UV_USE_IO_URING=0
 ExecStartPre=+/usr/local/sbin/prestium-thelounge-setup
 ExecStart=/opt/nodejs/bin/node /opt/thelounge/node_modules/thelounge/index.js start

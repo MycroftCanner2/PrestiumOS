@@ -85,7 +85,7 @@ def check(lines, path):
 secs = sections(open(tun).read().splitlines())
 res = []
 for name, body in secs:
-    if name is not None and "type" in keys(body) and not name.startswith("socks-outproxy"): body = setlen(body)   # 1.9.1.2: outproxy tunnels keep their 1-hop setting
+    if name is not None and "type" in keys(body) and not name.startswith("socks-outproxy"): body = setlen(body)   # outproxy tunnels keep their 1-hop setting
     res += body
 check(res, tun)
 open(tun, "w").write("\n".join(res) + "\n")

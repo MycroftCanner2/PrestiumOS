@@ -1,4 +1,4 @@
-# mode owner group path (from the Prestium 1.9.1.3 rootfs); applied by hook 0500
+# mode owner group path (from the earlier Prestium rootfs); applied by hook 0500
 0644 root root /etc/NetworkManager/conf.d/00-macrandomize.conf
 0644 root root /etc/NetworkManager/conf.d/20-connectivity.conf
 0644 root root /etc/NetworkManager/conf.d/30-ipv6-privacy.conf

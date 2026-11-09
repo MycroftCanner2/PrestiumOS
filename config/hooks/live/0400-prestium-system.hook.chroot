@@ -1,11 +1,11 @@
 #!/bin/sh
-# Prestium 2.0: system setup carried over from 1.9.1.3 (services, masks, diversions, alternatives,
+# Prestium 2.0: system setup carried over from earlier releases (services, masks, diversions, alternatives,
 # CA list, dconf, plymouth, locale, version strings) plus the 2.0 audio stack.
 set -e
 B=/usr/share/prestium/build
 VERSION=2.0
 
-## services: exactly the units 1.9.1.3 enabled (+ PipeWire for 2.0); everything else package
+## services: exactly the units earlier releases enabled (+ PipeWire for 2.0); everything else package
 ## postinsts enabled is disabled again
 keep=$(cut -d' ' -f1 "$B/systemd-wants.txt")
 for l in $(find /etc/systemd/system /etc/systemd/user -path '*.wants/*' 2>/dev/null); do
@@ -21,15 +21,15 @@ ln -sfn /usr/lib/systemd/system/wpa_supplicant.service /etc/systemd/system/dbus-
 ln -sfn /usr/lib/systemd/system/ModemManager.service /etc/systemd/system/dbus-org.freedesktop.ModemManager1.service
 ln -sfn /usr/lib/systemd/system/NetworkManager-dispatcher.service /etc/systemd/system/dbus-org.freedesktop.nm-dispatcher.service
 systemctl set-default graphical.target
-# masks (1.9.1.3): no wait-online at boot, no zeitgeist activity log
+# masks: no wait-online at boot, no zeitgeist activity log
 ln -sfn /dev/null /etc/systemd/system/NetworkManager-wait-online.service
 ln -sfn /dev/null /etc/systemd/user/zeitgeist.service
 ln -sfn /dev/null /etc/systemd/user/zeitgeist-fts.service
-# init.d i2pd script removed in 1.9 (systemd unit only)
+# init.d i2pd script removed earlier (systemd unit only)
 rm -f /etc/init.d/i2pd
 update-rc.d -f i2pd remove >/dev/null 2>&1 || true
 
-## gvfs network backends disabled (diverted, as in 1.9.1.3)
+## gvfs network backends disabled (diverted, as in earlier releases)
 for m in afp-browse afp dav+sd dav dns-sd ftp ftpis ftps google http network nfs onedrive sftp smb-browse smb wsdd; do
 	f=/usr/share/gvfs/mounts/$m.mount
 	dpkg-divert --local --rename --divert "$f.prestium-disabled" --add "$f" >/dev/null
@@ -39,7 +39,7 @@ done
 ## /etc/apparmor.d/usr.share.librewolf.librewolf
 rm -f /etc/apparmor.d/librewolf
 
-## alternatives (1.9.1.3 values)
+## alternatives (values from earlier releases)
 # 2.0 r10: the default browser is the sandboxed launcher, never the bare LibreWolf binary
 for a in x-www-browser gnome-www-browser; do
 	update-alternatives --install /usr/bin/$a $a /usr/local/bin/librewolf-i2p 300 >/dev/null

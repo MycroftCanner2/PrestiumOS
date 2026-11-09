@@ -1,4 +1,4 @@
-# Installed by hook 0010 when available: packages 1.9.1.3 had as dependencies/recommends (parity),
+# Installed by hook 0010 when available: packages earlier releases had as dependencies/recommends (parity),
 # plus extra firmware beyond Tails 7.15 (network cards, TV tuners, Qualcomm, Samsung, AMD SEV).
 akonadi-mime-data
 audacity-data

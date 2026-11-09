@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prestium 1.9.1: "Remove metadata" (PCManFM right-click action, like Tails' Files action).
+# Prestium: "Remove metadata" (PCManFM right-click action, like Tails' Files action).
 # Runs mat2 on the selected files, inside mat2's own bubblewrap sandbox (no network).
 # For each file it writes a cleaned copy "<name>.cleaned.<ext>" next to it; the original
 # is left unchanged. The result is shown in a dialog.

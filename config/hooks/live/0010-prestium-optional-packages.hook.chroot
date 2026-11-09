@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.0: install the "parity" packages (what 1.9.1.3 had as dependencies/recommends) and the
+# Prestium 2.0: install the "parity" packages (what earlier releases had as dependencies/recommends) and the
 # extra firmware listed in /usr/share/prestium/build/optional-packages.txt. Names that the archive
 # no longer has are skipped and logged instead of failing the build.
 set -e
