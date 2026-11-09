@@ -45,6 +45,13 @@ for a in x-www-browser gnome-www-browser; do
 	update-alternatives --install /usr/bin/$a $a /usr/local/bin/librewolf-i2p 300 >/dev/null
 	update-alternatives --set $a /usr/local/bin/librewolf-i2p >/dev/null
 done
+# 2.1: ferm (iptables-restore) and prestium-firewall-early must use the same xtables backend. Debian 13
+# defaults to iptables-nft; Prestium uses legacy for both. Fail the build if it cannot be set.
+for a in iptables ip6tables; do
+	update-alternatives --set $a /usr/sbin/$a-legacy >/dev/null || { echo "E: cannot set $a to $a-legacy"; exit 1; }
+	[ "$(readlink -f /usr/sbin/$a-restore)" = "$(readlink -f /usr/sbin/xtables-legacy-multi)" ] \
+		|| { echo "E: $a-restore is not the legacy backend"; exit 1; }
+done
 # 2.0 r10: Wayland session (labwc, /usr/share/wayland-sessions/prestium.desktop); foot is the terminal
 update-alternatives --set x-terminal-emulator /usr/bin/foot >/dev/null 2>&1 || true
 rm -f /usr/share/wayland-sessions/labwc.desktop   # only the Prestium session (it sets up the sandboxing)

@@ -6,8 +6,8 @@
 #   It also stages a signature-checked I2P reseed file (StormyCloud su3; a verified download under 24 h old is reused) into config/includes.chroot/var/lib/i2pd/.
 # Needs: curl gpg gpgv git sha256sum unzip npm python3 openssl (the host's npm only runs "npm ci --ignore-scripts": pure JS,
 # architecture-independent). Every registry tarball is checked against the lockfile's sha512 integrity; the one git
-# dependency (irc-framework, pinned to a commit, no integrity in the lockfile) is checked file by file against a git
-# checkout of the commit pinned in thirdparty/versions.sh (IRC_FRAMEWORK_COMMIT), which works with any npm version.
+# dependency (irc-framework, pinned to a commit, no integrity in the lockfile) is installed from a "git archive" tarball
+# of IRC_FRAMEWORK_COMMIT with a pinned SHA-256, and checked file by file against a git checkout of that commit.
 set -euo pipefail
 TOP=$(cd "$(dirname "$0")/.." && pwd)
 . "$TOP/thirdparty/versions.sh"
@@ -32,8 +32,10 @@ pinhash(){ # name sha256 expected
 treehash(){ # sha256 over package.json, package-lock.json, .npmrc and every file under node_modules
   (cd "$1" && { find node_modules -type f -print0; printf '%s\0' package.json package-lock.json .npmrc; } \
     | LC_ALL=C sort -z | xargs -0 sha256sum) | sha256sum | cut -c1-64; }
+. "$TOP/scripts/sigcheck.sh"
 sigok(){ # sigfile datafile fpr
-  gpg --status-fd 1 --verify "$1" "$2" 2>/dev/null | grep -q "VALIDSIG.*$3" || { echo "ERROR: bad signature on $2"; exit 1; }; }
+  local st; st=$(gpg --status-fd 1 --verify "$1" "$2" 2>/dev/null) || true
+  sigstatus_ok "$2" "$st" "$3" || exit 1; }
 
 # Tor Browser
 TBF=tor-browser-linux-x86_64-$TB_VERSION.tar.xz
@@ -54,8 +56,13 @@ pin FF "$C/$FFF" "$FF_SHA256"
 NF=node-$NODE_VERSION-linux-x64.tar.xz
 get https://nodejs.org/dist/$NODE_VERSION/SHASUMS256.txt.asc node-$NODE_VERSION.SHASUMS256.txt.asc
 get https://nodejs.org/dist/$NODE_VERSION/$NF $NF
-gpgv --keyring "$TOP/thirdparty/keys/node-release-keys.kbx" --output "$C/node-$NODE_VERSION.SHASUMS256.txt" \
-  "$C/node-$NODE_VERSION.SHASUMS256.txt.asc" 2>/dev/null || { echo "ERROR: bad Node SHASUMS signature"; exit 1; }
+# gpgv exits 0 for a good signature by an expired key too: apply the same status-line policy (any key in
+# the Node.js releasers' keybox; the keybox itself is the pin)
+rm -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp"
+NST=$(gpgv --status-fd 1 --keyring "$TOP/thirdparty/keys/node-release-keys.kbx" --output "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp" \
+  "$C/node-$NODE_VERSION.SHASUMS256.txt.asc" 2>/dev/null) || true
+sigstatus_ok "Node SHASUMS256.txt" "$NST" "" || { rm -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp"; exit 1; }
+mv -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp" "$C/node-$NODE_VERSION.SHASUMS256.txt"
 grep -q "^$(sha "$C/$NF")  $NF\$" "$C/node-$NODE_VERSION.SHASUMS256.txt" || { echo "ERROR: Node not in signed SHASUMS"; exit 1; }
 pin NODE "$C/$NF" "$NODE_SHA256"
 
@@ -65,30 +72,11 @@ get https://featherwallet.org/files/releases/linux/$FEF $FEF
 get https://featherwallet.org/files/releases/linux/$FEF.asc $FEF.asc
 sigok "$C/$FEF.asc" "$C/$FEF" "$FEATHER_KEY"; pin FEATHER "$C/$FEF" "$FEATHER_SHA256"
 
-# The Lounge: npm ci from the committed lockfile (registry tarballs checked against their sha512 integrity;
-# .npmrc: ignore-scripts, save-exact, min-release-age=7 for lockfile regeneration, see BUILDING.md)
-L=$C/thelounge-$THELOUNGE_VERSION-r13   # r13: new cache name (trees from older builds still hold irc-framework/dist)
-if [ ! -s "$L/.done" ]; then   # 2.0 r7: empty .done (older builds) = no recorded tree hash, install again
-  rm -rf "$L"; mkdir -p "$L"
-  cp "$TOP/thirdparty/thelounge/package.json" "$TOP/thirdparty/thelounge/package-lock.json" "$TOP/thirdparty/thelounge/.npmrc" "$L/"
-  ( cd "$L" && npm ci --omit=dev --omit=optional --ignore-scripts --no-audit --no-fund >/dev/null )
-  grep -q "\"version\": \"$THELOUNGE_VERSION\"" "$L/node_modules/thelounge/package.json" || { echo "ERROR: thelounge version"; exit 1; }
-  # 2.0 r13: npm runs irc-framework's "prepare" (babel + webpack) when it packs the git dependency, so dist/ is
-  # built with whatever toolchain versions resolve that day and differs between hosts and npm versions. dist/ is
-  # only the browser bundle ("browser" field); Node (The Lounge's server) loads "main": src/. Drop it.
-  rm -rf "$L/node_modules/irc-framework/dist"
-  treehash "$L" > "$L/.done"
-fi
-# 2.0 r7: a cached install is reused only if its whole tree still matches the hash recorded right
-# after the lockfile-verified npm ci (catches cache corruption or later edits; .done itself is
-# not a signature: a cache writer could rewrite both, so keep the cache on storage only the builder writes)
-[ "$(treehash "$L")" = "$(cat "$L/.done")" ] || { echo "ERROR: cached The Lounge tree changed since npm ci (delete $L)"; exit 1; }
-# irc-framework comes from git (commit-pinned, no lockfile integrity). 2.0 r13: instead of an npm-dependent tree
-# hash, check every installed file against a git checkout of the pinned commit: same paths, same bytes,
-# package.json equal as JSON, nothing that is not in the commit. Checked on every build, cached or fresh.
-IRCF=$L/node_modules/irc-framework
-[ -d "$IRCF" ] && [ -z "$(find "$IRCF" ! -type f ! -type d | head -1)" ] || { echo "ERROR: irc-framework tree missing or has non-regular files"; exit 1; }
-[ ! -e "$IRCF/dist" ] || { echo "ERROR: irc-framework/dist present (delete $L)"; exit 1; }
+# irc-framework (a git dependency of The Lounge, commit-pinned, no integrity in the lockfile). 2.1: npm
+# never sees the git URL: packing a git dependency runs its "prepare" script (babel + webpack, caret-ranged
+# devDependencies resolved from the registry that day) on the build host, even with --ignore-scripts.
+# Instead the pinned commit is exported with "git archive" (no lifecycle scripts, the files npm would
+# ship: IRC_FRAMEWORK_FILES), its SHA-256 is pinned, and npm ci installs that tarball.
 grep -q "irc-framework.git#$IRC_FRAMEWORK_COMMIT\"" "$TOP/thirdparty/thelounge/package-lock.json" \
   || { echo "ERROR: package-lock.json does not resolve irc-framework to $IRC_FRAMEWORK_COMMIT"; exit 1; }
 IG=$C/irc-framework-src
@@ -96,6 +84,40 @@ if [ ! -d "$IG/.git" ]; then rm -rf "$IG"; git clone -q https://github.com/kiwii
 git -C "$IG" cat-file -e "$IRC_FRAMEWORK_COMMIT^{commit}" 2>/dev/null || git -C "$IG" fetch -q origin
 git -C "$IG" -c advice.detachedHead=false checkout -q -f "$IRC_FRAMEWORK_COMMIT" && git -C "$IG" clean -qfdx
 [ "$(git -C "$IG" rev-parse HEAD)" = "$IRC_FRAMEWORK_COMMIT" ] || { echo "ERROR: irc-framework checkout is not $IRC_FRAMEWORK_COMMIT"; exit 1; }
+IT=$C/irc-framework-$IRC_FRAMEWORK_COMMIT.tar
+# shellcheck disable=SC2086 # IRC_FRAMEWORK_FILES is a list of paths
+git -C "$IG" archive --format=tar --prefix=package/ "$IRC_FRAMEWORK_COMMIT" $IRC_FRAMEWORK_FILES > "$IT.tmp" && mv -f "$IT.tmp" "$IT"
+pin IRC_FRAMEWORK_TAR "$IT" "$IRC_FRAMEWORK_TAR_SHA256"
+
+# The Lounge: npm ci from the committed lockfile (registry tarballs checked against their sha512 integrity;
+# .npmrc: ignore-scripts, save-exact, min-release-age=7 for lockfile regeneration, see BUILDING.md)
+L=$C/thelounge-$THELOUNGE_VERSION-r21   # r21: new cache name (older trees were built with irc-framework's prepare)
+if [ ! -s "$L/.done" ]; then   # 2.0 r7: empty .done (older builds) = no recorded tree hash, install again
+  rm -rf "$L"; mkdir -p "$L"
+  cp "$TOP/thirdparty/thelounge/package.json" "$TOP/thirdparty/thelounge/package-lock.json" "$TOP/thirdparty/thelounge/.npmrc" "$L/"
+  cp "$IT" "$L/irc-framework.tar"
+  [ "$(sha "$L/irc-framework.tar")" = "$IRC_FRAMEWORK_TAR_SHA256" ] || [ "$REPIN" = 1 ] \
+    || { echo "ERROR: staged irc-framework tarball does not match its pinned SHA-256"; exit 1; }
+  # working copies only: lockfile entry -> file:irc-framework.tar + its sha512, package.json override
+  python3 "$TOP/scripts/npm-local-tarball.py" "$L" irc-framework irc-framework.tar >/dev/null
+  # --git=false: if npm still wanted the git URL, the install fails instead of cloning and packing it
+  ( cd "$L" && npm ci --omit=dev --omit=optional --ignore-scripts --git=false --no-audit --no-fund >/dev/null )
+  grep -q "\"version\": \"$THELOUNGE_VERSION\"" "$L/node_modules/thelounge/package.json" || { echo "ERROR: thelounge version"; exit 1; }
+  # ship the committed manifest and lockfile, not the working copies
+  cp "$TOP/thirdparty/thelounge/package.json" "$TOP/thirdparty/thelounge/package-lock.json" "$L/"
+  rm -f "$L/irc-framework.tar"
+  treehash "$L" > "$L/.done"
+fi
+# 2.0 r7: a cached install is reused only if its whole tree still matches the hash recorded right
+# after the lockfile-verified npm ci (catches cache corruption or later edits; .done itself is
+# not a signature: a cache writer could rewrite both, so keep the cache on storage only the builder writes)
+[ "$(treehash "$L")" = "$(cat "$L/.done")" ] || { echo "ERROR: cached The Lounge tree changed since npm ci (delete $L)"; exit 1; }
+# 2.0 r13: check every installed irc-framework file against the git checkout of the pinned commit: same
+# paths, same bytes, package.json equal as JSON, nothing that is not in the commit, and no dist/ (the
+# browser bundle "prepare" builds; 2.1: never built, so its presence means prepare ran). Every build.
+IRCF=$L/node_modules/irc-framework
+[ -d "$IRCF" ] && [ -z "$(find "$IRCF" ! -type f ! -type d | head -1)" ] || { echo "ERROR: irc-framework tree missing or has non-regular files"; exit 1; }
+[ ! -e "$IRCF/dist" ] || { echo "ERROR: irc-framework/dist present: its prepare script ran (delete $L)"; exit 1; }
 [ -f "$IRCF/src/index.js" ] || { echo "ERROR: irc-framework src/index.js missing"; exit 1; }
 ( cd "$IRCF" && find . -type f -print0 ) | while IFS= read -r -d '' f; do
   f=${f#./}
@@ -106,7 +128,7 @@ git -C "$IG" -c advice.detachedHead=false checkout -q -f "$IRC_FRAMEWORK_COMMIT"
   elif ! cmp -s "$IRCF/$f" "$IG/$f"; then echo "ERROR: irc-framework file differs from commit $IRC_FRAMEWORK_COMMIT: $f"; exit 1; fi
 done
 echo "OK IRC_FRAMEWORK $IRC_FRAMEWORK_COMMIT ($(find "$IRCF" -type f | wc -l) files match the commit)"
-echo "OK THELOUNGE $THELOUNGE_VERSION (npm ci, lockfile integrity + irc-framework tree pin)"
+echo "OK THELOUNGE $THELOUNGE_VERSION (npm ci, lockfile integrity + pinned irc-framework tarball)"
 
 # lurch source at pinned commits (submodules checked too)
 LS=$C/lurch-src

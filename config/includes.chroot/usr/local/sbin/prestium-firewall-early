@@ -1,10 +1,26 @@
 #!/bin/sh
-# Prestium: default-deny before ferm (legacy xtables backend, as ferm uses)
+# Prestium: default-deny before ferm, and ferm's ExecStop (ferm.service.d/prestium-failclosed.conf).
+# Backend: legacy xtables. Hook 0400 pins the iptables/ip6tables alternatives to *-legacy, so ferm
+# (iptables-restore, FAST=yes) and this script program the same tables; Debian 13's default is nft.
+# 2.1: every step is checked. A missing binary or a failed command does not stop the rest (as much DROP
+# as possible is applied, which matters on ferm stop), then the policies are read back; any failure
+# exits non-zero so systemd records it.
+rc=0
+err(){ echo "prestium-firewall-early: $*" >&2; logger -t prestium-firewall-early -p auth.crit -- "$*" 2>/dev/null; rc=1; }
 for t in iptables-legacy ip6tables-legacy; do
-  command -v $t >/dev/null 2>&1 || continue
-  $t -w -P INPUT DROP; $t -w -P OUTPUT DROP; $t -w -P FORWARD DROP
-  $t -w -F; $t -w -X
-  $t -w -A INPUT -i lo -j ACCEPT
-  $t -w -A OUTPUT -o lo -j ACCEPT
+  if ! command -v $t >/dev/null 2>&1; then err "$t is missing: the firewall is not set to drop-all"; continue; fi
+  $t -w -P INPUT DROP || err "$t -P INPUT DROP failed"
+  $t -w -P OUTPUT DROP || err "$t -P OUTPUT DROP failed"
+  $t -w -P FORWARD DROP || err "$t -P FORWARD DROP failed"
+  $t -w -F || err "$t -F failed"
+  $t -w -X || err "$t -X failed"
+  $t -w -A INPUT -i lo -j ACCEPT || err "$t: loopback INPUT rule failed"
+  $t -w -A OUTPUT -o lo -j ACCEPT || err "$t: loopback OUTPUT rule failed"
+  if ! r=$($t -w -S 2>/dev/null); then err "$t -S failed: cannot confirm drop-all"; continue; fi
+  for c in INPUT OUTPUT FORWARD; do
+    printf '%s\n' "$r" | grep -qx -- "-P $c DROP" || err "$t: $c policy is not DROP"
+  done
+  printf '%s\n' "$r" | grep -qx -- "-A INPUT -i lo -j ACCEPT" || err "$t: loopback INPUT rule missing"
+  printf '%s\n' "$r" | grep -qx -- "-A OUTPUT -o lo -j ACCEPT" || err "$t: loopback OUTPUT rule missing"
 done
-exit 0
+exit $rc

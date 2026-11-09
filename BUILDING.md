@@ -77,7 +77,7 @@ starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (mu
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
 | `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + uBlock Origin), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected), Feather |
 | `0300-prestium-lurch` | builds lurch 0.7.0 (OMEMO for Pidgin) from the pinned source and purges the build tools again |
-| `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives, CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
+| `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives (iptables/ip6tables pinned to legacy, the backend ferm and `prestium-firewall-early` share), CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them) |
 | `0600-prestium-apparmor` | enforces all Prestium profiles (LibreWolf included) and compiles them to catch errors |
 | `0700-prestium-i2pd` | i2pd's real config in `/var/lib/i2pd`, owned by uid 2000; `tunnels.conf.d` root:i2pd 0750 (written by root helpers only through `/usr/local/lib/prestium/safefile`); Prestium's dark theme inlined into the torrent web UI |
@@ -101,11 +101,17 @@ the value in, rebuild. The Lounge is updated by regenerating `thirdparty/theloun
 (`npm install thelounge@<version> --package-lock-only` in `thirdparty/thelounge/`, with npm
 11.10 or newer so `.npmrc`'s `min-release-age=7` is enforced: older npm ignores it and may pick a
 release published minutes ago; review the lockfile diff), then set `IRC_FRAMEWORK_COMMIT` in `versions.sh` to the commit the
-lockfile resolves irc-framework to, if it changed. The build itself only runs `npm ci --ignore-scripts`,
-which installs exactly the lockfile with any npm. irc-framework is a git dependency with no lockfile
-integrity: npm still runs its `prepare` script (babel + webpack) to pack it, so its `dist/` browser
-bundle differs between hosts and npm versions. The build deletes `dist/` (Node loads `src/`) and checks
-every remaining file against a git checkout of `IRC_FRAMEWORK_COMMIT`, so no hash needs repinning. LibreWolf, i2pd and Tor come from their
+lockfile resolves irc-framework to, if it changed, set `IRC_FRAMEWORK_TAR_SHA256` to `""` and run
+`--repin` for its new value. The build itself only runs `npm ci --ignore-scripts`, which installs
+exactly the lockfile with any npm. irc-framework is a git dependency with no lockfile integrity, and
+npm packing it would run its `prepare` script (babel + webpack, unpinned) even with `--ignore-scripts`.
+So the build exports `IRC_FRAMEWORK_COMMIT` with `git archive --format=tar --prefix=package/ <commit>
+$IRC_FRAMEWORK_FILES` (the files npm ships, per the package's `.npmignore`), checks the tarball against
+`IRC_FRAMEWORK_TAR_SHA256`, and points a working copy of the lockfile at it
+(`scripts/npm-local-tarball.py`: `file:` tarball with its sha512, plus a package.json override). npm
+then runs with `--git=false`, and the image ships the committed package.json and lockfile. Every
+installed irc-framework file is still checked against a git checkout of the commit, and `dist/` must
+be absent. If upstream's file list changes, update `IRC_FRAMEWORK_FILES` with the commit. LibreWolf, i2pd and Tor come from their
 signed apt repositories and are always the newest at build time.
 
 ## Tor Connection Assistant and DNS

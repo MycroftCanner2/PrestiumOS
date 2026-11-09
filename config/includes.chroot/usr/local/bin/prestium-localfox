@@ -20,6 +20,9 @@ mkdir -p "$P" && chmod 700 "$P" || exit 1
 cp -f /usr/local/share/prestium-localfox/user.js "$P/user.js"
 # distrust the eMudhra (emSign) roots built into Firefox
 [ -e "$P/cert9.db" ] || cp /usr/local/share/prestium-nssdb/cert9.db /usr/local/share/prestium-nssdb/key4.db "$P/"
-CMD="exec /opt/firefox/firefox --name prestium-localfox --class PrestiumLocalFirefox --profile '$P' '$URL'"
-if [ "$(id -gn)" = prestium-localweb ]; then exec sh -c "$CMD"; fi
-exec sg prestium-localweb -c "$CMD"
+# 2.1: argv only, never a command string, so no value ($HOME in $P, the URL) is parsed by a shell.
+# sg runs its -c string with sh; "$0" "$@" are the arguments after it, passed through unparsed.
+if [ "$(id -gn)" = prestium-localweb ]; then
+  exec /opt/firefox/firefox --name prestium-localfox --class PrestiumLocalFirefox --profile "$P" "$URL"
+fi
+exec sg prestium-localweb -c 'exec "$0" "$@"' /opt/firefox/firefox --name prestium-localfox --class PrestiumLocalFirefox --profile "$P" "$URL"

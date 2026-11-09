@@ -2,6 +2,7 @@
 # Prestium 2.0 r7: tell the live user, visibly and persistently, when a privacy protection is not
 # active: the boot-medium watchdog did not arm (or died), or the shutdown memory wipe was not
 # prepared. Started from the session autostart; checks every 20 s and alerts once per new problem.
+# 2.1: also AppArmor (module enabled, apparmor.service active, Prestium's profiles in enforce mode).
 D=/run/prestium/safety
 declare -A shown
 alert() {   # $1 key, $2 text
@@ -11,6 +12,9 @@ alert() {   # $1 key, $2 text
   zenity --warning --no-wrap --title "Prestium: protection NOT active" --text "$2" >/dev/null 2>&1 &
 }
 toram=; grep -qw toram /proc/cmdline && toram=1
+AA_ENABLED=${PRESTIUM_AA_ENABLED:-/sys/module/apparmor/parameters/enabled}
+AA_PROFILES=${PRESTIUM_AA_PROFILES:-/sys/kernel/security/apparmor/profiles}
+AA_PRESTIUM_PROFILES="torbrowser_firefox librewolf prestium-localfox claws-mail gajim pidgin onionshare feather libreoffice thelounge"
 sleep 15
 while :; do
   for f in "$D"/*; do
@@ -40,6 +44,20 @@ while :; do
     if ! systemctl -q is-active prestium-wl-broker.service; then
       alert wl:broker "The Wayland broker is not running. The screen lock, screenshots and panel may not work, and new windows may lose their protection. Restart Prestium."
     fi
+  fi
+  # 2.1: application confinement needs AppArmor loaded (module enabled, profiles loaded by apparmor.service)
+  aa=$(cat "$AA_ENABLED" 2>/dev/null)
+  if [ "$aa" != Y ]; then
+    alert unit:apparmor "AppArmor is not active (kernel module ${aa:-not loaded}). Applications may be running unconfined. Restart Prestium."
+  elif ! systemctl -q is-active apparmor.service; then
+    st=$(systemctl show -p ActiveState --value apparmor.service)
+    [ "$st" = activating ] || alert unit:apparmor "AppArmor is not active (apparmor.service: $st). Applications may be running unconfined. Restart Prestium."
+  elif [ -r "$AA_PROFILES" ]; then
+    # optional: Prestium's profiles must be loaded in enforce mode (only when the kernel lets us read the list)
+    for pr in $AA_PRESTIUM_PROFILES; do
+      grep -qx "$pr (enforce)" "$AA_PROFILES" 2>/dev/null \
+        || alert "aa:$pr" "The AppArmor profile \"$pr\" is not loaded in enforce mode. That application may run unconfined. Restart Prestium."
+    done
   fi
   if systemctl -q is-failed prestium-initramfs-shutdown.service; then
     alert unit:wipe "The shutdown memory wipe could not be prepared. Memory will NOT be overwritten at shutdown; the kernel still zeroes freed memory (init_on_free=1), but no final wipe pass runs."

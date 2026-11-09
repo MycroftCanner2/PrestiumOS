@@ -19,6 +19,10 @@ THELOUNGE_VERSION=4.5.2                                  # npm; package-lock.jso
 # irc-framework 4.14.0 is a git dependency of The Lounge (kiwiirc/irc-framework#9578e59a1056499e4a03a0f0fd2c260e9aadc541)
 # with no integrity in package-lock.json: fetch-thirdparty.sh checks each installed file against this commit's git checkout
 IRC_FRAMEWORK_COMMIT=9578e59a1056499e4a03a0f0fd2c260e9aadc541
+# 2.1: installed from "git archive --format=tar --prefix=package/ $IRC_FRAMEWORK_COMMIT $IRC_FRAMEWORK_FILES"
+# (no prepare/babel/webpack), pinned here; --repin prints a new value. The files are what npm ships (.npmignore).
+IRC_FRAMEWORK_FILES="package.json README.md LICENSE.txt src"
+IRC_FRAMEWORK_TAR_SHA256=0c25dd1efea08411f4df8e2a950efe1d720ea76650b8df8af406499ea5583a0e
 
 FEATHER_VERSION=2.9.1
 FEATHER_SHA256=f1d40d619664d9e6318c086b9015ee72bc69741ec86148ce2ea2ef75ef47feed

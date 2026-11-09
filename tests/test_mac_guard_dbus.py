@@ -111,6 +111,19 @@ class Guard(dbusmock.DBusTestCase):
                         "connection not reset: %s" % get())
         self.assertIn("Cafe", self.flags())
 
+    def test_permanent_address_change_reinstalls_egress_filter(self):
+        # 2.1: same interface name, new permanent address (re-plug/driver reload): a second nft install
+        dev = self.add_eth(DeviceState.ACTIVATED, hw="78:DD:08:11:22:33")
+        self.start_guard()
+        self.assertTrue(wait(lambda: os.path.exists(self.nftf) and "78:dd:08:d2:3d:43" in open(self.nftf).read()))
+        new = "02:AB:CD:EF:01:23"
+        dev.Set(WIRED, "PermHwAddress", new, dbus_interface=dbus.PROPERTIES_IFACE)
+        dbus.Interface(dev, dbusmock.MOCK_IFACE).EmitSignal(
+            "org.freedesktop.DBus.Properties", "PropertiesChanged", "sa{sv}as",
+            [WIRED, {"PermHwAddress": new}, dbus.Array([], signature="s")])
+        self.assertTrue(wait(lambda: "ether saddr 02:ab:cd:ef:01:23 counter drop" in open(self.nftf).read()),
+                        "egress filter not re-installed for the new permanent address")
+
     def test_nomacspoof_disables_guard(self):
         with open(os.path.join(self.tmp, "cmdline"), "w") as f:
             f.write("boot=live nomacspoof\n")

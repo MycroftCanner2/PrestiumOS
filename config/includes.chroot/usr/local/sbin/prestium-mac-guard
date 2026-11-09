@@ -92,6 +92,32 @@ def nft_rules(ifname, permanent):
             "add rule netdev %s %s ether saddr %s counter drop\n"
             % (NFT_TABLE, NFT_TABLE, ch, ifname, NFT_TABLE, ch, NFT_TABLE, ch, permanent.lower()))
 
+class EgressFilters:
+    """2.1: the nft egress drop of each device's permanent address. Installed again on every device
+    check (nft_rules flushes the chain first, so this is idempotent), never skipped because an interface
+    name was seen before: a new permanent address under the same name (re-plug, driver reload), a
+    ruleset flushed by someone else, or an earlier failed install is put right on the next event."""
+    def __init__(self, nft=None):
+        self.nft = nft or os.environ.get("PRESTIUM_NFT", "nft")
+        self.installed = {}   # NM device path -> (ifname, permanent address) of the last good install
+
+    def ensure(self, dev, iface, perm):
+        try:
+            r = subprocess.run([self.nft, "-f", "-"], input=nft_rules(iface, perm), text=True,
+                               capture_output=True, timeout=10)
+            if r.returncode == 0:
+                self.installed[dev] = (iface, perm.lower())
+                return True
+            log("%s: egress filter not installed: %s" % (iface, r.stderr.strip()), crit=True)
+        except (OSError, ValueError, subprocess.SubprocessError) as e:
+            log("%s: egress filter not installed: %s" % (iface, e), crit=True)
+        self.installed.pop(dev, None)
+        return False
+
+    def removed(self, dev):
+        # the chain stays (harmless; the next device with that name re-flushes it with its own address)
+        self.installed.pop(dev, None)
+
 # ---------- NetworkManager over D-Bus ----------
 
 def main():
@@ -176,22 +202,14 @@ def main():
         perm = prop(dev, NM + sub, "PermHwAddress")
         # Device.HwAddress (NM >= 1.24); the per-type interfaces still carry it too
         cur = prop(dev, NM + ".Device", "HwAddress") or prop(dev, NM + sub, "HwAddress")
-        if perm and MAC_RE.match(perm.lower()) and iface not in nft_done:
-            try:
-                r = subprocess.run([os.environ.get("PRESTIUM_NFT", "nft"), "-f", "-"], input=nft_rules(iface, perm), text=True,
-                                   capture_output=True, timeout=10)
-                if r.returncode == 0:
-                    nft_done.add(iface)
-                else:
-                    log("%s: egress filter not installed: %s" % (iface, r.stderr.strip()), crit=True)
-            except (OSError, ValueError, subprocess.SubprocessError) as e:
-                log("%s: egress filter not installed: %s" % (iface, e), crit=True)
+        if perm and MAC_RE.match(perm.lower()):
+            egress.ensure(dev, iface, perm)
         state = prop(dev, NM + ".Device", "State") or 0
         if state >= DEV_ACTIVATING and is_real_mac(cur, perm):
             disconnect(dev, "The network device %s was about to use its real MAC address. Prestium "
                        "disconnected it. Restart Prestium before connecting again." % iface)
 
-    nft_done = set()
+    egress = EgressFilters()
 
     def on_signal(_c, _sender, path, iface, member, params, _d):
         if iface == NM + ".Settings" and member == "NewConnection":
@@ -200,11 +218,14 @@ def main():
             check_connection(path)
         elif iface == NM and member == "DeviceAdded":
             check_device(params.unpack()[0])
+        elif iface == NM and member == "DeviceRemoved":
+            egress.removed(params.unpack()[0])
         elif iface == NM + ".Device" and member == "StateChanged":
             check_device(path)
         elif iface == "org.freedesktop.DBus.Properties" and member == "PropertiesChanged":
             changed = params.unpack()[1]
-            if params.unpack()[0].startswith(NM + ".Device") and ("HwAddress" in changed or "State" in changed):
+            if params.unpack()[0].startswith(NM + ".Device") and ("HwAddress" in changed or "PermHwAddress" in changed
+                                                                 or "State" in changed):
                 check_device(path)
 
     bus.signal_subscribe(NM, None, None, None, None, Gio.DBusSignalFlags.NONE, on_signal, None)

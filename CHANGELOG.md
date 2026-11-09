@@ -4,6 +4,34 @@
 
 Enhanced security and new features. Changes will be listed here as they land.
 
+### Security review fixes
+- **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
+  when the key that made it has since expired. Every third-party signature (Tor Browser, Firefox,
+  Feather, and now the Node.js releasers' keybox too) is checked line by line: an expired or revoked
+  key, an expired signature, or a bad signature stops the build, each with its own message. The pinned
+  fingerprints are unchanged (`scripts/sigcheck.sh`, `tests/test_sigcheck.sh`).
+- **No unpinned build tools run for The Lounge.** npm used to pack irc-framework, a git dependency,
+  by running its `prepare` script, which pulled babel and webpack from the registry at whatever version
+  resolved that day and ran them on the build host. irc-framework is now installed from a `git archive`
+  of the pinned commit with a pinned SHA-256; npm never sees the git URL (`--git=false`) and runs no
+  scripts. The installed files, and every other The Lounge package, are the same as before. The
+  file-by-file check against the commit stays, and the cache directory is new (`-r21`).
+- **The local-only Firefox launcher passes arguments, not a command string.** The profile path (from
+  `$HOME`) and the URL are no longer quoted into `sh -c`, so a home directory with a quote in its name
+  can't change the command. Same URL allow-list and flags.
+- **The early firewall reports failure.** `prestium-firewall-early` (before ferm, and on ferm stop)
+  used to skip a missing backend and always exit 0. It now checks every step, still applies as much
+  drop-all as it can, reads the policies back, and exits non-zero if IPv4 or IPv6 isn't DROP with only
+  loopback allowed. The iptables and ip6tables alternatives are pinned to legacy, so ferm and this
+  layer use the same tables (Debian 13 defaults to iptables-nft).
+- **The MAC guard keeps its egress filter current.** The nft rule that drops frames carrying a card's
+  real address was installed once per interface name and never refreshed. It's now re-installed on
+  every device event, including a changed permanent address and after a failed or flushed install, and
+  a removed device is forgotten.
+- **AppArmor health alert.** The safety notifier now warns on the desktop when the AppArmor module is
+  off, when apparmor.service isn't active (not while it's still starting), or when one of Prestium's
+  profiles isn't loaded in enforce mode.
+
 ## 2.0: changes since Prestium 1.9.1.3
 
 Prestium 2.0 is the base of PrestiumOS. Its goal was to fully modernize
