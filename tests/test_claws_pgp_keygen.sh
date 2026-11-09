@@ -10,10 +10,18 @@ L=$C/usr/local/bin/claws-mail-i2p
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 
 # shipped account files
-for f in "$C/etc/skel/.claws-mail/accountrc" "$C/home/user/.claws-mail/accountrc"; do
-  grep -qx 'name=' "$f" && no "empty name line in ${f#$C}" || ok "no empty name line in ${f#$C}"
-  grep -q '^address=' "$f" && ok "address kept in ${f#$C}" || no "address in ${f#$C}"
+# no preset account: Claws' first-run wizard asks for name, address and password (an empty name is refused there)
+for d in "$C/etc/skel/.claws-mail" "$C/home/user/.claws-mail"; do
+  [ ! -e "$d/accountrc" ] && ok "no preset account in ${d#$C}" || no "preset accountrc still in ${d#$C}"
+  m=$d/accountrc.tmpl
+  grep -qx 'smtpserver=127.0.0.1:7659' "$m" && grep -qx 'recvserver=127.0.0.1:7660' "$m" && grep -qx 'recvtype=0' "$m" \
+    && ok "wizard defaults: POP3 127.0.0.1:7660, SMTP 127.0.0.1:7659 in ${d#$C}" || no "wizard servers in ${d#$C}"
+  grep -qx 'smtpauth=1' "$m" && grep -qx 'smtpssl=0' "$m" && grep -qx 'recvssl=0' "$m" && ok "SMTP auth on, no TLS in ${d#$C}" || no "auth/ssl in ${d#$C}"
+  grep -Eq '^(smtpport|popport)=' "$m" && no "port keys Claws ignores in ${d#$C}" || ok "ports given as server:port in ${d#$C}"
+  grep -Eqx 'name=|recvuser=|recvpass=|smtppass=' "$m" && ! grep -Eq '^(recvpass|smtppass|name)=.' "$m" && ok "name and password left for the user in ${d#$C}" || no "prefilled name/password in ${d#$C}"
 done
+cmp -s "$C/etc/skel/.claws-mail/accountrc.tmpl" "$C/home/user/.claws-mail/accountrc.tmpl" && ok "skel and live user template match" || no "templates differ"
+! grep -q '/.claws-mail/accountrc$' "$C/usr/share/prestium/build/perms.txt" && ok "perms.txt has no preset accountrc" || no "perms.txt still lists accountrc"
 # every way in uses the launcher
 grep -q 'command="prestium-run claws-mail-i2p"' "$C/etc/xdg/labwc/menu.xml" && ok "menu uses launcher" || no "menu uses launcher"
 D=$C/usr/local/share/applications/claws-mail.desktop

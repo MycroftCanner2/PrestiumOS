@@ -46,12 +46,19 @@ Enhanced security and new features. Changes will be listed here as they land.
 - **Claws Mail can generate PGP keys.** "Generate a new key pair" failed with "General error": Prestium's
   mail account has no full name (mail goes out from the @mail.i2p address alone), Claws reads the
   empty `name=` line as an empty name rather than none, and passes it to GnuPG, which refuses an empty
-  name. The account no longer has that line, and the new `claws-mail-i2p` launcher (menu entry and
-  mail links) drops it again before each start, since Claws writes it back whenever the account is
-  saved. Claws then names the key after the address. The AppArmor profile is unchanged: generating,
+  name. The preset account is gone (see below), and the new `claws-mail-i2p` launcher (menu entry and
+  mail links) drops an empty `name=` line before each start, for accounts kept on persistent storage,
+  since Claws writes it back whenever the account is saved. Claws then names the key after the address. The AppArmor profile is unchanged: generating,
   using an imported key, signing and verifying were tested with the profile enforced
   (`tests/test_claws_pgp_keygen.sh`). The key choices on the account's Privacy page stay greyed out
   until a secret key exists, which is how Claws works. To use your own key, import it with Kleopatra.
+- **Mail (I2P) asks for your account on first start.** Prestium used to ship a ready-made account
+  with the placeholder address `username@mail.i2p`, no name and no password, which had to be found and
+  edited in the account settings. There is no preset account now: on first start Claws opens its setup
+  wizard with I2P mail already filled in (POP3 on 127.0.0.1:7660 and SMTP on 127.0.0.1:7659 through
+  the i2pd tunnels to postman, SMTP login on, no TLS since the tunnel encrypts). You enter your name,
+  your @mail.i2p address and your postman password; the user name follows the address. The wizard's
+  port keys were ignored before (Claws takes a port only as `server:port`).
 
 ## 2.0: changes since Prestium 1.9.1.3
 
