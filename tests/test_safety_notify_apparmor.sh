@@ -43,4 +43,15 @@ for p in torbrowser_firefox librewolf prestium-localfox claws-mail gajim pidgin 
 o=$(run Y active "$P"); [ -z "$o" ] && ok "all Prestium profiles enforced: no alert" || bad "false profile alert: $o"
 sed -i 's/^gajim (enforce)$/gajim (complain)/; /^feather /d' "$P"
 o=$(run Y active "$P"); case "$o" in *'"gajim" is not loaded in enforce mode'*'"feather"'*|*'"feather"'*'"gajim" is not loaded'*) ok "complain/missing profile: alert";; *) bad "no profile alert: $o";; esac
+# securityfs shows the list as 0444 but only root may open it: [ -r ] passes, the read fails.
+# A file that tests readable but cannot be read must give no profile alerts.
+grep -q '\[ -r "\$AA_PROFILES" \]' "$N" && bad "notifier still trusts [ -r ] on the profiles list" || ok "notifier does not rely on [ -r ]"
+U=$T/unreadable; mkdir -p "$U"   # a directory: [ -r ] is true, cat fails like an EACCES open
+[ -r "$U" ] && ! cat "$U" >/dev/null 2>&1 && ok "fixture: readable by [ -r ], read fails" || bad "fixture"
+o=$(run Y active "$U"); [ -z "$o" ] && ok "unreadable profiles list: no alerts" || bad "false alerts from unreadable list: $o"
+if [ "$(id -u)" != 0 ]; then
+  cp "$P" "$T/noperm"; chmod 000 "$T/noperm"
+  o=$(run Y active "$T/noperm"); [ -z "$o" ] && ok "permission-denied profiles list: no alerts" || bad "false alerts on EACCES: $o"
+fi
+: > "$T/empty"; o=$(run Y active "$T/empty"); [ -z "$o" ] && ok "empty profiles list: no alerts" || bad "false alerts from empty list: $o"
 [ $fail = 0 ] && echo "safety notify apparmor: OK"; exit $fail

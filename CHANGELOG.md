@@ -16,14 +16,24 @@ Enhanced security and new features. Changes will be listed here as they land.
   of the pinned commit with a pinned SHA-256; npm never sees the git URL (`--git=false`) and runs no
   scripts. The installed files, and every other The Lounge package, are the same as before. The
   file-by-file check against the commit stays, and the cache directory is new (`-r21`).
-- **The local-only Firefox launcher passes arguments, not a command string.** The profile path (from
+- **The local-only Firefox launcher no longer builds a command string.** The profile path (from
   `$HOME`) and the URL are no longer quoted into `sh -c`, so a home directory with a quote in its name
-  can't change the command. Same URL allow-list and flags.
+  can't change the command. They reach Firefox through the environment, because Debian's `sg` accepts
+  only `sg GROUP -c CMD` and refuses further arguments; the `-c` string is a fixed literal. Same URL
+  allow-list and flags (`tests/test_localfox_argv.sh` now uses an `sg` stub that refuses extra
+  arguments the way the real one does).
 - **The early firewall reports failure.** `prestium-firewall-early` (before ferm, and on ferm stop)
   used to skip a missing backend and always exit 0. It now checks every step, still applies as much
   drop-all as it can, reads the policies back, and exits non-zero if IPv4 or IPv6 isn't DROP with only
-  loopback allowed. The iptables and ip6tables alternatives are pinned to legacy, so ferm and this
-  layer use the same tables (Debian 13 defaults to iptables-nft).
+  loopback allowed. Both layers already used legacy xtables (this script calls `*-legacy` directly,
+  and ferm 2.5.1 prefers the `-legacy` tools when they are installed); the iptables and ip6tables
+  alternatives are now also pinned to legacy so plain `iptables` and any other tool see the same tables,
+  and the build fails if the pin can't be set.
+- **The AppArmor alert doesn't misfire.** The check that Prestium's profiles are in enforce mode
+  used `[ -r ]` on `/sys/kernel/security/apparmor/profiles`, which is true for the live user even
+  though only root may open the file, so every login could have raised ten false alerts. It now reads
+  the list and skips the check when the read fails or is empty. The module and service checks are
+  unchanged (`tests/test_safety_notify_apparmor.sh` adds unreadable, denied and empty lists).
 - **The MAC guard keeps its egress filter current.** The nft rule that drops frames carrying a card's
   real address was installed once per interface name and never refreshed. It's now re-installed on
   every device event, including a changed permanent address and after a failed or flushed install, and

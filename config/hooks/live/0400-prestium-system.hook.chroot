@@ -45,8 +45,9 @@ for a in x-www-browser gnome-www-browser; do
 	update-alternatives --install /usr/bin/$a $a /usr/local/bin/librewolf-i2p 300 >/dev/null
 	update-alternatives --set $a /usr/local/bin/librewolf-i2p >/dev/null
 done
-# 2.1: ferm (iptables-restore) and prestium-firewall-early must use the same xtables backend. Debian 13
-# defaults to iptables-nft; Prestium uses legacy for both. Fail the build if it cannot be set.
+# 2.1: Prestium's firewall is legacy xtables. prestium-firewall-early calls *-legacy directly and ferm
+# 2.5.1 already prefers the -legacy tools; the alternatives are pinned too, so plain iptables/ip6tables
+# (and anything else that calls them) see the same tables. Fail the build if the pin cannot be set.
 for a in iptables ip6tables; do
 	update-alternatives --set $a /usr/sbin/$a-legacy >/dev/null || { echo "E: cannot set $a to $a-legacy"; exit 1; }
 	[ "$(readlink -f /usr/sbin/$a-restore)" = "$(readlink -f /usr/sbin/xtables-legacy-multi)" ] \

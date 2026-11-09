@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prestium: default-deny before ferm, and ferm's ExecStop (ferm.service.d/prestium-failclosed.conf).
-# Backend: legacy xtables. Hook 0400 pins the iptables/ip6tables alternatives to *-legacy, so ferm
-# (iptables-restore, FAST=yes) and this script program the same tables; Debian 13's default is nft.
+# Backend: legacy xtables, called by name below. ferm 2.5.1 prefers the -legacy tools too, so both
+# program the same tables; hook 0400 also pins the iptables/ip6tables alternatives to legacy.
 # 2.1: every step is checked. A missing binary or a failed command does not stop the rest (as much DROP
 # as possible is applied, which matters on ferm stop), then the policies are read back; any failure
 # exits non-zero so systemd records it.

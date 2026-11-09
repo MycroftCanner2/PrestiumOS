@@ -52,10 +52,12 @@ while :; do
   elif ! systemctl -q is-active apparmor.service; then
     st=$(systemctl show -p ActiveState --value apparmor.service)
     [ "$st" = activating ] || alert unit:apparmor "AppArmor is not active (apparmor.service: $st). Applications may be running unconfined. Restart Prestium."
-  elif [ -r "$AA_PROFILES" ]; then
-    # optional: Prestium's profiles must be loaded in enforce mode (only when the kernel lets us read the list)
+  elif aa_list=$(cat "$AA_PROFILES" 2>/dev/null) && [ -n "$aa_list" ]; then
+    # optional: Prestium's profiles must be loaded in enforce mode, checked only when the list can really
+    # be read. securityfs shows the file as 0444, but AppArmor lets only root open it, so [ -r ] is true
+    # for the live user while the read fails; a failed or empty read skips the check (no alerts).
     for pr in $AA_PRESTIUM_PROFILES; do
-      grep -qx "$pr (enforce)" "$AA_PROFILES" 2>/dev/null \
+      printf '%s\n' "$aa_list" | grep -qx "$pr (enforce)" \
         || alert "aa:$pr" "The AppArmor profile \"$pr\" is not loaded in enforce mode. That application may run unconfined. Restart Prestium."
     done
   fi
