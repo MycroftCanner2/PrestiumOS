@@ -1,0 +1,6 @@
+# Prestium 2.1 (security audit): "user" may set the clock as root only through prestium-set-clock,
+# which refuses dates before the image was built (or 10 years after) and raises a safety flag.
+# The old rule (sudo date -s with any date) let any unconfined program of the user move the clock
+# anywhere, and an even older one (date with any arguments) allowed "date -f FILE" (GTFOBins).
+#   sudo prestium-set-clock 2026-11-10 14:30
+user	ALL=(root) NOPASSWD: /usr/local/sbin/prestium-set-clock ^[0-9]{4}-[0-9]{2}-[0-9]{2} [0-9]{2}:[0-9]{2}(:[0-9]{2})?$

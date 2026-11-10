@@ -1,0 +1,27 @@
+#!/bin/sh
+# Prestium 2.1 (security audit): set the clock by hand, as root through sudo (for a computer whose
+# hardware clock is far off, when Tor can't fix it). Replaces "sudo date -s", which let any
+# unconfined program of the user move the clock anywhere: the clock decides whether Tor's consensus,
+# TLS certificates and the publisher keys of the Browser Updater are valid.
+#   sudo prestium-set-clock 2026-11-10 14:30        (UTC; seconds optional)
+# Refused: anything before this image was built, or more than 10 years after it. A safety flag on
+# the desktop says that the clock was set by hand (until reboot).
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+BUILD_FILE=/usr/share/prestium/build-date
+FLAG=/usr/local/lib/prestium/safety-flag
+die() { echo "prestium-set-clock: $*" >&2; exit 1; }
+[ "$(id -u)" = 0 ] || die "run it with sudo"
+[ $# -eq 2 ] || die "usage: sudo prestium-set-clock YYYY-MM-DD HH:MM[:SS]   (UTC)"
+case "$1" in [0-9][0-9][0-9][0-9]-[0-1][0-9]-[0-3][0-9]) ;; *) die "bad date '$1' (YYYY-MM-DD)";; esac
+case "$2" in [0-2][0-9]:[0-5][0-9]|[0-2][0-9]:[0-5][0-9]:[0-5][0-9]) ;; *) die "bad time '$2' (HH:MM or HH:MM:SS, UTC)";; esac
+new=$(date -u -d "$1 $2" +%s 2>/dev/null) || die "not a valid date and time: $1 $2"
+# the date must round-trip (no 2026-02-30 being read as March 2)
+[ "$(date -u -d "@$new" +%Y-%m-%d)" = "$1" ] || die "not a valid date: $1"
+build=$(head -c 32 "$BUILD_FILE" 2>/dev/null | tr -cd 0-9)
+[ -n "$build" ] || die "this image has no build date ($BUILD_FILE); refusing"
+# one day of slack below the build time (time zones, a build late in the day)
+[ "$new" -ge $((build - 86400)) ] || die "$1 $2 UTC is before this image was built ($(date -u -d "@$build" '+%Y-%m-%d') UTC); refusing"
+[ "$new" -le $((build + 315576000)) ] || die "$1 $2 UTC is more than 10 years after this image was built; refusing"
+date -u -s "@$new" >/dev/null || die "could not set the clock"
+"$FLAG" set clock-manual "The clock was set by hand to $(date -u -d "@$new" '+%Y-%m-%d %H:%M') UTC. Tor, TLS and the Browser Updater trust it until reboot." 2>/dev/null
+echo "Clock set to $(date -u '+%Y-%m-%d %H:%M:%S') UTC."

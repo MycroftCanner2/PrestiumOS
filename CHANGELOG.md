@@ -109,6 +109,12 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   every admin, network, module, raw I/O and clock capability. It gets no syscall filter or
   `NoNewPrivileges`, because the session tools it starts inherit them (swaylock's PAM helper is setgid,
   the idle lock uses sudo). (`tests/test_service_hardening.sh`)
+- **Setting the clock by hand has limits.** `sudo date -s` let any unconfined program of the user move
+  the clock anywhere, and the clock decides whether Tor's consensus, TLS certificates and the Browser
+  Updater's publisher keys count as valid. It is replaced by `sudo prestium-set-clock 2026-11-10 14:30`
+  (UTC): strict date and time, never before the image was built (one day of slack) or more than 10
+  years after, and a safety notice on the desktop afterwards. The build records its date in
+  `/usr/share/prestium/build-date`. (`tests/test_set_clock.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

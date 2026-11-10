@@ -92,6 +92,12 @@ apt-get purge -y arandr || true
 apt-get purge -y orca speech-dispatcher speech-dispatcher-espeak-ng espeak-ng python3-speechd || true
 apt-get autoremove --purge -y || true
 
+## 2.1 (security audit): the image's build time (UTC, seconds): the lower bound for setting the clock
+## by hand (prestium-set-clock) and the image date shown on the desktop
+BUILD_EPOCH=${SOURCE_DATE_EPOCH:-$(date -u +%s)}
+mkdir -p /usr/share/prestium && printf '%s\n' "$BUILD_EPOCH" > /usr/share/prestium/build-date
+chmod 0644 /usr/share/prestium/build-date
+
 ## version strings
 cat > /usr/lib/os-release <<EOF
 PRETTY_NAME="Prestium"
