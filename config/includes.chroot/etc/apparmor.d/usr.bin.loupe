@@ -1,0 +1,23 @@
+# Prestium 2.1 (audit of 96468c5, M-1): Loupe, the default image viewer, ENFORCED. A crafted image gets no network, no other
+# app's data and no keys; it may read the file folders. Its decoders (glycin) run in their own
+# bubblewrap sandbox, here in the child profile "bwrap". Replaces Debian's unconfined "loupe" profile.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile loupe /usr/bin/loupe {
+  include <abstractions/prestium-viewer>
+  /usr/bin/loupe mr,
+  owner @{HOME}/.config/loupe/ rw,
+  owner @{HOME}/.config/loupe/** rwk,
+  owner @{HOME}/.cache/loupe/ rw,
+  owner @{HOME}/.cache/loupe/** rwk,
+  # rotate and save, "set as background" are not offered here: no writes in the folders
+  /usr/bin/bwrap mrCx -> bwrap,
+
+  profile bwrap flags=(attach_disconnected,mediate_deleted) {
+    include <abstractions/prestium-viewer-bwrap>
+    /usr/libexec/glycin-loaders/** mrix,
+  }
+  include if exists <local/usr.bin.loupe>
+}

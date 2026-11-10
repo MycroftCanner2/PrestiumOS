@@ -1,0 +1,54 @@
+# Prestium 2.1 (audit of 96468c5, M-1): KeePassXC, ENFORCED. A crafted database or key file gets no network, no OpenPGP keys and no
+# other app's data. It may read and write *.kdbx databases (and their save and backup files) anywhere
+# in the home, read key files in the file folders, and use a security key (hidraw, pcscd).
+# Off here: icon downloads and breach checks (no network), browser integration (it may not write the
+# browsers' directories) and opening URLs (no other programs).
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile keepassxc /usr/bin/keepassxc {
+  include <abstractions/prestium-app-common>
+  include <abstractions/prestium-app-secrets>
+  include <abstractions/prestium-user-files>
+  deny @{HOME}/.Private/** wx,
+  deny @{HOME}/tmp/** wx,
+  deny @{HOME}/.gnupg/** rw,
+  network unix stream,
+  network unix dgram,
+  network netlink dgram,
+  network netlink raw,
+  deny network inet,
+  deny network inet6,
+
+  /usr/bin/keepassxc mr,
+  /usr/lib/@{multiarch}/keepassxc/** mr,
+  owner @{HOME}/**.kdbx rwk,
+  owner @{HOME}/**.kdbx.* rwk,
+  owner @{HOME}/**/ r,
+  /media/**.kdbx rwk,
+  /media/**.kdbx.* rwk,
+  owner @{HOME}/.config/keepassxc/ rw,
+  owner @{HOME}/.config/keepassxc/** rwk,
+  owner @{HOME}/.cache/keepassxc/ rw,
+  owner @{HOME}/.cache/keepassxc/** rwk,
+  owner @{HOME}/.local/share/keepassxc/ rw,
+  owner @{HOME}/.local/share/keepassxc/** rwk,
+  owner @{run}/user/[0-9]*/ r,
+  owner @{run}/user/[0-9]*/org.keepassxc.* rw,
+  owner @{run}/user/[0-9]*/app/ r,
+  owner @{run}/user/[0-9]*/app/org.keepassxc.KeePassXC/ rw,
+  owner @{run}/user/[0-9]*/app/org.keepassxc.KeePassXC/** rw,
+  # SSH agent integration (adds keys to the running agent; never reads ~/.ssh)
+  owner @{run}/user/[0-9]*/{gcr,keyring,openssh_agent}/ssh rw,
+  owner /tmp/ssh-*/agent.* rw,
+  # hardware keys (YubiKey challenge-response)
+  /dev/hidraw[0-9]* rw,
+  /run/pcscd/pcscd.comm rw,
+  /run/udev/data/** r,
+  /sys/bus/ r,
+  /sys/class/ r,
+  /sys/class/hidraw/ r,
+  /sys/devices/** r,
+  include if exists <local/usr.bin.keepassxc>
+}

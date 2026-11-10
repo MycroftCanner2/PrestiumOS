@@ -198,6 +198,25 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
 - **Root daemons ignore their test overrides when installed** (I-1). The broker, prestium-wl-config and
   the MAC guard read PRESTIUM_* variables only when run from the source tree, so the installed copies no
   longer rely on sudo's env_reset. (`tests/test_root_env_overrides.py`)
+- **The programs that open downloaded files are confined** (M-1). Loupe, Ristretto, VLC, File Roller,
+  Xarchiver, FeatherPad, mat2, Metadata Cleaner, GIMP and Audacity now run under enforced AppArmor
+  profiles (`abstractions/prestium-viewer`): no network, no camera, no admin tools, no other app's data
+  (mail, chat, browser profiles), no OpenPGP keys, no KeePassXC databases or key files. They may read
+  the file folders (Desktop, Documents, Downloads, Pictures, Music, Videos, Public, Templates,
+  OnionShare, the Tor Browser's downloads, unlocked volumes) and their own settings; the editors, the
+  archive managers and the metadata cleaners may also save into the file folders, never into the Tor
+  Browser's folder (mat2 only writes its ".cleaned" copy there), the home directory itself or a dot
+  directory. Loupe's image decoders and mat2's helpers keep their own bubblewrap sandbox, in a child
+  profile with the same limits. Debian's unconfined "loupe" profile is removed.
+  (`tests/test_viewer_confinement.sh`, which checks the compiled profiles)
+- **KeePassXC and Kleopatra are confined too.** KeePassXC may open *.kdbx databases anywhere in the
+  home and key files in the file folders, and use a security key; it has no network (no icon downloads
+  or breach checks), no OpenPGP keys, and can't write the browsers' directories (no browser
+  integration) or start other programs. Kleopatra and the GnuPG tools it starts may use ~/.gnupg and the
+  file folders; only its dirmngr, in a child profile, opens TCP sockets (the firewall lets it reach only
+  Tor), and passphrase prompts go to the pinentry profile.
+- Files outside the file folders (for example a text file directly in the home directory, or in a dot
+  directory) can no longer be opened in these programs; move them into Documents first.
 - The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
   every boot), which the audit (I-3) read from the commented template; nothing changed there.
 

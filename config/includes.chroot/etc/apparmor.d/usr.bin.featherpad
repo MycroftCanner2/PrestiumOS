@@ -1,0 +1,18 @@
+# Prestium 2.1 (audit of 96468c5, M-1): FeatherPad, the text editor, ENFORCED. No network, no other app's data, no keys,
+# no shell or start-up files: it opens and saves files in the file folders only (not in dot
+# directories or the home directory itself).
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile featherpad /usr/bin/{featherpad,fpad} {
+  include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-write>
+  /usr/bin/{featherpad,fpad} mr,
+  owner @{HOME}/.config/featherpad/ rw,
+  owner @{HOME}/.config/featherpad/** rwk,
+  owner @{HOME}/.local/share/featherpad/ rw,
+  owner @{HOME}/.local/share/featherpad/** rwk,
+  # a running instance is found over D-Bus; never another program
+  include if exists <local/usr.bin.featherpad>
+}

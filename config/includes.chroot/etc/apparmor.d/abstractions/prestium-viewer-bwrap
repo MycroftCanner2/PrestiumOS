@@ -1,0 +1,46 @@
+# Prestium 2.1 (audit of 96468c5, M-1): bubblewrap as a viewer starts it for its own decoders (Loupe's
+# glycin loaders, mat2's ffmpeg and exiftool). bubblewrap builds its own user, mount and network
+# namespaces; the child profile that includes this adds only the programs it may run. Still no
+# network, no part of the home but the file folders (read), no writes outside /tmp and /run.
+  include <abstractions/base>
+  include <abstractions/prestium-no-admin>
+  userns,
+  capability sys_admin,
+  capability sys_chroot,
+  capability setpcap,
+  capability net_admin,
+  capability setuid,
+  capability setgid,
+  capability dac_override,
+  capability dac_read_search,
+  capability chown,
+  capability fowner,
+  capability fsetid,
+  capability kill,
+  mount,
+  remount,
+  umount,
+  pivot_root,
+  network netlink raw,
+  network unix stream,
+  network unix dgram,
+  deny network inet,
+  deny network inet6,
+  signal (send, receive) peer=@{profile_name},
+  /usr/bin/bwrap mr,
+  # the system (read-only) and the user's file folders; not the rest of the home directory
+  / r,
+  /usr/ r,
+  /usr/** mr,
+  /etc/ r,
+  /etc/** r,
+  /sys/** r,
+  /var/ r,
+  /var/lib/ r,
+  @{HOME}/ r,
+  include <abstractions/prestium-user-files>
+  /dev/** rw,
+  /proc/** rw,
+  owner /tmp/** rwlk,
+  owner /run/** rwlk,
+  deny @{HOME}/** w,

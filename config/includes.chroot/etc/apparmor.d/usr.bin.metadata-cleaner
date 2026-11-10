@@ -1,0 +1,33 @@
+# Prestium 2.1 (audit of 96468c5, M-1): Metadata Cleaner (the GUI for mat2), ENFORCED. The same rules as mat2.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile metadata-cleaner /usr/bin/metadata-cleaner {
+  include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-write>
+  /usr/bin/metadata-cleaner r,
+  /usr/share/metadata-cleaner/** r,
+  owner @{HOME}/.config/metadata-cleaner/ rw,
+  owner @{HOME}/.config/metadata-cleaner/** rwk,
+  include <abstractions/python>
+  /usr/bin/python3* ix,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.*/** mr,
+  # mat2's helpers (videos, other formats), each run by mat2 in bubblewrap when it is installed
+  /usr/bin/{ffmpeg,exiftool,perl} mrix,
+  /usr/share/perl5/** r,
+  /usr/share/perl/** r,
+  /usr/lib/@{multiarch}/perl*/** mr,
+  /usr/bin/bwrap mrCx -> bwrap,
+  # the cleaned copy goes next to the original: "<name>.cleaned.<ext>", the Tor Browser's folder included
+  owner "@{HOME}/Tor Browser/**.cleaned.*" rw,
+
+  profile bwrap flags=(attach_disconnected,mediate_deleted) {
+    include <abstractions/prestium-viewer-bwrap>
+    /usr/bin/{ffmpeg,exiftool,perl} mrix,
+    /usr/share/perl5/** r,
+    /usr/lib/@{multiarch}/perl*/** mr,
+  }
+  include if exists <local/usr.bin.metadata-cleaner>
+}

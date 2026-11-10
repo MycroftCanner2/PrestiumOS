@@ -1,0 +1,17 @@
+# Prestium 2.1 (audit of 96468c5, M-1): Ristretto, the second image viewer, ENFORCED. No network, no other app's data, no keys;
+# reads the file folders and writes only its own settings.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile ristretto /usr/bin/ristretto {
+  include <abstractions/prestium-viewer>
+  /usr/bin/ristretto mr,
+  owner @{HOME}/.config/ristretto/ rw,
+  owner @{HOME}/.config/ristretto/** rwk,
+  owner @{HOME}/.config/xfce4/ r,
+  owner @{HOME}/.config/xfce4/** r,
+  owner @{HOME}/.cache/ristretto/ rw,
+  owner @{HOME}/.cache/ristretto/** rwk,
+  include if exists <local/usr.bin.ristretto>
+}

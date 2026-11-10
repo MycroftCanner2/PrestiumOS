@@ -1,0 +1,34 @@
+# Prestium 2.1 (audit of 96468c5, M-1): GIMP, ENFORCED. Images are a common exploit vector, and GIMP runs plug-ins for many
+# formats: no network, no other app's data, no keys; it and its plug-ins read the file folders and
+# save only into them.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile gimp /usr/bin/{gimp,gimp-3,gimp-3.0,gimp-console,gimp-console-3,gimp-console-3.0} {
+  include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-write>
+  include <abstractions/python>
+  /usr/bin/{gimp,gimp-3,gimp-3.0,gimp-console,gimp-console-3,gimp-console-3.0} mr,
+  # plug-ins (C, Python, Script-Fu) run under this same profile
+  /usr/lib/gimp/** mrix,
+  /usr/lib/@{multiarch}/gimp/** mrix,
+  /usr/lib/@{multiarch}/{gegl,babl}-0.4/** mr,
+  /usr/bin/gimp-script-fu-interpreter* mrix,
+  /usr/bin/python3* ix,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.*/** mr,
+  /usr/bin/{gs,gjs,lua*} mrix,
+  /{,usr/}bin/{sh,dash,bash} ix,
+  owner @{HOME}/.config/GIMP/ rw,
+  owner @{HOME}/.config/GIMP/** rwk,
+  owner @{HOME}/.cache/gimp/ rw,
+  owner @{HOME}/.cache/gimp/** rwk,
+  owner @{HOME}/.local/share/gimp/ rw,
+  owner @{HOME}/.local/share/gimp/** rwk,
+  owner @{HOME}/.cache/babl/ rw,
+  owner @{HOME}/.cache/babl/** rwk,
+  owner @{HOME}/.local/share/gegl-0.4/ rw,
+  owner @{HOME}/.local/share/gegl-0.4/** rwk,
+  include if exists <local/usr.bin.gimp>
+}

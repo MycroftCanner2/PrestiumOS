@@ -1,0 +1,27 @@
+# Prestium 2.1 (audit of 96468c5, M-1): Audacity, ENFORCED. No network, no camera, no other app's data, no keys; it opens and
+# saves sound files and projects in the file folders only.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile audacity /usr/bin/audacity {
+  include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-write>
+  /usr/bin/audacity mr,
+  /usr/lib/@{multiarch}/audacity/** mr,
+  /usr/lib/{lv2,ladspa,vst,vst3}/** mr,
+  /usr/lib/@{multiarch}/{lv2,ladspa}/** mr,
+  /{,usr/}bin/{sh,dash,bash} ix,
+  owner @{HOME}/.config/audacity/ rw,
+  owner @{HOME}/.config/audacity/** rwk,
+  owner @{HOME}/.local/share/audacity/ rw,
+  owner @{HOME}/.local/share/audacity/** rwkl,
+  owner @{HOME}/.local/state/audacity/ rw,
+  owner @{HOME}/.local/state/audacity/** rwk,
+  owner @{HOME}/.cache/audacity/ rw,
+  owner @{HOME}/.cache/audacity/** rwk,
+  owner @{HOME}/.audacity-data/ rw,
+  owner @{HOME}/.audacity-data/** rwk,
+  deny /dev/video* rw,
+  include if exists <local/usr.bin.audacity>
+}

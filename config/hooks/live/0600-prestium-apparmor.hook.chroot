@@ -6,14 +6,19 @@ set -e
 # would conflict with Prestium's confined profile for the local-only Firefox; drop it (no other
 # Firefox is installed).
 rm -f /etc/apparmor.d/firefox /etc/apparmor.d/local/firefox
+# 2.1 (audit of 96468c5, M-1): the same for Debian's "loupe" (flags=unconfined, same attachment as
+# Prestium's confined Loupe profile)
+rm -f /etc/apparmor.d/loupe /etc/apparmor.d/local/loupe
 # 2.0 r12: Claws Mail (I2P mail) is confined too
+# 2.1 (audit of 96468c5, M-1): the programs that open downloaded files, KeePassXC and Kleopatra too
 # 2.1 (security audit): onion-grater too (ptrace read only); 2.1 (review): the browser launchers as
 # Claws Mail, Gajim and Pidgin start them, and pinentry as Claws Mail's gpg-agent starts it
 # 2.0 r9: Gajim, OnionShare, Feather, LibreOffice, The Lounge and the local-only Firefox are confined too
 for p in usr.share.librewolf.librewolf torbrowser.Browser.firefox usr.bin.pidgin system_tor usr.bin.i2pd \
 	usr.bin.gajim usr.bin.onionshare usr.local.bin.feather usr.lib.libreoffice.program prestium.thelounge \
 	opt.firefox.firefox usr.bin.claws-mail usr.local.sbin.prestium-onion-grater \
-	prestium.browser-launcher prestium.pinentry; do
+	prestium.browser-launcher prestium.pinentry \
+	usr.bin.loupe usr.bin.ristretto usr.bin.vlc usr.bin.file-roller usr.bin.xarchiver usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.bin.gimp usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra; do
 	f=/etc/apparmor.d/$p
 	[ -e "$f" ] || { echo "W: no profile $p"; continue; }
 	sed -i 's/ flags=(complain)//; s/flags=(complain) //' "$f"
@@ -25,6 +30,7 @@ touch /etc/apparmor.d/local/usr.share.librewolf.librewolf
 # 2.0 r9: every confined app denies sudo/su/pkexec and Prestium's helpers
 for p in usr.share.librewolf.librewolf usr.bin.pidgin usr.bin.gajim usr.bin.onionshare usr.local.bin.feather \
 	usr.lib.libreoffice.program prestium.thelounge opt.firefox.firefox local/torbrowser.Browser.firefox \
-	usr.bin.claws-mail prestium.pinentry; do
-	grep -q 'prestium-no-admin\|prestium-app-base' "/etc/apparmor.d/$p" || { echo "E: $p does not deny sudo"; exit 1; }
+	usr.bin.claws-mail prestium.pinentry \
+	usr.bin.loupe usr.bin.ristretto usr.bin.vlc usr.bin.file-roller usr.bin.xarchiver usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.bin.gimp usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra; do
+	grep -q 'prestium-no-admin\|prestium-app-base\|prestium-app-common\|prestium-viewer' "/etc/apparmor.d/$p" || { echo "E: $p does not deny sudo"; exit 1; }
 done

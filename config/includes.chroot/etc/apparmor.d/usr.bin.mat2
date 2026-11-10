@@ -1,0 +1,31 @@
+# Prestium 2.1 (audit of 96468c5, M-1): mat2, the metadata cleaner (command line), ENFORCED. No network, no other app's data, no keys;
+# reads the file folders and writes the cleaned copy next to the original.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile mat2 /usr/bin/mat2 {
+  include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-write>
+  /usr/bin/mat2 r,
+  include <abstractions/python>
+  /usr/bin/python3* ix,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.*/** mr,
+  # mat2's helpers (videos, other formats), each run by mat2 in bubblewrap when it is installed
+  /usr/bin/{ffmpeg,exiftool,perl} mrix,
+  /usr/share/perl5/** r,
+  /usr/share/perl/** r,
+  /usr/lib/@{multiarch}/perl*/** mr,
+  /usr/bin/bwrap mrCx -> bwrap,
+  # the cleaned copy goes next to the original: "<name>.cleaned.<ext>", the Tor Browser's folder included
+  owner "@{HOME}/Tor Browser/**.cleaned.*" rw,
+
+  profile bwrap flags=(attach_disconnected,mediate_deleted) {
+    include <abstractions/prestium-viewer-bwrap>
+    /usr/bin/{ffmpeg,exiftool,perl} mrix,
+    /usr/share/perl5/** r,
+    /usr/lib/@{multiarch}/perl*/** mr,
+  }
+  include if exists <local/usr.bin.mat2>
+}

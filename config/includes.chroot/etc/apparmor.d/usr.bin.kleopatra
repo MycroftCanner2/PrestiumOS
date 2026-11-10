@@ -1,0 +1,73 @@
+# Prestium 2.1 (audit of 96468c5, M-1): Kleopatra, ENFORCED. No network for Kleopatra itself (its dirmngr, which fetches keys, runs
+# in the child profile "dirmngr" and reaches only what ferm lets it: Tor), no other app's data, no
+# KeePassXC databases. It and the GnuPG tools it starts use ~/.gnupg, read the file folders and
+# write decrypted or signed files only into them. A passphrase prompt goes to prestium_pinentry.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile kleopatra /usr/bin/{kleopatra,kwatchgnupg} {
+  include <abstractions/prestium-app-common>
+  include <abstractions/prestium-app-secrets>
+  include <abstractions/prestium-user-files>
+  deny @{HOME}/.Private/** wx,
+  deny @{HOME}/tmp/** wx,
+  include <abstractions/prestium-viewer-write>
+  include <abstractions/nameservice-strict>
+  deny @{HOME}/**.kdbx rw,
+  network unix stream,
+  network unix dgram,
+  network netlink dgram,
+  deny network inet,
+  deny network inet6,
+
+  /usr/bin/{kleopatra,kwatchgnupg} mr,
+  /usr/lib/@{multiarch}/qt6/** mr,
+  /usr/lib/@{multiarch}/qt5/** mr,
+  /usr/bin/{gpg,gpgsm,gpgconf,gpg-agent,gpg-connect-agent,gpgtar,gpgv,gpg-wks-client,gpgme-json,gpgsm-gencert.sh} mrix,
+  /usr/lib/gnupg/** mrix,
+  /usr/libexec/gnupg/** mrix,
+  /usr/bin/dirmngr mrCx -> dirmngr,
+  /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11,-qt} Px -> prestium_pinentry,
+  /etc/alternatives/pinentry{,-x11} r,
+  owner @{HOME}/.gnupg/ rw,
+  owner @{HOME}/.gnupg/** rwkl,
+  owner @{run}/user/[0-9]*/gnupg/ rw,
+  owner @{run}/user/[0-9]*/gnupg/** rw,
+  owner @{HOME}/.config/kleopatrarc* rwk,
+  owner @{HOME}/.config/kleopatra/ rw,
+  owner @{HOME}/.config/kleopatra/** rwk,
+  owner @{HOME}/.config/{kdeglobals,QtProject.conf,kwatchgnupgrc} rwk,
+  owner @{HOME}/.local/share/kleopatra/ rw,
+  owner @{HOME}/.local/share/kleopatra/** rwk,
+  owner @{HOME}/.local/share/kxmlgui5/ r,
+  owner @{HOME}/.local/share/kxmlgui5/** r,
+  owner @{HOME}/.cache/kleopatra/ rw,
+  owner @{HOME}/.cache/kleopatra/** rwk,
+  owner @{HOME}/.cache/{ksycoca6*,kio*,icon-cache.kcache} rwk,
+
+  # key lookups: dirmngr alone may open TCP sockets (the firewall lets the desktop user reach only Tor)
+  profile dirmngr {
+    include <abstractions/base>
+    include <abstractions/nameservice-strict>
+    include <abstractions/prestium-no-admin>
+    network inet stream,
+    network inet6 stream,
+    network unix stream,
+    /usr/bin/dirmngr mr,
+    /etc/gnupg/** r,
+    /usr/share/gnupg/** r,
+    /etc/ssl/certs/** r,
+    /usr/share/ca-certificates/** r,
+    owner @{HOME}/.gnupg/ r,
+    owner @{HOME}/.gnupg/dirmngr.conf r,
+    owner @{HOME}/.gnupg/crls.d/ rw,
+    owner @{HOME}/.gnupg/crls.d/** rwk,
+    owner @{HOME}/.gnupg/dirmngr_ldapservers.conf r,
+    owner @{HOME}/.gnupg/S.dirmngr rw,
+    owner @{run}/user/[0-9]*/gnupg/ r,
+    owner @{run}/user/[0-9]*/gnupg/S.dirmngr rw,
+    owner @{PROC}/@{pid}/** r,
+  }
+  include if exists <local/usr.bin.kleopatra>
+}

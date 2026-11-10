@@ -1,0 +1,9 @@
+# Prestium 2.1 (audit of 96468c5, M-1): read the user's file folders: Desktop, Documents, Downloads
+# (with I2P's torrents), Pictures, Music, Videos, Public, Templates, OnionShare, the Tor Browser's
+# download folder, and unlocked volumes under /media. No dot directory, nothing else in the home.
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/ r,
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/** r,
+  owner "@{HOME}/Tor Browser/" r,
+  owner "@{HOME}/Tor Browser/**" r,
+  /media/ r,
+  /media/** r,

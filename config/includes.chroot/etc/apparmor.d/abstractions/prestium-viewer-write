@@ -1,0 +1,7 @@
+# Prestium 2.1 (audit of 96468c5, M-1): for the viewers that save files (GIMP, Audacity, the text
+# editor, the archive managers, the metadata cleaners): write in the user's file folders and unlocked
+# volumes. Never in the Tor Browser's download folder (read only), the home directory itself or any
+# dot directory, so a crafted file can't plant a configuration or start-up file.
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/ rw,
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/** rwkl,
+  /media/** rwk,

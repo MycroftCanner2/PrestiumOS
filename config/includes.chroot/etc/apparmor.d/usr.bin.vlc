@@ -1,0 +1,25 @@
+# Prestium 2.1 (audit of 96468c5, M-1): VLC, ENFORCED. Video and sound files are a common exploit vector: no network (no
+# streams), no camera, no other app's data, no keys; it reads the file folders and DVDs and may save
+# snapshots in Pictures.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile vlc /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} {
+  include <abstractions/prestium-viewer>
+  /{,usr/}bin/{sh,dash,bash} ix,
+  /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} mr,
+  /usr/lib/@{multiarch}/vlc/** mr,
+  /usr/lib/@{multiarch}/vlc/vlc-cache-gen ix,
+  owner @{HOME}/.config/vlc/ rw,
+  owner @{HOME}/.config/vlc/** rwk,
+  owner @{HOME}/.local/share/vlc/ rw,
+  owner @{HOME}/.local/share/vlc/** rwk,
+  owner @{HOME}/.cache/vlc/ rw,
+  owner @{HOME}/.cache/vlc/** rwk,
+  owner @{HOME}/Pictures/vlcsnap-* rw,
+  # optical discs (read), never a camera
+  /dev/sr[0-9]* r,
+  deny /dev/video* rw,
+  include if exists <local/usr.bin.vlc>
+}
