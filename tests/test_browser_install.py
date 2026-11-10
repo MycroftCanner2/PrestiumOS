@@ -120,6 +120,12 @@ class Unit(unittest.TestCase):
                 self.m.ensure_tmpfs(bu.tmpfs_need("tor-browser", art))
             self.assertEqual(len(calls), 1)
 
+    def test_helper_never_reads_bytecode(self):
+        self.assertTrue(self.m.sys.dont_write_bytecode)
+        self.assertEqual(self.m.sys.pycache_prefix, "/nonexistent/prestium-pycache")
+        src = open(T.HELPER).read()
+        self.assertLess(src.index("sys.pycache_prefix"), src.index("import browser_update"))
+
     def test_lister_reports_sizes(self):
         S = os.path.join(self.m.STAGING_ROOT, "tor-browser"); os.makedirs(S)
         open(os.path.join(S, "a.tar.xz"), "wb").write(b"x" * 1234)
@@ -883,6 +889,21 @@ del RUNS[:]
         v, opts, stamps, sv = r["sig"][0]
         self.assertEqual((v, sv, stamps), ("16.0.1", "16.0.1", ["tor-browser"]))
         self.assertEqual(len(opts), 1); self.assertIn("ro", opts[0])
+
+    def test_signals_shielded_during_reset(self):
+        """SIGTERM right after Reset's unmount is held until the stamp is gone, the tmpfs is released
+        and the result is printed."""
+        r = self.run_steps([
+            ("stage", "16.0"), ("install", "tor-browser"),
+            ("py", "import signal, sys as _sy\nRES['sig'] = []\n"
+                   "def h(n, f):\n    _sy.__stdout__.flush()\n    RES['sig'].append([tbver(), len(binds(T_)), sorted(os.listdir(m.STAMP_DIR)), len(tmpfs())])\n"
+                   "signal.signal(signal.SIGTERM, h)\n_u2 = m.do_umount\n_once = [1]\n"
+                   "def ku(t):\n    r = _u2(t)\n    if t == T_ and _once:\n        _once.pop(); os.kill(os.getpid(), signal.SIGTERM)\n    return r\nm.do_umount = ku"),
+            ("revert", "tor-browser"),
+        ])
+        S = r["steps"]
+        self.assertEqual(S[1][0], 0, S[1]); self.assertIn("is back", S[1][1]["message"])
+        self.assertEqual(r["sig"], [["15.0.26", 0, [], 0]], "delivered once, after stamp removal and tmpfs release")
 
     def test_lw_tmpfs_grows_to_real_size(self):
         """The fixed LibreWolf estimate is too small: once the package listing is known the tmpfs is

@@ -33,6 +33,9 @@
 import contextlib, errno, fcntl, hashlib, json, os, posixpath, re, shutil, signal, stat, subprocess, sys, tarfile, tempfile, time
 
 sys.dont_write_bytecode = True
+# never read bytecode from next to the library either: a stale __pycache__/browser_update.*.pyc in the
+# image would otherwise be used instead of the root-owned source (this prefix does not exist)
+sys.pycache_prefix = "/nonexistent/prestium-pycache"
 LIBDIR = "/usr/local/lib/prestium"
 if LIBDIR not in sys.path:
     sys.path.insert(0, LIBDIR)
@@ -1206,23 +1209,35 @@ def revert(name):
         return
     refuse_if_running(name, stamp_factory_ids(name))
     event("Restoring the shipped copy ...")
-    try:
-        with shielded():
+    # signals are held from the unmount through the stamp removal, the tmpfs release and the printed
+    # result: a deferred SIGTERM must not leave the old stamp or the tmpfs behind once the shipped copy
+    # is visible again (the window would then have no Reset to finish the cleanup)
+    with shielded():
+        try:
             unmount_all(entries)
-    except MountError as e:
-        raise Fail("%s is still in use (%s). Close it and try again." % (bu.TITLES[name], e), 3)
-    first = UNITS[name][0][1]
-    if not any(os.path.isfile(os.path.join(first, x)) for x in EXES[name]) or not bu.tree_version(name, first):
-        raise Fail("The update was removed, but the shipped %s at %s looks incomplete." % (bu.TITLES[name], first))
-    for src, _, _ in UNITS[name]:
-        for suf in ("",) + SUFFIXES:
-            p = src_path(src + suf)
-            if os.path.lexists(p) and not is_mount_source(src + suf):
-                rm_tree_or_file(p)
-    remove_stamp(name)
-    note = release_tmpfs_if_unused()
-    msg = "The shipped %s %s is back." % (bu.TITLES[name], bu.tree_version(name, first))
-    out({"ok": True, "message": msg + (" " + note if note else ""), "version": bu.tree_version(name, first)})
+        except MountError as e:
+            raise Fail("%s is still in use (%s). Close it and try again." % (bu.TITLES[name], e), 3)
+        first = UNITS[name][0][1]
+        try:
+            remove_stamp(name)          # the update is off: its record goes first
+        except OSError:
+            pass
+        for src, _, _ in UNITS[name]:
+            for suf in ("",) + SUFFIXES:
+                p = src_path(src + suf)
+                try:
+                    if os.path.lexists(p) and not is_mount_source(src + suf):
+                        rm_tree_or_file(p)
+                except OSError:
+                    pass
+        note = release_tmpfs_if_unused()
+        v = bu.tree_version(name, first)
+        if not any(os.path.isfile(os.path.join(first, x)) for x in EXES[name]) or not v:
+            out({"ok": False, "code": 1, "error": "The update was removed, but the shipped %s at %s looks "
+                 "incomplete." % (bu.TITLES[name], first)})
+            return 1
+        msg = "The shipped %s %s is back." % (bu.TITLES[name], v)
+        out({"ok": True, "message": msg + (" " + note if note else ""), "version": v})
 
 
 def main(argv):
@@ -1246,8 +1261,7 @@ def main(argv):
         out({"ok": False, "error": "another browser update is already running"})
         return 1
     try:
-        (install if argv[1] == "install" else revert)(argv[2])
-        return 0
+        return (install if argv[1] == "install" else revert)(argv[2]) or 0
     except Fail as e:
         out({"ok": False, "error": str(e), "code": e.code})
         return e.code

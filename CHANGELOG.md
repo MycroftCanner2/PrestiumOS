@@ -98,7 +98,7 @@ Enhanced security and new features. Changes will be listed here as they land.
     shipped copy** is the only way back.
 - **Install = bind mount, Reset = umount.** The helper:
   - unpacks onto its own **tmpfs at `/run/prestium/browsers`** (`exec,nosuid,nodev`, sized for the
-    update and checked against available RAM; `/run` itself is noexec and is not used), with archive checks: no `..`, absolute
+    update and checked against available RAM; `/run` itself is not used, since it's expected to be noexec; the VM `findmnt` check confirms that), with archive checks: no `..`, absolute
     paths, escaping symlinks, devices, fifos, hard links or setuid/setgid;
   - re-applies Prestium's policies and extensions from `/usr/share/prestium/opt-overlay`, which the
     image now keeps;

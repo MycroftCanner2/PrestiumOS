@@ -282,6 +282,15 @@ class TestWindow(unittest.TestCase):
         self.assertNotIn("(the copy on the USB image)", s.version.get_text())
         self.assertIn("session update", s.version.get_text())
 
+    def test_reset_available_with_a_stale_stamp(self):
+        """An interrupted Reset left the stamp (no bind, factory version showing): Reset stays
+        clickable so the user can finish the cleanup."""
+        s = self.w.sections["tor-browser"]
+        with mock.patch.object(bu, "installed_version", lambda n: {"version": "15.0.26", "full": None, "updated": False,
+                                                                  "stamp": {"version": "16.0"}}):
+            s.refresh(); self.w.update_buttons()
+        self.assertTrue(s.reset_btn._sensitive)
+
     def test_cancel_during_final_check_skips_helper(self):
         """Close or Cancel after the download, during the last signature check: the helper never runs."""
         def prep(name, transport, cancel, progress, log):
