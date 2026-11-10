@@ -115,6 +115,11 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   (UTC): strict date and time, never before the image was built (one day of slack) or more than 10
   years after, and a safety notice on the desktop afterwards. The build records its date in
   `/usr/share/prestium/build-date`. (`tests/test_set_clock.sh`)
+- **Fewer filesystem drivers can be loaded.** udisks lets the desktop user attach disk images (needed
+  for VeraCrypt file containers), so any program of the user can make the kernel parse a filesystem
+  image it chose. 21 rarely used filesystem drivers (hfs, minix, jfs, reiserfs, nilfs2, ufs, erofs and
+  others) are now blocked like cramfs, freevxfs and jffs2 were. FAT, exFAT, NTFS, ext4, Btrfs, XFS,
+  F2FS, ISO 9660, UDF and HFS+ still work. (`tests/test_fs_blacklist.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
