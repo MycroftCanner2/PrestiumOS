@@ -37,9 +37,15 @@ case "$virt" in
 esac
 
 tor_ok() { journalctl -b -u tor@default -o cat --no-pager 2>/dev/null | grep -q 'Bootstrapped 100'; }
-tor_skew() {   # Tor's own clock-skew warnings, last one
-  journalctl -b -u tor@default -o cat --no-pager 2>/dev/null \
-    | grep -iE 'clock (is|skew)|skewed|time.*(behind|ahead)' | tail -n 1 | cut -c1-200
+tor_skew() {   # Tor's last clock-skew warning, as "clock is 7 hours behind" (never Tor's own text:
+  # 2.1 security audit, its log lines can name relays, and this goes to a world-readable file)
+  local l r D='[0-9]{1,6} [a-z]{3,7}(, [0-9]{1,6} [a-z]{3,7}){0,4}'
+  l=$(journalctl -b -u tor@default -o cat --no-pager 2>/dev/null \
+    | grep -iE 'clock (is|skew)|skewed|time.*(behind|ahead)' | tail -n 1)
+  [ -n "$l" ] || return 0
+  # "our clock is behind by 7 hours, 3 minutes" (connection skew) or "Our clock is 7 hours behind" (consensus)
+  r=$(printf '%s\n' "$l" | sed -nE "s/.*[Oo]ur clock is (ahead|behind) by ($D).*/clock is \\2 \\1/p; t; s/.*[Oo]ur clock is ($D) (ahead|behind).*/clock is \\1 \\3/p" | head -n 1)
+  printf '%s\n' "${r:-clock skew reported}"
 }
 sync_skew() {  # seconds prestium-timesync measured (0 if it measured nothing)
   journalctl -b -u prestium-timesync -o cat --no-pager 2>/dev/null \

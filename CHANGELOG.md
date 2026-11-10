@@ -97,6 +97,11 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   other processes' command lines, such as the local-only Firefox's, which carries The Lounge's sign-in
   URL. (The sign-in token stays reusable for the boot: the desktop user's own programs can read its file
   anyway, so a one-time token would not protect against anything new.) (`tests/test_thelounge_readonly.sh`)
+- **The VM network check no longer runs as root**, and never copies Tor's log text. It runs as its own
+  user `prestium-vmcheck` (group systemd-journal, to read Tor's and i2pd's journal) with a tighter
+  sandbox (`ProtectProc=invisible`, `IPAddressDeny=any`, `@system-service` syscalls only, no
+  namespaces). Tor's clock-skew line can name the relay it came from; the world-readable diagnosis now
+  says only "clock is 7 hours, 3 minutes behind" (or "clock skew reported"). (`tests/test_vm_check.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

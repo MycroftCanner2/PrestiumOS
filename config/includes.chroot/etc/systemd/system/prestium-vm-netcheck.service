@@ -8,6 +8,11 @@ After=network.target tor.service i2pd.service systemd-tmpfiles-setup.service
 [Service]
 Type=simple
 ExecStart=/usr/local/sbin/prestium-vm-netcheck
+# 2.1 (security audit): not root. Reading the system journal needs only the systemd-journal group;
+# ss (sock_diag) and ip route work unprivileged.
+User=prestium-vmcheck
+Group=prestium-vmcheck
+SupplementaryGroups=systemd-journal
 # read-only checks (journal, routes, socket list); writes only /run/prestium/vm
 NoNewPrivileges=yes
 ProtectSystem=strict
@@ -24,6 +29,16 @@ RestrictSUIDSGID=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes
 SystemCallArchitectures=native
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+ProtectProc=invisible
+IPAddressDeny=any
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0022
 
 [Install]
 WantedBy=multi-user.target

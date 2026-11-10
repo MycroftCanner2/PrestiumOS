@@ -45,13 +45,18 @@ check(){ # runs one check round; env: VIRT GW TORLOG SYNCLOG SSOUT
     timeout 10 bash "$CHK" >/dev/null 2>&1
   echo $? > "$T/rc"; cat "$T/out/network" 2>/dev/null; }
 
+U=$C/etc/systemd/system/prestium-vm-netcheck.service
+grep -qx 'User=prestium-vmcheck' "$U" && grep -qx 'SupplementaryGroups=systemd-journal' "$U" && ok "service: own user, journal group (not root)" || bad "service runs as root"
+for k in ProtectProc=invisible IPAddressDeny=any SystemCallFilter=@system-service RestrictNamespaces=yes ProtectKernelLogs=yes; do
+  grep -qx "$k" "$U" && ok "service: $k" || bad "service: no $k"; done
+grep -q '^sysuser prestium-vmcheck ' "$R/config/hooks/live/0100-prestium-users.hook.chroot" && ok "user prestium-vmcheck created" || bad "no prestium-vmcheck user"
 grep -q '^ConditionVirtualization=vm$' $C/etc/systemd/system/prestium-vm-netcheck.service && ok "service runs only in a VM" || bad "no ConditionVirtualization=vm"
 grep -qx '/etc/systemd/system/multi-user.target.wants/prestium-vm-netcheck.service /etc/systemd/system/prestium-vm-netcheck.service' \
   $C/usr/share/prestium/build/systemd-wants.txt && ok "service enabled (systemd-wants.txt)" || bad "service not enabled"
 for p in "0755 root root /usr/local/sbin/prestium-vm-netcheck" "0755 root root /usr/local/bin/prestium-vm-notify" \
          "0644 root root /etc/systemd/system/prestium-vm-netcheck.service"; do
   grep -qxF "$p" $C/usr/share/prestium/build/perms.txt && ok "perms: $p" || bad "perms missing: $p"; done
-grep -qx 'd /run/prestium/vm 0755 root root -' $C/usr/lib/tmpfiles.d/prestium-safety.conf && ok "tmpfiles: /run/prestium/vm" || bad "tmpfiles"
+grep -qx "d /run/prestium/vm 0755 prestium-vmcheck prestium-vmcheck -" $C/usr/lib/tmpfiles.d/prestium-safety.conf && ok "tmpfiles: /run/prestium/vm" || bad "tmpfiles"
 grep -qx 'prestium-run /usr/local/bin/prestium-vm-notify >/dev/null 2>&1 &' $C/etc/xdg/labwc/autostart \
   && [ "$(grep -n vm-notify $C/etc/xdg/labwc/autostart | cut -d: -f1)" -lt "$(grep -n 'safety-notify' $C/etc/xdg/labwc/autostart | tail -1 | cut -d: -f1)" ] \
   && ok "autostart: notifier backgrounded, before the never-returning safety notifier" || bad "autostart line"
@@ -73,6 +78,12 @@ case "$o" in *"I2P has NO peer connections"*) ok "uid:20000 is not i2pd (uid 200
 
 o=$(VIRT=kvm GW=192.168.122.1 TORLOG=$'Bootstrapped 5%\nReceived NETINFO cell with skewed time: Our clock is 7 hours behind' check)
 case "$o" in *"clock is or was wrong (Tor: "*"7 hours behind"*"<clock offset='utc'>"*) ok "Tor skew warning shown with the fix";; *) bad "skew: $o";; esac
+# 2.1 (security audit): Tor's text is never copied (its skew lines can name a relay's address)
+o=$(VIRT=kvm GW=192.168.122.1 TORLOG=$'Bootstrapped 5%\nReceived NETINFO cell with skewed time (OR:198.51.100.7:9001): It seems that our clock is behind by 7 hours, 3 minutes, or that theirs is ahead. Tor requires an accurate clock' check)
+case "$o" in *"198.51.100"*|*"OR:"*|*NETINFO*) bad "Tor's own text (relay address) copied: $o";;
+  *"(Tor: clock is 7 hours, 3 minutes behind)"*) ok "connection skew: only the amount and direction, no relay address";; *) bad "connection skew: $o";; esac
+o=$(VIRT=kvm GW=192.168.122.1 TORLOG=$'Bootstrapped 5%\nclock skew detected from 203.0.113.9:443' check)
+case "$o" in *"203.0.113"*) bad "address copied: $o";; *"(Tor: clock skew reported)"*) ok "unparsed skew line: fixed wording";; *) bad "unparsed skew: $o";; esac
 case "$o" in *"user-mode"*) bad "NAT network flagged as user-mode";; *) ok "libvirt NAT not flagged as user-mode";; esac
 case "$o" in *"Neither Tor nor I2P connects"*) ok "both down on NAT: host/bridge hint";; *) bad "no both-down hint: $o";; esac
 

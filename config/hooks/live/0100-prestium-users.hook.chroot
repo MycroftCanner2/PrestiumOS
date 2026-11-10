@@ -32,6 +32,7 @@ sysuser thelounge /var/lib/thelounge ""
 sysuser onion-grater /nonexistent "Prestium Tor control filter"
 sysuser prestium-htp /nonexistent ""
 sysuser prestium-ptdns /nonexistent "Prestium DoH lookups for Tor bridges (via I2P)"
+sysuser prestium-vmcheck /nonexistent "Prestium VM network check"   # 2.1 (security audit): not root
 grp autologin; grp i2ptorrents; grp prestium-localweb
 grp prestium-tbb   # 2.0 r9: may use Tor's SOCKS socket for the Tor Browser sandbox
 
