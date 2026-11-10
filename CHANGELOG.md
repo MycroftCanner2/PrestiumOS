@@ -102,6 +102,13 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   sandbox (`ProtectProc=invisible`, `IPAddressDeny=any`, `@system-service` syscalls only, no
   namespaces). Tor's clock-skew line can name the relay it came from; the world-readable diagnosis now
   says only "clock is 7 hours, 3 minutes behind" (or "clock skew reported"). (`tests/test_vm_check.sh`)
+- **The Wayland broker and the MAC guard keep only the root powers they use.** The MAC guard (it reads
+  settings the user controls) is limited to `CAP_NET_ADMIN`, D-Bus and netlink sockets and
+  `@system-service` syscalls. The Wayland broker keeps chown/chmod, access to the user's runtime
+  directory, setuid/setgid/kill for the tools it starts, and reading labwc's `/proc` entry, and loses
+  every admin, network, module, raw I/O and clock capability. It gets no syscall filter or
+  `NoNewPrivileges`, because the session tools it starts inherit them (swaylock's PAM helper is setgid,
+  the idle lock uses sudo). (`tests/test_service_hardening.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

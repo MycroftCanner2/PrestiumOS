@@ -12,6 +12,15 @@ Restart=always
 RestartSec=1
 # the trusted tools it starts as the user live in this unit; a broker restart must not kill them
 KillMode=process
+# 2.1 (security audit): only the root powers the broker uses: chown/chmod the compositor's socket
+# and its directories, reach the user's runtime dir, start the trusted tools as the user (setuid,
+# setgid, kill), read /proc/<labwc>/exe (sys_ptrace). The tools it starts keep this bounding set,
+# so audit_write and sys_resource stay for sudo there (the idle lock's session-password helper).
+# No NoNewPrivileges or syscall filter: they would also bind those tools (swaylock's PAM helper).
+CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_SETUID CAP_SETGID CAP_KILL CAP_SYS_PTRACE CAP_AUDIT_WRITE CAP_SYS_RESOURCE
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+LockPersonality=yes
 
 [Install]
 WantedBy=graphical.target
