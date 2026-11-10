@@ -54,6 +54,7 @@
 0644 root root /etc/skel/.gtk-bookmarks
 0600 root root /etc/skel/.purple/prefs.xml
 0440 root root /etc/sudoers.d/prestium-set-clock
+0644 root root /etc/pam.d/swaylock
 0440 root root /etc/sudoers.d/prestium-power
 0440 root root /etc/sudoers.d/prestium-session-password
 0644 root root /etc/sysctl.d/zz-prestium-191.conf

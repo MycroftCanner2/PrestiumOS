@@ -1,0 +1,6 @@
+# Prestium 2.1 (security audit): the screen lock. Each wrong password costs at least 4 seconds
+# (pam_faildelay; PAM uses the longest delay any module asks for), which slows guessing at the
+# keyboard. No lockout: the live user is the only account and would be shut out of the session.
+# Then the usual login checks (Debian's swaylock file is "auth include login").
+auth	optional	pam_faildelay.so delay=4000000
+auth	include		login

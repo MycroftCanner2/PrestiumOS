@@ -120,6 +120,10 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   image it chose. 21 rarely used filesystem drivers (hfs, minix, jfs, reiserfs, nilfs2, ufs, erofs and
   others) are now blocked like cramfs, freevxfs and jffs2 were. FAT, exFAT, NTFS, ext4, Btrfs, XFS,
   F2FS, ISO 9660, UDF and HFS+ still work. (`tests/test_fs_blacklist.sh`)
+- **Stronger screen lock.** The session password (screen lock and administration prompts) must now have
+  at least 8 characters, and the dialog suggests a few unrelated words. Each wrong password at the lock
+  screen costs at least 4 seconds (`/etc/pam.d/swaylock`, pam_faildelay). There is no lockout, which
+  would shut the only user out of the session. (`tests/test_session_lock.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
