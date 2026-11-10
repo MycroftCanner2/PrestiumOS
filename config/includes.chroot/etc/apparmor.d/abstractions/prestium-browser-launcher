@@ -37,58 +37,6 @@
 
   /usr/bin/bwrap mrCx -> bwrap,
 
-  # bubblewrap: its own user, mount, network, PID and IPC namespaces, set up as the user. The
-  # browsers inside run under their own enforced profiles (torbrowser_firefox, librewolf).
-  # (attach_disconnected: bubblewrap builds the new root in a tmpfs that has no path in the parent)
-  profile bwrap flags=(attach_disconnected,mediate_deleted) {
-    include <abstractions/base>
-    include <abstractions/bash>
-    include <abstractions/consoles>
-    include <abstractions/nameservice>
-    userns,
-    capability sys_admin,
-    capability sys_chroot,
-    capability setpcap,
-    capability net_admin,
-    capability setuid,
-    capability setgid,
-    capability dac_override,
-    capability dac_read_search,
-    capability chown,
-    capability fowner,
-    capability fsetid,
-    capability kill,
-    capability sys_ptrace,
-    mount,
-    remount,
-    umount,
-    pivot_root,
-    network netlink raw,
-    network inet stream,
-    network inet6 stream,
-    network unix stream,
-    signal (send, receive) peer=@{profile_name},
-    ptrace (read, trace) peer=@{profile_name},
-    /usr/bin/bwrap mr,
-    /** r,
-    # the new root (a tmpfs on /tmp before pivot_root) and the sandbox's own /run
-    /dev/** rw,
-    /proc/** rw,
-    /tmp/** rwlk,
-    owner /run/** rwlk,
-    # inside the sandbox: only the browser directories the launcher binds in
-    owner @{HOME}/.tor-browser/** rwlk,
-    owner "@{HOME}/Tor Browser/" rw,
-    owner "@{HOME}/Tor Browser/**" rwlk,
-    owner @{HOME}/.librewolf/** rwlk,
-    owner @{HOME}/Downloads/** rwlk,
-    /{,usr/}bin/{sh,dash,bash,socat,sleep,dirname,expr,getconf,mkdir,ln,cp,sed,rm,realpath,readlink,id,pwd,env,cat} mrix,
-    # Tor Browser: start-tor-browser is a script in the read-only install; firefox.real gets its
-    # own profile, torbrowser_firefox
-    /{,usr/}bin/{grep,tr,awk,mawk,uname,file,head,tail,basename,ls,chmod,touch,test} mrix,
-    /opt/tor-browser/Browser/start-tor-browser mrix,
-    /opt/tor-browser/Browser/firefox mrix,
-    /opt/tor-browser/Browser/firefox.real Px -> torbrowser_firefox,
-    # LibreWolf (/usr/bin/librewolf is a link to /usr/share/librewolf/librewolf): profile librewolf
-    /usr/share/librewolf/librewolf{,-bin} Px -> librewolf,
-  }
+  # bubblewrap runs in a child profile "bwrap" that each launcher profile defines for itself, so a
+  # launcher's sandbox may write only that browser's directories
+  # (abstractions/prestium-browser-launcher-bwrap holds the rules they share).

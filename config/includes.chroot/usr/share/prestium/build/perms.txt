@@ -372,6 +372,7 @@
 0644 root root /etc/apparmor.d/abstractions/prestium-no-admin
 0644 root root /etc/apparmor.d/abstractions/prestium-app-base
 0644 root root /etc/apparmor.d/abstractions/prestium-browser-launcher
+0644 root root /etc/apparmor.d/abstractions/prestium-browser-launcher-bwrap
 0644 root root /etc/apparmor.d/prestium.browser-launcher
 0644 root root /etc/apparmor.d/prestium.pinentry
 0644 root root /etc/apparmor.d/local/torbrowser.Browser.firefox

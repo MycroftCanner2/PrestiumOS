@@ -1,0 +1,41 @@
+# Prestium 2.1 (review of the security audit): the rules the launchers' bubblewrap child profiles
+# share: bubblewrap builds its own user, mount, network, PID and IPC namespaces as the user. Each
+# launcher's child adds only its own browser's directories and programs; the browsers inside run
+# under their own enforced profiles (torbrowser_firefox, librewolf).
+  include <abstractions/base>
+  include <abstractions/bash>
+  include <abstractions/consoles>
+  include <abstractions/nameservice>
+  userns,
+  capability sys_admin,
+  capability sys_chroot,
+  capability setpcap,
+  capability net_admin,
+  capability setuid,
+  capability setgid,
+  capability dac_override,
+  capability dac_read_search,
+  capability chown,
+  capability fowner,
+  capability fsetid,
+  capability kill,
+  capability sys_ptrace,
+  mount,
+  remount,
+  umount,
+  pivot_root,
+  network netlink raw,
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  signal (send, receive) peer=@{profile_name},
+  ptrace (read, trace) peer=@{profile_name},
+  /usr/bin/bwrap mr,
+  /** r,
+  # the new root (a tmpfs on /tmp before pivot_root) and the sandbox's own /run
+  /dev/** rw,
+  /proc/** rw,
+  /tmp/** rwlk,
+  owner /run/** rwlk,
+  /{,usr/}bin/{sh,dash,bash,sleep,dirname,expr,getconf,mkdir,ln,cp,sed,rm,realpath,readlink,id,pwd,env,cat} mrix,
+  /{,usr/}bin/{grep,tr,awk,mawk,uname,file,head,tail,basename,ls,chmod,touch,test} mrix,

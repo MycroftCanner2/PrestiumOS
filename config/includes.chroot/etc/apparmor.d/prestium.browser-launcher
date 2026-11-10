@@ -2,7 +2,8 @@
 # them. Claws Mail, Gajim and Pidgin used "Ux", so a compromised client could run the launcher with
 # its own environment, before any sandbox. Now they use "Px -> prestium_*_launcher": the launcher
 # may write only its own browser's directories (a crafted HOME or a symlink in the profile cannot
-# reach another file), runs only the tools it needs, and starts bubblewrap in a child profile.
+# reach another file), runs only the tools it needs, and starts bubblewrap in its own child profile, which
+# may also write only that browser's directories.
 # Named profiles, no attachment: started from the menu, the launchers run as before.
 abi <abi/4.0>,
 include <tunables/global>
@@ -21,6 +22,19 @@ profile prestium_tor_browser_launcher {
   owner "@{HOME}/Tor Browser/" rw,
   # never another browser's data
   deny @{HOME}/.librewolf/** w,
+
+  # the sandbox: only Tor Browser's directories (not LibreWolf's or Downloads)
+  profile bwrap flags=(attach_disconnected,mediate_deleted) {
+    include <abstractions/prestium-browser-launcher-bwrap>
+    owner @{HOME}/.tor-browser/** rwlk,
+    owner "@{HOME}/Tor Browser/" rw,
+    owner "@{HOME}/Tor Browser/**" rwlk,
+    # start-tor-browser is a script in the read-only install; firefox.real has its own profile
+    /opt/tor-browser/Browser/start-tor-browser mrix,
+    /opt/tor-browser/Browser/firefox mrix,
+    /opt/tor-browser/Browser/firefox.real Px -> torbrowser_firefox,
+    deny @{HOME}/.librewolf/** w,
+  }
   include if exists <local/prestium.browser-launcher>
 }
 
@@ -40,5 +54,18 @@ profile prestium_librewolf_launcher {
   owner @{HOME}/Downloads/ rw,
   deny @{HOME}/.tor-browser/** w,
   deny "@{HOME}/Tor Browser/**" w,
+
+  # the sandbox: only LibreWolf's directories and Downloads (not Tor Browser's)
+  profile bwrap flags=(attach_disconnected,mediate_deleted) {
+    include <abstractions/prestium-browser-launcher-bwrap>
+    owner @{HOME}/.librewolf/** rwlk,
+    owner @{HOME}/Downloads/** rwlk,
+    # the inner relay to the bound-in proxy socket
+    /usr/bin/socat mrix,
+    # /usr/bin/librewolf links to /usr/share/librewolf/librewolf, which has its own profile
+    /usr/share/librewolf/librewolf{,-bin} Px -> librewolf,
+    deny @{HOME}/.tor-browser/** w,
+    deny "@{HOME}/Tor Browser/**" w,
+  }
   include if exists <local/prestium.browser-launcher>
 }

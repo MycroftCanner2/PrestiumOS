@@ -1,13 +1,14 @@
 # Prestium 2.1 (review of the security audit): the GnuPG passphrase prompt when Claws Mail's own
 # gpg-agent starts it (normally the session's agent does). It was "Ux" (unconfined). It talks to
 # gpg-agent on stdin/stdout, asks the GNOME prompter over the session bus or draws its own window,
-# and touches no files: it may not write anywhere, run anything else or use the network.
+# and touches no files: it may not write anywhere, run anything else or open
+# any network socket but a local (unix) one.
 abi <abi/4.0>,
 include <tunables/global>
 
 profile prestium_pinentry {
   include <abstractions/base>
-  include <abstractions/nameservice>
+  include <abstractions/nameservice-strict>
   include <abstractions/fonts>
   include <abstractions/freedesktop.org>
   include <abstractions/gnome>
@@ -28,6 +29,10 @@ profile prestium_pinentry {
   /dev/tty rw,
   /dev/pts/* rw,
   network unix stream,
+  # (nameservice-strict, not nameservice: no inet or netlink rules come in through an abstraction)
+  deny network inet,
+  deny network inet6,
+  deny network netlink,
 
   # the GNOME prompter (gcr) asks, then calls back on this connection
   dbus (send) bus=session peer=(name=org.gnome.keyring.SystemPrompter),
