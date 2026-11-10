@@ -1,0 +1,42 @@
+# Prestium 2.1 (review of the security audit): the GnuPG passphrase prompt when Claws Mail's own
+# gpg-agent starts it (normally the session's agent does). It was "Ux" (unconfined). It talks to
+# gpg-agent on stdin/stdout, asks the GNOME prompter over the session bus or draws its own window,
+# and touches no files: it may not write anywhere, run anything else or use the network.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile prestium_pinentry {
+  include <abstractions/base>
+  include <abstractions/nameservice>
+  include <abstractions/fonts>
+  include <abstractions/freedesktop.org>
+  include <abstractions/gnome>
+  include <abstractions/wayland>
+  include <abstractions/X>
+  include <abstractions/dbus-session-strict>
+  include <abstractions/prestium-no-admin>
+
+  /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11} mr,
+  /etc/alternatives/pinentry{,-x11} r,
+  /usr/share/** r,
+  /usr/lib/@{multiarch}/** mr,
+  /etc/gtk-2.0/** r,
+  /etc/gtk-3.0/** r,
+  owner @{HOME}/.gtkrc-2.0 r,
+  owner @{HOME}/.config/gtk-{2,3}.0/** r,
+  owner @{PROC}/@{pid}/{fd/,status,cmdline} r,
+  /dev/tty rw,
+  /dev/pts/* rw,
+  network unix stream,
+
+  # the GNOME prompter (gcr) asks, then calls back on this connection
+  dbus (send) bus=session peer=(name=org.gnome.keyring.SystemPrompter),
+  dbus (send) bus=session peer=(name=org.gnome.keyring.PrivatePrompter),
+  dbus (send, receive) bus=session interface=org.gnome.keyring.internal.Prompter{,.Callback},
+  dbus (receive) bus=session interface=org.freedesktop.DBus.Properties,
+
+  # nothing else: no files of the user, no other programs
+  deny @{HOME}/** w,
+  deny @{HOME}/.gnupg/** rw,
+  include if exists <local/prestium.pinentry>
+}

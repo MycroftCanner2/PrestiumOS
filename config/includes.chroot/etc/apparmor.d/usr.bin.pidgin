@@ -44,7 +44,8 @@ profile pidgin /usr/bin/pidgin {
   owner @{HOME}/Downloads/** rwk,
   /usr/bin/xdg-open ix,
   /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut} ix,
-  /usr/local/bin/tor-browser Ux,
+  # 2.1 (review): Px into the launcher profile, not Ux (see prestium.browser-launcher)
+  /usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,
 
   include if exists <local/usr.bin.pidgin>
 }

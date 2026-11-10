@@ -155,6 +155,14 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   security fixes only arrive with a newer image. Five minutes after login, a notice says how many days
   old the image is once it is past 45 days. `/etc/os-release` has the build date as `BUILD_ID`.
   (`tests/test_age_notify.sh`)
+- **Browsers opened from mail and chat run in their own AppArmor profiles.** Claws Mail, Gajim and Pidgin
+  started the Tor Browser and I2P Browser launchers unconfined ("Ux"), so a compromised client could
+  run them with a crafted HOME and overwrite a file through a symlink before the sandbox started. They
+  now use "Px" into `prestium_tor_browser_launcher` and `prestium_librewolf_launcher`, which may write
+  only their own browser's directories and start bubblewrap in a child profile. The launchers also take
+  HOME and XDG_RUNTIME_DIR from the system, not the caller. From the menu, the launchers run as before.
+  Claws Mail's passphrase prompt (pinentry) has its own profile too: no files, no programs, no network.
+  (`tests/test_browser_launcher_apparmor.sh`, `tests/test_launcher_env.sh`)
 
 ### Known security limits (from the 2026-11-10 audits)
 Not changed in 2.1, so you know where the edges are:

@@ -49,8 +49,9 @@ profile claws-mail /usr/bin/claws-mail {
   /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut,awk,mawk} ix,
   /usr/bin/x-www-browser ix,
   /etc/alternatives/x-www-browser ix,
-  /usr/local/bin/librewolf-i2p Ux,
-  /usr/local/bin/tor-browser Ux,
+  /usr/local/bin/librewolf-i2p Px -> prestium_librewolf_launcher,
+  # 2.1 (review): Px into the launcher profile, not Ux (see prestium.browser-launcher)
+  /usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,
 
   # never: anonymity and session settings, even read-write by name (default deny covers them too)
   deny @{HOME}/.config/prestium/** w,
@@ -95,8 +96,8 @@ profile claws-mail /usr/bin/claws-mail {
     owner @{HOME}/.claws-mail/** r,
 
     # the passphrase prompt (gpg-agent from the session normally owns it; this covers an agent
-    # started by Claws), unconfined with a scrubbed environment
-    /usr/bin/pinentry* Ux,
+    # started by Claws), in its own profile (prestium.pinentry)
+    /usr/bin/pinentry* Px -> prestium_pinentry,
   }
 
   include if exists <local/usr.bin.claws-mail>

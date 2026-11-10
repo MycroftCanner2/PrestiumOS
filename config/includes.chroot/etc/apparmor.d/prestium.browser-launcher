@@ -1,0 +1,44 @@
+# Prestium 2.1 (review of the security audit): the browser launchers when a confined app starts
+# them. Claws Mail, Gajim and Pidgin used "Ux", so a compromised client could run the launcher with
+# its own environment, before any sandbox. Now they use "Px -> prestium_*_launcher": the launcher
+# may write only its own browser's directories (a crafted HOME or a symlink in the profile cannot
+# reach another file), runs only the tools it needs, and starts bubblewrap in a child profile.
+# Named profiles, no attachment: started from the menu, the launchers run as before.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile prestium_tor_browser_launcher {
+  include <abstractions/prestium-browser-launcher>
+  /usr/local/bin/tor-browser r,
+  /opt/tor-browser/Browser/TorBrowser/Data/Browser/profile.default/extensions/ r,
+  /opt/tor-browser/Browser/TorBrowser/Data/Browser/profile.default/extensions/*.xpi r,
+  /usr/local/share/prestium-tor-browser/user.js r,
+  owner @{HOME}/.tor-browser/ rw,
+  owner @{HOME}/.tor-browser/profile.default/ rw,
+  owner @{HOME}/.tor-browser/profile.default/extensions/ rw,
+  owner @{HOME}/.tor-browser/profile.default/extensions/*.xpi rw,
+  owner @{HOME}/.tor-browser/profile.default/{user.js,cert9.db,key4.db} rw,
+  owner "@{HOME}/Tor Browser/" rw,
+  # never another browser's data
+  deny @{HOME}/.librewolf/** w,
+  include if exists <local/prestium.browser-launcher>
+}
+
+profile prestium_librewolf_launcher {
+  include <abstractions/prestium-browser-launcher>
+  /usr/local/bin/librewolf-i2p r,
+  # the relay to i2pd's HTTP proxy (127.0.0.1:4444) runs outside the sandbox
+  /usr/bin/socat mrix,
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  /usr/bin/kill mrix,
+  signal (send) set=(term) peer=@{profile_name},
+  owner @{HOME}/.librewolf/ rw,
+  owner @{HOME}/.librewolf/prestium/ rw,
+  owner @{HOME}/.librewolf/prestium/{cert9,key4}.db rw,
+  owner @{HOME}/Downloads/ rw,
+  deny @{HOME}/.tor-browser/** w,
+  deny "@{HOME}/Tor Browser/**" w,
+  include if exists <local/prestium.browser-launcher>
+}

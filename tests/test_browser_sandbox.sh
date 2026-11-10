@@ -26,8 +26,10 @@ export PRESTIUM_WL_BASE=$T/wlbase
 L=$T/launch; mkdir -p "$L"
 sed "s#^SBX_WL_BASE=.*#SBX_WL_BASE=$PRESTIUM_WL_BASE#; s#^SBX_BWRAP=.*#SBX_BWRAP=$(command -v bwrap)#" \
   "$I/usr/local/lib/prestium/browser-sandbox.sh" > "$L/browser-sandbox.sh"
-sed "s#^SBX_LIB=.*#SBX_LIB=$L/browser-sandbox.sh#" "$I/usr/local/bin/tor-browser" > "$L/tor-browser"
-sed "s#^SBX_LIB=.*#SBX_LIB=$L/browser-sandbox.sh#; s#^I2P_HTTP_PORT=.*#I2P_HTTP_PORT=14444#; s#^LIBREWOLF=.*#LIBREWOLF=\"\$HOME/.librewolf/probe\"#" \
+# 2.1 (review): the launchers take HOME and XDG_RUNTIME_DIR from the system; use the test's here
+UNHOME="s#^HOME=\$(getent passwd.*#:#; s#^case \$HOME in /home.*#:#; s#^XDG_RUNTIME_DIR=/run/user.*#:#"
+sed "s#^SBX_LIB=.*#SBX_LIB=$L/browser-sandbox.sh#; $UNHOME" "$I/usr/local/bin/tor-browser" > "$L/tor-browser"
+sed "s#^SBX_LIB=.*#SBX_LIB=$L/browser-sandbox.sh#; $UNHOME; s#^I2P_HTTP_PORT=.*#I2P_HTTP_PORT=14444#; s#^LIBREWOLF=.*#LIBREWOLF=\"\$HOME/.librewolf/probe\"#" \
   "$I/usr/local/bin/librewolf-i2p" > "$L/librewolf-i2p"
 pids=()
 cleanup() {

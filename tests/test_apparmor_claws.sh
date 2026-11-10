@@ -4,7 +4,7 @@
 set -u; T=$(cd "$(dirname "$0")/.." && pwd); A=$T/config/includes.chroot/etc/apparmor.d
 P=$A/usr.bin.claws-mail; H=$T/config/hooks/live/0600-prestium-apparmor.hook.chroot; fail=0
 ok(){ echo "OK $1"; }; no(){ echo "FAIL $1"; fail=1; }
-W=$(mktemp -d); trap 'rm -rf "$W"' EXIT; cp -r /etc/apparmor.d/. "$W"/ 2>/dev/null; cp -r "$A"/. "$W"/
+W=$(mktemp -d); trap 'rm -rf "$W"' EXIT; cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; cp -r "$A"/. "$W"/
 if command -v apparmor_parser >/dev/null; then
   apparmor_parser -QK -b "$W" "$W/usr.bin.claws-mail" 2>/dev/null && ok "profile compiles" || no "profile compiles"
   E=$(apparmor_parser -p -b "$W" "$W/usr.bin.claws-mail" 2>/dev/null)
@@ -22,5 +22,8 @@ parent=$(sed '/^  profile gpg {/,/^  }/d' "$P")
 grep -q '\.gnupg' <<<"$(grep -v '^\s*#' <<<"$parent")" && no "parent touches ~/.gnupg" || ok "parent has no ~/.gnupg rule"
 grep -Eq '@\{HOME\}/\*\*|@\{HOME\}/ +[rw]*w' <<<"$parent" && no "broad home access" || ok "no broad home access"
 grep -Eq '^\s*/\*\*|/usr/bin/\*\* +[A-Za-z]*x|/usr/local/bin/\*\*' <<<"$parent" && no "broad exec" || ok "no broad exec"
-grep -E ' Ux,' <<<"$parent" | grep -vq -e librewolf-i2p -e tor-browser && no "unexpected Ux" || ok "Ux only for sandboxed browsers"
+# 2.1 (review): no Ux at all; the browser launchers and pinentry run in their own profiles
+grep -Eq '\bUx,' "$P" && no "Ux in the profile" || ok "no Ux"
+grep -q '^  /usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,' "$P" && grep -q '^  /usr/local/bin/librewolf-i2p Px -> prestium_librewolf_launcher,' "$P" && ok "browsers: Px into the launcher profiles" || no "browser launchers not Px"
+grep -q '^    /usr/bin/pinentry\* Px -> prestium_pinentry,' "$P" && ok "pinentry: Px into prestium_pinentry" || no "pinentry not Px"
 exit $fail
