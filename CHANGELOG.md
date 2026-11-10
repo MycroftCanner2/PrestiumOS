@@ -146,6 +146,8 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   `scripts/sign-release.sh FINGERPRINT`, run by the release key's holder, writes and checks a detached
   `SHA256SUMS.asc`. The ISO itself is not signed yet: that needs the release key.
   (`tests/test_release_files.sh`)
+- **README: how to verify a download**, with `gpg --verify SHA256SUMS.asc` for signed releases and the
+  SHA-256 comparison for 2.0, which has no signed checksum file.
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

@@ -63,6 +63,27 @@ front, the WebTunnel bridge's host). In 2.0:
   installed `snowflake-client` has `-proxy`): Snowflake's broker request goes through i2pd's SOCKS
   proxy (4447) and the I2P outproxy; the WebRTC data still goes directly to the Snowflake proxy.
 
+## Verify a download
+
+Check a download before you write it to a USB stick.
+
+- **Releases with `SHA256SUMS` and `SHA256SUMS.asc`** (from 2.1 on, once they are signed): import the
+  Prestium release key, compare its full fingerprint with the one published with the release, then
+
+  ```
+  gpg --verify SHA256SUMS.asc SHA256SUMS
+  sha256sum --ignore-missing -c SHA256SUMS
+  ```
+
+  The first command must say "Good signature" from that fingerprint; a warning that the key is not
+  certified is normal. The second must say `OK` for the ISO.
+- **2.0** has no signed checksum file. Compare `sha256sum Prestium-2.0-amd64.iso` with the SHA-256 on
+  prestium.org, and get the torrent from this repository: the torrent's piece hashes check the data
+  as it downloads, but neither proves who made the image.
+
+To build the same image yourself, see [BUILDING.md](BUILDING.md); each build writes a manifest of what
+went into it.
+
 ## Repository layout
 
 - `auto/`, `config/`, `build.sh`, `scripts/`, `thirdparty/`: the live-build configuration
