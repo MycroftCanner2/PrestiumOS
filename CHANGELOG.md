@@ -72,6 +72,65 @@ Enhanced security and new features. Changes will be listed here as they land.
   wasn't installed: gpg-agent only suggests it, and apt never installs suggested packages. scdaemon is now installed (pcscd already was). "Compliance Check: Skipped" is normal: it
   only applies when GnuPG is set to de-vs compliance (`tests/test_kleopatra_selftest.sh`).
 
+### New: Browser Updater
+- **Network → Browser Updater** installs the latest **publisher-signed** Tor Browser or I2P Browser
+  (LibreWolf) **in place** of the copy on the USB image. Each browser has **Update using Tor** (Tor's
+  SOCKS port 9050 with remote DNS and a fresh SOCKS username per update, so the update gets its own
+  circuits) and **Update using I2P OutProxy** (i2pd's HTTP proxy on 127.0.0.1:4444 and its configured
+  outproxy, which can see the host names; the window says so). Only the transport that was clicked is
+  used. Proxy variables from `/etc/environment` are dropped, and there's no fallback to the other
+  transport. Downloads go only to `https://` on the publisher's own hosts (dist/aus1.torproject.org,
+  repo.librewolf.net). curl never follows redirects itself: each `Location` is resolved and checked
+  against those hosts first. Nothing is fetched when the window opens. Firefox (local pages) is not in
+  this first release. Its recipe is in the library and the helper, but the window and sudoers don't
+  offer it.
+- **Verified twice.** The window checks the signature as the user. The scoped root helper
+  `prestium-browser-install` (sudo, fixed `install|revert tor-browser|librewolf` only, no paths) then
+  copies the staged files *as the user* into a root-only directory and verifies them again with the
+  key shipped in the image (`/usr/share/prestium/keys/`, LibreWolf's `/usr/share/keyrings/librewolf.gpg`,
+  each pinned by fingerprint) and `sigcheck.sh`, the same policy that checks the build.
+  - **Tor Browser:** the tarball's detached signature, with the version from the signed file name
+    matching `Browser/TorBrowser/Docs/ChangeLog.txt` inside it.
+  - **LibreWolf:** the repository's signed `InRelease` (and its `Valid-Until`), then `Packages`, then
+    the `.deb`'s SHA-256.
+  - An expired key gives "key expired, use a newer ISO".
+  - Nothing older than the installed version is installed. Equal means up to date, and **Reset to
+    shipped copy** is the only way back.
+- **Install = bind mount, Reset = umount.** The helper:
+  - unpacks onto its own **tmpfs at `/run/prestium/browsers`** (`exec,nosuid,nodev`, sized for the
+    update and checked against available RAM; `/run` itself is noexec and is not used), with archive checks: no `..`, absolute
+    paths, escaping symlinks, devices, fifos, hard links or setuid/setgid;
+  - re-applies Prestium's policies and extensions from `/usr/share/prestium/opt-overlay`, which the
+    image now keeps;
+  - **bind-mounts** the new tree read-only (`ro,exec,nosuid,nodev`, checked in mountinfo) over
+    `/opt/tor-browser`, or over `/usr/share/librewolf` (plus `/usr/lib/librewolf` when needed).
+  Launchers, AppArmor exec paths and onion-grater were not changed: the paths stay the same.
+  LibreWolf's `.deb` is **not** installed with `dpkg -i`. After an `apt-get -s --no-download`
+  dependency check (only `librewolf` itself may be installed), it is unpacked with `dpkg-deb -x`. Its
+  maintainer scripts never run, and its own AppArmor profile and `distribution/` are not used. The dpkg
+  database and alternatives are untouched, so `dpkg -l` still shows the shipped version.
+  - A failed re-update puts the previous update of this session back, never the factory copy.
+  - The helper refuses while the browser is running (matched by device and inode) or while its files
+    are busy.
+  - Reset unmounts the update. After the last browser is reset, it also unmounts the tmpfs, which
+    frees the RAM.
+- **Session only.** Prestium has no persistence, so an update lasts until Reset or reboot and stays in
+  RAM: about 356 MB for Tor Browser 16.0 unpacked. The window shows the RAM cost and refuses to start
+  with less than 700 MB free for the download or under 1 GB of available RAM. A newer browser may need
+  AppArmor rules the shipped profile doesn't have, and the helper can't detect that. If an updated
+  browser doesn't start, press Reset to shipped copy.
+- Also: `torrc`'s 9050 SocksPort now says `IsolateSOCKSAuth` explicitly (it was already Tor's
+  default). New tests: `tests/test_browser_update.py`, `tests/test_browser_install.py`,
+  `tests/test_browser_updater_gui.py` and `tests/test_publisher_key_expiry.py` (fails when a pinned key
+  expires within 90 days). The helper's bind, re-update, rollback and reset steps run against a real
+  tmpfs and real bind mounts in an unprivileged user and mount namespace. That run used throw-away
+  keys, the real Tor Browser 16.0 tarball (with the shipped key) and the real LibreWolf 157.0.1-1
+  `.deb`.
+  - **Not run:** a download through live Tor or I2P, the GTK window on a display (its logic is tested
+    with a stand-in), and the bind-mount install and Reset on a Prestium live VM (overlay root, real
+    /proc and AppArmor, `findmnt -o TARGET,OPTIONS,SIZE /run`, the bind's `exec` flag,
+    `/proc/PID/attr/current` of the updated browser). That VM check is still needed before release.
+
 ## 2.0: changes since Prestium 1.9.1.3
 
 Prestium 2.0 is the base of PrestiumOS. Its goal was to fully modernize

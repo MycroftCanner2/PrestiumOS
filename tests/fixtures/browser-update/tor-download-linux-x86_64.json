@@ -1,0 +1,6 @@
+{
+   "binary" : "https://dist.torproject.org/torbrowser/16.0/tor-browser-linux-x86_64-16.0.tar.xz",
+   "git_tag" : "tbb-16.0-build1",
+   "sig" : "https://dist.torproject.org/torbrowser/16.0/tor-browser-linux-x86_64-16.0.tar.xz.asc",
+   "version" : "16.0"
+}

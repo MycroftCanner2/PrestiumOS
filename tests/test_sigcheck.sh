@@ -56,4 +56,8 @@ F=$R/scripts/fetch-thirdparty.sh
 grep -q '^\. "\$TOP/scripts/sigcheck.sh"' "$F" && grep -q 'sigstatus_ok "\$2" "\$st" "\$3"' "$F" \
   && grep -q 'NST=\$(gpgv --status-fd 1' "$F" && grep -q 'sigstatus_ok "Node SHASUMS256.txt" "\$NST"' "$F" \
   && ok "fetch-thirdparty.sh: gpg and gpgv paths use sigstatus_ok" || bad "fetch-thirdparty.sh does not use sigstatus_ok everywhere"
+# 2.1: the image ships the same policy for the Browser Updater (browser_update.py and the root helper)
+cmp -s "$R/scripts/sigcheck.sh" "$R/config/includes.chroot/usr/local/lib/prestium/sigcheck.sh" \
+  && ok "the image's /usr/local/lib/prestium/sigcheck.sh is scripts/sigcheck.sh" \
+  || bad "config/includes.chroot/usr/local/lib/prestium/sigcheck.sh differs from scripts/sigcheck.sh"
 [ $fail = 0 ] && echo "signature policy: OK"; exit $fail

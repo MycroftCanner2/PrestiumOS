@@ -1,0 +1,399 @@
+#!/usr/bin/python3
+# Prestium 2.1: Browser Updater (Network menu, after the Tor Connection Assistant).
+# Installs the latest publisher-signed Tor Browser or I2P Browser (LibreWolf) in place of the copy on
+# the USB image, for this session. The user picks the transport per update: "Update using Tor" (Tor's
+# SOCKS port, a fresh SOCKS username per update, so its own circuits) or "Update using I2P OutProxy"
+# (i2pd's HTTP proxy 127.0.0.1:4444 and its outproxy, which sees the host names). Nothing is fetched
+# when the window opens. The download and the first signature check run as the user
+# (/usr/local/lib/prestium/browser_update.py); the root helper /usr/local/sbin/prestium-browser-install
+# (sudo, fixed subcommands) checks everything again and bind-mounts the new tree over the factory path,
+# so launchers, AppArmor and onion-grater see the same paths. Without persistence an update lasts until
+# Reset or reboot and stays in RAM. Firefox (local pages) is not offered in this first release.
+# No state is kept (no settings file): the helper's stamp in /var/lib/prestium/browser-updates says
+# what this session installed.
+import os, sys, threading, time
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk, GLib, Gio, Pango
+
+sys.path.insert(0, "/usr/local/lib/prestium")
+import browser_update as bu  # noqa: E402
+
+APP_ID = "org.prestium.BrowserUpdater"
+INFO_MAX = 600
+INTRO = ("This installs the latest publisher-signed build of a browser in place of the copy on the USB "
+         "image. Each download is checked against the publisher's key that ships with Prestium. Without "
+         "persistence, an update lasts only for this session and stays in RAM until Reset or reboot. "
+         "Reset to shipped copy brings back the original from the USB image. If a browser does not "
+         "start after an update, press Reset to shipped copy.")
+I2P_HELP = ("I2P OutProxy: the download goes through I2P's configured outproxy, which can see which site "
+            "is contacted. Update using Tor does not use the outproxy.")
+
+
+def wrap_label(lines=0, selectable=False):
+    """Wraps anywhere, never asks for more than ~60 characters of width; lines > 0 caps the height."""
+    l = Gtk.Label(xalign=0)
+    l.set_line_wrap(True); l.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+    l.set_width_chars(10); l.set_max_width_chars(60)
+    if lines:
+        l.set_lines(lines); l.set_ellipsize(Pango.EllipsizeMode.END)
+    if selectable:
+        l.set_selectable(True)
+    return l
+
+
+def workarea(win=None):
+    """Usable area of the window's monitor (or the primary one), without the panel."""
+    disp = Gdk.Display.get_default()
+    mon = None
+    if win is not None and win.get_window() is not None:
+        mon = disp.get_monitor_at_window(win.get_window())
+    mon = mon or disp.get_primary_monitor() or disp.get_monitor(0)
+    if mon is None:
+        return 1024, 738
+    wa, geo = mon.get_workarea(), mon.get_geometry()
+    h = wa.height - (30 if wa.height >= geo.height else 0)
+    return wa.width, h
+
+
+def browser_running(name):
+    """The user's own check (the helper checks again as root): a process whose executable is the
+    browser's visible main executable, compared by device and inode."""
+    ids = set()
+    root = bu.FACTORY[name]
+    rels = ["Browser/firefox.real"] if name == "tor-browser" else ["librewolf", "librewolf-bin"]
+    for rel in rels:
+        try:
+            s = os.stat(os.path.join(root, rel))
+            ids.add((s.st_dev, s.st_ino))
+        except OSError:
+            pass
+    for pid in os.listdir("/proc"):
+        if not pid.isdigit():
+            continue
+        try:
+            s = os.stat("/proc/%s/exe" % pid)
+        except OSError:
+            continue
+        if (s.st_dev, s.st_ino) in ids:
+            return True
+    return False
+
+
+class Section:
+    def __init__(self, win, name):
+        self.win, self.name = win, name
+        self.frame = Gtk.Frame(label=" %s " % bu.TITLES[name])
+        b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6); b.set_border_width(8)
+        self.version = wrap_label(lines=3, selectable=True)
+        self.ram = wrap_label(lines=2)
+        self.ram.set_text(bu.ram_note(name))
+        bb = Gtk.Box(spacing=6)
+        self.tor_btn = Gtk.Button(label="Update using Tor")
+        self.i2p_btn = Gtk.Button(label="Update using I2P OutProxy")
+        self.tor_btn.connect("clicked", lambda *_: win.start_update(name, "tor"))
+        self.i2p_btn.connect("clicked", lambda *_: win.start_update(name, "i2p"))
+        bb.pack_start(self.tor_btn, False, False, 0)
+        bb.pack_start(self.i2p_btn, False, False, 0)
+        self.help = wrap_label(lines=3)
+        self.help.set_text(I2P_HELP)
+        rb = Gtk.Box(spacing=6)
+        self.reset_btn = Gtk.Button(label="Reset to shipped copy")
+        self.reset_btn.connect("clicked", lambda *_: win.start_reset(name))
+        self.cancel_btn = Gtk.Button(label="Cancel")
+        self.cancel_btn.connect("clicked", lambda *_: win.cancel_job())
+        rb.pack_start(self.reset_btn, False, False, 0)
+        rb.pack_end(self.cancel_btn, False, False, 0)
+        self.progress = Gtk.ProgressBar(show_text=True)
+        self.progress.set_text("Idle")
+        for w in (self.version, self.ram, bb, self.help, rb, self.progress):
+            b.pack_start(w, False, False, 0)
+        self.frame.add(b)
+        self.refresh()
+
+    def refresh(self):
+        try:
+            i = bu.installed_version(self.name)
+        except Exception as e:
+            i = {"version": None, "full": None, "updated": False, "error": str(e)}
+        v = i.get("full") or i.get("version")
+        if not v:
+            t = "Installed version: unknown (the browser's files could not be read)."
+        elif i.get("updated"):
+            t = ("Updated this session to %s. This copy stays in RAM until Reset or reboot." % v)
+        else:
+            t = "Installed: %s (the copy on the USB image)." % v
+        self.version.set_text(t)
+        self.updated = bool(i.get("updated"))
+
+    def set_busy(self, busy, mine=False, can_cancel=False):
+        for w in (self.tor_btn, self.i2p_btn, self.reset_btn):
+            w.set_sensitive(not busy)
+        self.reset_btn.set_sensitive(not busy and self.updated)
+        self.cancel_btn.set_visible(mine)
+        self.cancel_btn.set_sensitive(mine and can_cancel)
+        if not busy:
+            self.progress.set_fraction(0)
+
+
+class Window(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Browser Updater")
+        ww, wh = workarea()
+        self.set_default_size(min(640, ww - 16), min(700, wh - 40))
+        self.connect("realize", lambda *_: self.fit_screen())
+        self.get_screen().connect("monitors-changed", lambda *_: self.fit_screen())
+        self.set_border_width(12)
+        self.job = None            # (name, kind, transport)
+        self.cancel = None
+        self.can_cancel = False
+        self.last = None           # last failed update, for Retry
+        self.closing = False
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.add(outer)
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        scroll.set_propagate_natural_height(True)
+        outer.pack_start(scroll, True, True, 0)
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        scroll.add(box)
+
+        intro = wrap_label()
+        intro.set_text(INTRO)
+        box.pack_start(intro, False, False, 0)
+
+        # messages: a fixed-height read-only text area (4 lines, scrolls), full text in Details
+        self.info = Gtk.InfoBar(); self.info.set_no_show_all(True)
+        self.info_view = Gtk.TextView(); self.info_view.set_editable(False); self.info_view.set_cursor_visible(False)
+        self.info_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        lh = self.info_view.create_pango_layout("Ag").get_pixel_size()[1] or 17
+        isw = Gtk.ScrolledWindow(); isw.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        isw.set_shadow_type(Gtk.ShadowType.IN)
+        isw.set_size_request(-1, 4 * lh + 8); isw.set_propagate_natural_height(False)
+        isw.add(self.info_view); isw.show_all()
+        self.info.get_content_area().pack_start(isw, True, True, 0)
+        self.retry_btn = self.info.add_button("Retry", 1)
+        self.info.add_button("Dismiss", 2)
+        self.info.connect("response", self.on_info)
+        box.pack_start(self.info, False, False, 0)
+
+        self.sections = {}
+        for name in bu.FIRST_RELEASE:
+            s = Section(self, name)
+            self.sections[name] = s
+            box.pack_start(s.frame, False, False, 0)
+
+        self.details = Gtk.Expander(label="Details (log)")
+        lsw = Gtk.ScrolledWindow(); lsw.set_min_content_height(130)
+        self.log_view = Gtk.TextView(); self.log_view.set_editable(False); self.log_view.set_monospace(True)
+        self.log_view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+        lsw.add(self.log_view); self.details.add(lsw)
+        box.pack_start(self.details, False, False, 0)
+
+        bb = Gtk.Box(spacing=6)
+        close = Gtk.Button(label="Close"); close.connect("clicked", lambda *_: self.close())
+        bb.pack_end(close, False, False, 0)
+        outer.pack_start(bb, False, False, 0)
+        self.connect("delete-event", self.on_delete)
+        self.update_buttons()
+
+    def fit_screen(self):
+        ww, wh = workarea(self)
+        g = Gdk.Geometry(); g.max_width = max(320, ww - 16); g.max_height = max(240, wh - 40)
+        self.set_geometry_hints(None, g, Gdk.WindowHints.MAX_SIZE)
+        w, h = self.get_size()
+        if w > g.max_width or h > g.max_height:
+            self.resize(min(w, g.max_width), min(h, g.max_height))
+
+    # ------------------------------------------------------------- messages
+    def log(self, msg):
+        b = self.log_view.get_buffer()
+        b.insert(b.get_end_iter(), time.strftime("%H:%M:%S ") + msg.rstrip() + "\n")
+        if b.get_line_count() > 600:
+            b.delete(b.get_start_iter(), b.get_iter_at_line(b.get_line_count() - 500))
+        self.log_view.scroll_to_iter(b.get_end_iter(), 0, False, 0, 1)
+        return False
+
+    def show_info(self, text, kind=Gtk.MessageType.INFO, retry=False):
+        self.info.set_message_type(kind)
+        self.log("message: " + text)
+        if len(text) > INFO_MAX:
+            text = text[:INFO_MAX].rstrip() + " ... (full text in Details)"
+        self.info_view.get_buffer().set_text(text)
+        self.retry_btn.set_visible(retry and self.last is not None)
+        self.info.show()
+
+    def on_info(self, _bar, resp):
+        self.info.hide()
+        if resp == 1 and self.last:
+            self.start_update(*self.last)
+
+    def update_buttons(self):
+        busy = self.job is not None
+        for n, s in self.sections.items():
+            s.set_busy(busy, mine=busy and self.job[0] == n, can_cancel=self.can_cancel)
+        return False
+
+    def set_status(self, name, text, fraction=None):
+        p = self.sections[name].progress
+        p.set_text(text)
+        if fraction is None:
+            p.pulse()
+        else:
+            p.set_fraction(max(0.0, min(1.0, fraction)))
+        return False
+
+    # ------------------------------------------------------------- update
+    def start_update(self, name, transport):
+        if self.job:
+            return
+        self.info.hide()
+        if browser_running(name):
+            self.show_info("%s is running. Close it, then update." % bu.TITLES[name], Gtk.MessageType.WARNING)
+            return
+        self.job, self.cancel, self.can_cancel = (name, "update", transport), threading.Event(), True
+        self.last = (name, transport)
+        self.update_buttons()
+        via = "Tor" if transport == "tor" else "the I2P outproxy"
+        self.log("%s: update using %s" % (bu.TITLES[name], via))
+        self.set_status(name, "Checking ...")
+
+        def progress(label, done, total):
+            if total:
+                GLib.idle_add(self.set_status, name, "Downloading %s: %d / %d MB" % (label, done // bu.MiB,
+                              max(1, total // bu.MiB)), done / total)
+            elif done:
+                GLib.idle_add(self.set_status, name, "Downloading %s: %d MB" % (label, done // bu.MiB))
+            else:
+                GLib.idle_add(self.set_status, name, label)
+
+        def logcb(msg):
+            GLib.idle_add(self.log, msg)
+
+        def work():
+            try:
+                r = bu.prepare_update(name, transport, self.cancel, progress, logcb)
+            except bu.Cancelled:
+                GLib.idle_add(self.done, name, "info", "Update cancelled. Nothing was changed.", False)
+                return
+            except bu.KeyExpiredError as e:
+                GLib.idle_add(self.done, name, "error", "%s: %s" % (bu.TITLES[name], e), False)
+                return
+            except bu.UpdateError as e:
+                GLib.idle_add(self.done, name, "error", "%s was not updated: %s" % (bu.TITLES[name], e), True)
+                return
+            except Exception as e:                          # never leave the window stuck
+                GLib.idle_add(self.done, name, "error", "%s was not updated: %s: %s"
+                              % (bu.TITLES[name], e.__class__.__name__, e), True)
+                return
+            if r["status"] != "staged":
+                msg = ("%s %s is already installed; it is the latest signed version." % (bu.TITLES[name], r["installed"])
+                       if r["status"] == "current" else
+                       "The latest signed %s (%s) is older than the installed %s. Nothing was changed."
+                       % (bu.TITLES[name], r["version"], r["installed"]))
+                GLib.idle_add(self.done, name, "info", msg, False)
+                return
+            # from here on the root helper runs: no Cancel (a root unpack is never killed)
+            self.can_cancel = False
+            GLib.idle_add(self.update_buttons)
+            GLib.idle_add(self.set_status, name, "Installing ...")
+            try:
+                res = bu.run_helper("install", name,
+                                    on_event=lambda d: GLib.idle_add(self.set_status, name, d.get("message", "")))
+            except Exception as e:
+                res = {"ok": False, "error": str(e)}
+            finally:
+                bu.clean_staging(name)
+            if res.get("ok"):
+                GLib.idle_add(self.done, name, "ok", "%s Without persistence this lasts until Reset or reboot."
+                              % res.get("message", "Installed."), False)
+            elif res.get("code") == 4:
+                GLib.idle_add(self.done, name, "info", res.get("error", ""), False)
+            else:
+                GLib.idle_add(self.done, name, "error", "%s was not updated: %s %s"
+                              % (bu.TITLES[name], res.get("error", "unknown error"),
+                                 "" if res.get("code") == 3 else bu.RESET_HINT), res.get("code") != 3)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def cancel_job(self):
+        if self.job and self.cancel and self.can_cancel:
+            self.cancel.set()
+            self.set_status(self.job[0], "Cancelling ...")
+
+    # ------------------------------------------------------------- reset
+    def start_reset(self, name):
+        if self.job:
+            return
+        self.info.hide()
+        self.job, self.cancel, self.can_cancel = (name, "reset", None), None, False
+        self.update_buttons()
+        self.set_status(name, "Restoring the shipped copy ...")
+        self.log("%s: reset to shipped copy" % bu.TITLES[name])
+
+        def work():
+            try:
+                res = bu.run_helper("revert", name,
+                                    on_event=lambda d: GLib.idle_add(self.set_status, name, d.get("message", "")))
+            except Exception as e:
+                res = {"ok": False, "error": str(e)}
+            if res.get("ok"):
+                GLib.idle_add(self.done, name, "ok", res.get("message", "The shipped copy is back."), False)
+            else:
+                GLib.idle_add(self.done, name, "error", "Reset failed: %s" % res.get("error", "unknown error"), False)
+
+        threading.Thread(target=work, daemon=True).start()
+
+    def done(self, name, kind, msg, retry):
+        self.job, self.cancel, self.can_cancel = None, None, False
+        if self.closing:
+            self.destroy()
+            return False
+        self.sections[name].refresh()
+        self.sections[name].progress.set_text("Idle")
+        self.update_buttons()
+        mt = {"ok": Gtk.MessageType.INFO, "info": Gtk.MessageType.INFO, "error": Gtk.MessageType.ERROR}[kind]
+        self.show_info(msg, mt, retry=retry)
+        return False
+
+    def on_delete(self, *_a):
+        if self.job and not self.can_cancel:
+            self.show_info("The update is being installed. Wait until it has finished.", Gtk.MessageType.WARNING)
+            return True                                     # keep the window: the helper is running
+        if self.job:
+            # stop the download (curl is killed, partial files removed), then close
+            self.closing = True
+            self.cancel_job()
+            return True
+        return False
+
+
+class App(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+        self.win = None
+
+    def do_activate(self):
+        if self.win is None:
+            self.win = Window(self)
+            self.win.show_all()
+            self.win.update_buttons()
+        self.win.present()
+
+
+def main():
+    app = App()
+    rt = os.environ.get("XDG_RUNTIME_DIR", "/run/user/%d" % os.getuid())
+    if not os.environ.get("DBUS_SESSION_BUS_ADDRESS") and not os.path.exists(os.path.join(rt, "bus")):
+        app.set_flags(Gio.ApplicationFlags.NON_UNIQUE)    # no session bus: still usable, just not single-instance
+    else:
+        try:
+            app.register(None)
+        except GLib.Error:
+            app.set_flags(Gio.ApplicationFlags.NON_UNIQUE)
+    return app.run(sys.argv)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

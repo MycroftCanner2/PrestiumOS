@@ -6,7 +6,9 @@ B=/usr/share/prestium/build
 # record what went in (kept in the image for reference)
 dpkg-query -W -f='${Package}\t${Version}\n' > /usr/share/prestium/packages-2.0.txt
 [ -f "$B/optional-skipped.txt" ] && cp "$B/optional-skipped.txt" /usr/share/prestium/optional-skipped-2.0.txt
-rm -rf /usr/src/prestium-thirdparty "$B" /usr/share/prestium/opt-overlay
+# 2.1: /usr/share/prestium/opt-overlay stays in the image: the Browser Updater's root helper
+# (/usr/local/sbin/prestium-browser-install) re-applies Prestium's policies and extensions from it
+rm -rf /usr/src/prestium-thirdparty "$B"
 rm -f /usr/sbin/policy-rc.d.prestium
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin /tmp/* /root/.cache /root/.npm

@@ -4,7 +4,7 @@
 # world-writable unix socket /run/tor/socks (which the per-uid firewall can't
 # filter) is gone. Streams to different destination hosts/ports use separate
 # circuits; Tor Browser isolates further by SOCKS username (first-party domain).
-SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort
+SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort IsolateSOCKSAuth
 # 2.0 r9: Tor Browser runs in a sandbox with no network at all (its own empty network namespace,
 # like Tails' "tbb" namespace but without even a veth); this Unix socket, bound into the sandbox, is
 # its only way out. Only members of prestium-tbb (the desktop user) can use it, the same users the

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Browser Updater
+Comment=Install the latest publisher-signed Tor Browser or I2P Browser (LibreWolf) for this session
+Exec=/usr/local/bin/prestium-browser-updater
+Icon=system-software-update
+Terminal=false
+StartupNotify=true
+Categories=Network;

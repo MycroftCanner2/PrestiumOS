@@ -42,6 +42,10 @@ which works but is several times slower.
    the last hook); it also stages a StormyCloud I2P reseed file (a verified download under 24 h old is reused, see CHANGELOG r14), checks it with
    `config/includes.chroot/usr/local/lib/prestium/verify-su3` (SU3 format, RSA-4096/SHA-512 signature against `thirdparty/keys/reseed/`,
    at most 14 days old) and puts it at `config/includes.chroot/var/lib/i2pd/stormycloud-i2pseeds.su3`;
+   (2.1: the image also ships copies of `thirdparty/keys/torbrowser.asc` and `mozilla.asc` in
+   `/usr/share/prestium/keys/` and of `scripts/sigcheck.sh` in `/usr/local/lib/prestium/` for the
+   Browser Updater, and keeps `/usr/share/prestium/opt-overlay`; when a key or `sigcheck.sh` changes,
+   update both copies; `tests/test_browser_install.py` and `tests/test_sigcheck.sh` compare them)
 2. runs `lb config` (options in `auto/config`);
 3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.0-amd64.iso` and `Prestium-2.0-amd64.iso.sha256`.
 

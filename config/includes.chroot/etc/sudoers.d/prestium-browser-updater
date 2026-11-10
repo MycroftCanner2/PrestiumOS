@@ -1,0 +1,2 @@
+# Prestium 2.1: Browser Updater. No path arguments; the helper reads a fixed staging directory.
+user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-browser-install install tor-browser, /usr/local/sbin/prestium-browser-install install librewolf, /usr/local/sbin/prestium-browser-install revert tor-browser, /usr/local/sbin/prestium-browser-install revert librewolf

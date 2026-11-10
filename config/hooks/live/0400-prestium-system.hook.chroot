@@ -78,6 +78,8 @@ echo prestium > /etc/hostname
 install -d -m 755 /etc/tor/torrc.d
 install -d -m 755 /run/prestium 2>/dev/null || true
 printf 'd /run/prestium 0755 root root -\n' > /usr/lib/tmpfiles.d/prestium.conf
+# 2.1: Browser Updater stamps (prestium-browser-install writes one file per updated browser)
+install -d -m 0755 -o root -g root /var/lib/prestium/browser-updates
 
 ## 2.0 audio: PipeWire for every user session (systemd --user), PulseAudio clients via pipewire-pulse
 systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service >/dev/null 2>&1 || true

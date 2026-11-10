@@ -1,0 +1,1142 @@
+#!/usr/bin/python3 -I
+# Prestium 2.1: root helper of the Browser Updater (/usr/local/bin/prestium-browser-updater). "user"
+# may run exactly these through sudo (/etc/sudoers.d/prestium-browser-updater):
+#   prestium-browser-install install tor-browser|librewolf
+#   prestium-browser-install revert  tor-browser|librewolf
+# ("firefox" is implemented here for the Firefox (local pages) follow-up but not allowed by sudoers.)
+#
+# install: the GUI has downloaded and verified a publisher-signed build, as the user, into the fixed
+#   directory /home/user/.cache/prestium/browser-updater/staging/<browser>/ (no path is ever taken
+#   from the command line). This helper copies those files AS THE USER (runuser; the user's files are
+#   never opened as root) into a root-only directory on its own tmpfs at /run/prestium/browsers
+#   (exec,nosuid,nodev; /run itself is noexec), verifies them again with the key shipped in the image
+#   and sigcheck.sh, refuses anything that is not newer than what is installed, unpacks with archive
+#   safety checks (no "..", absolute paths, escaping symlinks, devices, fifos, setuid/setgid),
+#   re-applies Prestium's policies and extensions from /usr/share/prestium/opt-overlay, and then
+#   bind-mounts the new tree over the factory path (/opt/tor-browser; LibreWolf: /usr/share/librewolf,
+#   and /usr/lib/librewolf or /usr/bin/librewolf when the package needs them), read-only. Launchers,
+#   AppArmor exec paths and onion-grater's identity check stay as they are: the paths do not change.
+#   LibreWolf's .deb is never installed with dpkg -i (no maintainer scripts, no dpkg database change):
+#   after an apt-get dependency simulation it is unpacked with dpkg-deb -x and only its allow-listed
+#   paths are used. A failed re-update rolls back to the previous session update.
+# revert: unmount the helper's bind mounts for that browser (the factory copy from the USB image is
+#   visible again) and, when no updated browser is left, the tmpfs, which frees the RAM.
+# Output: JSON lines ({"event": "phase", "message": ...}); the last line is {"ok": true|false, ...}.
+# Exit: 0 done, 1 error, 2 usage, 3 the browser is running (or busy), 4 nothing newer to install.
+#
+# Residual risk: this is privileged attack surface. Mitigations: fixed argv (sudoers), fixed staging
+# directory read as the user, independent signature check as root, no downloads and no name lookups
+# as root, a fixed PATH and environment, cd /, a lock. A bind mount lasts until umount or reboot; an
+# interrupted run is detected in mountinfo on the next run (and cleaned up, never stacked). A new
+# browser build may need AppArmor rules the shipped profile lacks; that cannot be detected here (the
+# GUI tells the user to press Reset if the browser does not start).
+import errno, fcntl, hashlib, json, os, posixpath, re, shutil, stat, subprocess, sys, tarfile, tempfile, time
+
+sys.dont_write_bytecode = True
+LIBDIR = "/usr/local/lib/prestium"
+if LIBDIR not in sys.path:
+    sys.path.insert(0, LIBDIR)
+import browser_update as bu  # noqa: E402  (root-owned, 0644, in the image)
+
+MiB = bu.MiB
+MOUNT = "/run/prestium/browsers"
+WORKNAME = ".work"
+LOCK = "/run/prestium-browser-install.lock"
+STAGING_ROOT = "/home/user/.cache/prestium/browser-updater/staging"
+STAMP_DIR = "/var/lib/prestium/browser-updates"
+OVERLAY = "/usr/share/prestium/opt-overlay"
+PROC = "/proc"
+MOUNTINFO = "/proc/self/mountinfo"
+MEMINFO = "/proc/meminfo"
+MOUNT_BIN = "/usr/bin/mount"
+UMOUNT_BIN = "/usr/bin/umount"
+APT_GET = "/usr/bin/apt-get"
+DPKG_DEB = "/usr/bin/dpkg-deb"
+PY = "/usr/bin/python3"
+USER = "user"
+COPY_AS = ["/usr/sbin/runuser", "-u", USER, "--"]
+ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"}
+SCRATCH = 100 * MiB
+FREE_MIN = 700 * MiB
+
+# Each browser is one unit: (source name on the tmpfs, factory path, kind), in bind order.
+UNITS = {
+    "tor-browser": [("tor-browser", "/opt/tor-browser", "dir")],
+    "firefox": [("firefox", "/opt/firefox", "dir")],
+    "librewolf": [("librewolf", "/usr/share/librewolf", "dir"),
+                  ("librewolf-lib", "/usr/lib/librewolf", "dir"),
+                  ("librewolf-wrapper", "/usr/bin/librewolf", "file")],
+}
+# main executables, relative to the unit's first tree
+EXES = {"tor-browser": ["Browser/firefox.real"], "firefox": ["firefox", "firefox-bin"],
+        "librewolf": ["librewolf", "librewolf-bin"]}
+TOPDIR = {"tor-browser": "tor-browser", "firefox": "firefox"}
+# LibreWolf .deb: only these trees are used; symlinks may only point inside them
+LW_TREES = ("usr/share/librewolf", "usr/lib/librewolf", "usr/bin/librewolf")
+SUFFIXES = (".next", ".prev", ".bad")
+
+
+class Fail(Exception):
+    def __init__(self, msg, code=1):
+        super().__init__(msg)
+        self.code = code
+
+
+class MountError(Exception):
+    pass
+
+
+def out(obj):
+    sys.stdout.write(json.dumps(obj) + "\n")
+    sys.stdout.flush()
+
+
+def event(msg):
+    out({"event": "phase", "message": msg})
+
+
+def run(cmd, **kw):
+    kw.setdefault("env", ENV)
+    kw.setdefault("cwd", "/")
+    return subprocess.run(cmd, capture_output=True, text=True, **kw)
+
+
+def src_path(src):
+    return os.path.join(MOUNT, src)
+
+
+def rm_tree_or_file(p):
+    if os.path.islink(p) or os.path.isfile(p):
+        os.unlink(p)
+    elif os.path.isdir(p):
+        shutil.rmtree(p)
+
+
+# ------------------------------------------------------------------ mountinfo
+def _unescape(s):
+    return re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), s)
+
+
+def mounts():
+    res = []
+    with open(MOUNTINFO) as f:
+        for line in f:
+            pre, _, post = line.rstrip("\n").partition(" - ")
+            a, b = pre.split(), post.split()
+            if len(a) < 6 or len(b) < 2:
+                continue
+            res.append({"id": int(a[0]), "dev": a[2], "root": _unescape(a[3]), "target": _unescape(a[4]),
+                        "opts": set(a[5].split(",")), "fstype": b[0], "super": b[2] if len(b) > 2 else ""})
+    return res
+
+
+def entries_at(target, ms=None):
+    return [m for m in (ms if ms is not None else mounts()) if m["target"] == target]
+
+
+def tmpfs_entry(ms=None):
+    """The helper's tmpfs (the topmost mount on MOUNT), or None."""
+    e = entries_at(MOUNT, ms)
+    if not e:
+        return None
+    top = e[-1]
+    if top["fstype"] != "tmpfs" or top["root"] != "/":
+        raise Fail("%s has an unexpected mount (%s); nothing was changed" % (MOUNT, top["fstype"]))
+    return top
+
+
+def our_entries(ms=None):
+    """Bind mounts whose source is on the helper's tmpfs (excluding the tmpfs itself)."""
+    ms = ms if ms is not None else mounts()
+    t = tmpfs_entry(ms)
+    if t is None:
+        return []
+    return [m for m in ms if m["dev"] == t["dev"] and m["id"] != t["id"] and m["target"] != MOUNT]
+
+
+def is_mount_source(name, ms=None):
+    return any(m["root"] == "/" + name or m["root"].startswith("/" + name + "/") for m in our_entries(ms))
+
+
+def unit_binds(name, ms=None):
+    """[(src, target, entry)] for the unit in bind order. A target whose topmost mount is not ours,
+    a stacked bind, a bind of an unexpected source or a bind without ro/nosuid/nodev (or with noexec)
+    means an earlier run was interrupted: raise Fail("interrupted") with the entries."""
+    ms = ms if ms is not None else mounts()
+    ours = our_entries(ms)
+    res, bad = [], []
+    for src, tgt, _ in UNITS[name]:
+        at = entries_at(tgt, ms)
+        mine = [m for m in at if m in ours]
+        if not at or not mine:
+            continue
+        if at[-1] not in ours:
+            raise Fail("%s has a mount on top of the browser update that this helper did not make; "
+                       "nothing was changed" % tgt)
+        if len(mine) > 1 or mine[0]["root"] != "/" + src or not flags_ok(mine[0]):
+            bad.extend(mine)
+            continue
+        res.append((src, tgt, mine[0]))
+    if bad:
+        e = Fail("interrupted")
+        e.entries = sorted(bad + [r[2] for r in res], key=lambda m: -m["id"])
+        raise e
+    return res
+
+
+def flags_ok(e):
+    return {"ro", "nosuid", "nodev"} <= e["opts"] and "noexec" not in e["opts"]
+
+
+def do_mount(args):
+    r = run([MOUNT_BIN] + args)
+    if r.returncode != 0:
+        raise MountError((r.stderr or r.stdout).strip() or "mount failed")
+
+
+def do_umount(target):
+    # never -l (lazy) or -f (force): a busy tree stays mounted and the user is told to close the browser
+    r = run([UMOUNT_BIN, target])
+    if r.returncode != 0:
+        raise MountError((r.stderr or r.stdout).strip() or "umount failed")
+
+
+def bind(src, target, kind):
+    st = os.lstat(target)
+    if stat.S_ISLNK(st.st_mode) or (kind == "dir" and not stat.S_ISDIR(st.st_mode)) \
+            or (kind == "file" and not stat.S_ISREG(st.st_mode)):
+        raise MountError("%s is not a %s (a symlink or another type); not mounting over it" % (target, kind))
+    do_mount(["--bind", src_path(src), target])
+    try:
+        do_mount(["-o", "remount,bind,ro,exec,nosuid,nodev", target])
+        e = entries_at(target)[-1]
+        t = tmpfs_entry()
+        if t is None or e["dev"] != t["dev"] or e["root"] != "/" + src:
+            raise MountError("%s: the bind mount is not the expected source" % target)
+        if not flags_ok(e):
+            raise MountError("%s: mount options are %s (need ro,nosuid,nodev and not noexec)"
+                             % (target, ",".join(sorted(e["opts"]))))
+    except Exception:
+        do_umount(target)          # never leave a read-write or noexec bind mounted
+        raise
+
+
+# ------------------------------------------------------------------ running browsers
+def exe_ids(name, extra=()):
+    ids = set(tuple(x) for x in extra)
+    first, tgt, _ = UNITS[name][0]
+    paths = []
+    for rel in EXES[name]:
+        paths.append(os.path.join(tgt, rel))
+        for suf in ("",) + SUFFIXES:
+            paths.append(os.path.join(MOUNT, first + suf, rel))
+    for p in paths:
+        try:
+            s = os.stat(p)
+        except FileNotFoundError:
+            continue
+        except PermissionError:
+            raise Fail("cannot check whether %s is running (no access to %s); nothing was changed"
+                       % (bu.TITLES[name], p))
+        ids.add((s.st_dev, s.st_ino))
+    return ids
+
+
+def running(name, extra=()):
+    """PIDs whose /proc/PID/exe is one of the browser's executables, compared by device and inode
+    (a sandboxed process may show another path for the same file). A PermissionError means the scan
+    is blind: refuse, never skip."""
+    ids = exe_ids(name, extra)
+    hits = []
+    for pid in os.listdir(PROC):
+        if not pid.isdigit():
+            continue
+        try:
+            s = os.stat(os.path.join(PROC, pid, "exe"))
+        except (FileNotFoundError, ProcessLookupError):
+            continue                    # kernel thread, zombie or a process that just exited
+        except PermissionError:
+            raise Fail("cannot check whether %s is running (no access to /proc/%s/exe); nothing was "
+                       "changed" % (bu.TITLES[name], pid))
+        if (s.st_dev, s.st_ino) in ids:
+            hits.append(int(pid))
+    return hits
+
+
+def refuse_if_running(name, extra=()):
+    if running(name, extra):
+        raise Fail("%s is running. Close it and try again." % bu.TITLES[name], 3)
+
+
+# ------------------------------------------------------------------ tmpfs
+def ensure_tmpfs(need):
+    """Mount (or reuse, enlarging if needed) the helper's tmpfs with exec,nosuid,nodev and a size
+    from MemAvailable. need: bytes this install adds (artefacts + unpacked tree + scratch); a tree
+    from an earlier update that is still there is already counted as used space."""
+    need = max(need, FREE_MIN)
+    os.makedirs(MOUNT, mode=0o755, exist_ok=True)
+    st = os.lstat(MOUNT)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != 0 or st.st_mode & 0o022:
+        raise Fail("%s is not a root-owned directory" % MOUNT)
+    mem = bu.mem_available(MEMINFO)
+    if mem < bu.MEM_MIN or mem < need + bu.MEM_RESERVE:
+        raise Fail("Only %d MB of RAM available; this update needs about %d MB plus %d MB for the rest "
+                   "of the session. Close memory-heavy applications and try again."
+                   % (mem // MiB, need // MiB, bu.MEM_RESERVE // MiB))
+    t = tmpfs_entry()
+    fresh = False
+    if t is None:
+        do_mount(["-t", "tmpfs", "-o", "mode=0755,exec,nosuid,nodev,size=%dM" % -(-need // MiB),
+                  "tmpfs", MOUNT])
+        fresh = True
+    else:
+        sv = os.statvfs(MOUNT)
+        total, used = sv.f_blocks * sv.f_frsize, (sv.f_blocks - sv.f_bfree) * sv.f_frsize
+        if total - used < need:
+            do_mount(["-o", "remount,mode=0755,exec,nosuid,nodev,size=%dM" % -(-(used + need) // MiB), MOUNT])
+    try:
+        t = tmpfs_entry()
+        if t is None or "nosuid" not in t["opts"] or "nodev" not in t["opts"] or "noexec" in t["opts"]:
+            raise Fail("%s is not an exec,nosuid,nodev tmpfs; nothing was changed" % MOUNT)
+        free = shutil.disk_usage(MOUNT).free
+        if free < need:
+            raise Fail("Only %d MB free on %s (%d MB needed). Close memory-heavy applications and try "
+                       "again." % (free // MiB, MOUNT, need // MiB))
+    except Fail:
+        if fresh and tmpfs_entry() is not None:
+            do_umount(MOUNT)          # only a tmpfs this run mounted
+        raise
+    return fresh
+
+
+def release_tmpfs_if_unused():
+    """Unmount the tmpfs (and so free its RAM) when no bind of ours is left. Returns a note or None."""
+    try:
+        if tmpfs_entry() is None or our_entries():
+            return None
+        do_umount(MOUNT)
+    except (MountError, Fail) as e:
+        return "The RAM used by browser updates could not be released (%s)." % e
+    return None if tmpfs_entry() is None else "The browser update tmpfs is still mounted."
+
+
+# ------------------------------------------------------------------ staging (read as the user)
+COPIER = r'''
+import os, stat, sys
+p, cap = sys.argv[1], int(sys.argv[2])
+try:
+    fd = os.open(p, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOCTTY | os.O_CLOEXEC)
+except OSError as e:
+    sys.stderr.write("cannot open %s: %s\n" % (p, e.strerror)); sys.exit(3)
+st = os.fstat(fd)
+if not stat.S_ISREG(st.st_mode):
+    sys.stderr.write("%s is not a regular file\n" % p); sys.exit(3)
+if st.st_size > cap:
+    sys.stderr.write("%s is too large\n" % p); sys.exit(4)
+os.set_blocking(fd, True)
+n, w = 0, sys.stdout.buffer
+while True:
+    b = os.read(fd, 1 << 20)
+    if not b:
+        break
+    n += len(b)
+    if n > cap:
+        sys.stderr.write("%s is too large\n" % p); sys.exit(4)
+    w.write(b)
+w.flush()
+'''
+LISTER = r'''
+import os, stat, sys
+p = sys.argv[1]
+st = os.lstat(p)
+if not stat.S_ISDIR(st.st_mode):
+    sys.stderr.write("%s is not a directory\n" % p); sys.exit(3)
+for n in sorted(os.listdir(p)):
+    if "\n" not in n:
+        print(n)
+'''
+
+
+def check_staging_path(p):
+    if not p.startswith(STAGING_ROOT + "/") or posixpath.normpath(p) != p or "\n" in p or "\0" in p \
+            or ".." in p.split("/") or not posixpath.isabs(p):
+        raise Fail("refusing staging path %r" % p)
+
+
+def staging(name):
+    p = os.path.join(STAGING_ROOT, name)
+    check_staging_path(p)
+    return p
+
+
+def list_as_user(d):
+    check_staging_path(d)
+    r = run(COPY_AS + [PY, "-I", "-c", LISTER, d])
+    if r.returncode != 0:
+        raise Fail("no staged update for this browser (%s)" % (r.stderr.strip() or "cannot list"))
+    return r.stdout.splitlines()
+
+
+def copy_as_user(src, dest, cap):
+    """Copy a staged file into the root work directory, reading it as the user: the user's file is
+    never opened as root, so a symlink or a race can only reach what the user can read anyway."""
+    check_staging_path(src)
+    p = subprocess.Popen(COPY_AS + [PY, "-I", "-c", COPIER, src, str(cap)], stdout=subprocess.PIPE,
+                         stderr=subprocess.PIPE, env=ENV, cwd="/")
+    n = 0
+    try:
+        with open(dest, "xb") as f:
+            while True:
+                b = p.stdout.read(1 << 20)
+                if not b:
+                    break
+                n += len(b)
+                if n > cap:
+                    p.kill()
+                    raise Fail("%s is too large" % os.path.basename(src))
+                f.write(b)
+    finally:
+        err = p.stderr.read().decode("utf-8", "replace").strip()
+        p.wait()
+    if p.returncode != 0:
+        try:
+            os.unlink(dest)
+        except FileNotFoundError:
+            pass
+        raise Fail("cannot use the staged %s (%s)" % (os.path.basename(src), err or "copy failed"))
+    return n
+
+
+def staged_sizes(paths):
+    """Sizes for the RAM estimate only (lstat: metadata, nothing is opened)."""
+    t = 0
+    for p in paths:
+        try:
+            t += min(os.lstat(p).st_size, bu.ARTEFACT_CAP)
+        except OSError:
+            pass
+    return t
+
+
+# ------------------------------------------------------------------ archives
+def resolve(path, links, absolute_ok):
+    """Resolve path (relative to the archive root, "a/b/c") through the archive's own symlinks.
+    None when it leaves the root (".." past it, or an absolute target when not allowed)."""
+    stack = [c for c in path.split("/")]
+    outp, hops = [], 0
+    while stack:
+        c = stack.pop(0)
+        if c in ("", "."):
+            continue
+        if c == "..":
+            if not outp:
+                return None
+            outp.pop()
+            continue
+        outp.append(c)
+        cur = "/".join(outp)
+        if cur in links:
+            hops += 1
+            if hops > 40:
+                return None
+            t = links[cur]
+            outp.pop()
+            if t.startswith("/"):
+                if not absolute_ok:
+                    return None
+                outp = []
+            stack = t.split("/") + stack
+    return "/".join(outp)
+
+
+def check_member_name(n):
+    if not n or "\n" in n or "\0" in n or "\\" in n or n.startswith("/"):
+        raise Fail("unsafe archive member %r" % n[:120])
+    parts = n.rstrip("/").split("/")
+    if any(p in ("..", ".", "") for p in parts):
+        raise Fail("unsafe archive member %r" % n[:120])
+    return "/".join(parts)
+
+
+def check_links_within(links, ok):
+    for p, t in links.items():
+        r = resolve(p, links, absolute_ok=True)
+        if r is None or not ok(r):
+            raise Fail("archive symlink %s -> %s points outside the browser" % (p, t))
+
+
+def check_no_parent_links(paths, links):
+    for p in paths:
+        parts = p.split("/")
+        for i in range(1, len(parts)):
+            if "/".join(parts[:i]) in links:
+                raise Fail("archive member %s is below a symlink" % p)
+
+
+def check_tar(members, top):
+    """Exactly one top-level directory named top; only files, directories and symlinks inside it."""
+    links, names, total = {}, [], 0
+    for m in members:
+        n = check_member_name(m.name)
+        if n.split("/")[0] != top:
+            raise Fail("the archive has %r outside the single top-level directory %s/" % (n[:120], top))
+        if not (m.isdir() or m.isreg() or m.issym()) or m.type == tarfile.CONTTYPE:
+            raise Fail("the archive has a special file (device, fifo or hard link): %s" % n[:120])
+        if m.mode & 0o6000:
+            raise Fail("the archive has a setuid/setgid file: %s" % n[:120])
+        if m.issym():
+            if m.linkname.startswith("/"):
+                raise Fail("the archive has an absolute symlink: %s" % n[:120])
+            links[n] = m.linkname
+        if m.isreg():
+            total += m.size
+        names.append(n)
+    if top not in names:
+        raise Fail("the archive has no %s/ directory" % top)
+    check_no_parent_links(names, links)
+    for p, t in links.items():
+        r = resolve(p, links, absolute_ok=False)
+        if r is None or not (r == top or r.startswith(top + "/")):
+            raise Fail("archive symlink %s -> %s points outside %s/" % (p, t, top))
+    return total
+
+
+def extract_tarball(archive, unpack, top):
+    with tarfile.open(archive, "r:xz") as tf:
+        members = tf.getmembers()
+        total = check_tar(members, top)
+        free = shutil.disk_usage(MOUNT).free
+        if free < total + SCRATCH:
+            raise Fail("Not enough space on %s to unpack (%d MB free, %d MB needed)"
+                       % (MOUNT, free // MiB, (total + SCRATCH) // MiB))
+        os.makedirs(unpack, mode=0o700)
+        tf.extractall(unpack, members=members, filter="tar")
+    entries = os.listdir(unpack)
+    if entries != [top] or not os.path.isdir(os.path.join(unpack, top)) \
+            or os.path.islink(os.path.join(unpack, top)):
+        raise Fail("the archive did not unpack to a single %s/ directory" % top)
+    walk_check(unpack, top_ok=lambda r: r == top or r.startswith(top + "/"), absolute_ok=False)
+    return os.path.join(unpack, top)
+
+
+LISTING = re.compile(r"^([-dlhcbps])([-rwxsStT]{9})\s+\S+\s+(\d+|\d+,\s*\d+)\s+\d{4}-\d{2}-\d{2}\s+"
+                     r"\d{2}:\d{2}(?::\d{2})?\s+(.*)$")
+
+
+def parse_deb_listing(text):
+    """dpkg-deb -c output -> {path: (type, linkname)}; refuses what the archive must not contain."""
+    res, links, total = {}, {}, 0
+    for line in text.splitlines():
+        if not line.strip():
+            continue
+        m = LISTING.match(line)
+        if not m:
+            raise Fail("cannot read the package listing: %r" % line[:120])
+        typ, perms, size, rest = m.groups()
+        if typ not in "-dl":
+            raise Fail("the package has a special file (device, fifo, socket or hard link): %s" % rest[:120])
+        if perms[2] in "sS" or perms[5] in "sS":
+            raise Fail("the package has a setuid/setgid file: %s" % rest[:120])
+        target = None
+        if typ == "l":
+            if rest.count(" -> ") != 1:
+                raise Fail("cannot read a symlink in the package listing: %r" % rest[:120])
+            rest, target = rest.split(" -> ")
+        elif " -> " in rest:
+            raise Fail("unexpected ' -> ' in the package listing: %r" % rest[:120])
+        if rest in ("./", "."):
+            continue
+        if not rest.startswith("./"):
+            raise Fail("unexpected path in the package listing: %r" % rest[:120])
+        n = check_member_name(rest[2:])
+        res[n] = (typ, target)
+        if typ == "l":
+            links[n] = target
+        elif typ == "-":
+            total += int(size)
+    check_no_parent_links(list(res), links)
+    check_links_within(links, lw_tree_ok)
+    return res, total
+
+
+def lw_tree_ok(r):
+    return any(r == t or r.startswith(t + "/") for t in LW_TREES)
+
+
+def walk_check(root, top_ok, absolute_ok, expect=None):
+    """Walk an unpacked tree with lstat: only regular files, directories and symlinks, no
+    setuid/setgid, every symlink resolving (through the tree's own symlinks) inside top_ok."""
+    links, seen = {}, {}
+    for dp, dns, fns in os.walk(root):
+        for n in dns + fns:
+            p = os.path.join(dp, n)
+            rel = os.path.relpath(p, root)
+            st = os.lstat(p)
+            if stat.S_ISLNK(st.st_mode):
+                t = os.readlink(p)
+                if t.startswith("/") and not absolute_ok:
+                    raise Fail("unpacked tree has an absolute symlink: %s" % rel)
+                links[rel] = t
+                seen[rel] = ("l", t)
+            elif stat.S_ISDIR(st.st_mode):
+                seen[rel] = ("d", None)
+            elif stat.S_ISREG(st.st_mode):
+                seen[rel] = ("-", None)
+            else:
+                raise Fail("unpacked tree has a special file: %s" % rel)
+            if not stat.S_ISLNK(st.st_mode) and st.st_mode & 0o6000:
+                raise Fail("unpacked tree has a setuid/setgid file: %s" % rel)
+    for p, t in links.items():
+        r = resolve(p, links, absolute_ok)
+        if r is None or not top_ok(r):
+            raise Fail("unpacked symlink %s -> %s points outside the browser" % (p, t))
+    if expect is not None and seen != expect:
+        diff = sorted(set(seen.items()) ^ set(expect.items()))[:3]
+        raise Fail("the unpacked package does not match its listing (%s)" % diff)
+
+
+def apt_simulate(deb):
+    """Dependencies against what is installed, without changing anything and without a network:
+    apt-get -s --no-download install /abs/path.deb. Only the package itself may be installed."""
+    if not os.path.isabs(deb):
+        raise Fail("internal: the package path must be absolute")
+    pkg = run([DPKG_DEB, "-f", deb, "Package"]).stdout.strip()
+    r = run([APT_GET, "-s", "--no-download", "install", deb],
+            env={"DEBIAN_FRONTEND": "noninteractive", "PATH": "/usr/sbin:/usr/bin:/sbin:/bin",
+                 "HOME": "/nonexistent", "LANG": "C"})
+    lines = (r.stdout or "").splitlines() + (r.stderr or "").splitlines()
+    errs = [l for l in lines if l.startswith("E:")]
+    if r.returncode != 0 or errs:
+        why = [l.strip() for l in lines if "Depends:" in l or l.startswith("E:")]
+        raise Fail("The new LibreWolf needs packages this Prestium image does not have (%s). Nothing was "
+                   "changed." % ("; ".join(why)[:300] or "apt-get exit %d" % r.returncode))
+    inst = [l.split()[1] for l in lines if l.startswith("Inst ") and len(l.split()) > 1]
+    remv = [l.split()[1] for l in lines if l.startswith("Remv ") and len(l.split()) > 1]
+    if not pkg or inst != [pkg] or remv:
+        raise Fail("The new LibreWolf would need other package changes (install: %s; remove: %s). Nothing "
+                   "was changed." % (", ".join(inst) or "-", ", ".join(remv) or "-"))
+    return pkg
+
+
+# ------------------------------------------------------------------ permissions / overlay
+def fix_perms(path):
+    """root:root, u=rwX,go=rX (nothing group/world writable), no setuid/setgid."""
+    def one(p):
+        st = os.lstat(p)
+        os.lchown(p, 0, 0)
+        if stat.S_ISLNK(st.st_mode):
+            return
+        if stat.S_ISDIR(st.st_mode):
+            os.chmod(p, 0o755)
+        else:
+            os.chmod(p, 0o755 if st.st_mode & 0o111 else 0o644)
+    one(path)
+    if os.path.isdir(path) and not os.path.islink(path):
+        for dp, dns, fns in os.walk(path):
+            for n in dns + fns:
+                one(os.path.join(dp, n))
+
+
+def apply_overlay(name, tree):
+    o = os.path.join(OVERLAY, name)
+    if not os.path.isdir(o):
+        raise Fail("Prestium's %s settings (%s) are missing from this image" % (bu.TITLES[name], o))
+    if name == "librewolf" and os.path.isdir(os.path.join(o, "distribution")):
+        # distribution/ is Prestium's sealed tree, not whatever the new package shipped
+        d = os.path.join(tree, "distribution")
+        if os.path.lexists(d):
+            rm_tree_or_file(d)
+    shutil.copytree(o, tree, symlinks=True, dirs_exist_ok=True)
+    if name == "tor-browser":
+        # Tor Browser's "packaged app" mode: no internal update prompts (as hook 0200 does)
+        open(os.path.join(tree, "Browser", "is-packaged-app"), "a").close()
+
+
+# ------------------------------------------------------------------ verify (root, on the copies)
+def verify_tor(files):
+    names = [n for n in files if bu.TB_NAME.match(n)]
+    if len(names) != 1 or names[0] + ".asc" not in files:
+        raise Fail("no staged Tor Browser update (expected one tor-browser-linux-x86_64-<version>.tar.xz "
+                   "and its .asc)")
+    n = names[0]
+    v = bu.TB_NAME.match(n).group(1)
+    return n, v, [n, n + ".asc"]
+
+
+def verify_ff(files):
+    names = [n for n in files if bu.FF_NAME.match(n)]
+    if len(names) != 1 or "SHA256SUMS" not in files or "SHA256SUMS.asc" not in files:
+        raise Fail("no staged Firefox update (expected firefox-<version>.tar.xz, SHA256SUMS and "
+                   "SHA256SUMS.asc)")
+    n = names[0]
+    return n, bu.FF_NAME.match(n).group(1), [n, "SHA256SUMS", "SHA256SUMS.asc"]
+
+
+def lw_signed(work):
+    with open(os.path.join(work, "InRelease"), "rb") as f:
+        bu.check_clearsigned_shape(f.read())
+    plain = os.path.join(work, "Release")
+    bu.gpg_verify("InRelease", "librewolf", work, clearsigned=os.path.join(work, "InRelease"), out=plain)
+    _, sums = bu.parse_release(bu.read_text(plain, bu.META_CAP))
+    with open(os.path.join(work, "Packages"), "rb") as f:
+        pb = f.read()
+    bu.check_packages(sums, pb)
+    deb = os.path.join(work, "librewolf.deb")
+    sha = bu.sha256_file(deb)
+    st = [s for s in bu.lw_candidates(bu.parse_packages(pb.decode("utf-8", "replace"))) if s["SHA256"] == sha]
+    if len(st) != 1 or int(st[0]["Size"]) != os.path.getsize(deb):
+        raise Fail("the LibreWolf package does not match the signed Packages index")
+    st = st[0]
+    f = {k: run([DPKG_DEB, "-f", deb, k]).stdout.strip() for k in ("Package", "Version", "Architecture")}
+    if f != {"Package": "librewolf", "Version": st["Version"], "Architecture": "amd64"}:
+        raise Fail("the LibreWolf package's control fields do not match the signed index (%s)" % f)
+    return st["Version"], sha
+
+
+def check_newer(name, v):
+    info = bu.installed_version(name, root=UNITS[name][0][1], stamp_dir=STAMP_DIR)
+    c = bu.compare_candidate(name, v, info)
+    if c == 0:
+        raise Fail("%s %s is already installed." % (bu.TITLES[name], v), 4)
+    if c < 0:
+        raise Fail("%s %s is older than the installed %s; not downgrading (Reset to shipped copy is the "
+                   "only way back)." % (bu.TITLES[name], v, info.get("full") or info["version"]), 4)
+
+
+# ------------------------------------------------------------------ build the new unit (.next)
+def clear_stale(name):
+    for src, _, _ in UNITS[name]:
+        for suf in (".next", ".bad"):
+            p = src_path(src + suf)
+            if os.path.lexists(p):
+                if is_mount_source(src + suf):
+                    raise Fail("%s is still mounted; nothing was changed" % p)
+                rm_tree_or_file(p)
+
+
+def build_tarball_unit(name, work, archive, v):
+    top = TOPDIR[name]
+    tree = extract_tarball(archive, os.path.join(work, "unpack"), top)
+    nxt = src_path(UNITS[name][0][0] + ".next")
+    os.rename(tree, nxt)                  # the named directory itself: no <path>/<top>/ nesting
+    apply_overlay(name, nxt)
+    fix_perms(nxt)
+    exe = os.path.join(nxt, EXES[name][0])
+    if not os.path.isfile(exe) or os.path.islink(exe):
+        raise Fail("the new %s has no %s" % (bu.TITLES[name], EXES[name][0]))
+    got = bu.tree_version(name, nxt)
+    if got != v:
+        raise Fail("the new %s says it is version %s, the signed file name says %s"
+                   % (bu.TITLES[name], got, v))
+    return [UNITS[name][0][0]]
+
+
+def lw_factory_link(target):
+    """The absolute path the factory /usr/bin/librewolf symlink points to, or None (not a symlink)."""
+    st = os.lstat(target)
+    if not stat.S_ISLNK(st.st_mode):
+        return None
+    return posixpath.normpath(posixpath.join(posixpath.dirname(target), os.readlink(target)))
+
+
+def build_lw_unit(work, deb, v):
+    listing = run([DPKG_DEB, "-c", deb])
+    if listing.returncode != 0:
+        raise Fail("cannot list the LibreWolf package (%s)" % listing.stderr.strip()[:200])
+    expect, total = parse_deb_listing(listing.stdout)
+    free = shutil.disk_usage(MOUNT).free
+    if free < total + SCRATCH:
+        raise Fail("Not enough space on %s to unpack (%d MB free, %d MB needed)"
+                   % (MOUNT, free // MiB, (total + SCRATCH) // MiB))
+    unpack = os.path.join(work, "unpack")
+    os.makedirs(unpack, mode=0o700)
+    r = run([DPKG_DEB, "-x", deb, unpack])      # data only: no maintainer scripts run
+    if r.returncode != 0:
+        raise Fail("cannot unpack the LibreWolf package (%s)" % r.stderr.strip()[:200])
+    walk_check(unpack, top_ok=lw_tree_ok, absolute_ok=True, expect=expect)
+    share_t, lib_t, wrap_t = (u[1] for u in UNITS["librewolf"])
+    share = os.path.join(unpack, "usr/share/librewolf")
+    if not os.path.isdir(share) or os.path.islink(share):
+        raise Fail("the new LibreWolf has no usr/share/librewolf/")
+    if not any(os.path.isfile(os.path.join(share, e)) and not os.path.islink(os.path.join(share, e))
+               for e in EXES["librewolf"]):
+        raise Fail("the new LibreWolf has no usr/share/librewolf/librewolf")
+    srcs = []
+    os.rename(share, src_path("librewolf.next"))
+    srcs.append("librewolf")
+    # /usr/lib/librewolf: the new tree, or an empty directory that hides the factory one so old
+    # libraries are never mixed with the new share tree
+    lib = os.path.join(unpack, "usr/lib/librewolf")
+    if os.path.lexists(lib):
+        if os.path.islink(lib) or not os.path.isdir(lib):
+            raise Fail("the new LibreWolf's usr/lib/librewolf is not a directory")
+        if not os.path.isdir(lib_t) or os.path.islink(lib_t):
+            raise Fail("the new LibreWolf needs %s, which this image does not have; nothing was changed"
+                       % lib_t)
+        os.rename(lib, src_path("librewolf-lib.next"))
+        srcs.append("librewolf-lib")
+    elif os.path.lexists(lib_t):
+        if os.path.islink(lib_t) or not os.path.isdir(lib_t):
+            raise Fail("%s is not a directory" % lib_t)
+        os.mkdir(src_path("librewolf-lib.next"), 0o755)
+        srcs.append("librewolf-lib")
+    # /usr/bin/librewolf: the package's symlink into usr/share/librewolf needs no mount of its own (the
+    # share bind covers what it points to) when the factory one points to the same place; a regular
+    # file is bound over a regular factory file. Never mount on a symlink (that would hit its target).
+    wrap = os.path.join(unpack, "usr/bin/librewolf")
+    if not os.path.lexists(wrap):
+        raise Fail("the new LibreWolf has no usr/bin/librewolf")
+    if os.path.islink(wrap):
+        new = resolve("usr/bin/librewolf", {k: t for k, (ty, t) in expect.items() if ty == "l"}, True)
+        if not new or not new.startswith("usr/share/librewolf/"):
+            raise Fail("the new usr/bin/librewolf does not point into usr/share/librewolf")
+        new_abs = posixpath.join(share_t, new[len("usr/share/librewolf/"):])
+        old = lw_factory_link(wrap_t)
+        if old != new_abs:
+            raise Fail("the new usr/bin/librewolf (-> %s) does not match this image's (%s); nothing "
+                       "was changed" % (new_abs, old or "a regular file"))
+    elif os.path.isfile(wrap):
+        if lw_factory_link(wrap_t) is not None or not os.path.isfile(wrap_t):
+            raise Fail("the new usr/bin/librewolf is a file but this image's is a symlink; nothing was "
+                       "changed")
+        os.rename(wrap, src_path("librewolf-wrapper.next"))
+        srcs.append("librewolf-wrapper")
+    else:
+        raise Fail("the new usr/bin/librewolf is not a file")
+    # everything else in the package (/etc/apparmor.d/librewolf, icons, docs) is not used
+    apply_overlay("librewolf", src_path("librewolf.next"))
+    for s in srcs:
+        fix_perms(src_path(s + ".next"))
+    got = bu.tree_version("librewolf", src_path("librewolf.next"))
+    if got != bu.deb_upstream(v):
+        raise Fail("the new LibreWolf says it is version %s, the signed index says %s" % (got, v))
+    return srcs
+
+
+# ------------------------------------------------------------------ publish / rollback
+def confirm(name, srcs, v=None):
+    """The visible factory paths show the new sources (same inodes) and the new version."""
+    for src, tgt, kind in UNITS[name]:
+        if src not in srcs:
+            continue
+        a, b = os.stat(tgt), os.stat(src_path(src))
+        if (a.st_dev, a.st_ino) != (b.st_dev, b.st_ino):
+            raise MountError("%s does not show the new files" % tgt)
+    first = UNITS[name][0][1]
+    if not any(os.path.isfile(os.path.join(first, e)) for e in EXES[name]):
+        raise MountError("%s has no main executable after the update" % first)
+    if v is not None:
+        want = bu.deb_upstream(v) if name == "librewolf" else v
+        got = bu.tree_version(name, first)
+        if got != want:
+            raise MountError("%s shows version %s after the update, expected %s" % (first, got, want))
+
+
+def unmount_all(entries):
+    """Unmount entries newest first. On a failure, put back what was already taken off and raise."""
+    done = []
+    try:
+        for e in sorted(entries, key=lambda m: -m["id"]):
+            do_umount(e["target"])
+            done.append(e)
+    except MountError:
+        for e in reversed(done):
+            src = e["root"].lstrip("/")
+            kind = "file" if os.path.isfile(src_path(src)) else "dir"
+            try:
+                bind(src, e["target"], kind)
+            except Exception:
+                pass
+        raise
+
+
+def rollback(name, applied, new_srcs, had_prev):
+    """Undo a failed publish: unmount what was bound (newest first), move the new sources to .bad,
+    put every .prev source back and bind the previous unit again. Returns a description."""
+    probs = []
+    for tgt in reversed(applied):
+        try:
+            do_umount(tgt)
+        except MountError as e:
+            probs.append(str(e))
+    for src in new_srcs:
+        if os.path.lexists(src_path(src)) and not is_mount_source(src):
+            os.rename(src_path(src), src_path(src + ".bad"))
+    for src in had_prev:
+        if not os.path.lexists(src_path(src)):
+            os.rename(src_path(src + ".prev"), src_path(src))
+    for src, tgt, kind in UNITS[name]:
+        if src in had_prev:
+            try:
+                bind(src, tgt, kind)
+            except Exception as e:
+                probs.append("%s: %s" % (tgt, e))
+    if had_prev and not probs:
+        try:
+            confirm(name, had_prev)
+        except MountError as e:
+            probs.append(str(e))
+    for src, _, _ in UNITS[name]:
+        p = src_path(src + ".bad")
+        if os.path.lexists(p) and not is_mount_source(src + ".bad"):
+            rm_tree_or_file(p)
+    if probs:
+        return "The previous state could not be fully restored: %s" % "; ".join(probs)
+    return "The previous update of this session is still in place." if had_prev else \
+        "The shipped copy is still in place."
+
+
+def publish(name, new_srcs, v, extra_ids=()):
+    parts = UNITS[name]
+    cur = unit_binds(name)
+    if cur:
+        refuse_if_running(name, extra_ids)
+        event("Removing the previous update of this session ...")
+        try:
+            unmount_all([c[2] for c in cur])
+        except MountError as e:
+            raise Fail("%s is still in use (%s). Close it and try again." % (bu.TITLES[name], e), 3)
+    # move every live source of the unit aside, then put the new ones in place (renames on the same
+    # tmpfs; if one fails, undo them and bind the previous unit again)
+    moved_prev, moved_new = [], []
+    try:
+        for src, _, _ in parts:
+            live, prev = src_path(src), src_path(src + ".prev")
+            if os.path.lexists(prev):
+                if is_mount_source(src + ".prev"):
+                    raise Fail("%s is still mounted" % prev)
+                rm_tree_or_file(prev)
+            if os.path.lexists(live):
+                if is_mount_source(src):
+                    raise Fail("%s is still mounted" % live)
+                os.rename(live, prev)
+                moved_prev.append(src)
+        for src in new_srcs:
+            os.rename(src_path(src + ".next"), src_path(src))
+            moved_new.append(src)
+    except (Fail, OSError) as e:
+        for src in reversed(moved_new):
+            os.rename(src_path(src), src_path(src + ".next"))
+        for src in reversed(moved_prev):
+            os.rename(src_path(src + ".prev"), src_path(src))
+        probs = []
+        for src, tgt, kind in parts:
+            if any(c[0] == src for c in cur):
+                try:
+                    bind(src, tgt, kind)
+                except Exception as be:
+                    probs.append("%s: %s" % (tgt, be))
+        raise Fail("The new %s could not be put in place (%s). %s" % (
+            bu.TITLES[name], e, "The previous state could not be fully restored: %s" % "; ".join(probs)
+            if probs else ("The previous update of this session is still in place." if cur else
+                           "The shipped copy is still in place.")))
+    had_prev = moved_prev
+    # a browser that started since the first scan would read the new files with the old binary
+    if running(name, extra_ids):
+        msg = rollback(name, [], new_srcs, had_prev)
+        raise Fail("%s was started during the update. Close it and try again. %s" % (bu.TITLES[name], msg), 3)
+    applied = []
+    try:
+        for src, tgt, kind in parts:
+            if src in new_srcs:
+                bind(src, tgt, kind)
+                applied.append(tgt)
+        confirm(name, new_srcs, v)
+    except (MountError, OSError) as e:
+        msg = rollback(name, applied, new_srcs, had_prev)
+        raise Fail("The new %s could not be put in place (%s). %s" % (bu.TITLES[name], e, msg))
+    for src, _, _ in parts:
+        for suf in SUFFIXES:
+            p = src_path(src + suf)
+            if os.path.lexists(p) and not is_mount_source(src + suf):
+                rm_tree_or_file(p)
+
+
+def write_stamp(name, v, sha, factory_ids):
+    os.makedirs(STAMP_DIR, mode=0o755, exist_ok=True)
+    d = {"browser": name, "version": v, "sha256": sha,
+         "installed_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+         "factory_exe": sorted([list(x) for x in factory_ids])}
+    fd, tmp = tempfile.mkstemp(dir=STAMP_DIR, prefix=".stamp-")
+    with os.fdopen(fd, "w") as f:
+        json.dump(d, f)
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, os.path.join(STAMP_DIR, name))
+
+
+def remove_stamp(name):
+    try:
+        os.unlink(os.path.join(STAMP_DIR, name))
+    except FileNotFoundError:
+        pass
+
+
+def stamp_factory_ids(name):
+    st = bu.read_stamp(name, STAMP_DIR) or {}
+    ids = st.get("factory_exe") or []
+    return {tuple(x) for x in ids if isinstance(x, list) and len(x) == 2 and all(isinstance(i, int) for i in x)}
+
+
+def recover_interrupted(name):
+    """unit_binds() found a half-finished earlier run: unmount every bind of ours for the unit (never
+    stacking a second one on top) and fail; the next attempt starts clean."""
+    try:
+        unit_binds(name)
+        return
+    except Fail as e:
+        if str(e) != "interrupted":
+            raise
+        entries = e.entries
+    try:
+        unmount_all(entries)
+    except MountError as e:
+        raise Fail("An earlier update of %s was interrupted and is still in use (%s). Close the browser "
+                   "and try again." % (bu.TITLES[name], e), 3)
+    remove_stamp(name)
+    raise Fail("An earlier update of %s was interrupted; it has been removed and the shipped copy is "
+               "back. Try again." % bu.TITLES[name])
+
+
+# ------------------------------------------------------------------ commands
+def install(name):
+    recover_interrupted(name)
+    cur = unit_binds(name)
+    # the factory executables: from the stamp after a first update (they are hidden then)
+    factory = stamp_factory_ids(name) if cur else exe_ids(name)
+    refuse_if_running(name, factory)
+    sdir = staging(name)
+    files = list_as_user(sdir)
+    if name == "tor-browser":
+        art, v, need_files = verify_tor(files)
+    elif name == "firefox":
+        art, v, need_files = verify_ff(files)
+    else:
+        need_files = ["InRelease", "Packages", "librewolf.deb"]
+        missing = [n for n in need_files if n not in files]
+        if missing:
+            raise Fail("no staged LibreWolf update (missing %s)" % ", ".join(missing))
+    paths = [os.path.join(sdir, n) for n in need_files]
+    ok, work = False, None
+    fresh = ensure_tmpfs(staged_sizes(paths) + bu.UNPACKED[name] + SCRATCH)
+    try:
+        base = os.path.join(MOUNT, WORKNAME)
+        os.makedirs(base, mode=0o700, exist_ok=True)
+        os.chmod(base, 0o700)
+        work = tempfile.mkdtemp(dir=base)
+        event("Copying the downloaded files ...")
+        for n in need_files:
+            cap = bu.ARTEFACT_CAP if n.endswith((".tar.xz", ".deb")) else \
+                (bu.PACKAGES_CAP if n == "Packages" else (4 * MiB if n == "SHA256SUMS" else bu.META_CAP))
+            copy_as_user(os.path.join(sdir, n), os.path.join(work, n), cap)
+        event("Verifying signature ...")
+        if name == "tor-browser":
+            bu.gpg_verify(art, name, work, sig=os.path.join(work, art + ".asc"), data=os.path.join(work, art))
+            sha = bu.sha256_file(os.path.join(work, art))
+        elif name == "firefox":
+            bu.gpg_verify("SHA256SUMS", name, work, sig=os.path.join(work, "SHA256SUMS.asc"),
+                          data=os.path.join(work, "SHA256SUMS"))
+            sha = bu.sha256_file(os.path.join(work, art))
+            bu.ff_check_sums(bu.read_text(os.path.join(work, "SHA256SUMS"), 4 * MiB), sha, v)
+        else:
+            v, sha = lw_signed(work)
+        check_newer(name, v)
+        clear_stale(name)
+        event("Unpacking %s %s ..." % (bu.TITLES[name], v))
+        if name == "librewolf":
+            deb = os.path.join(work, "librewolf.deb")
+            event("Checking dependencies ...")
+            apt_simulate(deb)
+            new_srcs = build_lw_unit(work, deb, v)
+        else:
+            new_srcs = build_tarball_unit(name, work, os.path.join(work, art), v)
+        shutil.rmtree(work, ignore_errors=True)        # the artefact copy: free the RAM before publish
+        refuse_if_running(name, factory)
+        event("Installing ...")
+        publish(name, new_srcs, v, factory)
+        write_stamp(name, v, sha, factory)
+        ok = True
+        out({"ok": True, "version": v,
+             "message": "%s %s is installed for this session (in RAM until Reset or reboot). %s"
+                        % (bu.TITLES[name], v, bu.RESET_HINT)})
+    except bu.UpdateError as e:
+        raise Fail(str(e))
+    finally:
+        if work:
+            shutil.rmtree(work, ignore_errors=True)
+        if not ok:
+            for src, _, _ in UNITS[name]:
+                p = src_path(src + ".next")
+                if os.path.lexists(p) and not is_mount_source(src + ".next"):
+                    rm_tree_or_file(p)
+            if fresh:
+                release_tmpfs_if_unused()     # a first install that failed gives the RAM back
+
+
+def revert(name):
+    try:
+        cur = unit_binds(name)
+        entries = [c[2] for c in cur]
+    except Fail as e:
+        if str(e) != "interrupted":
+            raise
+        entries = e.entries
+    if not entries:
+        remove_stamp(name)
+        release_tmpfs_if_unused()
+        out({"ok": True, "message": "%s is already the shipped copy." % bu.TITLES[name], "nothing": True})
+        return
+    refuse_if_running(name, stamp_factory_ids(name))
+    event("Restoring the shipped copy ...")
+    try:
+        unmount_all(entries)
+    except MountError as e:
+        raise Fail("%s is still in use (%s). Close it and try again." % (bu.TITLES[name], e), 3)
+    first = UNITS[name][0][1]
+    if not any(os.path.isfile(os.path.join(first, x)) for x in EXES[name]) or not bu.tree_version(name, first):
+        raise Fail("The update was removed, but the shipped %s at %s looks incomplete." % (bu.TITLES[name], first))
+    for src, _, _ in UNITS[name]:
+        for suf in ("",) + SUFFIXES:
+            p = src_path(src + suf)
+            if os.path.lexists(p) and not is_mount_source(src + suf):
+                rm_tree_or_file(p)
+    remove_stamp(name)
+    note = release_tmpfs_if_unused()
+    msg = "The shipped %s %s is back." % (bu.TITLES[name], bu.tree_version(name, first))
+    out({"ok": True, "message": msg + (" " + note if note else ""), "version": bu.tree_version(name, first)})
+
+
+def main(argv):
+    if len(argv) != 3 or argv[1] not in ("install", "revert") or argv[2] not in UNITS:
+        out({"ok": False, "error": "usage: prestium-browser-install install|revert tor-browser|librewolf"})
+        return 2
+    if os.geteuid() != 0:
+        os.execv("/usr/bin/sudo", ["sudo", "-n", "/usr/local/sbin/prestium-browser-install"] + argv[1:])
+    su = os.environ.get("SUDO_USER")
+    if su is not None and su != USER:
+        out({"ok": False, "error": "only %s may run this through sudo" % USER})
+        return 2
+    os.chdir("/")
+    os.umask(0o022)
+    os.environ.clear()
+    os.environ.update(ENV)
+    lk = os.open(LOCK, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    try:
+        fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        out({"ok": False, "error": "another browser update is already running"})
+        return 1
+    try:
+        (install if argv[1] == "install" else revert)(argv[2])
+        return 0
+    except Fail as e:
+        out({"ok": False, "error": str(e), "code": e.code})
+        return e.code
+    except (MountError, bu.UpdateError, OSError, tarfile.TarError) as e:
+        out({"ok": False, "error": "%s: %s" % (e.__class__.__name__, e)})
+        return 1
+    finally:
+        os.close(lk)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

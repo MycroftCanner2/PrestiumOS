@@ -1,0 +1,73 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Origin: LibreWolf Software Repository
+Label: LibreWolf Software Repository
+Suite: librewolf
+Codename: librewolf
+NotAutomatic: no
+ButAutomaticUpgrades: no
+Components: main
+Architectures: amd64 arm64
+Date: Wed, 04 Nov 2026 00:59:21 +0000
+Valid-Until: Tue, 31 Jul 2029 00:59:21 +0000
+MD5Sum:
+ 91701de460de38635a34453453ac166e 148551692 .refs/main/librewolf-159.0.1-1-linux-arm64-deb.deb
+ 6639a75bf1eeae1cbd4ff1b38d2f6998 153796164 .refs/main/librewolf-159.0.1-1-linux-x86_64-deb.deb
+ e6b5928f0d47b0be793f84caef1399ea 148495678 .refs/main/librewolf-159.0-1-linux-arm64-deb.deb
+ 41dc15390bdabe48ad9bf2a114bc1a32 153747744 .refs/main/librewolf-159.0-1-linux-x86_64-deb.deb
+ 57bcb54faf1bad27898178053e192e84 2634 main/binary-amd64/Packages
+ faec4e2e3b6d515ebfb51079529e2969 991 main/binary-amd64/Packages.gz
+ d62bd2b4a01c32e95e626b40170d0765 235 main/binary-amd64/Release
+ 87c351aef40e1b29cb30459301208485 2632 main/binary-arm64/Packages
+ 3eb434bce429e65a59d5bca71232302c 984 main/binary-arm64/Packages.gz
+ 228b2fc9ac90c54bc96d4ca179071b87 235 main/binary-arm64/Release
+SHA1:
+ 603982abf5755a052b86af3639db70744ab7e786 148551692 .refs/main/librewolf-159.0.1-1-linux-arm64-deb.deb
+ 01f05addcffb202fa90d8ff19576d2f24c705f07 153796164 .refs/main/librewolf-159.0.1-1-linux-x86_64-deb.deb
+ fe802dbead3dc21ad4f4bbf3bde5ae864b25c685 148495678 .refs/main/librewolf-159.0-1-linux-arm64-deb.deb
+ 7eb4676a4c817064d8ab6d75431e8455ddb4bbad 153747744 .refs/main/librewolf-159.0-1-linux-x86_64-deb.deb
+ 9f8f7b729f69ed75a26597a1369a5804c2199903 2634 main/binary-amd64/Packages
+ 9060b19ef4a66b15b76d03f67ce2374f1700eef3 991 main/binary-amd64/Packages.gz
+ a00abf5c19b4758d0ce817296b5dc3db3ad8348d 235 main/binary-amd64/Release
+ bb73eed41df173394fb0fa8727e43eb2db60a736 2632 main/binary-arm64/Packages
+ 393bc1217a0e259357010b959559f29aa5b6d90b 984 main/binary-arm64/Packages.gz
+ 1ba697bc4f6149c7b9124995802231db67fe7549 235 main/binary-arm64/Release
+SHA256:
+ 4ef60bb9e9646d822c0f3ff567de8c7cb651a839873f87c2ab04b222ee118830 148551692 .refs/main/librewolf-159.0.1-1-linux-arm64-deb.deb
+ 8f252136b41599f2af846bd6083032e2c88d1ccb043ac5e5faeffdbdfe8282b8 153796164 .refs/main/librewolf-159.0.1-1-linux-x86_64-deb.deb
+ 49d1941947b316e5d92e912ae66b9d2576fb76ba66fbff333083fa37b2fae3ef 148495678 .refs/main/librewolf-159.0-1-linux-arm64-deb.deb
+ 5167c2611bbe829393ac1a5720d3f0580fe784d00b6a20c4789d5bfca0659473 153747744 .refs/main/librewolf-159.0-1-linux-x86_64-deb.deb
+ 94648cf138fffeb5c057f99f64b9d1cf35c0e30b889d0843341808313844a157 2634 main/binary-amd64/Packages
+ 95c8709af71bb518bd86ca849b549cdf78342f67b9d7f6368da201d6ff259da6 991 main/binary-amd64/Packages.gz
+ 2cc43e235030dde8234e0efb74a15f9b37f7228f8703747e13f2329a2e46a1db 235 main/binary-amd64/Release
+ baa784e9c0af000e569516253d2e051c4aca13f7777b94c77e182100a0363f8d 2632 main/binary-arm64/Packages
+ bb2d12a28d37fdc794c56fbc676a08bfb6e764da27b195e3478554efd57208a3 984 main/binary-arm64/Packages.gz
+ 1368ed94bdc5ab3f602b03450646fbe958672c1da4805b3f94f8355f1bd59540 235 main/binary-arm64/Release
+SHA512:
+ 8dae8eadd5a84dd883b62f950bf905bdca3517e0ffbfd0162ba7a27588cd6e89bfa1f9efffae315066ed24bcfa53779344c6c6c051bf7ae26ba6284d015c5402 148551692 .refs/main/librewolf-159.0.1-1-linux-arm64-deb.deb
+ 5debffb2c7985a660b4b5d715c9e4896d186affc5d5db6c4ea14e34e11d3ac8ccfbc5fc8a5a30f053ff2b55b22156a93f19bb7f9186b9865b28c713f3abe6d14 153796164 .refs/main/librewolf-159.0.1-1-linux-x86_64-deb.deb
+ c4edec405d2ca7b6ffb9120a10a6ca1707c5297c7340acfe57c8d42de08fc5163ed9e1f5336a7f154c88f6e95894ffe56e9c35e5ce87f39a1c03d8e7494c037f 148495678 .refs/main/librewolf-159.0-1-linux-arm64-deb.deb
+ 17d7b45ada7e2309ab57a56ad3c7bb4c62c3f3a97be4f52470c2a60531b52483a3d694e6c6fbe73330834cae87a7278b0dd652c29460157e9e0a8136d589ec3f 153747744 .refs/main/librewolf-159.0-1-linux-x86_64-deb.deb
+ cfd792549737f62d75101a28a8cc8c87a34b9f7137b0b5bba0d8432b00124276a8de1c9f3ed4af22361bd2bc3da77f66920d415ff63233ad33e8904ece41f4e5 2634 main/binary-amd64/Packages
+ 803115b09a25b3606c32696f2b073a1b2221c067fe94fb2e6c65a706112b0c3bf5175cbff161301cb00b6c75ac94a24f2046d5d05960cc9b5127f23adb9e7775 991 main/binary-amd64/Packages.gz
+ bbdc70d33efed74e6f4d3afe4134f6cfca716f7de0a8ad307325cfc8b044707a0c7a92bc48e90b9cb5dc191b731ad8057d1a6304261fae300754bcce521e457f 235 main/binary-amd64/Release
+ 68f3823e3d3f5e46dfa3737ec1cb2a4972baad5d7daf32fba18ac12dc7bddc540a4131a3040bc35503b85690c159d2fc08aac563b73880b30aefeffd31700ef8 2632 main/binary-arm64/Packages
+ 2e69d270a41c947e86272889ad2b7728bb0003c140e30f428f8d39107cf2c3fb6723aad8a7c796a9e2adfd6818e3706d1d9e68db0f572d0e0cda6e79eb328a8d 984 main/binary-arm64/Packages.gz
+ a452fe5dfbc95fe58ba6ad9fbe89a1945dee46492dc934e7b29aa99eb69c1b4c34890e8213a7e4948a38f2ad921a5209c0b09a8738d2aa5695d1231bc9d7bca7 235 main/binary-arm64/Release
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEETdS77KvTLnmMx3pAR5gepz0OHGMFAmrqg5sACgkQR5gepz0O
+HGOjUQ/7BbG/aRvzNwJScXf4JeBpf2jQ81bK4uDx2pV2AeQCyzKVHAH5bnzdxcrg
+PID4GdOTIVYMtdO8TaEzvcQkhdQ/fSXZE0Ek29v0DmhzewhfN+hb2RO7Na2ewIwC
+1OQtyBPnHvhetzpfgNspL0CTbly1U9BTEWrla1dnudea/ENYtdj2dHqxYVD/AXma
+wYFeHi+h6nBdcAi56gO+s1+W+/G4V83FEdqyDKSZ2JqWzrMZhKcYVwrU8wZZj3Bu
+iS8DKOhSC8oOhtpUU8AOKf7Nbhk5L7wbwQb7vLjtvXtNz4il7MoEVtpH2Q3asbqR
+FhZelwpxBqPpJANz6ZGH/f0qnUTmmzLg6W1WSBhRnYC/v0aUdlDemrUC6rfz6RoY
++wiR/oq8nAKJT4KJOiQejLBw0n1dyHJ6QrOr9F821oICRZjoA0FHW29MH2oRUWgS
+fEuTqjrMy4IhFBrq+Z3WEsLjtAX748WXCxXNgu8IPhtJn3Dgo6xAqFnvY6O7GSpQ
+AMbc3l45c09GW0aTuotJF/7wKkJeX6Svz3gzzLK3aAv6At81CCe5zCugXDKXmd3A
+SBvMot98W94iHWu9R0/UW3DIk14pd2ENV8xSOrv5G3c9OntwlIzel9GB+H/hVBH+
+WY19ykjINSdbIXXsqvdrG1ER7n4hORyhYVNq1+I8uPp0xy0S6wA=
+=T3WU
+-----END PGP SIGNATURE-----

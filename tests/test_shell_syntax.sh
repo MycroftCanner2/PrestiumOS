@@ -27,7 +27,10 @@ for f in \
   "$root/config/includes.chroot/usr/local/bin/prestium-tor-assistant" \
   "$root/config/includes.chroot/usr/local/bin/prestium-torrents" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-onion-grater" \
-  "$root/config/includes.chroot/usr/local/lib/prestium/safefile"
+  "$root/config/includes.chroot/usr/local/lib/prestium/safefile" \
+  "$root/config/includes.chroot/usr/local/lib/prestium/browser_update.py" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-browser-install" \
+  "$root/config/includes.chroot/usr/local/bin/prestium-browser-updater"
 do
   if ! python3 -m py_compile "$f"; then
     echo "FAIL py_compile $f"; fail=1
