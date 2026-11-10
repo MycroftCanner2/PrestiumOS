@@ -35,7 +35,10 @@ Enhanced security and new features. Changes will be listed here as they land.
   clock set to local time (virt-manager `<clock offset='utc'>`, VirtualBox "Hardware Clock in UTC Time",
   Hyper-V time synchronization); or Tor working while I2P has no peers, which points to a VPN or
   firewall on the host blocking I2P's ports. The diagnosis disappears once both connect. Read-only: it
-  never changes the clock, the network, Tor or i2pd (`tests/test_vm_check.sh`).
+  never changes the clock, the network, Tor or i2pd (`tests/test_vm_check.sh`). i2pd's connections are
+  matched on the whole `uid:2000` field, so another user such as uid 20000 is never counted as an I2P peer.
+  Only established TCP (NTCP2) connections count, so an I2P session that uses only UDP (SSU2) can look
+  like no peers.
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

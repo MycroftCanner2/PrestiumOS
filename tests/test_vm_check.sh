@@ -68,6 +68,9 @@ case "$o" in *"user-mode networking"*"User session"*) ok "10.0.2.2: user-mode ne
 case "$o" in *"Check the clock: the VM thinks it is "*"<clock offset='utc'>"*) ok "no skew evidence, Tor down: clock check with the virt-manager fix";; *) bad "no clock hint: $o";; esac
 case "$o" in *"loopback"*|*"(1 peers)"*) bad "loopback counted as a peer";; *) ok "i2pd's own 127.0.0.1 tunnel is not a peer";; esac
 
+o=$(VIRT=kvm GW=192.168.122.1 TORLOG='Bootstrapped 100% (done): Done' SSOUT="0 0 10.0.2.15:41003 198.51.100.9:23456 uid:20000 ino:4 sk:4" check)
+case "$o" in *"I2P has NO peer connections"*) ok "uid:20000 is not i2pd (uid 2000): not counted";; *) bad "uid:20000 counted as i2pd: $o";; esac
+
 o=$(VIRT=kvm GW=192.168.122.1 TORLOG=$'Bootstrapped 5%\nReceived NETINFO cell with skewed time: Our clock is 7 hours behind' check)
 case "$o" in *"clock is or was wrong (Tor: "*"7 hours behind"*"<clock offset='utc'>"*) ok "Tor skew warning shown with the fix";; *) bad "skew: $o";; esac
 case "$o" in *"user-mode"*) bad "NAT network flagged as user-mode";; *) ok "libvirt NAT not flagged as user-mode";; esac

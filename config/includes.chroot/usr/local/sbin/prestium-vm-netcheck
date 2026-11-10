@@ -47,7 +47,8 @@ sync_skew() {  # seconds prestium-timesync measured (0 if it measured nothing)
 }
 i2p_peers() {  # established TCP (NTCP2) connections of i2pd to other computers
   ss -Htne state established 2>/dev/null \
-    | awk -v u="uid:$I2PD_UID" 'index($0, u) && $4 !~ /^127\./ && $4 !~ /^\[::1\]/ { n++ } END { print n+0 }'
+    | awk -v u="uid:$I2PD_UID" '$4 !~ /^127\./ && $4 !~ /^\[::1\]/ { for (i = 5; i <= NF; i++) if ($i == u) { n++; break } }
+        END { print n+0 }'   # the whole field: uid:2000 must not match uid:20000
 }
 
 sleep "$FIRST"
