@@ -4,8 +4,14 @@
 # scripts/fetch-thirdparty.sh --repin (it verifies the signature, then prints the new SHA to pin).
 # LibreWolf, i2pd and Tor come from their signed apt repositories (config/archives/), not from here.
 
-TB_VERSION=16.0.1
-TB_SHA256=5b36ad610c20c81faa72caf27d1cd3a11f14a327c320b4cec581400016ba78b0
+# 2.1: Tor Browser is the newest release at build time (scripts/tb-latest.sh asks the Tor Project's update
+# service for the version; the tarball must carry a valid signature by TB_KEY and be no older than
+# TB_MIN_VERSION). The build log shows the version and SHA-256 it shipped ("OK TB <sha> (Tor Browser <v>,
+# ...)"; the image's /opt/tor-browser/Browser/tbb_version.json names the version too). To pin one release instead (reproducible builds),
+# set TB_VERSION to it and TB_SHA256 to its SHA-256, or build with PRESTIUM_TB_VERSION=<v> PRESTIUM_TB_SHA256=<sha>.
+TB_VERSION=${PRESTIUM_TB_VERSION:-latest}
+TB_SHA256=${PRESTIUM_TB_SHA256:-}
+TB_MIN_VERSION=16.0.1                                    # never ship anything older (raise it, never lower it)
 TB_KEY=EF6E286DDA85EA2A4BA7DE684E2C6E8793298290          # Tor Browser Developers (signing key)
 
 FF_VERSION=159.0.1

@@ -9,6 +9,15 @@ Enhanced security and new features. Changes will be listed here as they land.
   pins the new tarball's SHA-256; its signature verifies with the shipped Tor Browser key through the signing
   subkey. dist.torproject.org no longer serves 16.0, so the old pin could not build. The Tor daemon and
   LibreWolf still come from their apt repositories at build time.
+- **Tor Browser is now the newest release at every build**, with no version file to edit.
+  `scripts/tb-latest.sh` asks the Tor Project's update service (aus1, HTTPS, no redirects) for the version
+  number only, then builds the download URL on dist.torproject.org. The tarball must carry a valid
+  signature by the pinned Tor Browser key (the same expired and revoked key checks) and be no older than
+  `TB_MIN_VERSION` (16.0.1), so an older release that is still validly signed can't be slipped in. With no
+  pin, the signature is the only check (there was a pinned SHA-256 too). The build log prints the
+  version and SHA-256 it shipped. To pin a release for a reproducible build, set
+  `PRESTIUM_TB_VERSION` and `PRESTIUM_TB_SHA256` (`tests/test_tb_latest.sh`). torbrowser-launcher is
+  not used: it downloads Tor Browser on first launch, which on a live system means every boot.
 - **Tor 0.4.9.16** (the system Tor daemon). deb.torproject.org's trixie repository has served
   `0.4.9.16-1~d13.trixie+1` since 2026-11-10, and the next build installs it. Tor isn't pinned to a version, so no
   other change is needed.

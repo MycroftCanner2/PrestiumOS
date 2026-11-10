@@ -17,7 +17,8 @@ support: the same Debian release, kernel line and firmware set, with Secure Boot
 
 - **Built from git:** the whole image is built from the live-build configuration here, and every
   third-party download (Tor Browser, Firefox, Node.js, The Lounge, Feather, lurch, the I2P reseed file)
-  is checked against its publisher's signature and a pinned SHA-256.
+  is checked against its publisher's signature and a pinned SHA-256 (Tor Browser: the newest signed
+  release at build time, no older than a pinned minimum).
 - **Wayland desktop** (labwc, waybar, swaylock, mako) with a restricted Wayland socket for apps:
   no screen capture, input injection or window snooping. A root broker keeps the full socket away from apps.
 - **Sandboxed browsers:** Tor Browser and LibreWolf (I2P Browser) run in bubblewrap with their own empty

@@ -99,6 +99,11 @@ third-party trees in `/opt` are not copied: they are downloaded and verified at 
 
 ## Updating third-party software
 
+Tor Browser needs nothing: each build takes the newest release, verified by its signature with the
+pinned Tor Browser key and held to `TB_MIN_VERSION` (see `thirdparty/versions.sh`; pin one release with
+`PRESTIUM_TB_VERSION=<v> PRESTIUM_TB_SHA256=<sha>`). Tor, LibreWolf and i2pd come from their signed apt
+repositories, also at the newest version. For everything else:
+
 Edit the version in `thirdparty/versions.sh`, set its `*_SHA256` to `""`, run
 `scripts/fetch-thirdparty.sh --repin` (it checks the signature and prints the new SHA-256), paste
 the value in, rebuild. The Lounge is updated by regenerating `thirdparty/thelounge/package-lock.json`

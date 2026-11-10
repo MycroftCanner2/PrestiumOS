@@ -3,6 +3,7 @@
 # for the chroot hooks in config/includes.chroot/usr/src/prestium-thirdparty/ (not committed).
 #   scripts/fetch-thirdparty.sh            verify signature + pinned SHA-256 (fails on any mismatch)
 #   scripts/fetch-thirdparty.sh --repin    verify signature only, print the SHA-256 values to pin
+#   2.1: Tor Browser is the newest signed release unless pinned (thirdparty/versions.sh, scripts/tb-latest.sh)
 #   It also stages a signature-checked I2P reseed file (StormyCloud su3; a verified download under 24 h old is reused) into config/includes.chroot/var/lib/i2pd/.
 # Needs: curl gpg gpgv git sha256sum unzip npm python3 openssl (the host's npm only runs "npm ci --ignore-scripts": pure JS,
 # architecture-independent). Every registry tarball is checked against the lockfile's sha512 integrity; the one git
@@ -37,11 +38,26 @@ sigok(){ # sigfile datafile fpr
   local st; st=$(gpg --status-fd 1 --verify "$1" "$2" 2>/dev/null) || true
   sigstatus_ok "$2" "$st" "$3" || exit 1; }
 
-# Tor Browser
+# Tor Browser (2.1: the newest release unless versions.sh or PRESTIUM_TB_VERSION pins one)
+. "$TOP/scripts/tb-latest.sh"
+if [ "$TB_VERSION" = latest ]; then
+  TB_VERSION=$(tb_latest) || exit 1
+  TB_LATEST=1; echo "Tor Browser: newest release is $TB_VERSION"
+else
+  TB_LATEST=0
+  tb_version_ok "$TB_VERSION" || { echo "ERROR: bad TB_VERSION '$TB_VERSION'"; exit 1; }
+  tb_version_ge "$TB_VERSION" "$TB_MIN_VERSION" || { echo "ERROR: TB_VERSION $TB_VERSION is older than TB_MIN_VERSION $TB_MIN_VERSION"; exit 1; }
+fi
 TBF=tor-browser-linux-x86_64-$TB_VERSION.tar.xz
 get https://dist.torproject.org/torbrowser/$TB_VERSION/$TBF $TBF
 get https://dist.torproject.org/torbrowser/$TB_VERSION/$TBF.asc $TBF.asc
-sigok "$C/$TBF.asc" "$C/$TBF" "$TB_KEY"; pin TB "$C/$TBF" "$TB_SHA256"
+sigok "$C/$TBF.asc" "$C/$TBF" "$TB_KEY"
+if [ "$TB_LATEST" = 1 ]; then
+  # no pin to compare with: the signature by TB_KEY (checked above) is the trust anchor; record what was used
+  TB_SHA256=$(sha "$C/$TBF"); echo "OK TB $TB_SHA256 (Tor Browser $TB_VERSION, signature verified, not pinned)"
+else
+  pin TB "$C/$TBF" "$TB_SHA256"
+fi
 
 # Firefox (local-only browser for Prestium's own pages)
 FFF=firefox-$FF_VERSION.tar.xz
