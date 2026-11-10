@@ -166,6 +166,23 @@ class Unit(unittest.TestCase):
         with tarfile.open(p) as tf:
             return tf.getmembers()
 
+    def test_copy_as_user_bounded(self):
+        """2.1 audit: the copier runs as the user, who can hold its pipes open or flood stderr."""
+        S = os.path.join(self.m.STAGING_ROOT, "tor-browser"); os.makedirs(S)
+        w = os.path.join(self.d, "work"); os.makedirs(w)
+        open(os.path.join(S, "f"), "w").write("data")
+        self.m.COPY_TIMEOUT = 2
+        self.m.COPIER = "import time; time.sleep(60)"
+        with self.assertRaises(self.m.Fail) as c:
+            self.m.copy_as_user(os.path.join(S, "f"), os.path.join(w, "hang"), 100)
+        self.assertIn("too long", str(c.exception))
+        self.assertFalse(os.path.exists(os.path.join(w, "hang")))
+        self.m.COPY_TIMEOUT = 30
+        self.m.COPIER = "import sys; sys.stderr.write('E' * (8 << 20)); sys.exit(1)"
+        with self.assertRaises(self.m.Fail) as c:
+            self.m.copy_as_user(os.path.join(S, "f"), os.path.join(w, "flood"), 100)
+        self.assertLess(len(str(c.exception)), self.m.COPY_ERR_CAP + 200)
+
     def test_tar_rules(self):
         F = tarfile
         ok = [dict(name="tor-browser/a", data=b"x"), dict(name="tor-browser/l", typ=F.SYMTYPE, link="a"),
@@ -184,6 +201,14 @@ class Unit(unittest.TestCase):
             [dict(name="tor-browser/a", data=b"x"), dict(name="tor-browser/h", typ=F.LNKTYPE, link="tor-browser/a")],
             [dict(name="tor-browser/suid", data=b"x", mode=0o4755)],
             [dict(name="tor-browser/sgid", data=b"x", mode=0o2755)],
+            # 2.1 audit: duplicates, owners other than root, group/world-writable entries
+            [dict(name="tor-browser/l", typ=F.SYMTYPE, link="/etc"), dict(name="tor-browser/l", typ=F.SYMTYPE, link="a")],
+            [dict(name="tor-browser/a", data=b"x"), dict(name="tor-browser/a", data=b"y")],
+            [dict(name="tor-browser/u", data=b"x", uid=1000)],
+            [dict(name="tor-browser/g", data=b"x", gid=1000)],
+            [dict(name="tor-browser/w", data=b"x", mode=0o666)],
+            [dict(name="tor-browser/gw", data=b"x", mode=0o664)],
+            [dict(name="tor-browser/wd", typ=F.DIRTYPE, mode=0o777)],
             [dict(name="other/a", data=b"x")],
             [dict(name="tor-browser/l", typ=F.SYMTYPE, link="."), dict(name="tor-browser/l/x", data=b"x")],
             # chained symlinks that escape only after the second hop
@@ -242,6 +267,11 @@ class Unit(unittest.TestCase):
                      L % ("-rwxr-xr-x", "5", "/etc/x"),
                      L % ("lrwxrwxrwx", "0", "./usr/share/librewolf/l -> /etc"),
                      L % ("-rwxr-xr-x", "5", "./usr/share/librewolf/a -> b"),
+                     # 2.1 audit
+                     L % ("-rwxr-xr-x", "5", "./usr/share/librewolf/librewolf"),             # listed twice
+                     L % ("-rw-rw-r--", "5", "./usr/share/librewolf/gw"),
+                     L % ("drwxrwxrwx", "0", "./usr/share/librewolf/wd/"),
+                     "-rwxr-xr-x 1000/1000 5 2026-10-08 00:03 ./usr/share/librewolf/user-owned",
                      "garbage line"):
             with self.assertRaises(self.m.Fail, msg=line):
                 self.m.parse_deb_listing("\n".join(good + [line]))
@@ -546,6 +576,37 @@ RES.setdefault("state", []).append({"tb": tbver(), "lw": lwver(), "binds": {t[le
         self.assertEqual(s[4], {"tb": "15.0.26", "lw": "157.0.1", "binds": {"/opt/tor-browser": 0, "/usr/share/librewolf": 0,
                                 "/usr/lib/librewolf": 0, "/usr/bin/librewolf": 0}, "tmpfs": 0, "src": None, "stamp": []})
         self.assertEqual(steps[7][0], 0); self.assertTrue(steps[7][1].get("nothing"))
+
+    def test_no_older_release_after_reset(self):
+        """2.1 audit: Reset brings back the shipped copy, not the right to install a superseded release."""
+        st = self.state()
+        r = self.run_steps([
+            ("stage", "16.0.1"), ("install", "tor-browser"),
+            ("revert", "tor-browser"), ("py", st),
+            ("stage", "16.0"), ("install", "tor-browser"), ("py", st),
+            ("stage", "16.0.1"), ("install", "tor-browser"), ("py", st),
+        ])
+        s, steps = r["state"], r["steps"]
+        self.assertEqual(steps[0][0], 0, steps[0])
+        self.assertEqual(steps[1][0], 0, steps[1])
+        self.assertEqual(s[0]["tb"], "15.0.26")
+        self.assertEqual(steps[2][0], 4, steps[2])
+        self.assertIn("earlier in this session", steps[2][1]["error"])
+        self.assertEqual(s[1]["tb"], "15.0.26")
+        self.assertEqual(steps[3][0], 0, steps[3])          # the same release again is fine
+        self.assertEqual(s[2]["tb"], "16.0.1")
+
+    def test_perms_set_before_tree_is_visible(self):
+        """2.1 audit: overlay and fix_perms run inside the root-only work directory."""
+        r = self.run_steps([
+            ("py", "_fp = m.fix_perms\nRES['fp'] = []\ndef rec(p):\n    RES['fp'].append(os.path.relpath(p, m.MOUNT)); return _fp(p)\nm.fix_perms = rec"),
+            ("stage", "16.0.1"), ("install", "tor-browser"),
+            ("py", "m.fix_perms = _fp"),
+        ])
+        self.assertEqual(r["steps"][0][0], 0, r["steps"][0])
+        self.assertTrue(r["fp"], "fix_perms was called")
+        for p in r["fp"]:
+            self.assertTrue(p.startswith(".work/"), p)
 
     def test_rename_failure_rebinds_previous(self):
         st = self.state()

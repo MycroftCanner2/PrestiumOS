@@ -66,6 +66,15 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   in. `tb_version_ok` accepts one line only. Detached signatures (build and Browser Updater) must be one
   signature and no embedded data (`sigstatus_detached_ok`; GnuPG 2.4.7 already refuses an inline-signed
   file there, this does not depend on it). (`tests/test_tb_latest.sh`, `tests/test_sigcheck.sh`)
+- **Browser Updater root helper, tighter.** The new browser tree gets Prestium's settings, root
+  ownership and its final permissions while it is still in the root-only work directory, and is moved
+  where the desktop user can see it only after that; permissions are set through a descriptor that never
+  follows a symlink. Archives and packages with an entry not owned by root, a group- or world-writable
+  entry, or the same name twice are refused (signed Tor Browser 16.0 and LibreWolf trees have none). The
+  copy of each staged file (made as the user) is read with a size cap on its error output and a
+  15-minute limit, so a stopped or held copier can't keep the helper and its lock. Reset no longer
+  allows installing a release older than one already installed this session
+  (`/var/lib/prestium/browser-updates-highest`, in RAM). (`tests/test_browser_install.py`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

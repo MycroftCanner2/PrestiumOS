@@ -30,7 +30,7 @@
 # interrupted run is detected in mountinfo on the next run (and cleaned up, never stacked). A new
 # browser build may need AppArmor rules the shipped profile lacks; that cannot be detected here (the
 # GUI tells the user to press Reset if the browser does not start).
-import contextlib, errno, fcntl, hashlib, json, os, posixpath, re, shutil, signal, stat, subprocess, sys, tarfile, tempfile, time
+import contextlib, errno, fcntl, hashlib, json, os, posixpath, re, select, shutil, signal, stat, subprocess, sys, tarfile, tempfile, time
 
 sys.dont_write_bytecode = True
 # never read bytecode from next to the library either: a stale __pycache__/browser_update.*.pyc in the
@@ -47,6 +47,7 @@ WORKNAME = ".work"
 LOCK = "/run/prestium-browser-install.lock"
 STAGING_ROOT = "/home/user/.cache/prestium/browser-updater/staging"
 STAMP_DIR = "/var/lib/prestium/browser-updates"
+HIGHEST_DIR = "/var/lib/prestium/browser-updates-highest"   # 2.1 audit: newest version per browser this session
 OVERLAY = "/usr/share/prestium/opt-overlay"
 PROC = "/proc"
 MOUNTINFO = "/proc/self/mountinfo"
@@ -58,6 +59,8 @@ DPKG_DEB = "/usr/bin/dpkg-deb"
 PY = "/usr/bin/python3"
 USER = "user"
 COPY_AS = ["/usr/sbin/runuser", "-u", USER, "--"]
+COPY_TIMEOUT = 900          # 2.1 audit: seconds for one staged file (the user can hold the copier's pipes)
+COPY_ERR_CAP = 4096         # bytes of the copier's error text that are kept
 ENV = {"PATH": "/usr/sbin:/usr/bin:/sbin:/bin", "LANG": "C"}
 SCRATCH = bu.SCRATCH
 FREE_MIN = bu.FREE_MIN
@@ -407,25 +410,50 @@ def list_as_user(d):
 
 def copy_as_user(src, dest, cap):
     """Copy a staged file into the root work directory, reading it as the user: the user's file is
-    never opened as root, so a symlink or a race can only reach what the user can read anyway."""
+    never opened as root, so a symlink or a race can only reach what the user can read anyway.
+    2.1 audit: the copier runs as the user, who can open its pipes through /proc/<pid>/fd and its
+    process can be stopped, so both pipes are read with a size cap and one deadline."""
     check_staging_path(src)
     p = subprocess.Popen(COPY_AS + [PY, "-I", "-c", COPIER, src, str(cap)], stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, env=ENV, cwd="/")
-    n = 0
+    n, err, done = 0, b"", False
+    deadline = time.monotonic() + COPY_TIMEOUT
     try:
         with open(dest, "xb") as f:
-            while True:
-                b = p.stdout.read(1 << 20)
-                if not b:
-                    break
-                n += len(b)
-                if n > cap:
-                    p.kill()
-                    raise Fail("%s is too large" % os.path.basename(src))
-                f.write(b)
+            fds = {p.stdout.fileno(): "out", p.stderr.fileno(): "err"}
+            while fds:
+                left = deadline - time.monotonic()
+                if left <= 0:
+                    raise Fail("copying %s took too long" % os.path.basename(src))
+                ready, _, _ = select.select(list(fds), [], [], left)
+                for fd in ready:
+                    b = os.read(fd, 1 << 20)
+                    if not b:
+                        del fds[fd]
+                    elif fds[fd] == "out":
+                        n += len(b)
+                        if n > cap:
+                            raise Fail("%s is too large" % os.path.basename(src))
+                        f.write(b)
+                    elif len(err) < COPY_ERR_CAP:
+                        err += b[:COPY_ERR_CAP - len(err)]
+            try:
+                p.wait(timeout=max(1, deadline - time.monotonic()))
+            except subprocess.TimeoutExpired:
+                raise Fail("copying %s took too long" % os.path.basename(src))
+            done = True
     finally:
-        err = p.stderr.read().decode("utf-8", "replace").strip()
-        p.wait()
+        if not done:
+            p.kill()
+            p.wait()
+        p.stdout.close()
+        p.stderr.close()
+        if not done:
+            try:
+                os.unlink(dest)
+            except FileNotFoundError:
+                pass
+    err = err.decode("utf-8", "replace").strip()
     if p.returncode != 0:
         try:
             os.unlink(dest)
@@ -499,14 +527,22 @@ def check_no_parent_links(paths, links):
 def check_tar(members, top):
     """Exactly one top-level directory named top; only files, directories and symlinks inside it."""
     links, names, total = {}, [], 0
+    seen = set()
     for m in members:
         n = check_member_name(m.name)
+        if n in seen:       # 2.1 audit: a later member of the same name would replace a checked one
+            raise Fail("the archive has %s twice" % n[:120])
+        seen.add(n)
         if n.split("/")[0] != top:
             raise Fail("the archive has %r outside the single top-level directory %s/" % (n[:120], top))
         if not (m.isdir() or m.isreg() or m.issym()) or m.type == tarfile.CONTTYPE:
             raise Fail("the archive has a special file (device, fifo or hard link): %s" % n[:120])
         if m.mode & 0o6000:
             raise Fail("the archive has a setuid/setgid file: %s" % n[:120])
+        if m.uid != 0 or m.gid != 0:       # 2.1 audit: publishers ship root-owned trees
+            raise Fail("the archive has a file not owned by root: %s" % n[:120])
+        if not m.issym() and m.mode & 0o022:
+            raise Fail("the archive has a group- or world-writable file: %s" % n[:120])
         if m.issym():
             if m.linkname.startswith("/"):
                 raise Fail("the archive has an absolute symlink: %s" % n[:120])
@@ -543,7 +579,7 @@ def extract_tarball(archive, unpack, top):
     return os.path.join(unpack, top)
 
 
-LISTING = re.compile(r"^([-dlhcbps])([-rwxsStT]{9})\s+\S+\s+(\d+|\d+,\s*\d+)\s+\d{4}-\d{2}-\d{2}\s+"
+LISTING = re.compile(r"^([-dlhcbps])([-rwxsStT]{9})\s+(\S+)\s+(\d+|\d+,\s*\d+)\s+\d{4}-\d{2}-\d{2}\s+"
                      r"\d{2}:\d{2}(?::\d{2})?\s+(.*)$")
 
 
@@ -556,7 +592,11 @@ def parse_deb_listing(text):
         m = LISTING.match(line)
         if not m:
             raise Fail("cannot read the package listing: %r" % line[:120])
-        typ, perms, size, rest = m.groups()
+        typ, perms, owner, size, rest = m.groups()
+        if owner not in ("root/root", "0/0"):     # 2.1 audit
+            raise Fail("the package has a file not owned by root: %s" % rest[:120])
+        if typ != "l" and (perms[4] == "w" or perms[7] == "w"):
+            raise Fail("the package has a group- or world-writable file: %s" % rest[:120])
         if typ not in "-dl":
             raise Fail("the package has a special file (device, fifo, socket or hard link): %s" % rest[:120])
         if perms[2] in "sS" or perms[5] in "sS":
@@ -573,6 +613,8 @@ def parse_deb_listing(text):
         if not rest.startswith("./"):
             raise Fail("unexpected path in the package listing: %r" % rest[:120])
         n = check_member_name(rest[2:])
+        if n in res:
+            raise Fail("the package lists %s twice" % n[:120])
         res[n] = (typ, target)
         if typ == "l":
             links[n] = target
@@ -644,16 +686,31 @@ def apt_simulate(deb):
 
 # ------------------------------------------------------------------ permissions / overlay
 def fix_perms(path):
-    """root:root, u=rwX,go=rX (nothing group/world writable), no setuid/setgid."""
+    """root:root, u=rwX,go=rX (nothing group/world writable), no setuid/setgid. 2.1 audit: each
+    entry is opened without following a symlink and changed through its descriptor (fchown,
+    fchmod); a symlink only gets lchown. Runs while the tree is still in the root-only work dir."""
     def one(p):
         st = os.lstat(p)
-        os.lchown(p, 0, 0)
         if stat.S_ISLNK(st.st_mode):
+            os.lchown(p, 0, 0)
             return
+        flags = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_CLOEXEC
         if stat.S_ISDIR(st.st_mode):
-            os.chmod(p, 0o755)
-        else:
-            os.chmod(p, 0o755 if st.st_mode & 0o111 else 0o644)
+            flags |= os.O_DIRECTORY
+        elif not stat.S_ISREG(st.st_mode):
+            raise Fail("unpacked tree has a special file: %s" % p)
+        fd = os.open(p, flags)
+        try:
+            fs = os.fstat(fd)
+            if (fs.st_dev, fs.st_ino) != (st.st_dev, st.st_ino):
+                raise Fail("unpacked tree changed while its permissions were set: %s" % p)
+            os.fchown(fd, 0, 0)
+            if stat.S_ISDIR(fs.st_mode):
+                os.fchmod(fd, 0o755)
+            else:
+                os.fchmod(fd, 0o755 if fs.st_mode & 0o111 else 0o644)
+        finally:
+            os.close(fd)
     one(path)
     if os.path.isdir(path) and not os.path.islink(path):
         for dp, dns, fns in os.walk(path):
@@ -725,6 +782,39 @@ def check_newer(name, v):
     if c < 0:
         raise Fail("%s %s is older than the installed %s; not downgrading (Reset to shipped copy is the "
                    "only way back)." % (bu.TITLES[name], v, info.get("full") or info["version"]), 4)
+    # 2.1 audit: Reset brings back the shipped copy, but not the right to install a signed release
+    # older than one already installed this session (a superseded release with known holes)
+    hv = read_highest(name)
+    if hv and bu.compare_candidate(name, v, {"version": hv, "full": hv if name == "librewolf" else None}) < 0:
+        raise Fail("%s %s is older than %s, which was installed earlier in this session; not "
+                   "downgrading." % (bu.TITLES[name], v, hv), 4)
+
+
+HIGHEST_RE = re.compile(r"^[0-9A-Za-z.+~:-]{1,64}$")
+
+
+def read_highest(name):
+    """The newest version installed this session (root-owned, in HIGHEST_DIR), or None."""
+    try:
+        with open(os.path.join(HIGHEST_DIR, name), "rb") as f:
+            v = f.read(128).decode("ascii", "replace").strip()
+    except FileNotFoundError:
+        return None
+    if not HIGHEST_RE.match(v):
+        raise Fail("the record of earlier %s updates is damaged; reboot to clear it" % bu.TITLES[name])
+    return v
+
+
+def write_highest(name, v):
+    hv = read_highest(name)
+    if hv and bu.compare_candidate(name, v, {"version": hv, "full": hv if name == "librewolf" else None}) <= 0:
+        return
+    os.makedirs(HIGHEST_DIR, mode=0o755, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=HIGHEST_DIR, prefix=".tmp-")
+    with os.fdopen(fd, "w") as f:
+        f.write(v + "\n")
+    os.chmod(tmp, 0o644)
+    os.replace(tmp, os.path.join(HIGHEST_DIR, name))
 
 
 # ------------------------------------------------------------------ build the new unit (.next)
@@ -741,17 +831,18 @@ def clear_stale(name):
 def build_tarball_unit(name, work, archive, v):
     top = TOPDIR[name]
     tree = extract_tarball(archive, os.path.join(work, "unpack"), top)
-    nxt = src_path(UNITS[name][0][0] + ".next")
-    os.rename(tree, nxt)                  # the named directory itself: no <path>/<top>/ nesting
-    apply_overlay(name, nxt)
-    fix_perms(nxt)
-    exe = os.path.join(nxt, EXES[name][0])
+    # 2.1 audit: overlay, permissions and checks while the tree is still in the root-only (0700)
+    # work directory; it is moved where the user can see it only when it is final
+    apply_overlay(name, tree)
+    fix_perms(tree)
+    exe = os.path.join(tree, EXES[name][0])
     if not os.path.isfile(exe) or os.path.islink(exe):
         raise Fail("the new %s has no %s" % (bu.TITLES[name], EXES[name][0]))
-    got = bu.tree_version(name, nxt)
+    got = bu.tree_version(name, tree)
     if got != v:
         raise Fail("the new %s says it is version %s, the signed file name says %s"
                    % (bu.TITLES[name], got, v))
+    os.rename(tree, src_path(UNITS[name][0][0] + ".next"))   # the named directory: no <top>/ nesting
     return [UNITS[name][0][0]]
 
 
@@ -812,9 +903,10 @@ def build_lw_unit(work, deb, v, layout=None):
     if not any(os.path.isfile(os.path.join(share, e)) and not os.path.islink(os.path.join(share, e))
                for e in EXES["librewolf"]):
         raise Fail("the new LibreWolf has no usr/share/librewolf/librewolf")
-    srcs = []
-    os.rename(share, src_path("librewolf.next"))
-    srcs.append("librewolf")
+    # 2.1 audit: decide and check everything, set the overlay and permissions while the trees are
+    # still in the root-only (0700) work directory, and move them where the user can see them last
+    moves = [(share, "librewolf")]
+    empty_lib = False
     # /usr/lib/librewolf: the new tree, or an empty directory that hides the factory one so old
     # libraries are never mixed with the new share tree
     lib = os.path.join(unpack, "usr/lib/librewolf")
@@ -824,13 +916,11 @@ def build_lw_unit(work, deb, v, layout=None):
         if layout["lib"] != "dir":
             raise Fail("the new LibreWolf needs %s, which this image does not have; nothing was changed"
                        % lib_t)
-        os.rename(lib, src_path("librewolf-lib.next"))
-        srcs.append("librewolf-lib")
+        moves.append((lib, "librewolf-lib"))
     elif layout["lib"] != "none":
         if layout["lib"] != "dir":
             raise Fail("%s is not a directory" % lib_t)
-        os.mkdir(src_path("librewolf-lib.next"), 0o755)
-        srcs.append("librewolf-lib")
+        empty_lib = True
     # /usr/bin/librewolf: the package's symlink into usr/share/librewolf needs no mount of its own (the
     # share bind covers what it points to) when the factory one points to the same place; a regular
     # file is bound over a regular factory file. Never mount on a symlink (that would hit its target).
@@ -850,17 +940,24 @@ def build_lw_unit(work, deb, v, layout=None):
         if layout["bin"] != "file":
             raise Fail("the new usr/bin/librewolf is a file but this image's is a symlink; nothing was "
                        "changed")
-        os.rename(wrap, src_path("librewolf-wrapper.next"))
-        srcs.append("librewolf-wrapper")
+        moves.append((wrap, "librewolf-wrapper"))
     else:
         raise Fail("the new usr/bin/librewolf is not a file")
     # everything else in the package (/etc/apparmor.d/librewolf, icons, docs) is not used
-    apply_overlay("librewolf", src_path("librewolf.next"))
-    for s in srcs:
-        fix_perms(src_path(s + ".next"))
-    got = bu.tree_version("librewolf", src_path("librewolf.next"))
+    apply_overlay("librewolf", share)
+    for path, _ in moves:
+        fix_perms(path)
+    got = bu.tree_version("librewolf", share)
     if got != bu.deb_upstream(v):
         raise Fail("the new LibreWolf says it is version %s, the signed index says %s" % (got, v))
+    srcs = []
+    for path, src in moves:
+        os.rename(path, src_path(src + ".next"))
+        srcs.append(src)
+    if empty_lib:
+        os.mkdir(src_path("librewolf-lib.next"), 0o755)
+        os.chmod(src_path("librewolf-lib.next"), 0o755)
+        srcs.append("librewolf-lib")
     return srcs
 
 
@@ -1168,6 +1265,11 @@ def install(name):
             ok = True           # published: from here on a failure must not report "not updated"
             msg = ("%s %s is installed for this session (in RAM until Reset or reboot). %s"
                    % (bu.TITLES[name], v, bu.RESET_HINT))
+            try:
+                write_highest(name, v)
+            except (OSError, Fail) as e:
+                print("prestium-browser-install: warning: cannot record the installed version (%s)" % e,
+                      file=sys.stderr)       # the update itself is in place
             try:
                 write_stamp(name, v, sha, factory, layout)
             except OSError as e:

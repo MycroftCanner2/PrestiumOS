@@ -86,9 +86,9 @@ def changelog_for(v):
     return CHANGELOG.replace("Tor Browser 16.0 -", "Tor Browser %s -" % v, 1)
 
 
-def add(tf, name, data=None, mode=0o644, typ=tarfile.REGTYPE, link=""):
+def add(tf, name, data=None, mode=0o644, typ=tarfile.REGTYPE, link="", uid=0, gid=0):
     ti = tarfile.TarInfo(name)
-    ti.mode, ti.type, ti.linkname = mode, typ, link
+    ti.mode, ti.type, ti.linkname, ti.uid, ti.gid = mode, typ, link, uid, gid
     if data is not None:
         ti.size = len(data)
         tf.addfile(ti, io.BytesIO(data))
@@ -344,6 +344,7 @@ bu.DPKG = "/usr/bin/dpkg"; bu.PACKAGES_LIST = os.path.join(R, "packages.txt")
 m.MOUNT = os.path.join(R, "run/prestium/browsers"); m.LOCK = os.path.join(R, "lock")
 m.STAGING_ROOT = os.path.join(R, "home/user/.cache/prestium/browser-updater/staging")
 m.STAMP_DIR = os.path.join(R, "var/lib/prestium/browser-updates")
+m.HIGHEST_DIR = os.path.join(R, "var/lib/prestium/browser-updates-highest")
 m.OVERLAY = os.path.join(T.INC, "usr/share/prestium/opt-overlay")
 m.PROC = os.path.join(R, "proc"); m.MEMINFO = os.path.join(R, "meminfo")
 m.PY = sys.executable; m.COPY_AS = []; m.APT_GET = os.path.join(R, "fakeapt")
