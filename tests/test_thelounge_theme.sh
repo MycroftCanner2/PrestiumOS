@@ -17,6 +17,6 @@ grep -q '^	theme: "thelounge-theme-prestium",$' "$I/var/lib/thelounge/config.js"
 grep -qiE 'url\(|https?:|@font-face' <(grep -v '^@import "default.css";$' "$D/theme.css") && bad "theme loads something remote" || ok "theme loads nothing but The Lounge's default.css"
 [ "$(grep -c '{' "$D/theme.css")" = "$(grep -c '}' "$D/theme.css")" ] && ok "braces balanced" || bad "braces"
 for f in index.js package.json theme.css; do
-  grep -qx "0600 thelounge thelounge /var/lib/thelounge/packages/node_modules/thelounge-theme-prestium/$f" "$I/usr/share/prestium/build/perms.txt" && ok "perms: $f" || bad "perms: $f"; done
-grep -qx "0700 thelounge thelounge /var/lib/thelounge/packages/node_modules/thelounge-theme-prestium/" "$I/usr/share/prestium/build/perms.txt" && ok "perms: directory" || bad "perms: directory"
+  grep -qx "0640 root thelounge /var/lib/thelounge/packages/node_modules/thelounge-theme-prestium/$f" "$I/usr/share/prestium/build/perms.txt" && ok "perms: $f" || bad "perms: $f"; done
+grep -qx "0750 root thelounge /var/lib/thelounge/packages/node_modules/thelounge-theme-prestium/" "$I/usr/share/prestium/build/perms.txt" && ok "perms: directory" || bad "perms: directory"
 [ $fail = 0 ] && echo "thelounge theme: OK"; exit $fail

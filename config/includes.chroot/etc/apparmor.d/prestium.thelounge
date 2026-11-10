@@ -39,6 +39,11 @@ profile thelounge flags=(attach_disconnected) {
   /tmp/** rwk,
   /dev/shm/** rwk,
 
+  # 2.1 (security audit): its code and settings are root's: The Lounge require()s config.js and
+  # every package at start, so it must not be able to rewrite them (or replace the directory)
+  deny /var/lib/thelounge/config.js wl,
+  deny /var/lib/thelounge/packages{,/**} wl,
+
   # no home directories at all, no other programs
   deny /home/** rw,
   deny /root/** rw,

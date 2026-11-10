@@ -89,6 +89,14 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   loopback i2pd keeps only its SOCKS outproxy tunnel (4500) and Tor only the kernel's ephemeral ports
   32768-60999, where its pluggable transports listen. Bridges must be re-checked on a booted ISO.
   (`tests/test_ferm_loopback.sh`)
+- **The Lounge can't rewrite its own code.** It `require()`s `config.js` and its packages (the sign-in
+  page and the theme) at every start, and they belonged to the thelounge uid. They are now root-owned
+  and read-only for The Lounge (`root:thelounge` 0640/0750, `ReadOnlyPaths=` in the unit, `deny ... wl`
+  in its AppArmor profile); checked with the real The Lounge 4.5.2, which starts and loads both
+  packages from a read-only tree. i2pd and Tor now run with `ProtectProc=invisible`, so they can't read
+  other processes' command lines, such as the local-only Firefox's, which carries The Lounge's sign-in
+  URL. (The sign-in token stays reusable for the boot: the desktop user's own programs can read its file
+  anyway, so a one-time token would not protect against anything new.) (`tests/test_thelounge_readonly.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
