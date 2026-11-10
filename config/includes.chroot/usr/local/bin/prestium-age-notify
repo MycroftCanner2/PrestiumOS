@@ -1,0 +1,17 @@
+#!/bin/sh
+# Prestium 2.1 (security audit): say when this image is old. Prestium has no updates inside a
+# session: Debian security fixes, Tor and i2pd only reach you in a newer image. Started from the
+# session autostart; waits for the clock to be set (prestium-timesync runs once Tor is up).
+B=/usr/share/prestium/build-date
+WAIT=${PRESTIUM_AGE_WAIT:-300}
+OLD=${PRESTIUM_AGE_DAYS:-45}
+build=$(head -c 32 "$B" 2>/dev/null | tr -cd 0-9)
+[ -n "$build" ] || exit 0
+sleep "$WAIT"
+now=$(date -u +%s)
+days=$(( (now - build) / 86400 ))
+[ "$days" -ge "$OLD" ] || exit 0
+when=$(date -u -d "@$build" '+%Y-%m-%d')
+notify-send -u normal -t 0 "This Prestium image is $days days old" \
+  "It was built on $when. Security fixes released since then (Debian, Tor, i2pd) are not in it, and Prestium does not update itself during a session. Download the newest release when you can." 2>/dev/null
+exit 0

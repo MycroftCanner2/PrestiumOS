@@ -14,4 +14,6 @@ prestium-run nm-applet --indicator >/dev/null 2>&1
 prestium-run lxpolkit >/dev/null 2>&1
 # 2.1: virtual machine warning and network diagnosis (backgrounded: the safety notifier below never returns)
 prestium-run /usr/local/bin/prestium-vm-notify >/dev/null 2>&1 &
+# 2.1 (security audit): a notice when the image is more than 45 days old
+prestium-run /usr/local/bin/prestium-age-notify >/dev/null 2>&1 &
 prestium-run /usr/local/bin/prestium-safety-notify >/dev/null 2>&1

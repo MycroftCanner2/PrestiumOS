@@ -108,6 +108,7 @@ ID=prestium
 ID_LIKE=debian
 VERSION_CODENAME=trixie
 HOME_URL="https://prestium.org/"
+BUILD_ID="$(date -u -d "@$BUILD_EPOCH" +%Y-%m-%d)"
 EOF
 rm -f /etc/os-release; cp /usr/lib/os-release /etc/os-release
 printf 'Prestium %s \\n \\l\n\n' "$VERSION" > /etc/issue

@@ -151,6 +151,10 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
 - **Repeatable builds (first step).** `PRESTIUM_SNAPSHOT=20261110T000000Z` builds from
   snapshot.debian.org at that time, and `build.sh` sets `SOURCE_DATE_EPOCH` to the commit's time. The
   image is not yet bit-for-bit reproducible. (`tests/test_build_snapshot.sh`)
+- **The desktop says when the image is old.** Prestium does not update itself during a session, so
+  security fixes only arrive with a newer image. Five minutes after login, a notice says how many days
+  old the image is once it is past 45 days. `/etc/os-release` has the build date as `BUILD_ID`.
+  (`tests/test_age_notify.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

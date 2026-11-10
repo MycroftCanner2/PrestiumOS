@@ -366,6 +366,7 @@
 0755 root root /usr/local/lib/prestium/safety-flag
 0755 root root /usr/local/bin/prestium-safety-notify
 0755 root root /usr/local/bin/prestium-vm-notify
+0755 root root /usr/local/bin/prestium-age-notify
 # 2.0 r9: sandboxed Tor Browser, app confinement
 0644 root root /usr/lib/tmpfiles.d/prestium-tbb.conf
 0644 root root /etc/apparmor.d/abstractions/prestium-no-admin
