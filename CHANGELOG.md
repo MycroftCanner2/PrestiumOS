@@ -48,6 +48,16 @@ Enhanced security and new features. Changes will be listed here as they land.
   in Settings. The sign-in page is dark too, so it no longer flashes white
   (`tests/test_thelounge_theme.sh`).
 
+### Security audit fixes (2026-11-10)
+Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
+- **Browser launchers take nothing from the caller's environment.** Claws Mail, Gajim and Pidgin start
+  `tor-browser` and `librewolf-i2p` with AppArmor `Ux`, which keeps their environment. The launchers
+  honoured `PRESTIUM_SANDBOX_LIB`, `PRESTIUM_BWRAP`, `PRESTIUM_WL_BASE`, `PRESTIUM_LIBREWOLF` and
+  `PRESTIUM_I2P_HTTP_PORT` (test hooks), and bash also reads `BASH_ENV` and exported functions, so a
+  compromised mail or chat client could run its own code outside its profile. They now run as
+  `bash -p`, set a fixed PATH and use fixed paths only; the tests run patched copies
+  (`tests/test_launcher_env.sh`).
+
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
   when the key that made it has since expired. Every third-party signature (Tor Browser, Firefox,

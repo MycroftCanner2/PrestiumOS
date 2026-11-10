@@ -14,6 +14,10 @@
 #    other setuid program are useless inside).
 #  - the browser's AppArmor profile still applies inside (same paths).
 
+# 2.1 (security audit): fixed paths, never from the environment (see the launchers' header).
+SBX_WL_BASE=/run/prestium-wl
+SBX_BWRAP=/usr/bin/bwrap
+
 sbx_fail() {   # $1 title, $2 message
   notify-send -u critical "$1" "$2" 2>/dev/null
   echo "$1: $2" >&2
@@ -23,12 +27,12 @@ sbx_fail() {   # $1 title, $2 message
 # sbx_init TITLE: checks, and starts the B array with everything both browsers share.
 sbx_init() {
   SBX_TITLE=$1
-  command -v bwrap >/dev/null || sbx_fail "$SBX_TITLE" "The browser sandbox (bubblewrap) is missing. The browser was not started."
+  [ -x "$SBX_BWRAP" ] || sbx_fail "$SBX_TITLE" "The browser sandbox (bubblewrap) is missing. The browser was not started."
   [ -n "${XDG_RUNTIME_DIR:-}" ] || sbx_fail "$SBX_TITLE" "No session. The browser was not started."
   SBX_U=$(id -u)
   SBX_DIR="$XDG_RUNTIME_DIR/prestium-sandbox"
   mkdir -p -m 0700 "$SBX_DIR" || sbx_fail "$SBX_TITLE" "Cannot create $SBX_DIR."
-  SBX_WL="${PRESTIUM_WL_BASE:-/run/prestium-wl}/$SBX_U/apps"
+  SBX_WL="$SBX_WL_BASE/$SBX_U/apps"
   [ -S "$SBX_WL" ] || sbx_fail "$SBX_TITLE" "The restricted Wayland socket is missing. The browser was not started."
   local inner="/run/user/$SBX_U"
   B=(--unshare-all --new-session --die-with-parent --hostname localhost
@@ -58,9 +62,9 @@ sbx_init() {
 # is shared by all applications.)
 sbx_run() {
   shift
-  ${PRESTIUM_BWRAP:-bwrap} "${B[@]}" -- "$@"
+  "$SBX_BWRAP" "${B[@]}" -- "$@"
 }
 sbx_exec() {
   shift
-  exec ${PRESTIUM_BWRAP:-bwrap} "${B[@]}" -- "$@"
+  exec "$SBX_BWRAP" "${B[@]}" -- "$@"
 }

@@ -21,8 +21,14 @@ sudo -n chown "$(id -u)" /run/prestium-tbb /opt/tor-browser/Browser
 sudo -n sh -c 'echo "user_pref(\"browser.download.dir\", \"@DOWNLOADS@\");" > /usr/local/share/prestium-tor-browser/user.js; : > /usr/local/share/prestium-nssdb/cert9.db; : > /usr/local/share/prestium-nssdb/key4.db'
 T=$(mktemp -d); chmod 755 "$T"; export HOME=$T/home; mkdir -p "$HOME"; echo secret > "$HOME/keepass.kdbx"; mkdir -p "$HOME/.ssh"
 export XDG_RUNTIME_DIR=$T/xdg$(id -u); mkdir -m 700 "$XDG_RUNTIME_DIR"
-export PRESTIUM_SANDBOX_LIB=$I/usr/local/lib/prestium/browser-sandbox.sh
 export PRESTIUM_WL_BASE=$T/wlbase
+# 2.1: the shipped launchers take nothing from the environment, so the test runs patched copies
+L=$T/launch; mkdir -p "$L"
+sed "s#^SBX_WL_BASE=.*#SBX_WL_BASE=$PRESTIUM_WL_BASE#; s#^SBX_BWRAP=.*#SBX_BWRAP=$(command -v bwrap)#" \
+  "$I/usr/local/lib/prestium/browser-sandbox.sh" > "$L/browser-sandbox.sh"
+sed "s#^SBX_LIB=.*#SBX_LIB=$L/browser-sandbox.sh#" "$I/usr/local/bin/tor-browser" > "$L/tor-browser"
+sed "s#^SBX_LIB=.*#SBX_LIB=$L/browser-sandbox.sh#; s#^I2P_HTTP_PORT=.*#I2P_HTTP_PORT=14444#; s#^LIBREWOLF=.*#LIBREWOLF=\"\$HOME/.librewolf/probe\"#" \
+  "$I/usr/local/bin/librewolf-i2p" > "$L/librewolf-i2p"
 pids=()
 cleanup() {
   kill "${pids[@]}" 2>/dev/null; [ -s "$T/broker.pid" ] && sudo -n kill "$(cat "$T/broker.pid")" 2>/dev/null; wait 2>/dev/null
@@ -89,7 +95,7 @@ $(cat "$PROBE")
 PY
 EOF
 chmod +x /opt/tor-browser/Browser/start-tor-browser
-out=$(bash "$I/usr/local/bin/tor-browser" "https://example.org/" 2>&1)
+out=$(bash -p "$L/tor-browser" "https://example.org/" 2>&1)
 j=$(printf '%s\n' "$out" | sed -n 's/^PROBE//p')
 if [ -z "$j" ]; then bad "Tor Browser probe did not run: $out"; else
   common "Tor Browser" "$j"
@@ -102,7 +108,7 @@ fi
 echo "== LibreWolf (I2P Browser)"
 mkdir -p "$HOME/.librewolf"
 cp "$PROBE" "$HOME/.librewolf/probe"; chmod +x "$HOME/.librewolf/probe"
-out=$(PRESTIUM_LIBREWOLF="$HOME/.librewolf/probe" PRESTIUM_I2P_HTTP_PORT=14444 bash "$I/usr/local/bin/librewolf-i2p" "http://example.i2p/" 2>&1)
+out=$(bash -p "$L/librewolf-i2p" "http://example.i2p/" 2>&1)
 j=$(printf '%s\n' "$out" | sed -n 's/^PROBE//p')
 if [ -z "$j" ]; then bad "LibreWolf probe did not run: $out"; else
   common "LibreWolf" "$j"
@@ -113,10 +119,10 @@ if [ -z "$j" ]; then bad "LibreWolf probe did not run: $out"; else
 fi
 ls "$XDG_RUNTIME_DIR/prestium-sandbox" 2>/dev/null | grep -q . && bad "sandbox sockets left behind" || ok "sandbox sockets removed after exit"
 sudo -n mv "$PRESTIUM_WL_BASE/$(id -u)/apps" "$T/apps.moved"
-bash "$I/usr/local/bin/tor-browser" >/dev/null 2>&1 && bad "starts without the restricted socket" || ok "refuses to start without the restricted Wayland socket"
+bash -p "$L/tor-browser" >/dev/null 2>&1 && bad "starts without the restricted socket" || ok "refuses to start without the restricted Wayland socket"
 sudo -n mv "$T/apps.moved" "$PRESTIUM_WL_BASE/$(id -u)/apps"
 
 echo "== refusals"
 sudo -n rm -f /run/prestium-tbb/socks
-bash "$I/usr/local/bin/tor-browser" >/dev/null 2>&1 && bad "Tor Browser starts without Tor's socket" || ok "Tor Browser refuses to start without Tor's socket"
+bash -p "$L/tor-browser" >/dev/null 2>&1 && bad "Tor Browser starts without Tor's socket" || ok "Tor Browser refuses to start without Tor's socket"
 exit $fail

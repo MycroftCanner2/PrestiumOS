@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -p
 # Prestium: official Tor Browser (/opt/tor-browser), using the system Tor
 # (tor@default, SOCKS 127.0.0.1:9050) instead of its own tor, so the ferm rule
 # "only debian-tor and i2pd reach the network" still holds.
@@ -11,6 +11,14 @@
 #  - The control port is reached through the onion-grater filter
 #    (/run/onion-grater/control: NEWNYM, circuit display, onion auth only).
 TB=/opt/tor-browser
+# 2.1 (security audit): Claws Mail, Gajim and Pidgin start this launcher with AppArmor "Ux", which
+# keeps their environment (only the loader's unsafe variables are dropped). So nothing here may come
+# from the caller's environment: "bash -p" ignores BASH_ENV, ENV, SHELLOPTS, BASHOPTS, CDPATH,
+# GLOBIGNORE and exported functions; PATH is fixed; every file and program is a fixed path (no
+# PRESTIUM_* overrides; the tests run patched copies).
+PATH=/usr/bin:/bin; export PATH
+unset IFS
+SBX_LIB=/usr/local/lib/prestium/browser-sandbox.sh
 if [ "$(id -u)" -eq 0 ]; then echo "Tor Browser must not run as root." >&2; exit 1; fi
 P="$HOME/.tor-browser/profile.default"
 D="$HOME/Tor Browser"
@@ -33,7 +41,7 @@ sed "s#@DOWNLOADS@#$D#g" /usr/local/share/prestium-tor-browser/user.js > "$P/use
 # the onion-grater control filter.
 SOCKS=/run/prestium-tbb/socks
 CTL=/run/onion-grater/control
-. ${PRESTIUM_SANDBOX_LIB:-/usr/local/lib/prestium/browser-sandbox.sh}
+. "$SBX_LIB" || { echo "browser sandbox library missing" >&2; exit 1; }
 [ -S "$SOCKS" ] || sbx_fail "Tor Browser" "Tor is not running (no SOCKS socket). Tor Browser was not started."
 sbx_init "Tor Browser"
 B+=(--ro-bind "$TB" "$TB"
