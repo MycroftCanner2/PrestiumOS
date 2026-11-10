@@ -21,7 +21,12 @@ mv "$T/tor-browser" /opt/tor-browser
 cp -a "$O/tor-browser/." /opt/tor-browser/
 touch /opt/tor-browser/Browser/is-packaged-app
 chown -R root:root /opt/tor-browser; chmod -R u+rwX,go+rX,go-w /opt/tor-browser
-grep -q '"version"' /opt/tor-browser/Browser/tbb_version.json 2>/dev/null && echo "P: Tor Browser $(cat /opt/tor-browser/Browser/tbb_version.json)"
+# 2.1 audit: the installed tree must be the release fetch-thirdparty.sh asked for (and signature-checked)
+tbv=$(python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["version"] if d.get("channel")=="release" else "")' \
+  /opt/tor-browser/Browser/tbb_version.json 2>/dev/null) || tbv=
+[ -n "$tbv" ] && [ "$tbv" = "$(cat "$S/tor-browser.version" 2>/dev/null)" ] \
+  || { echo "E: Tor Browser in the image is '${tbv:-unknown}', expected $(cat "$S/tor-browser.version" 2>/dev/null)"; exit 1; }
+echo "P: Tor Browser $tbv"
 
 # Firefox (local-only)
 rm -rf /opt/firefox

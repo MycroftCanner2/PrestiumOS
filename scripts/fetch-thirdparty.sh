@@ -34,9 +34,9 @@ treehash(){ # sha256 over package.json, package-lock.json, .npmrc and every file
   (cd "$1" && { find node_modules -type f -print0; printf '%s\0' package.json package-lock.json .npmrc; } \
     | LC_ALL=C sort -z | xargs -0 sha256sum) | sha256sum | cut -c1-64; }
 . "$TOP/scripts/sigcheck.sh"
-sigok(){ # sigfile datafile fpr
+sigok(){ # sigfile datafile fpr (detached signatures only)
   local st; st=$(gpg --status-fd 1 --verify "$1" "$2" 2>/dev/null) || true
-  sigstatus_ok "$2" "$st" "$3" || exit 1; }
+  sigstatus_detached_ok "$2" "$st" "$3" || exit 1; }
 
 # Tor Browser (2.1: the newest release unless versions.sh or PRESTIUM_TB_VERSION pins one)
 . "$TOP/scripts/tb-latest.sh"
@@ -51,13 +51,19 @@ fi
 TBF=tor-browser-linux-x86_64-$TB_VERSION.tar.xz
 get https://dist.torproject.org/torbrowser/$TB_VERSION/$TBF $TBF
 get https://dist.torproject.org/torbrowser/$TB_VERSION/$TBF.asc $TBF.asc
-sigok "$C/$TBF.asc" "$C/$TBF" "$TB_KEY"
+# 2.1 audit: verify, hash and stage one private copy (the shared cache can change between reads)
+TBW=$GNUPGHOME/tb; mkdir -m 700 "$TBW"; cp "$C/$TBF" "$TBW/$TBF"; cp "$C/$TBF.asc" "$TBW/$TBF.asc"
+sigok "$TBW/$TBF.asc" "$TBW/$TBF" "$TB_KEY"
 if [ "$TB_LATEST" = 1 ]; then
   # no pin to compare with: the signature by TB_KEY (checked above) is the trust anchor; record what was used
-  TB_SHA256=$(sha "$C/$TBF"); echo "OK TB $TB_SHA256 (Tor Browser $TB_VERSION, signature verified, not pinned)"
+  TB_SHA256=$(sha "$TBW/$TBF"); echo "OK TB $TB_SHA256 (Tor Browser $TB_VERSION, signature verified, not pinned)"
 else
-  pin TB "$C/$TBF" "$TB_SHA256"
+  pin TB "$TBW/$TBF" "$TB_SHA256"
 fi
+# the signature does not cover the file name: the tarball's own version must be the one asked for
+TB_GOT=$(tb_tarball_version "$TBW/$TBF") \
+  || { echo "ERROR: $TBF has no release-channel linux-x86_64 tbb_version.json"; exit 1; }
+[ "$TB_GOT" = "$TB_VERSION" ] || { echo "ERROR: $TBF contains Tor Browser $TB_GOT, not $TB_VERSION"; exit 1; }
 
 # Firefox (local-only browser for Prestium's own pages)
 FFF=firefox-$FF_VERSION.tar.xz
@@ -205,7 +211,7 @@ chmod 644 "$SU3.part"; mv -f "$SU3.part" "$SU3"
 
 # stage for the hooks
 rm -rf "$S"; mkdir -p "$S"
-cp "$C/$TBF" "$S/tor-browser.tar.xz"; cp "$C/$FFF" "$S/firefox.tar.xz"; cp "$C/$NF" "$S/node.tar.xz"
+cp "$TBW/$TBF" "$S/tor-browser.tar.xz"; echo "$TB_VERSION" > "$S/tor-browser.version"; cp "$C/$FFF" "$S/firefox.tar.xz"; cp "$C/$NF" "$S/node.tar.xz"
 cp "$C/$FEF" "$S/feather.zip"; echo "$FEATHER_VERSION" > "$S/feather.version"
 # 2.0 r7: re-check what was actually staged (closes the verify-then-copy gap)
 for x in "tor-browser.tar.xz $TB_SHA256" "firefox.tar.xz $FF_SHA256" "node.tar.xz $NODE_SHA256" "feather.zip $FEATHER_SHA256"; do

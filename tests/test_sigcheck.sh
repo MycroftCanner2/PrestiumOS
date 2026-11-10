@@ -5,7 +5,8 @@
 set -u
 R=$(cd "$(dirname "$0")/.." && pwd)
 . "$R/scripts/sigcheck.sh"
-command -v gpg >/dev/null && command -v gpgv >/dev/null || { echo "SKIP gpg/gpgv missing"; exit 0; }
+command -v gpg >/dev/null || { echo "SKIP gpg missing"; exit 0; }
+V=checkv; command -v gpgv >/dev/null || { echo "SKIP gpgv missing (gpgv cases)"; V=; }
 export GNUPGHOME=$(mktemp -d); W=$(mktemp -d); trap 'gpgconf --kill all >/dev/null 2>&1; rm -rf "$GNUPGHOME" "$W"' EXIT
 fail=0
 ok(){ echo "OK   $*"; }; bad(){ echo "FAIL $*"; fail=1; }
@@ -42,18 +43,31 @@ gpg -q --batch --export > "$W/ring.gpg"
 gpg --batch --verify "$W/exp.sig" "$W/data" 2>/dev/null && ok "gpg exits 0 for the expired key (status lines needed)"
 
 o=$(check good "$W/good.sig" "$GOOD") && ok "good signature, pinned key: accepted" || bad "good signature rejected: $o"
-o=$(checkv good "$W/good.sig" "") && ok "good signature via gpgv: accepted" || bad "gpgv good signature rejected: $o"
+[ -z "$V" ] || o=$(checkv good "$W/good.sig" "") && ok "good signature via gpgv: accepted" || bad "gpgv good signature rejected: $o"
 o=$(check other "$W/other.sig" "$GOOD") && bad "other key accepted" || { case "$o" in *"not made by the pinned key"*) ok "other key: rejected ($o)";; *) bad "other key: wrong message: $o";; esac; }
-for f in check checkv; do
+for f in check $V; do
   o=$($f expired "$W/exp.sig" "$EXP") && bad "$f: expired key accepted" || { case "$o" in *EXPIRED*) ok "$f expired key: rejected ($o)";; *) bad "$f expired: wrong message: $o";; esac; }
   o=$($f revoked "$W/rev.sig" "$REV") && bad "$f: revoked key accepted" || { case "$o" in *REVOKED*) ok "$f revoked key: rejected ($o)";; *) bad "$f revoked: wrong message: $o";; esac; }
 done
 printf 'tampered\n' > "$W/data"
 o=$(check tampered "$W/good.sig" "$GOOD") && bad "tampered data accepted" || { case "$o" in *"bad signature"*) ok "tampered data: rejected ($o)";; *) bad "tampered: wrong message: $o";; esac; }
 o=$(sigstatus_ok empty "" "$GOOD") && bad "empty status accepted" || ok "no status output: rejected"
+# 2.1 audit: an inline-signed (opaque) message passed as the "detached" signature verifies its own
+# text, not the data file; sigstatus_detached_ok refuses it, and a file with two signatures
+printf 'payload\n' > "$W/data"
+$G -u "$GOOD" --sign -o "$W/opaque.gpg" "$W/data" 2>/dev/null
+printf 'other data\n' > "$W/data2"
+st=$(gpg --status-fd 1 --verify "$W/opaque.gpg" "$W/data2" 2>/dev/null) || true
+sigstatus_ok opaque "$st" "$GOOD" >/dev/null && ok "(general policy alone would accept the opaque message)"
+o=$(sigstatus_detached_ok opaque "$st" "$GOOD") && bad "opaque message accepted as detached signature" || ok "opaque message refused ($o)"
+$G -u "$GOOD" -u "$OTHER" --detach-sign -o "$W/two.sig" "$W/data" 2>/dev/null
+st=$(gpg --status-fd 1 --verify "$W/two.sig" "$W/data" 2>/dev/null) || true
+o=$(sigstatus_detached_ok two "$st" "$GOOD") && bad "two signatures accepted" || ok "two signatures refused ($o)"
+st=$(gpg --status-fd 1 --verify "$W/good.sig" "$W/data" 2>/dev/null) || true
+o=$(sigstatus_detached_ok good "$st" "$GOOD") && ok "detached good signature accepted" || bad "detached good refused: $o"
 # fetch-thirdparty.sh must use the policy for every signature, gpgv (Node.js) included
 F=$R/scripts/fetch-thirdparty.sh
-grep -q '^\. "\$TOP/scripts/sigcheck.sh"' "$F" && grep -q 'sigstatus_ok "\$2" "\$st" "\$3"' "$F" \
+grep -q '^\. "\$TOP/scripts/sigcheck.sh"' "$F" && grep -q 'sigstatus_detached_ok "\$2" "\$st" "\$3"' "$F" \
   && grep -q 'NST=\$(gpgv --status-fd 1' "$F" && grep -q 'sigstatus_ok "Node SHASUMS256.txt" "\$NST"' "$F" \
   && ok "fetch-thirdparty.sh: gpg and gpgv paths use sigstatus_ok" || bad "fetch-thirdparty.sh does not use sigstatus_ok everywhere"
 # 2.1: the image ships the same policy for the Browser Updater (browser_update.py and the root helper)

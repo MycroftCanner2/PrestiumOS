@@ -497,12 +497,14 @@ class Fetcher:
 # ------------------------------------------------------------------ signatures
 FPR_RE = re.compile(r"^[0-9A-F]{40}$")
 
-def sigstatus_ok(name, status, fpr, sigcheck=None, bash=None):
+def sigstatus_ok(name, status, fpr, sigcheck=None, bash=None, detached=False):
     """The shell policy itself (sigcheck.sh), given the gpg status text as an argument (never
-    interpolated into the script). Returns (ok, message)."""
+    interpolated into the script). detached: sigstatus_detached_ok (one signature, no embedded
+    data). Returns (ok, message)."""
     if not FPR_RE.match(fpr or ""):
         raise ValueError("a pinned 40-hex fingerprint is required")      # empty FPR = any key
-    res = subprocess.run([bash or BASH, "-c", '. "$4" && sigstatus_ok "$1" "$2" "$3"', "_",
+    fn = "sigstatus_detached_ok" if detached else "sigstatus_ok"
+    res = subprocess.run([bash or BASH, "-c", '. "$4" && ' + fn + ' "$1" "$2" "$3"', "_",
                           name, status, fpr, sigcheck or SIGCHECK],
                          capture_output=True, text=True, env={"PATH": "/usr/bin:/bin", "LANG": "C"})
     return res.returncode == 0, (res.stdout or res.stderr).strip()
@@ -536,7 +538,7 @@ def gpg_verify(name, browser, workdir, sig=None, data=None, clearsigned=None, ou
             cmd = base + ["--status-fd", "1", "--verify", sig, data]
         r = subprocess.run(cmd, capture_output=True, env=env)
         status = r.stdout.decode("utf-8", "replace")
-        ok, msg = sigstatus_ok(name, status, fpr, sigcheck=sigcheck)
+        ok, msg = sigstatus_ok(name, status, fpr, sigcheck=sigcheck, detached=not clearsigned)
         if not ok:
             raise sig_failure(status, msg)
         if r.returncode != 0:

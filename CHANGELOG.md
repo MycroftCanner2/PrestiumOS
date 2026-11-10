@@ -57,6 +57,15 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   compromised mail or chat client could run its own code outside its profile. They now run as
   `bash -p`, set a fixed PATH and use fixed paths only; the tests run patched copies
   (`tests/test_launcher_env.sh`).
+- **The Tor Browser tarball must contain the release that was asked for.** An OpenPGP signature does not
+  cover the file name, so a compromised download server could serve an older (or alpha) tarball that is
+  still signed by the Tor Browser key under the newest release's name, below `TB_MIN_VERSION`. The build now
+  reads `Browser/tbb_version.json` from the signed tarball (release channel, linux-x86_64) and requires it
+  to equal the requested version, and hook 0200 checks the installed copy again. The tarball is verified,
+  hashed and staged from one private copy, so a change in the shared cache between those steps can't slip
+  in. `tb_version_ok` accepts one line only. Detached signatures (build and Browser Updater) must be one
+  signature and no embedded data (`sigstatus_detached_ok`; GnuPG 2.4.7 already refuses an inline-signed
+  file there, this does not depend on it). (`tests/test_tb_latest.sh`, `tests/test_sigcheck.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

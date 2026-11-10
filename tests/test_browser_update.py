@@ -252,11 +252,11 @@ class TestSignatures(Base):
         self.assertEqual(os.listdir(self.d), [], "the throw-away GNUPGHOME is removed")
 
     def test_policy_is_called(self):
-        calls = []
+        calls = []; kws = []
         real = bu.sigstatus_ok
 
         def spy(*a, **kw):
-            calls.append(a); return real(*a, **kw)
+            calls.append(a); kws.append(kw); return real(*a, **kw)
         bu.sigstatus_ok = spy
         try:
             self.verify("good")
@@ -264,6 +264,7 @@ class TestSignatures(Base):
             bu.sigstatus_ok = real
         self.assertEqual(len(calls), 1)
         self.assertEqual(calls[0][2], self.keys.fpr["good"])
+        self.assertTrue(kws[0].get("detached"), "2.1 audit: a detached signature uses sigstatus_detached_ok")
 
     def test_tampered(self):
         bad = os.path.join(self.d, "bad")

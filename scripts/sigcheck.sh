@@ -27,3 +27,17 @@ sigstatus_ok(){
   fi
   return 0
 }
+
+# 2.1 (security audit): a DETACHED signature check (gpg --verify SIG DATA). Given an inline-signed
+# (opaque) message as SIG, gpg verifies the text embedded in it, prints PLAINTEXT and only warns that
+# DATA was NOT verified, with GOODSIG/VALIDSIG and exit 0. So: no PLAINTEXT, exactly one signature,
+# then the policy above. sigstatus_detached_ok NAME STATUS-TEXT FPR
+sigstatus_detached_ok(){
+  local name=$1 st=$2 n
+  if printf '%s\n' "$st" | grep -qE '^\[GNUPG:\] PLAINTEXT( |$)'; then
+    echo "ERROR: $name: the signature file is not a detached signature (it carries its own signed data)"; return 1
+  fi
+  n=$(printf '%s\n' "$st" | grep -cE '^\[GNUPG:\] (GOODSIG|BADSIG|ERRSIG|EXPSIG|EXPKEYSIG|REVKEYSIG) ')
+  [ "$n" = 1 ] || { echo "ERROR: $name: expected exactly one signature, found $n"; return 1; }
+  sigstatus_ok "$@"
+}
