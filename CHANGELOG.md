@@ -40,6 +40,14 @@ Enhanced security and new features. Changes will be listed here as they land.
   Only established TCP (NTCP2) connections count, so an I2P session that uses only UDP (SSU2) can look
   like no peers.
 
+### New: Prestium theme for The Lounge
+- **The Lounge (IRC) now uses a dark Prestium theme** by default, with the same palette as the i2pd
+  console and I2P Torrents pages. It's a local theme package
+  (`/var/lib/thelounge/packages/node_modules/thelounge-theme-prestium`) built on The Lounge's own dark
+  "Morning" theme. It loads no fonts, images or anything else from outside. The other themes are still
+  in Settings. The sign-in page is dark too, so it no longer flashes white
+  (`tests/test_thelounge_theme.sh`).
+
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
   when the key that made it has since expired. Every third-party signature (Tor Browser, Firefox,

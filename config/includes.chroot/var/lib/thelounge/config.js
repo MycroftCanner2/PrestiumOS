@@ -14,7 +14,9 @@ module.exports = {
 	reverseProxy: false,
 	maxHistory: 10000,
 	https: {enable: false, key: "", certificate: "", ca: ""},
-	theme: "default",
+	// 2.1: Prestium theme (packages/node_modules/thelounge-theme-prestium, listed in packages/package.json;
+	// The Lounge falls back to "default" with a warning if it is missing). Users can still pick another in Settings.
+	theme: "thelounge-theme-prestium",
 	prefetch: false,
 	disableMediaPreview: true,
 	prefetchStorage: false,
