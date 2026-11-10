@@ -156,6 +156,8 @@ class TestWindow(unittest.TestCase):
                           ("clean_staging", lambda n: self.calls.append(("clean", n)))):
             pt = mock.patch.object(bu, name, val); pt.start(); self.p.append(pt)
         pt = mock.patch.object(self.g, "browser_running", lambda n: False); pt.start(); self.p.append(pt)
+        self.bound = set()
+        pt = mock.patch.object(bu, "helper_bind_present", lambda n: n in self.bound); pt.start(); self.p.append(pt)
         self.calls = []
         self.w = self.g.Window(None)
         self.w.update_buttons()
@@ -268,6 +270,28 @@ class TestWindow(unittest.TestCase):
             self.w.sections["tor-browser"].reset_btn.click()
         self.assertEqual(seen["c"], ("revert", "tor-browser"))
         self.assertIn("is back", self.info())
+
+    def test_reset_available_while_a_bind_is_up(self):
+        """No stamp (its write failed) but a helper bind on the factory path: Reset stays clickable and
+        the label does not call the tree the USB copy."""
+        s = self.w.sections["tor-browser"]
+        self.assertFalse(s.reset_btn._sensitive)
+        self.bound.add("tor-browser")
+        s.refresh(); self.w.update_buttons()
+        self.assertTrue(s.reset_btn._sensitive)
+        self.assertNotIn("(the copy on the USB image)", s.version.get_text())
+        self.assertIn("session update", s.version.get_text())
+
+    def test_cancel_during_final_check_skips_helper(self):
+        """Close or Cancel after the download, during the last signature check: the helper never runs."""
+        def prep(name, transport, cancel, progress, log):
+            self.w.on_delete()            # Close while prepare_update is still verifying
+            return {"status": "staged", "version": "16.0", "installed": "15.0.26"}
+        h = mock.Mock()
+        with mock.patch.object(bu, "prepare_update", prep), mock.patch.object(bu, "run_helper", h):
+            self.w.sections["tor-browser"].tor_btn.click()
+        h.assert_not_called()
+        self.assertIn(("clean", "tor-browser"), self.calls)
 
     def test_close_during_install_refused(self):
         self.w.job, self.w.can_cancel = ("tor-browser", "update", "tor"), False

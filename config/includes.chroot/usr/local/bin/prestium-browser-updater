@@ -12,6 +12,8 @@
 # No state is kept (no settings file): the helper's stamp in /var/lib/prestium/browser-updates says
 # what this session installed.
 import os, sys, threading, time
+
+sys.dont_write_bytecode = True      # no __pycache__ next to the shipped library
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib, Gio, Pango
@@ -116,15 +118,22 @@ class Section:
             i = bu.installed_version(self.name)
         except Exception as e:
             i = {"version": None, "full": None, "updated": False, "error": str(e)}
+        try:
+            bound = bu.helper_bind_present(self.name)
+        except Exception:
+            bound = True                    # unsure: keep Reset available (it is a no-op when unneeded)
         v = i.get("full") or i.get("version")
         if not v:
             t = "Installed version: unknown (the browser's files could not be read)."
         elif i.get("updated"):
             t = ("Updated this session to %s. This copy stays in RAM until Reset or reboot." % v)
+        elif bound:
+            t = ("Installed: %s (a session update in RAM, not the copy on the USB image). "
+                 "Reset to shipped copy brings the original back." % v)
         else:
             t = "Installed: %s (the copy on the USB image)." % v
         self.version.set_text(t)
-        self.updated = bool(i.get("updated"))
+        self.updated = bool(i.get("updated")) or bound
 
     def set_busy(self, busy, mine=False, can_cancel=False):
         for w in (self.tor_btn, self.i2p_btn, self.reset_btn):
@@ -293,6 +302,12 @@ class Window(Gtk.ApplicationWindow):
                        "The latest signed %s (%s) is older than the installed %s. Nothing was changed."
                        % (bu.TITLES[name], r["version"], r["installed"]))
                 GLib.idle_add(self.done, name, "info", msg, False)
+                return
+            # Cancel or Close during the last check (signature, hash) is only polled inside curl:
+            # look again before the root helper starts
+            if self.cancel is not None and self.cancel.is_set():
+                bu.clean_staging(name)
+                GLib.idle_add(self.done, name, "info", "Update cancelled. Nothing was changed.", False)
                 return
             # from here on the root helper runs: no Cancel (a root unpack is never killed)
             self.can_cancel = False

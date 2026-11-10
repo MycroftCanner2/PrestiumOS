@@ -7,6 +7,7 @@ fake system tree in a temporary directory, with the real mount/umount: a real tm
 the flags read back from /proc/self/mountinfo. Signatures use throw-away keys. This is not the live-VM
 test (overlay root, real /proc, AppArmor); that must still be run before a release."""
 import io, json, os, shutil, stat, subprocess, sys, tarfile, tempfile, textwrap, unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import browser_update_testlib as T  # noqa: E402
@@ -92,6 +93,40 @@ class Unit(unittest.TestCase):
             self.assertFalse(os.path.exists(os.path.join(w, n)), n)
         with self.assertRaises(self.m.Fail):
             self.m.copy_as_user(secret, os.path.join(w, "s"), 100)        # outside the staging dir
+
+    def test_helper_ram_formula_matches_window(self):
+        """ensure_tmpfs refuses below bu.helper_mem_needed and goes ahead at it (the window's figure
+        minus the downloads already in RAM)."""
+        art = 120 * bu.MiB
+        need = bu.helper_mem_needed("tor-browser", art)
+        mem = os.path.join(self.d, "meminfo")
+        self.m.MOUNT = os.path.join(self.d, "mnt"); os.makedirs(self.m.MOUNT)
+        self.m.tmpfs_entry = lambda ms=None: None
+        calls = []
+
+        def fake_mount(a):
+            calls.append(a); raise self.m.MountError("stop")
+        self.m.do_mount = fake_mount
+        self.m.MEMINFO = mem
+        lst = os.lstat
+        os_lstat = lambda p, *a, **k: os.stat_result((0o40755, 0, 0, 0, 0, 0, 0, 0, 0, 0)) if p == self.m.MOUNT else lst(p, *a, **k)
+        with mock.patch.object(self.m.os, "lstat", os_lstat):
+            open(mem, "w").write("MemAvailable: %d kB\n" % (need // 1024 - 1))
+            with self.assertRaises(self.m.Fail) as e:
+                self.m.ensure_tmpfs(bu.tmpfs_need("tor-browser", art))
+            self.assertIn("RAM", str(e.exception)); self.assertEqual(calls, [])
+            open(mem, "w").write("MemAvailable: %d kB\n" % (need // 1024))
+            with self.assertRaises(self.m.MountError):
+                self.m.ensure_tmpfs(bu.tmpfs_need("tor-browser", art))
+            self.assertEqual(len(calls), 1)
+
+    def test_lister_reports_sizes(self):
+        S = os.path.join(self.m.STAGING_ROOT, "tor-browser"); os.makedirs(S)
+        open(os.path.join(S, "a.tar.xz"), "wb").write(b"x" * 1234)
+        open(os.path.join(S, "a.tar.xz.asc"), "wb").write(b"y" * 10)
+        files = self.m.list_as_user(S)
+        self.assertEqual(files, {"a.tar.xz": 1234, "a.tar.xz.asc": 10})
+        self.assertEqual(self.m.staged_sizes(files, ["a.tar.xz", "a.tar.xz.asc", "missing"]), 1244)
 
     def test_copy_never_opens_user_path_in_helper(self):
         """The helper process itself never opens the staged path (the copier subprocess does)."""
@@ -757,6 +792,111 @@ del RUNS[:]
         self.assertIn("other package changes", r["steps"][0][1]["error"])
         self.assertEqual((r["state"][0]["lw"], r["state"][0]["tmpfs"]), ("157.0.1", 0))
         self.assertFalse([x for x in r["state"][0]["runs"] if x[1:2] == ["-x"]], "not unpacked")
+
+
+    # ---------------------------------------------------------------- review fixes (2026-11-09)
+    def test_bind_fail_and_indexerror_roll_back(self):
+        """bind() raising Fail (tmpfs_entry) or a missing mountinfo line: the previous update is bound
+        again, never left in .prev with the factory copy visible."""
+        st = self.state()
+        r = self.run_steps([
+            ("stage", "16.0"), ("install", "tor-browser"),
+            ("stage", "16.0.1"),
+            ("py", "_te = m.tmpfs_entry\n_arm = [0]\n_m2 = m.do_mount\n"
+                   "def armm(a):\n    r = _m2(a)\n    if a[:1] == ['--bind'] and a[1].endswith('/tor-browser') and _arm[0] == 0: _arm[0] = 1\n    return r\n"
+                   "def te(ms=None):\n    if _arm[0] == 1:\n        _arm[0] = 2; raise m.Fail('injected tmpfs_entry')\n    return _te(ms)\n"
+                   "m.do_mount, m.tmpfs_entry = armm, te"),
+            ("install", "tor-browser"), ("py", st),
+            ("py", "m.tmpfs_entry = _te\n_ea = m.entries_at\n_arm2 = [0]\n"
+                   "def armr(a):\n    r = _m2(a)\n    if a[:2] == ['-o', 'remount,bind,ro,exec,nosuid,nodev'] and _arm2[0] == 0: _arm2[0] = 1\n    return r\n"
+                   "def ea(t, ms=None):\n    if t == T_ and _arm2[0] == 1:\n        _arm2[0] = 2; return []\n    return _ea(t, ms)\n"
+                   "m.do_mount, m.entries_at = armr, ea"),
+            ("install", "tor-browser"), ("py", st),
+            ("py", "m.entries_at, m.do_mount = _ea, _m2"),
+            ("install", "tor-browser"), ("py", st),
+        ])
+        S, s = r["steps"], r["state"]
+        self.assertEqual(S[1][0], 1, S[1]); self.assertIn("previous update of this session is still in place", S[1][1]["error"])
+        self.assertEqual((s[0]["tb"], s[0]["binds"]["/opt/tor-browser"]), ("16.0", 1))
+        self.assertEqual(S[2][0], 1, S[2]); self.assertIn("previous update of this session is still in place", S[2][1]["error"])
+        self.assertEqual((s[1]["tb"], s[1]["binds"]["/opt/tor-browser"]), ("16.0", 1))
+        self.assertEqual(S[3][0], 0, S[3]); self.assertEqual(s[2]["tb"], "16.0.1")
+
+    def test_rollback_never_stacks(self):
+        """The new bind cannot be removed (remount failed, then umount failed): rollback does not bind
+        the previous unit on top of it; the next Reset clears everything."""
+        st = self.state()
+        r = self.run_steps([
+            ("stage", "16.0"), ("install", "tor-browser"),
+            ("stage", "16.0.1"),
+            ("py", "_m2, _u2 = m.do_mount, m.do_umount\n_fail = [0]\n"
+                   "def badm(a):\n    if a[:2] == ['-o', 'remount,bind,ro,exec,nosuid,nodev'] and not _fail[0]:\n        _fail[0] = 2; raise m.MountError('injected remount')\n    return _m2(a)\n"
+                   "def badu(t):\n    if t == T_ and _fail[0] > 0:\n        _fail[0] -= 1; raise m.MountError('injected busy')\n    return _u2(t)\n"
+                   "m.do_mount, m.do_umount = badm, badu"),
+            ("install", "tor-browser"), ("py", st),
+            ("py", "m.do_mount, m.do_umount = _m2, _u2"),
+            ("revert", "tor-browser"), ("py", st),
+        ])
+        S, s = r["steps"], r["state"]
+        self.assertEqual(S[1][0], 1, S[1])
+        self.assertIn("was not mounted again", S[1][1]["error"])
+        self.assertEqual(s[0]["binds"]["/opt/tor-browser"], 1, "no second bind stacked")
+        self.assertEqual(S[2][0], 0, S[2])
+        self.assertEqual((s[1]["tb"], s[1]["binds"]["/opt/tor-browser"], s[1]["tmpfs"]), ("15.0.26", 0, 0))
+
+    def test_stamp_failure_after_publish(self):
+        """The bind is up but the stamp cannot be written: success with a warning, a re-update is
+        refused (fail closed: the factory facts are unknown), Reset works."""
+        st = self.state()
+        r = self.run_steps([
+            ("stage", "16.0"),
+            ("py", "_ws = m.write_stamp\ndef bad(*a, **k):\n    raise OSError(28, 'No space left on device')\nm.write_stamp = bad"),
+            ("install", "tor-browser"), ("py", st),
+            ("py", "m.write_stamp = _ws"),
+            ("stage", "16.0.1"), ("install", "tor-browser"), ("py", st),
+            ("revert", "tor-browser"), ("py", st),
+        ])
+        S, s = r["steps"], r["state"]
+        self.assertEqual(S[0][0], 0, S[0]); self.assertTrue(S[0][1]["ok"])
+        self.assertIn("could not be recorded", S[0][1]["message"]); self.assertIn("warning", S[0][1])
+        self.assertEqual((s[0]["tb"], s[0]["binds"]["/opt/tor-browser"], s[0]["stamp"]), ("16.0", 1, []))
+        self.assertEqual(S[1][0], 1); self.assertIn("record is missing", S[1][1]["error"])
+        self.assertEqual(s[1]["tb"], "16.0")
+        self.assertEqual(S[2][0], 0, S[2]); self.assertEqual((s[2]["tb"], s[2]["tmpfs"]), ("15.0.26", 0))
+
+    def test_signals_shielded_during_swap(self):
+        """SIGTERM between unmount and bind is held until the new unit is bound and stamped."""
+        import signal as _s
+        st = self.state()
+        r = self.run_steps([
+            ("stage", "16.0"), ("install", "tor-browser"),
+            ("stage", "16.0.1"),
+            ("py", "import signal\nRES['sig'] = []\n"
+                   "def h(n, f):\n    RES['sig'].append([tbver(), [sorted(e['opts']) for e in binds(T_)], sorted(os.listdir(m.STAMP_DIR)), json.load(open(m.STAMP_DIR + '/tor-browser'))['version']])\n"
+                   "signal.signal(signal.SIGTERM, h)\n_u2 = m.do_umount\n_once = [1]\n"
+                   "def ku(t):\n    r = _u2(t)\n    if t == T_ and _once:\n        _once.pop(); os.kill(os.getpid(), signal.SIGTERM)\n    return r\nm.do_umount = ku"),
+            ("install", "tor-browser"), ("py", st),
+        ])
+        S = r["steps"]
+        self.assertEqual(S[1][0], 0, S[1])
+        self.assertEqual(len(r["sig"]), 1, "the signal was delivered once, after the swap")
+        v, opts, stamps, sv = r["sig"][0]
+        self.assertEqual((v, sv, stamps), ("16.0.1", "16.0.1", ["tor-browser"]))
+        self.assertEqual(len(opts), 1); self.assertIn("ro", opts[0])
+
+    def test_lw_tmpfs_grows_to_real_size(self):
+        """The fixed LibreWolf estimate is too small: once the package listing is known the tmpfs is
+        enlarged (remount) instead of failing with "Not enough space"."""
+        st = self.lw_state()
+        self.apt_ok("158.0-1")
+        r = self.run_steps([
+            ("py", "bu.UNPACKED['librewolf'] = 0; bu.SCRATCH = 0; bu.FREE_MIN = 0; m.FREE_MIN = 0; m.SCRATCH = 24 * bu.MiB"),
+            ("stage-lw", "158.0-1"), ("install", "librewolf"), ("py", st),
+            ("py", "RES['remounts'] = [a for a in MOUNTS if a[:1] == ['-o'] and a[1].startswith('remount,mode=')]"),
+        ])
+        self.assertEqual(r["steps"][0][0], 0, r["steps"][0])
+        self.assertEqual(r["state"][0]["lw"], "158.0")
+        self.assertTrue(r["remounts"], "the tmpfs was enlarged")
 
 
 class Image(unittest.TestCase):

@@ -65,6 +65,11 @@ UNPACKED = {"tor-browser": 380 * MiB, "librewolf": 480 * MiB, "firefox": 320 * M
 CACHE_FREE_MIN = 700 * MiB
 MEM_MIN = 1024 * MiB
 MEM_RESERVE = 512 * MiB
+# the helper's tmpfs: scratch on top of the copies and the tree, never less than FREE_MIN
+SCRATCH = 100 * MiB
+FREE_MIN = 700 * MiB
+# download sizes before they are known (Tor Browser 16.0: 110 MB; LibreWolf 157: about 120 MB)
+ARTEFACT_EST = {"tor-browser": 130 * MiB, "librewolf": 160 * MiB, "firefox": 100 * MiB}
 
 TOR_SOCKS = ("127.0.0.1", 9050)
 I2P_HTTP = ("127.0.0.1", 4444)
@@ -157,6 +162,14 @@ def ini_version(text):
             return line.split("=", 1)[1].strip()
     return None
 
+def redact(args):
+    """Command line for the Details log: the per-job SOCKS username is never written out."""
+    out, hide = [], False
+    for a in args:
+        out.append("<per-job>:" if hide else a)
+        hide = a == "--proxy-user"
+    return out
+
 def read_text(path, limit=1 * MiB):
     try:
         with open(path, "rb") as f:
@@ -211,6 +224,29 @@ def installed_version(name, root=None, stamp_dir=None, packages_list=None):
         info["updated"] = True
     return info
 
+BIND_ROOT = "/run/prestium/browsers"
+UNIT_TARGETS = {"tor-browser": ("/opt/tor-browser",), "firefox": ("/opt/firefox",),
+                "librewolf": ("/usr/share/librewolf", "/usr/lib/librewolf", "/usr/bin/librewolf")}
+MOUNTINFO = "/proc/self/mountinfo"
+
+def helper_bind_present(name, mountinfo=None):
+    """True when a factory path of the unit has a mount from the helper's tmpfs (same device as the
+    mount on BIND_ROOT). Read as the user from mountinfo; used to keep Reset available even when the
+    helper's stamp is missing (the helper's revert is a no-op when nothing is mounted)."""
+    try:
+        with open(mountinfo or MOUNTINFO) as f:
+            lines = f.read(4 * MiB).splitlines()
+    except OSError:
+        return False
+    unesc = lambda x: re.sub(r"\\([0-7]{3})", lambda m: chr(int(m.group(1), 8)), x)
+    ms = []
+    for line in lines:
+        a = line.partition(" - ")[0].split()
+        if len(a) >= 5:
+            ms.append((a[2], unesc(a[4])))
+    devs = {d for d, t in ms if t == BIND_ROOT}
+    return any(d in devs and t in UNIT_TARGETS[name] for d, t in ms)
+
 def compare_candidate(name, candidate, info):
     """1 newer, 0 same, -1 older than what is installed. Unknown installed version: VersionError."""
     if not info or not info.get("version"):
@@ -229,20 +265,39 @@ def mem_available(path=None):
         raise ResourceError("cannot read MemAvailable")
     return int(m.group(1)) * 1024
 
+def tmpfs_need(name, artefacts, unpacked=None):
+    """Bytes the root helper's tmpfs needs for one install: its copies of the downloads, the
+    unpacked tree and scratch, at least FREE_MIN. The helper and the window use this one formula."""
+    return max(artefacts + (unpacked if unpacked else UNPACKED[name]) + SCRATCH, FREE_MIN)
+
+def helper_mem_needed(name, artefacts, unpacked=None):
+    """MemAvailable the helper requires when it runs (the downloads already sit in RAM then)."""
+    return max(MEM_MIN, tmpfs_need(name, artefacts, unpacked) + MEM_RESERVE)
+
+def window_mem_needed(name, artefacts=None, unpacked=None):
+    """MemAvailable the window requires before downloading: what the helper will require, plus the
+    downloads themselves, which take RAM in the cache before the helper starts."""
+    a = artefacts if artefacts is not None else ARTEFACT_EST[name]
+    return a + helper_mem_needed(name, a, unpacked)
+
+def check_ram(name, artefacts=None, unpacked=None, meminfo=None):
+    mem = mem_available(meminfo)
+    need = window_mem_needed(name, artefacts, unpacked)
+    if mem < need:
+        raise ResourceError("Only %d MB of RAM available (%d MB needed). Close memory-heavy "
+                            "applications and try again." % (mem // MiB, need // MiB))
+    return mem
+
 def check_resources(name, cache_dir, meminfo=None, disk_usage=shutil.disk_usage):
-    """Before any download: 700 MB free where the download goes, and enough RAM for the unpacked
-    tree, which stays in RAM until Reset or reboot (plus 512 MB for the rest of the session)."""
+    """Before any download: 700 MB free where the download goes, and the RAM the whole update will
+    need (window_mem_needed: the downloads, the helper's tmpfs, 512 MB for the rest of the session).
+    The unpacked tree stays in RAM until Reset or reboot."""
     os.makedirs(cache_dir, mode=0o700, exist_ok=True)
     free = disk_usage(cache_dir).free
     if free < CACHE_FREE_MIN:
         raise ResourceError("Only %d MB free for the download (%d MB needed). Close memory-heavy "
                             "applications and try again." % (free // MiB, CACHE_FREE_MIN // MiB))
-    mem = mem_available(meminfo)
-    need = max(MEM_MIN, UNPACKED[name] + MEM_RESERVE)
-    if mem < MEM_MIN or mem <= UNPACKED[name] + MEM_RESERVE:
-        raise ResourceError("Only %d MB of RAM available (%d MB needed). Close memory-heavy "
-                            "applications and try again." % (mem // MiB, need // MiB))
-    return free, mem
+    return free, check_ram(name, meminfo=meminfo)
 
 def ram_note(name):
     return ("The updated %s stays in RAM until Reset or reboot (about %d MB)."
@@ -350,7 +405,7 @@ class Fetcher:
         cmd = [self.curl, "-q", "-sS", "--proto", "=https", "--max-redirs", "0", "--retry", "3",
                "--connect-timeout", "60", "-m", "1800", "-A", UA, "--max-filesize", str(cap),
                "-D", hdr, "-o", part, "-w", "%{http_code}"] + self.t.curl_args() + [url]
-        self.log("curl " + " ".join(shlex.quote(c) for c in cmd[1:]))
+        self.log("curl " + " ".join(shlex.quote(c) for c in redact(cmd[1:])))
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.t.env(),
                                 start_new_session=True)
         total = expected_size
@@ -640,8 +695,13 @@ def staging_dir(name, home=None):
 def clean_staging(name, home=None):
     shutil.rmtree(staging_dir(name, home), ignore_errors=True)
 
+def lw_installed_size(st):
+    """Installed-Size (KiB) of a Packages stanza in bytes, or None."""
+    v = st.get("Installed-Size", "")
+    return int(v) * 1024 if v.isdigit() and int(v) > 0 else None
+
 def prepare_update(name, transport, cancel=None, progress=None, log=None, home=None,
-                   fetcher=None, check=check_resources):
+                   fetcher=None, check=check_resources, meminfo=None):
     """Check, download and verify (first verification, as the user) into the fixed staging
     directory. Returns {"status": "staged"|"current"|"older", "version", "installed"}."""
     progress = progress or (lambda *a: None)
@@ -714,6 +774,9 @@ def prepare_update(name, transport, cancel=None, progress=None, log=None, home=N
             size = int(st["Size"])
             if size > ARTEFACT_CAP:
                 raise UpdateError("the LibreWolf package is larger than %d MB" % (ARTEFACT_CAP // MiB))
+            # the signed index gives the real sizes: check the RAM again before the large download
+            if check is check_resources:
+                check_ram(name, size, lw_installed_size(st), meminfo=meminfo)
             deb = os.path.join(sdir, "librewolf.deb")
             f.fetch(LW_BASE + st["Filename"], deb, ARTEFACT_CAP, os.path.basename(st["Filename"]), size)
             progress("Verifying the package ...", 0, None)

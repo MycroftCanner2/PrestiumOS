@@ -32,12 +32,14 @@ for f in \
   "$root/config/includes.chroot/usr/local/sbin/prestium-browser-install" \
   "$root/config/includes.chroot/usr/local/bin/prestium-browser-updater"
 do
-  if ! python3 -m py_compile "$f"; then
+  # bytecode goes to a throw-away prefix, never into config/includes.chroot (live-build would ship it)
+  if ! PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/prestium-pycache.$$" python3 -m py_compile "$f"; then
     echo "FAIL py_compile $f"; fail=1
   else
     echo "OK   py_compile $f"
   fi
 done
+rm -rf "${TMPDIR:-/tmp}/prestium-pycache.$$"
 # awk dry-run for port+auth rewrite
 python3 - <<'PY'
 import subprocess, tempfile, textwrap, os

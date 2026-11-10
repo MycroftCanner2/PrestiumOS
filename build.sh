@@ -32,6 +32,11 @@ PRESTIUM_CACHE=$CACHE scripts/fetch-thirdparty.sh
 #    (nameserver 127.0.0.1) is put back by live-build at the end of the chroot stage
 install -D -m 644 /etc/resolv.conf config/includes.chroot/usr/share/prestium/build/host-resolv.conf
 
+# 2b. Python bytecode left by running the tests (gitignored) must not reach the image: the
+#     Browser Updater's root helper would read a stale browser_update.pyc
+find config/includes.chroot -name __pycache__ -type d -prune -exec rm -rf {} +
+find config/includes.chroot -name '*.pyc' -type f -delete
+
 # 3. configure + build
 lb config >/dev/null
 if [ "$MODE" = --resume ]; then

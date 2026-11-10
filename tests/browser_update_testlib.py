@@ -1,5 +1,7 @@
 # Prestium 2.1: shared helpers for tests/test_browser_update.py and tests/test_browser_install.py
 # (throw-away OpenPGP keys, a fake curl, fixture archives). No network, no root.
+import sys as _sys
+_sys.dont_write_bytecode = True   # no __pycache__ under config/includes.chroot (live-build would ship it)
 import io, json, os, shutil, subprocess, sys, tarfile, tempfile, textwrap, importlib.machinery, importlib.util
 
 HERE = os.path.dirname(os.path.abspath(__file__))

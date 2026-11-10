@@ -10,6 +10,8 @@ dpkg-query -W -f='${Package}\t${Version}\n' > /usr/share/prestium/packages-2.0.t
 # (/usr/local/sbin/prestium-browser-install) re-applies Prestium's policies and extensions from it
 rm -rf /usr/src/prestium-thirdparty "$B"
 rm -f /usr/sbin/policy-rc.d.prestium
+# 2.1: no Python bytecode next to Prestium's own scripts (the helper would read it as root)
+find /usr/local -name __pycache__ -type d -prune -exec rm -rf {} +
 apt-get clean
 rm -rf /var/lib/apt/lists/* /var/cache/apt/*.bin /tmp/* /root/.cache /root/.npm
 echo "P: cleanup done"

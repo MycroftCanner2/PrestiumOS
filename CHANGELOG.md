@@ -109,14 +109,29 @@ Enhanced security and new features. Changes will be listed here as they land.
   dependency check (only `librewolf` itself may be installed), it is unpacked with `dpkg-deb -x`. Its
   maintainer scripts never run, and its own AppArmor profile and `distribution/` are not used. The dpkg
   database and alternatives are untouched, so `dpkg -l` still shows the shipped version.
-  - A failed re-update puts the previous update of this session back, never the factory copy.
+  - A failed re-update puts the previous update of this session back, never the factory copy. Any
+    error during the bind rolls back. The rollback itself never raises, and it never binds on top of a
+    new bind it couldn't remove. SIGTERM, SIGINT, SIGHUP and SIGQUIT are held from the first unmount
+    until the new unit is bound and recorded, so a signal can't leave the factory copy showing or a
+    read-write bind in place.
+  - The helper sizes its tmpfs again from the real unpacked size once the archive or package listing
+    is known, so a LibreWolf larger than the estimate doesn't fail with "Not enough space" while RAM
+    is free.
+  - If the update's record (the stamp) can't be written after the bind is up, the install reports
+    success with a warning. Reset stays available whenever a helper bind is on the browser's path
+    (read from mountinfo). A re-update is refused until Reset, because the shipped copy's details
+    are then unknown. LibreWolf's shipped `/usr/lib/librewolf` and `/usr/bin/librewolf` types are
+    recorded before the first bind and read from that record later.
   - The helper refuses while the browser is running (matched by device and inode) or while its files
     are busy.
   - Reset unmounts the update. After the last browser is reset, it also unmounts the tmpfs, which
     frees the RAM.
 - **Session only.** Prestium has no persistence, so an update lasts until Reset or reboot and stays in
-  RAM: about 356 MB for Tor Browser 16.0 unpacked. The window shows the RAM cost and refuses to start
-  with less than 700 MB free for the download or under 1 GB of available RAM. A newer browser may need
+  RAM: about 360 MB for Tor Browser 16.0 unpacked. The window shows the RAM cost and refuses to start
+  with less than 700 MB free for the download. It also uses the same RAM formula as the helper (the
+  helper's tmpfs need plus 512 MB, at least 1 GB, plus the download, which is already in RAM when the
+  helper runs): about 1.34 GB available for Tor Browser. For LibreWolf the window checks again with
+  the signed index's real sizes before the package download. A newer browser may need
   AppArmor rules the shipped profile doesn't have, and the helper can't detect that. If an updated
   browser doesn't start, press Reset to shipped copy.
 - Also: `torrc`'s 9050 SocksPort now says `IsolateSOCKSAuth` explicitly (it was already Tor's
@@ -129,7 +144,15 @@ Enhanced security and new features. Changes will be listed here as they land.
   - **Not run:** a download through live Tor or I2P, the GTK window on a display (its logic is tested
     with a stand-in), and the bind-mount install and Reset on a Prestium live VM (overlay root, real
     /proc and AppArmor, `findmnt -o TARGET,OPTIONS,SIZE /run`, the bind's `exec` flag,
-    `/proc/PID/attr/current` of the updated browser). That VM check is still needed before release.
+    `/proc/PID/attr/current` of the updated browser, mount(8)'s tmpfs remount as real root). Also:
+    that the new bind on `/opt/tor-browser` shows inside onion-grater's own mount namespace
+    (`ProtectSystem=strict`), since it matches Tor Browser by device and inode; and that the RAM is
+    really freed after the last Reset (a copy of the mount in another namespace can keep the tmpfs
+    alive). That VM check is still needed before release.
+  - The Details log no longer shows the per-job SOCKS username. Close during the final signature
+    check no longer starts the install. The tests and `build.sh` keep Python bytecode out of
+    `config/includes.chroot`, and hook 9990 removes any `__pycache__` under `/usr/local`, so the root
+    helper never reads a stale `.pyc`.
 
 ## 2.0: changes since Prestium 1.9.1.3
 

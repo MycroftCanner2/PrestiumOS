@@ -458,17 +458,42 @@ class TestResources(Base):
         self.assertEqual(os.stat(os.path.join(self.d, "c")).st_mode & 0o777, 0o700)
 
     def test_mem(self):
+        """One formula: the window asks for what the helper will ask for, plus the downloads, which
+        are already in RAM when the helper runs."""
         c = os.path.join(self.d, "c")
-        for kb, ok in ((1000 * 1024, False), (1023 * 1024, False), (1024 * 1024, True)):
-            f = (lambda: bu.check_resources("tor-browser", c, meminfo(self.d, kb), FakeDU(800 * MiB)))
-            if ok:
-                f()
-            else:
-                self.assertRaises(bu.ResourceError, f)
-        # LibreWolf: unpacked 480 MB + 512 MB reserve
-        self.assertRaises(bu.ResourceError, bu.check_resources, "librewolf", c,
-                          meminfo(self.d, (480 + 512) * 1024), FakeDU(800 * MiB))
-        bu.check_resources("librewolf", c, meminfo(self.d, (480 + 513) * 1024 + 50000), FakeDU(800 * MiB))
+        for name in ("tor-browser", "librewolf"):
+            a = bu.ARTEFACT_EST[name]
+            need = bu.window_mem_needed(name)
+            self.assertEqual(need, a + bu.helper_mem_needed(name, a))
+            self.assertEqual(bu.helper_mem_needed(name, a),
+                             max(bu.MEM_MIN, max(a + bu.UNPACKED[name] + bu.SCRATCH, bu.FREE_MIN) + bu.MEM_RESERVE))
+            self.assertGreaterEqual(need, bu.MEM_MIN)
+            kb = need // 1024
+            self.assertRaises(bu.ResourceError, bu.check_resources, name, c, meminfo(self.d, kb - 1), FakeDU(800 * MiB))
+            bu.check_resources(name, c, meminfo(self.d, kb), FakeDU(800 * MiB))
+        # Tor Browser today: 130 MB download estimate + the 700 MB tmpfs floor + 512 MB reserve
+        self.assertEqual(bu.window_mem_needed("tor-browser") // MiB, 130 + 700 + 512)
+        # LibreWolf with the signed index's real sizes (Installed-Size, KiB)
+        self.assertEqual(bu.lw_installed_size({"Installed-Size": "469000"}), 469000 * 1024)
+        self.assertIsNone(bu.lw_installed_size({}))
+        big = bu.window_mem_needed("librewolf", 125 * MiB, 700 * MiB)
+        self.assertEqual(big, 125 * MiB + max(bu.MEM_MIN, 125 * MiB + 700 * MiB + bu.SCRATCH + bu.MEM_RESERVE))
+
+    def test_redact_and_bind_present(self):
+        cmd = ["-q", "--socks5-hostname", "127.0.0.1:9050", "--proxy-user", "abcd1234:", "https://x/"]
+        self.assertEqual(bu.redact(cmd), ["-q", "--socks5-hostname", "127.0.0.1:9050", "--proxy-user",
+                                          "<per-job>:", "https://x/"])
+        mi = os.path.join(self.d, "mountinfo")
+        base = ("22 1 0:20 / / rw,relatime - overlay overlay rw\n"
+                "40 22 0:51 / /run/prestium/browsers rw,nosuid,nodev - tmpfs tmpfs rw,size=716800k,mode=755\n")
+        open(mi, "w").write(base)
+        self.assertFalse(bu.helper_bind_present("tor-browser", mi))
+        open(mi, "w").write(base + "41 22 0:51 /tor-browser /opt/tor-browser ro,nosuid,nodev - tmpfs tmpfs rw\n")
+        self.assertTrue(bu.helper_bind_present("tor-browser", mi))
+        self.assertFalse(bu.helper_bind_present("librewolf", mi))
+        open(mi, "w").write(base + "41 22 0:52 / /opt/tor-browser ro - tmpfs other rw\n")
+        self.assertFalse(bu.helper_bind_present("tor-browser", mi), "another filesystem is not ours")
+        self.assertFalse(bu.helper_bind_present("tor-browser", os.path.join(self.d, "missing")))
 
     def test_refusal_before_curl(self):
         """prepare_update: a failed RAM or space check aborts before curl is invoked."""
