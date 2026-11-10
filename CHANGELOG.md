@@ -184,6 +184,10 @@ Not changed in 2.1, so you know where the edges are:
 - **The boot menu can be edited** (no GRUB password): anyone at the keyboard can change the kernel
   options, for example to boot without AppArmor. A password would not stop someone who can rewrite the
   stick.
+- **Programs running as the desktop user can still attach a disk image** (udisks loop-setup), and the
+  kernel then parses that image's filesystem. Debian's udisks allows this to the active user anyway, and
+  polkit can't tell the unlock helpers from other programs with the same uid. The confined apps can't
+  reach udisks at all, and rarely used filesystem drivers can't be loaded.
 - **The local-only Firefox's network rule follows a group** (prestium-localweb) that the desktop user's
   programs can also use; such a program may reach the same three local pages.
 

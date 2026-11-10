@@ -1,9 +1,14 @@
 // Prestium: let the logged-in user unlock and mount encrypted (VeraCrypt)
 // partitions on internal disks through udisks2. udisks mounts them under
 // /media/user with nosuid,nodev, so this grants no root access.
-// 2.1 (security audit): loop-setup lets any program of the user hand the kernel a filesystem image
-// to parse; prestium-unlock-veracrypt needs it for file containers. Rarely used filesystem drivers
-// are not loadable (etc/modprobe.d/prestium-blacklist.conf), which limits what such an image reaches.
+// 2.1 (security audit, review): loop-setup lets a program of the user hand the kernel a filesystem
+// image to parse. It is kept on purpose. Debian's udisks2 already allows loop-setup and
+// filesystem-mount to the active local user (allow_active=yes), so dropping it here changes nothing,
+// and polkit can't tell the unlock helpers from any other program running as "user" (same uid; an
+// encrypted container with a crafted filesystem inside goes through the helpers' own path). The
+// confined apps (Claws Mail, Gajim, Pidgin, the browsers, ...) can't reach udisks at all: the
+// system bus is denied in their AppArmor profiles (prestium-no-admin). What such an image can reach is
+// limited instead: rarely used filesystem drivers are not loadable (etc/modprobe.d/prestium-blacklist.conf).
 polkit.addRule(function(action, subject) {
     if ((action.id == "org.freedesktop.udisks2.encrypted-unlock-system" ||
          action.id == "org.freedesktop.udisks2.filesystem-mount-system" ||
