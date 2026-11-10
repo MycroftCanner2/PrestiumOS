@@ -75,6 +75,14 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   15-minute limit, so a stopped or held copier can't keep the helper and its lock. Reset no longer
   allows installing a release older than one already installed this session
   (`/var/lib/prestium/browser-updates-highest`, in RAM). (`tests/test_browser_install.py`)
+- **onion-grater can only read, not trace.** The Tor control-port filter keeps `CAP_SYS_PTRACE` to read
+  `/proc/<pid>/exe` of the app that connects, but that capability also allows attaching to and writing
+  the memory of any process, root's included, and the filter parses requests from Tor Browser. Its unit
+  now filters out the `@debug` syscalls (ptrace, process_vm_*) on top of an `@system-service` allow-list,
+  and a new enforced AppArmor profile (`prestium_onion_grater`) allows `ptrace (read)` only and denies
+  `/proc/*/mem`. Tor Browser's profile allows that read (`ptrace (readby)`), since AppArmor checks both
+  sides. Not yet run on a booted ISO: NEWNYM and the circuit display must still work there.
+  (`tests/test_onion_grater_hardening.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

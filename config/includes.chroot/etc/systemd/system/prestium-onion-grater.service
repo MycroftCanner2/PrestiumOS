@@ -29,6 +29,16 @@ RestrictNamespaces=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes
 SystemCallArchitectures=native
+# 2.1 (security audit): CAP_SYS_PTRACE is for reading /proc of the connecting app only; no tracing
+# or cross-process memory syscalls at all (AppArmor profile prestium_onion_grater does the rest)
+SystemCallFilter=@system-service
+SystemCallFilter=~@debug
+SystemCallErrorNumber=EPERM
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
 Restart=always
 RestartSec=2
 

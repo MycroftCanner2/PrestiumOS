@@ -34,6 +34,9 @@ profile torbrowser_firefox @{torbrowser_firefox_executable} {
   owner @{HOME}/.cache/ibus/dbus-* rw,
 
   ptrace (trace) peer=@{profile_name},
+  # 2.1 (security audit): onion-grater is confined now; this profile has ptrace rules, so it must
+  # also allow onion-grater's read-only look at /proc/<pid>/exe and root (identity, not tracing)
+  ptrace (readby) peer=prestium_onion_grater,
   signal (receive, send) set=("term") peer=@{profile_name},
 
   deny /etc/host.conf r,

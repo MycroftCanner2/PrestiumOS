@@ -1,0 +1,46 @@
+# Prestium 2.1 (security audit): onion-grater, the Tor control-port filter, ENFORCED.
+# It needs CAP_SYS_PTRACE only to read who is connecting (/proc/<pid>/status, exe, cmdline and a
+# stat through /proc/<pid>/root) for processes of other uids. That capability also allows attaching
+# to and writing the memory of any process, root's included; this profile keeps the read-only use:
+# "ptrace (read)" is what the kernel asks for those /proc reads, tracing and /proc/<pid>/mem are
+# denied. Its unit adds SystemCallFilter=~@debug (no ptrace, process_vm_* syscalls at all).
+# Attached by path (the script), so if the profile were missing the filter still starts.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile prestium_onion_grater /usr/local/sbin/prestium-onion-grater flags=(attach_disconnected) {
+  include <abstractions/base>
+  include <abstractions/nameservice>
+  include <abstractions/python>
+
+  capability sys_ptrace,
+  ptrace (read),
+  deny ptrace (trace),
+  deny @{PROC}/*/mem rwx,
+  deny @{PROC}/*/environ r,
+
+  network unix stream,
+  network unix dgram,
+
+  /usr/local/sbin/prestium-onion-grater r,
+  /usr/bin/python3* mrix,
+
+  @{PROC}/[0-9]*/status r,
+  @{PROC}/[0-9]*/cmdline r,
+  @{PROC}/[0-9]*/exe r,
+  @{PROC}/[0-9]*/root/ r,
+  @{PROC}/@{pid}/** r,
+  @{PROC}/sys/kernel/random/* r,
+
+  /opt/tor-browser/Browser/firefox.real r,
+  /usr/bin/onionshare r,
+  /run/onion-grater/ rw,
+  /run/onion-grater/control rw,
+  /run/tor/control rw,
+  /run/tor/control.authcookie r,
+  /dev/log w,
+  /run/systemd/journal/dev-log w,
+
+  include if exists <local/usr.local.sbin.prestium-onion-grater>
+}

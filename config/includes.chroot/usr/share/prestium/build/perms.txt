@@ -10,6 +10,7 @@
 0644 root root /etc/apparmor.d/usr.bin.pidgin
 0644 root root /etc/apparmor.d/usr.bin.claws-mail
 0644 root root /etc/apparmor.d/usr.share.librewolf.librewolf
+0644 root root /etc/apparmor.d/usr.local.sbin.prestium-onion-grater
 0644 root root /etc/apt/preferences.d/prestium
 0644 root root /usr/share/prestium/build/apt/prestium-librewolf.list
 0644 root root /usr/share/prestium/build/apt/prestium-i2pd.list
