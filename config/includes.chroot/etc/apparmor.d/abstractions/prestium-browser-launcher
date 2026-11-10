@@ -85,7 +85,7 @@
     /{,usr/}bin/{sh,dash,bash,socat,sleep,dirname,expr,getconf,mkdir,ln,cp,sed,rm,realpath,readlink,id,pwd,env,cat} mrix,
     # Tor Browser: start-tor-browser is a script in the read-only install; firefox.real gets its
     # own profile, torbrowser_firefox
-    /{,usr/}bin/{grep,tr,awk,mawk,uname,file,head,tail,basename,ls,chmod,touch,[} mrix,
+    /{,usr/}bin/{grep,tr,awk,mawk,uname,file,head,tail,basename,ls,chmod,touch,test} mrix,
     /opt/tor-browser/Browser/start-tor-browser mrix,
     /opt/tor-browser/Browser/firefox mrix,
     /opt/tor-browser/Browser/firefox.real Px -> torbrowser_firefox,
