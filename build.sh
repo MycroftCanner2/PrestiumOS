@@ -5,7 +5,8 @@
 #   sudo ./build.sh --clean    lb clean --purge first
 # Host: Debian 13 (trixie) with live-build, debootstrap, squashfs-tools, xorriso, curl, gpg, gpgv,
 # git, unzip, npm. On a non-amd64 host also qemu-user-static with a binfmt_misc entry for x86-64
-# (flag F), so the amd64 chroot runs emulated. Output: ./Prestium-2.0-amd64.iso and .sha256.
+# (flag F), so the amd64 chroot runs emulated. Output: ./Prestium-2.0-amd64.iso and .sha256, and (2.1)
+# SHA256SUMS, the .manifest and the .packages list for a signed release (scripts/sign-release.sh).
 set -euo pipefail
 cd "$(dirname "$0")"
 TOP=$(pwd)
@@ -103,3 +104,30 @@ ISO=$(ls -t Prestium-2.0-amd64.hybrid.iso live-image-amd64.hybrid.iso Prestium-2
 [ "$ISO" = "$OUT" ] || mv -f "$ISO" "$OUT"
 sha256sum "$OUT" > "$OUT.sha256"
 cat "$OUT.sha256"
+
+# 5. 2.1 (security audit): release files. SHA256SUMS (the ISO and its manifest) is what a release is
+#    signed over: scripts/sign-release.sh KEYID (run as the person holding the release key, not root)
+#    writes SHA256SUMS.asc. The manifest records what went into the image.
+MAN=${OUT%.iso}.manifest
+PKGS=${OUT%.iso}.packages
+TP=config/includes.chroot/usr/src/prestium-thirdparty
+. thirdparty/versions.sh
+for f in live-image-amd64.packages chroot.packages.live; do [ -s "$f" ] && { cp -f "$f" "$PKGS"; break; }; done
+{
+	echo "# Prestium image manifest (written by build.sh)"
+	echo "image: $OUT"
+	echo "image_sha256: $(cut -c1-64 "$OUT.sha256")"
+	echo "image_bytes: $(stat -c %s "$OUT")"
+	echo "build_date_utc: $(date -u -d "@$(cat chroot/usr/share/prestium/build-date 2>/dev/null || date -u +%s)" '+%Y-%m-%dT%H:%M:%SZ')"
+	echo "source_commit: $(git rev-parse HEAD 2>/dev/null || echo unknown)$(git diff --quiet HEAD 2>/dev/null || echo ' (with local changes)')"
+	echo "debian: trixie, $(grep -c . "$PKGS" 2>/dev/null || echo 0) packages (see $PKGS)"
+	echo "tor_browser: $(cat "$TP/tor-browser.version" 2>/dev/null || echo unknown) sha256 $(sha256sum "$TP/tor-browser.tar.xz" 2>/dev/null | cut -c1-64)"
+	echo "firefox_local: $FF_VERSION sha256 $FF_SHA256"
+	echo "nodejs: $NODE_VERSION sha256 $NODE_SHA256"
+	echo "thelounge: $THELOUNGE_VERSION"
+	echo "feather: $FEATHER_VERSION sha256 $FEATHER_SHA256"
+	echo "apt (installed at build time, signed repositories): tor $(chroot chroot dpkg-query -W -f '${Version}' tor 2>/dev/null), i2pd $(chroot chroot dpkg-query -W -f '${Version}' i2pd 2>/dev/null), librewolf $(chroot chroot dpkg-query -W -f '${Version}' librewolf 2>/dev/null)"
+} > "$MAN"
+sha256sum "$OUT" "$MAN" $( [ -s "$PKGS" ] && echo "$PKGS" ) > SHA256SUMS
+rm -f SHA256SUMS.asc     # an old signature never covers a new build
+echo "release files: SHA256SUMS $MAN ${PKGS} (sign with: scripts/sign-release.sh KEYID)"

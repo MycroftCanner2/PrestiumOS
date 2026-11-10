@@ -21,3 +21,6 @@
 /.prestium-build.lock
 __pycache__/
 *.pyc
+/*.manifest
+/SHA256SUMS
+/SHA256SUMS.asc

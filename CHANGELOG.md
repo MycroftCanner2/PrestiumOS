@@ -139,6 +139,13 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   error level on all 82 shell scripts (none today), every AppArmor profile compiled, a scan for committed
   private keys and tokens, `systemd-analyze security` scores, and the tests that don't need a live
   Wayland session. The checkout action is pinned to a commit and the job can only read the repository.
+- **Release files for a signed download.** `build.sh` now also writes `SHA256SUMS` (the ISO, its manifest
+  and its package list) and `Prestium-<version>-amd64.manifest`: the image's SHA-256 and size, build
+  date, source commit, Debian package count, the Tor Browser version and SHA-256 that went in, the pinned
+  Firefox, Node.js, The Lounge and Feather versions, and the Tor, i2pd and LibreWolf package versions.
+  `scripts/sign-release.sh FINGERPRINT`, run by the release key's holder, writes and checks a detached
+  `SHA256SUMS.asc`. The ISO itself is not signed yet: that needs the release key.
+  (`tests/test_release_files.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
