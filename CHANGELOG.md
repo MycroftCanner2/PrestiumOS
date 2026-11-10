@@ -13,6 +13,21 @@ Enhanced security and new features. Changes will be listed here as they land.
   `0.4.9.16-1~d13.trixie+1` since 2026-11-10, and the next build installs it. Tor isn't pinned to a version, so no
   other change is needed.
 
+### New: virtual machine warning and network diagnosis
+- **Prestium tells you when it runs in a virtual machine**, the way Tails does: a notification at login
+  says the host and the virtualization software can see and record everything done in Prestium.
+  Detection is `systemd-detect-virt --vm`, run at boot by `prestium-vm-netcheck.service`
+  (`ConditionVirtualization=vm`, so it never runs on real hardware); `prestium-vm-notify` shows it.
+- **If Tor or I2P hasn't connected in a VM after 10 minutes, the desktop says why.** The service checks
+  every 2 minutes, for about 40 minutes. It looks at Tor's bootstrap and clock-skew messages, the skew
+  prestium-timesync measured, i2pd's TCP connections to other computers and the default route. Then it
+  names the likely cause and the setting that fixes it: no network adapter or no route; user-mode
+  networking (gateway 10.0.2.2: QEMU user/SLIRP, VirtualBox NAT, virt-manager's "User session"); a VM
+  clock set to local time (virt-manager `<clock offset='utc'>`, VirtualBox "Hardware Clock in UTC Time",
+  Hyper-V time synchronization); or Tor working while I2P has no peers, which points to a VPN or
+  firewall on the host blocking I2P's ports. The diagnosis disappears once both connect. Read-only: it
+  never changes the clock, the network, Tor or i2pd (`tests/test_vm_check.sh`).
+
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
   when the key that made it has since expired. Every third-party signature (Tor Browser, Firefox,

@@ -14,7 +14,9 @@ for f in \
   "$root/config/includes.chroot/usr/local/bin/prestium-i2p-console" \
   "$root/config/includes.chroot/usr/local/bin/prestium-localfox" \
   "$root/config/includes.chroot/usr/local/bin/prestium-tunnel-hops" \
-  "$root/config/includes.chroot/usr/lib/systemd/system-sleep/prestium-usb-watchdog"
+  "$root/config/includes.chroot/usr/lib/systemd/system-sleep/prestium-usb-watchdog" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-vm-netcheck" \
+  "$root/config/includes.chroot/usr/local/bin/prestium-vm-notify"
 do
   if ! bash -n "$f"; then
     echo "FAIL sh -n $f"; fail=1

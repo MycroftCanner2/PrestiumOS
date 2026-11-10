@@ -1,0 +1,34 @@
+#!/bin/bash
+# Prestium 2.1: warn when Prestium runs in a virtual machine (as Tails does), and show the network
+# diagnosis prestium-vm-netcheck (root, boot) writes to /run/prestium/vm when Tor or I2P can't connect.
+# Started from the session autostart. On real hardware the service never runs and this exits.
+D=${PRESTIUM_VM_OUT:-/run/prestium/vm}
+WAIT=${PRESTIUM_VM_NOTIFY_WAIT:-120}   # seconds to wait for $D/virt at session start
+POLL=${PRESTIUM_VM_NOTIFY_POLL:-30}
+LIFE=${PRESTIUM_VM_NOTIFY_LIFE:-3600}  # stop watching after an hour (the service gives up after ~40 min)
+# mako renders Pango markup: escape it, so "<clock offset='utc'>" is shown, not swallowed as a tag
+esc() { sed -e 's/&/\&amp;/g' -e 's/</\&lt;/g' -e 's/>/\&gt;/g'; }
+n=0
+while [ ! -s "$D/virt" ]; do
+  [ "$n" -ge "$WAIT" ] && exit 0
+  sleep 5; n=$((n + 5))
+done
+virt=$(head -c 40 "$D/virt" | tr -cd 'a-z0-9_-')
+notify-send -u normal -t 0 "Prestium is running in a virtual machine${virt:+ ($virt)}" \
+  "The host operating system and the virtualization software can see and record everything you do in Prestium: what you type, what is on screen, and the network traffic before it is encrypted. Use a virtual machine only on a computer you trust. Nothing you do here is hidden from the host." 2>/dev/null
+last=
+t=0
+while [ "$t" -lt "$LIFE" ]; do
+  if [ -s "$D/network" ]; then
+    cur=$(head -c 1500 "$D/network" | esc)
+    if [ "$cur" != "$last" ]; then
+      last=$cur
+      notify-send -u critical -t 0 "Prestium: network problem in the virtual machine" "$cur" 2>/dev/null
+    fi
+  elif [ -n "$last" ]; then
+    last=
+    notify-send -u normal "Prestium: network OK" "Tor and I2P are connected." 2>/dev/null
+  fi
+  sleep "$POLL"; t=$((t + POLL))
+done
+exit 0

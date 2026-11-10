@@ -1,0 +1,29 @@
+# Prestium 2.1: detect a virtual machine and explain, on the desktop, why Tor or I2P can't connect in it
+# (prestium-vm-notify shows what this writes to /run/prestium/vm). Never runs on real hardware.
+[Unit]
+Description=Prestium virtual machine detection and network diagnosis
+ConditionVirtualization=vm
+After=network.target tor.service i2pd.service systemd-tmpfiles-setup.service
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/prestium-vm-netcheck
+# read-only checks (journal, routes, socket list); writes only /run/prestium/vm
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/prestium/vm
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

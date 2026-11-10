@@ -1,0 +1,93 @@
+#!/bin/bash
+# Prestium 2.1: virtual machine detection and network diagnosis.
+# Started at boot by prestium-vm-netcheck.service (ConditionVirtualization=vm, so it never runs on real
+# hardware). Writes, for prestium-vm-notify (the desktop), in $OUT (root-owned, world-readable):
+#   virt     the hypervisor, as systemd-detect-virt names it (kvm, qemu, oracle, vmware, microsoft...)
+#   network  why Tor or I2P has not connected yet, in plain words; removed once both work
+# Read-only checks: it never changes the clock, the network, Tor or i2pd.
+set -u
+OUT=${PRESTIUM_VM_OUT:-/run/prestium/vm}
+FIRST=${PRESTIUM_VM_FIRST:-600}     # seconds before the first check (Tor and I2P need a few minutes)
+EVERY=${PRESTIUM_VM_EVERY:-120}     # seconds between checks
+ROUNDS=${PRESTIUM_VM_ROUNDS:-15}    # checks before giving up (about 40 minutes in all)
+I2PD_UID=${PRESTIUM_VM_I2PD_UID:-2000}
+
+put() {   # name: stdin to $OUT/name, atomically, 0644
+  local t; t=$(mktemp "$OUT/.$1.XXXXXX") || return 1
+  cat > "$t" && chmod 0644 "$t" && mv -f "$t" "$OUT/$1"
+}
+
+virt=$(systemd-detect-virt --vm 2>/dev/null) || exit 0
+[ -n "$virt" ] && [ "$virt" != none ] || exit 0
+mkdir -p "$OUT" || exit 1
+printf '%s\n' "$virt" | put virt
+echo "running in a virtual machine: $virt"
+
+case "$virt" in
+  kvm|qemu) name="QEMU/KVM (virt-manager, GNOME Boxes, Proxmox...)"
+    clock_fix="In virt-manager: open the VM, Overview, XML, and set <clock offset='utc'>. A Windows OS profile sets 'localtime'." ;;
+  oracle) name="VirtualBox"
+    clock_fix="In VirtualBox: Settings, System, Motherboard, tick 'Hardware Clock in UTC Time'." ;;
+  vmware) name="VMware"
+    clock_fix="In VMware the guest clock follows the host: check the host's own clock and time zone." ;;
+  microsoft) name="Hyper-V"
+    clock_fix="In Hyper-V: VM Settings, Integration Services, tick 'Time synchronization', and check the host's own clock." ;;
+  *) name=$virt
+    clock_fix="Set the virtual machine's hardware clock to UTC, not local time." ;;
+esac
+
+tor_ok() { journalctl -b -u tor@default -o cat --no-pager 2>/dev/null | grep -q 'Bootstrapped 100'; }
+tor_skew() {   # Tor's own clock-skew warnings, last one
+  journalctl -b -u tor@default -o cat --no-pager 2>/dev/null \
+    | grep -iE 'clock (is|skew)|skewed|time.*(behind|ahead)' | tail -n 1 | cut -c1-200
+}
+sync_skew() {  # seconds prestium-timesync measured (0 if it measured nothing)
+  journalctl -b -u prestium-timesync -o cat --no-pager 2>/dev/null \
+    | sed -n 's/.*skew \(-\{0,1\}[0-9]\{1,\}\)s.*/\1/p' | tail -n 1
+}
+i2p_peers() {  # established TCP (NTCP2) connections of i2pd to other computers
+  ss -Htne state established 2>/dev/null \
+    | awk -v u="uid:$I2PD_UID" 'index($0, u) && $4 !~ /^127\./ && $4 !~ /^\[::1\]/ { n++ } END { print n+0 }'
+}
+
+sleep "$FIRST"
+round=0
+while [ "$round" -lt "$ROUNDS" ]; do
+  round=$((round + 1))
+  mins=$(( (FIRST + (round - 1) * EVERY) / 60 ))
+  t=no; tor_ok && t=yes
+  peers=$(i2p_peers)
+  if [ "$t" = yes ] && [ "${peers:-0}" -gt 0 ]; then
+    rm -f "$OUT/network"; echo "Tor and I2P are connected"; exit 0
+  fi
+  gw=$(ip -4 route show default 2>/dev/null | awk '$1 == "default" { for (i = 1; i < NF; i++) if ($i == "via") { print $(i+1); exit } }')
+  {
+    printf 'Running in %s. After %s minutes: Tor %s, I2P %s.\n' "$name" "$mins" \
+      "$([ "$t" = yes ] && echo connected || echo 'NOT connected')" \
+      "$([ "${peers:-0}" -gt 0 ] && echo "connected ($peers peers)" || echo 'has NO peer connections')"
+    if [ -z "$gw" ]; then
+      echo "- The VM has no network: no default route. Check that the VM has a network adapter, that its link is up, and that its source is a NAT or bridged network (virt-manager: Virtual network 'default': NAT)."
+    else
+      case "$gw" in
+        10.0.2.2)
+          echo "- The VM uses user-mode networking (QEMU 'user'/SLIRP, VirtualBox NAT, or a virt-manager 'QEMU/KVM User session' VM). Peers can't reach Prestium and UDP is limited, so I2P struggles even when Tor works. Use a NAT network or a bridge instead (virt-manager: connect to 'QEMU/KVM', not 'User session')." ;;
+      esac
+    fi
+    s=$(tor_skew); k=$(sync_skew); k=${k:-0}; a=${k#-}
+    if [ -n "$s" ] || [ "$a" -gt 60 ]; then
+      off=; [ "$a" -gt 60 ] && off=", off by ${k} s at boot"
+      echo "- The VM's clock is or was wrong${s:+ (Tor: $s)}$off. Tor and I2P refuse connections from a wrong clock. $clock_fix"
+    elif [ "$t" = no ]; then
+      echo "- Check the clock: the VM thinks it is $(date -u '+%Y-%m-%d %H:%M') UTC. If that is wrong by more than a minute: $clock_fix"
+    fi
+    if [ -n "$gw" ] && [ "$t" = yes ] && [ "${peers:-0}" -eq 0 ]; then
+      echo "- Tor works but I2P doesn't: a VPN, firewall or antivirus on the host may block I2P's ports (random, 10000-30000, TCP and UDP) while letting Tor's ports (443, 9001) through. Try without the host VPN, or allow those ports."
+    fi
+    if [ -n "$gw" ] && [ "$t" = no ] && [ "${peers:-0}" -eq 0 ]; then
+      echo "- Neither Tor nor I2P connects: check that the host itself is online, and whether the network blocks Tor (then pick a bridge in the Tor Connection Assistant)."
+    fi
+  } | put network
+  echo "check $round: tor=$t i2p_peers=${peers:-0} gateway=${gw:-none}"
+  [ "$round" -lt "$ROUNDS" ] && sleep "$EVERY"
+done
+exit 0
