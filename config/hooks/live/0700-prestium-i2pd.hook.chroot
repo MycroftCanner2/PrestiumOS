@@ -6,6 +6,9 @@ for f in i2pd.conf tunnels.conf; do
 	[ -L /var/lib/i2pd/$f ] && { echo "E: /var/lib/i2pd/$f is still the package symlink"; exit 1; }
 	grep -q '^\[' /var/lib/i2pd/$f
 done
+# 2.1 (security audit): /etc/i2pd/i2pd.conf is not used (i2pd runs with --conf=/var/lib/i2pd/i2pd.conf),
+# but an older copy there had SAM on; it is now always the live file, so both say the same
+install -m 0644 -o root -g root /var/lib/i2pd/i2pd.conf /etc/i2pd/i2pd.conf
 ln -sfn /usr/share/i2pd/certificates /var/lib/i2pd/certificates
 ln -sfn /usr/share/i2pd/torrents /var/lib/i2pd/torrents
 install -d -o 2000 -g 2000 -m 774 /var/lib/i2pd/tunnels.d

@@ -131,6 +131,10 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   signature must now come from one of the 8 current releasers' primary keys (`NODE_KEYS` in
   `thirdparty/versions.sh`, from the Node.js README on 2026-11-10; Node 24.22.2 is signed by one of
   them). (`tests/test_sigcheck.sh`)
+- **Cleanup.** `/etc/i2pd/i2pd.conf`, which i2pd does not use, had drifted from the live
+  `/var/lib/i2pd/i2pd.conf` (SAM was on there); hook 0700 now installs the live file in its place. The
+  desktop user is no longer in group i2pd, which gave it nothing (`/var/lib/i2pd` is 0700). It stays in
+  prestium-localweb, which the local-only Firefox needs. (`tests/test_i2pd_config_copy.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

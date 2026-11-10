@@ -41,7 +41,10 @@ if ! getent passwd user >/dev/null; then
 	useradd --uid 1000 --gid 1000 --home-dir /home/user --no-create-home --shell /bin/bash user
 fi
 passwd -d user >/dev/null          # empty until the user sets a session password
-usermod -aG i2pd,autologin,i2ptorrents,prestium-localweb user
+# 2.1 (security audit): not in group i2pd any more (nothing of i2pd's is group-readable to it:
+# /var/lib/i2pd is 0700); prestium-localweb stays, the local-only Firefox runs with it (sg)
+gpasswd -d user i2pd >/dev/null 2>&1 || true
+usermod -aG autologin,i2ptorrents,prestium-localweb user
 usermod -aG prestium-tbb user       # 2.0 r9
 usermod -aG video user              # 2.0: backlight (brightnessctl, 90-prestium-backlight.rules)
 usermod -aG i2pd,i2ptorrents i2pd 2>/dev/null || true
