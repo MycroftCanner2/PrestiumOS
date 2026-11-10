@@ -217,6 +217,18 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   Tor), and passphrase prompts go to the pinentry profile.
 - Files outside the file folders (for example a text file directly in the home directory, or in a dot
   directory) can no longer be opened in these programs; move them into Documents first.
+- **onion-grater checks how a Python client was started** (L-1). Before, any program of the user could
+  start the real nyx, OnionShare or Tor Connection Assistant with its own PYTHONPATH or LD_PRELOAD and
+  get that client's allow-list. A client whose environment sets PYTHON* (other than
+  PYTHONDONTWRITEBYTECODE, PYTHONUNBUFFERED, PYTHONIOENCODING, PYTHONUTF8), LD_*, GCONV_PATH or
+  GLIBC_TUNABLES, or that runs executable code from outside /usr, /lib and the Tor Browser install, is
+  refused. Python no longer loads the user's own site-packages anywhere on the system (hook 0460), so a
+  .pth file in the home can't run inside these clients either. onion-grater's profile may now read a
+  client's environment and memory map (never its memory). (`tests/test_onion_grater_tamper.py`)
+- **`tests/ci.sh` gates `systemd-analyze security`**: every Prestium unit must score 5.0 or lower
+  (timesync 3.2, clockfix 2.1, USB watchdog 4.9 after this release; they were 9.4), except the Wayland
+  broker (5.4, down from 7.9), the early firewall and the two shutdown wipes, which need the whole
+  system by design. It runs the offline analysis in a user namespace when it isn't root.
 - The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
   every boot), which the audit (I-3) read from the commented template; nothing changed there.
 
@@ -237,6 +249,12 @@ Not changed in 2.1, so you know where the edges are:
   kernel then parses that image's filesystem. Debian's udisks allows this to the active user anyway, and
   polkit can't tell the unlock helpers from other programs with the same uid. The confined apps can't
   reach udisks at all, and rarely used filesystem drivers can't be loaded.
+- **Most confined apps share ~/Downloads** (Claws Mail, Gajim, Pidgin, LibreWolf, the local Firefox,
+  LibreOffice and the file viewers can write there), so a compromised one could change a file another
+  app later opens. Separate folders per app would change where your files end up; not done in 2.1.
+- **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need.
+- **Programs of the desktop user may change NetworkManager's system connections** (to add Wi-Fi). The
+  MAC guard and the firewall keep the real MAC address and real IP address from leaking that way.
 - **The local-only Firefox's network rule follows a group** (prestium-localweb) that the desktop user's
   programs can also use; such a program may reach the same three local pages.
 

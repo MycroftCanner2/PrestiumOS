@@ -1,0 +1,21 @@
+#!/bin/sh
+# Prestium 2.1 (audit of 96468c5, L-1): Python never loads the user's own site-packages
+# (~/.local/lib/python3.X/site-packages). A .pth file or usercustomize.py there runs inside every
+# Python program the user starts, including the clients that onion-grater lets use Tor's control
+# port (nyx, OnionShare, the Tor Connection Assistant), and any program of the user could put one
+# there. Nothing on Prestium installs packages per user (no pip). Fails the build if site.py changed.
+set -e
+n=0
+for f in /usr/lib/python3.*/site.py; do
+	[ -f "$f" ] || continue
+	grep -qx 'ENABLE_USER_SITE = None' "$f" || grep -qx 'ENABLE_USER_SITE = False  # Prestium' "$f" \
+		|| { echo "E: $f: no 'ENABLE_USER_SITE = None' line"; exit 1; }
+	sed -i 's/^ENABLE_USER_SITE = None$/ENABLE_USER_SITE = False  # Prestium/' "$f"
+	grep -qx 'ENABLE_USER_SITE = False  # Prestium' "$f" || { echo "E: $f not patched"; exit 1; }
+	rm -f "$(dirname "$f")"/__pycache__/site.*.pyc
+	n=$((n + 1))
+done
+[ "$n" -gt 0 ] || { echo "E: no Python site.py found"; exit 1; }
+python3 -c 'import site, sys; sys.exit(0 if site.ENABLE_USER_SITE is False else 1)' \
+	|| { echo "E: Python still enables the user site"; exit 1; }
+echo "P: Python user site-packages off ($n)"

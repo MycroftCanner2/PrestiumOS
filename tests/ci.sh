@@ -38,13 +38,24 @@ if git grep -nIE -e '-----BEGIN ((RSA|DSA|EC|OPENSSH|ENCRYPTED) )?PRIVATE KEY---
   echo "FAIL a private key or token is committed"; fail=1
 else echo "OK   none found"; fi
 
-step "systemd-analyze security (informational)"
+step "systemd-analyze security (gated: 5.0)"
+# 2.1 (audit of 96468c5): every Prestium unit scores 5.0 or lower, except these, which need the whole
+# system by design: the Wayland broker (the session tools it starts inherit its sandbox; 5.4 in 2.1),
+# the early firewall (iptables before any network), and the two shutdown wipes (memory, session files).
+ALLOW=" prestium-wl-broker prestium-firewall-early prestium-initramfs-shutdown prestium-wipe-session "
 if command -v systemd-analyze >/dev/null; then
-  for u in prestium-onion-grater prestium-vm-netcheck prestium-mac-guard prestium-wl-broker thelounge; do
-    s=$(systemd-analyze security --offline=true "config/includes.chroot/etc/systemd/system/$u.service" 2>/dev/null | tail -n 1)
-    echo "INFO $u: ${s:-n/a}"
+  D=config/includes.chroot/etc/systemd/system
+  score(){ # offline analysis needs a writable /run/systemd: as root, or in a user namespace
+    systemd-analyze security --offline=true --no-pager "$D/$1.service" 2>/dev/null | tail -n 1 | grep -o '[0-9]*\.[0-9]' \
+      || unshare -rm sh -c 'mount -t tmpfs tmpfs /run && systemd-analyze security --offline=true --no-pager "$0"' "$D/$1.service" 2>/dev/null \
+         | tail -n 1 | grep -o '[0-9]*\.[0-9]'; }
+  for f in "$D"/prestium-*.service "$D"/thelounge.service; do
+    u=$(basename "$f" .service); s=$(score "$u")
+    if [ -z "$s" ]; then echo "SKIP $u: n/a (needs root or user namespaces)"; continue; fi
+    case "$ALLOW" in *" $u "*) echo "INFO $u: $s (allowed above 5.0)"; continue;; esac
+    if awk -v s="$s" 'BEGIN{exit !(s > 5.0)}'; then echo "FAIL $u: $s (above 5.0)"; fail=1; else echo "OK   $u: $s"; fi
   done
-fi
+else echo "SKIP systemd-analyze missing"; fi
 
 step "tests"
 for t in tests/test_*.sh tests/test_*.py; do

@@ -18,7 +18,8 @@ profile prestium_onion_grater /usr/local/sbin/prestium-onion-grater flags=(attac
   ptrace (read),
   deny ptrace (trace),
   deny @{PROC}/*/mem rwx,
-  deny @{PROC}/*/environ r,
+  # 2.1 (audit of 96468c5, L-1): the environment and memory map of a client, to refuse a tampered
+  # start (PYTHONPATH, LD_PRELOAD, code from the home directory); never its memory
 
   network unix stream,
   network unix dgram,
@@ -29,6 +30,8 @@ profile prestium_onion_grater /usr/local/sbin/prestium-onion-grater flags=(attac
   @{PROC}/[0-9]*/status r,
   @{PROC}/[0-9]*/cmdline r,
   @{PROC}/[0-9]*/exe r,
+  @{PROC}/[0-9]*/environ r,
+  @{PROC}/[0-9]*/maps r,
   @{PROC}/[0-9]*/root/ r,
   @{PROC}/@{pid}/** r,
   @{PROC}/sys/kernel/random/* r,

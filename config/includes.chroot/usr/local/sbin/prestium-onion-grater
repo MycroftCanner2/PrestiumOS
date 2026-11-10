@@ -110,6 +110,34 @@ def same_file(a, b):
     return (x.st_dev, x.st_ino) == (y.st_dev, y.st_ino)
 
 
+# 2.1 (audit of 96468c5, L-1): a Python client is the system interpreter running the system script,
+# but a program of the same user could start that pair with its own environment (PYTHONPATH,
+# LD_PRELOAD, ...) and inherit the client's allow-list. Refuse a client whose environment points the
+# interpreter or the dynamic loader elsewhere, or that runs executable code from outside the system
+# directories. (The user's own site-packages are off system-wide: hook 0460 sets ENABLE_USER_SITE.)
+ENV_BAD = re.compile(rb"^(PYTHON(?!DONTWRITEBYTECODE=|UNBUFFERED=|IOENCODING=|UTF8=)[A-Z_]*|LD_[A-Z_]+|GCONV_PATH|GLIBC_TUNABLES)=")
+# (GTK, GIO and Qt module paths need no entry here: code they load from elsewhere shows in the maps)
+EXEC_OK = ("/usr/", "/lib/", "/lib64/", "/opt/tor-browser/")
+
+def tampered(pid, proc="/proc"):
+    """None if the process looks like an unmodified start, else the reason."""
+    try:
+        with open("%s/%d/environ" % (proc, pid), "rb") as f:
+            env = f.read().split(b"\0")
+        with open("%s/%d/maps" % (proc, pid)) as f:
+            maps = f.read().splitlines()
+    except OSError as e:
+        return "cannot inspect environment: %s" % e
+    for e in env:
+        if ENV_BAD.match(e):
+            return "environment sets %s" % e.split(b"=", 1)[0].decode(errors="replace")
+    for line in maps:
+        parts = line.split(None, 5)
+        if len(parts) == 6 and "x" in parts[1] and parts[5].startswith("/"):
+            if not parts[5].startswith(EXEC_OK):
+                return "runs code from %s" % parts[5]
+    return None
+
 def identify(conn):
     creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
     pid, uid, gid = struct.unpack("3i", creds)
@@ -150,6 +178,11 @@ def identify(conn):
         script = argv[1]
         if not script.startswith("/") or not same_file("/proc/%d/root%s" % (pid, script), script):
             return None, "unknown client %s %s (script is not the system file)" % (exe, script), pid
+        if script in ("/usr/bin/onionshare", "/usr/bin/onionshare-cli", "/usr/bin/nyx",
+                      "/usr/local/bin/prestium-tor-assistant"):
+            why = tampered(pid)
+            if why:
+                return None, "%s refused: %s" % (script, why), pid
         if script in ("/usr/bin/onionshare", "/usr/bin/onionshare-cli"):
             return "onionshare", script, pid
         if script == "/usr/bin/nyx":
