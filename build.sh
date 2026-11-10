@@ -39,6 +39,13 @@ find config/includes.chroot -name __pycache__ -type d -prune -exec rm -rf {} +
 find config/includes.chroot -name '*.pyc' -type f -delete
 
 # 3. configure + build
+# 2.1 (security audit): one timestamp for the build (file dates, the recorded build date): the source
+# commit's time unless given. With PRESTIUM_SNAPSHOT (auto/config) the Debian packages are fixed too.
+# The image is not bit-for-bit reproducible yet (live-build, squashfs and the third-party apt repos).
+if [ -z "${SOURCE_DATE_EPOCH:-}" ]; then
+	SOURCE_DATE_EPOCH=$(git log -1 --format=%ct 2>/dev/null || date -u +%s)
+fi
+export SOURCE_DATE_EPOCH
 lb config >/dev/null
 if [ "$MODE" = --resume ]; then
 	rm -f .lock

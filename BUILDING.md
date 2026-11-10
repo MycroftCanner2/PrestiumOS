@@ -52,6 +52,11 @@ which works but is several times slower.
 An interrupted build can be continued with `sudo ./build.sh --resume`; `sudo ./build.sh --clean`
 starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (much longer emulated).
 
+Repeatable builds: `sudo PRESTIUM_SNAPSHOT=20261110T000000Z ./build.sh` takes Debian (main and
+security) from snapshot.debian.org at that time, and `build.sh` sets `SOURCE_DATE_EPOCH` to the source
+commit's time. The Tor, i2pd and LibreWolf repositories have no snapshots, and the image is not yet
+bit-for-bit reproducible; compare two builds with their `.manifest` files.
+
 ## Checks
 
 `tests/ci.sh` runs what CI runs on every push (`.github/workflows/checks.yml`, Debian 13):

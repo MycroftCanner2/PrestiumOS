@@ -148,6 +148,9 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   (`tests/test_release_files.sh`)
 - **README: how to verify a download**, with `gpg --verify SHA256SUMS.asc` for signed releases and the
   SHA-256 comparison for 2.0, which has no signed checksum file.
+- **Repeatable builds (first step).** `PRESTIUM_SNAPSHOT=20261110T000000Z` builds from
+  snapshot.debian.org at that time, and `build.sh` sets `SOURCE_DATE_EPOCH` to the commit's time. The
+  image is not yet bit-for-bit reproducible. (`tests/test_build_snapshot.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,

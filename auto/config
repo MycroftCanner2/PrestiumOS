@@ -4,17 +4,30 @@
 # for the generated config/{bootstrap,chroot,binary,common,source} files.
 set -e
 APPEND="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 apparmor=1 security=apparmor quiet splash"
+# 2.1 (security audit): PRESTIUM_SNAPSHOT=20261110T000000Z builds from snapshot.debian.org at that time
+# (main and security), so two builds of the same commit get the same Debian packages. Unset: the
+# current archive. The Tor, i2pd and LibreWolf repositories have no snapshots.
+MIRROR=https://deb.debian.org/debian/
+MIRROR_SEC=https://security.debian.org/debian-security/
+APT_OPTS="--yes"
+if [ -n "${PRESTIUM_SNAPSHOT:-}" ]; then
+	echo "$PRESTIUM_SNAPSHOT" | grep -qxE '[0-9]{8}T[0-9]{6}Z' || { echo "PRESTIUM_SNAPSHOT must look like 20261110T000000Z"; exit 1; }
+	MIRROR=https://snapshot.debian.org/archive/debian/$PRESTIUM_SNAPSHOT/
+	MIRROR_SEC=https://snapshot.debian.org/archive/debian-security/$PRESTIUM_SNAPSHOT/
+	APT_OPTS="--yes -o Acquire::Check-Valid-Until=false"   # snapshot Release files are past Valid-Until
+fi
 lb config noauto \
 	--mode debian \
 	--distribution trixie \
 	--architecture amd64 \
 	--archive-areas "main contrib non-free-firmware" \
 	--parent-archive-areas "main contrib non-free-firmware" \
-	--mirror-bootstrap https://deb.debian.org/debian/ \
-	--mirror-chroot https://deb.debian.org/debian/ \
-	--mirror-binary https://deb.debian.org/debian/ \
-	--mirror-chroot-security https://security.debian.org/debian-security/ \
-	--mirror-binary-security https://security.debian.org/debian-security/ \
+	--mirror-bootstrap "$MIRROR" \
+	--mirror-chroot "$MIRROR" \
+	--mirror-binary "$MIRROR" \
+	--mirror-chroot-security "$MIRROR_SEC" \
+	--mirror-binary-security "$MIRROR_SEC" \
+	--apt-options "$APT_OPTS" \
 	--security true \
 	--updates true \
 	--backports true \
