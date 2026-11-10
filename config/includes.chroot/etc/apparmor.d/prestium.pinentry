@@ -1,8 +1,9 @@
 # Prestium 2.1 (review of the security audit): the GnuPG passphrase prompt when Claws Mail's own
 # gpg-agent starts it (normally the session's agent does). It was "Ux" (unconfined). It talks to
 # gpg-agent on stdin/stdout, asks the GNOME prompter over the session bus or draws its own window,
-# and touches no files: it may not write anywhere, run anything else or open
-# any network socket but a local (unix) one.
+# and needs none of the user's files. It may not write under the home directory, run any program or
+# open any network socket but a local (unix) one. (The expanded profile still has the scratch and
+# socket writes the GTK and GNOME abstractions grant: /tmp, /var/tmp, the display and bus sockets.)
 abi <abi/4.0>,
 include <tunables/global>
 
@@ -42,6 +43,10 @@ profile prestium_pinentry {
 
   # nothing else: no files of the user, no other programs
   deny @{HOME}/** w,
+  # base and gnome grant ix on a few home and /tmp paths (ecryptfs, @{HOME}/tmp); pinentry runs nothing
+  deny @{HOME}/** x,
+  deny /tmp/** x,
+  deny /var/tmp/** x,
   deny @{HOME}/.gnupg/** rw,
   include if exists <local/prestium.pinentry>
 }

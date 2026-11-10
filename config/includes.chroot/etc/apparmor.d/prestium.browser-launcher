@@ -3,7 +3,8 @@
 # its own environment, before any sandbox. Now they use "Px -> prestium_*_launcher": the launcher
 # may write only its own browser's directories (a crafted HOME or a symlink in the profile cannot
 # reach another file), runs only the tools it needs, and starts bubblewrap in its own child profile, which
-# may also write only that browser's directories.
+# may write only that browser's home directories (plus what bubblewrap itself needs: /tmp, the
+# user's own /run, ~/.bash_history from abstractions/bash, mount and user namespaces).
 # Named profiles, no attachment: started from the menu, the launchers run as before.
 abi <abi/4.0>,
 include <tunables/global>

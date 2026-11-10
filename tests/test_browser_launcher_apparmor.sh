@@ -44,13 +44,19 @@ pw=$(grep -v '^\s*#\|deny' "$PE" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '^\
 grep -Eq '\s[a-zA-Z]*[iPpCcUu]x[a-zA-Z]*(\s*->\s*\S+)?,\s*$' <<<"$(grep -v '^\s*#' "$PE")" && bad "pinentry may run programs" || ok "pinentry: runs nothing"
 grep -v '^\s*#' "$PE" | grep -v deny | grep -q 'network inet' && bad "pinentry has network" || ok "pinentry: no network rule of its own"
 grep -q 'abstractions/nameservice>' "$PE" && bad "pinentry includes nameservice (inet rules)" || ok "pinentry: nameservice-strict"
-grep -q '^  deny network inet,' "$PE" && grep -q '^  deny network inet6,' "$PE" && ok "pinentry: inet denied" || bad "pinentry inet deny"
+grep -q '^  deny @{HOME}/\*\* x,' "$PE" && grep -q '^  deny /tmp/\*\* x,' "$PE" && grep -q '^  deny network inet,' "$PE" && grep -q '^  deny network inet6,' "$PE" && ok "pinentry: inet denied" || bad "pinentry inet deny"
 if command -v apparmor_parser >/dev/null; then
   ex=$(apparmor_parser -p -b "$W" "$W/prestium.pinentry" 2>/dev/null | grep -v '^\s*#' | grep -Ev '^\s*deny' | grep -E '^\s*network (inet|inet6|netlink)')
   [ -z "$ex" ] && ok "pinentry, expanded: no inet/netlink allow" || bad "pinentry expanded network: $ex"
   exl=$(apparmor_parser -p -b "$W" "$W/prestium.browser-launcher" 2>/dev/null)
   tb=$(awk '/^profile prestium_tor_browser_launcher/{f=1} /^profile prestium_librewolf_launcher/{f=0} f' <<<"$exl" | grep -v '^\s*#' | grep -Ev '^\s*deny' | grep -E 'librewolf/.*w' )
   [ -z "$tb" ] && ok "Tor launcher and its child, expanded: no LibreWolf writes" || bad "Tor child LibreWolf: $tb"
+  lw=$(awk '/^profile prestium_librewolf_launcher/{f=1} f' <<<"$exl" | grep -v '^\s*#' | grep -Ev '^\s*deny' | grep -E '(tor-browser|Tor Browser)/.*w' )
+  [ -z "$lw" ] && ok "LibreWolf launcher and its child, expanded: no Tor Browser writes" || bad "LibreWolf child Tor Browser: $lw"
+  # pinentry, expanded: every exec rule the abstractions bring in falls under one of its x denies
+  pex=$(apparmor_parser -p -b "$W" "$W/prestium.pinentry" 2>/dev/null | grep -v '^\s*#' | grep -Ev '^\s*deny' \
+    | grep -E '\s[a-z]*[iPpCcUu]x[a-z]*(\s*->\s*\S+)?,\s*$' | grep -vE '^\s*(owner\s+)?(@\{HOME\}|@\{HOMEDIRS\}|/tmp|/var/tmp)/')
+  [ -z "$pex" ] && ok "pinentry, expanded: no exec outside its x denies" || bad "pinentry exec: $pex"
 fi
 for p in prestium.browser-launcher prestium.pinentry; do
   grep -q "$p" "$H" && ok "hook enforces $p" || bad "hook: $p"

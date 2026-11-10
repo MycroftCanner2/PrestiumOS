@@ -158,12 +158,14 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   started the Tor Browser and I2P Browser launchers unconfined ("Ux"), so a compromised client could
   run them with a crafted HOME and overwrite a file through a symlink before the sandbox started. They
   now use "Px" into `prestium_tor_browser_launcher` and `prestium_librewolf_launcher`, which may write
-  only their own browser's directories and start bubblewrap in a child profile of their own, which
-  may also write only that browser's directories (`abstractions/prestium-browser-launcher-bwrap` holds
-  the rules both share). The launchers also take HOME and XDG_RUNTIME_DIR from the system, not the
+  only their own browser's directories and start bubblewrap in a child profile of their own. Of the
+  home directory, that child may write only its own browser's folders; it can still write what
+  bubblewrap needs (/tmp, the user's own /run, ~/.bash_history from the bash abstraction) and use mount
+  and user namespaces, and only bubblewrap runs there, with arguments the launcher builds. The launchers also take HOME and XDG_RUNTIME_DIR from the system, not the
   caller. From the menu, the launchers run as before. Claws Mail's passphrase prompt (pinentry) has its
-  own profile too: no files, no programs, and no network socket but a local one (it uses
-  `nameservice-strict` and denies inet, inet6 and netlink).
+  own profile too: no writes under the home directory, no programs, and no network socket but a local
+  one (it uses `nameservice-strict` and denies inet, inet6 and netlink). The GTK and GNOME
+  abstractions still let it write scratch files in /tmp and /var/tmp.
   (`tests/test_browser_launcher_apparmor.sh`, `tests/test_launcher_env.sh`)
 - **The Lounge's sign-in token works once and never appears in a command line.** The launcher token
   was valid all boot and went to the local-only Firefox in its URL, which every user could read in
