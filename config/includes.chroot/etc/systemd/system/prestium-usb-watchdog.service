@@ -11,6 +11,22 @@ Restart=on-failure
 # 2.0 r7: exit 3 = could not arm (flagged to the desktop); restarting would not help
 RestartPreventExitStatus=3
 OOMScoreAdjust=-1000
+# 2.1 (audit L-3): only what an emergency power-off needs: kill every process (kill), delete the
+# session's files in RAM whoever owns them (dac_override, fowner), power off (sys_boot). Kept off on
+# purpose: ProtectSystem, PrivateTmp, ProtectKernelTunables (they would hide or freeze the overlay,
+# /tmp and /proc/sysrq-trigger it must wipe and write) and a syscall filter (kill, reboot).
+CapabilityBoundingSet=CAP_KILL CAP_SYS_BOOT CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH CAP_FOWNER CAP_CHOWN
+NoNewPrivileges=yes
+ProtectKernelModules=yes
+ProtectHostname=yes
+ProtectClock=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target

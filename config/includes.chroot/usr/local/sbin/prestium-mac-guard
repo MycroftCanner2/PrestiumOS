@@ -18,6 +18,14 @@ Boot option "nomacspoof" turns MAC spoofing off on purpose; then this service do
 """
 import os, re, subprocess, sys, syslog
 
+def _test_env(name, default, _installed="/usr/local/sbin/prestium-mac-guard"):
+    """2.1 (audit I-1): the PRESTIUM_* overrides are for the test suite, which runs this file from the
+    source tree. The installed copy ignores them, so its paths never depend on sudo's env_reset or on
+    what a unit sets."""
+    if os.path.realpath(__file__) == _installed:
+        return default
+    return os.environ.get(name, default)
+
 NM = "org.freedesktop.NetworkManager"
 NM_PATH = "/org/freedesktop/NetworkManager"
 SETTINGS_PATH = NM_PATH + "/Settings"
@@ -36,7 +44,7 @@ def log(msg, crit=False):
 def flag(msg):
     log(msg, crit=True)
     try:
-        subprocess.run([os.environ.get("PRESTIUM_SAFETY_FLAG", "/usr/local/lib/prestium/safety-flag"),
+        subprocess.run([_test_env("PRESTIUM_SAFETY_FLAG", "/usr/local/lib/prestium/safety-flag"),
                         "set", "mac-address", msg], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except OSError as e:
         log("could not raise the safety flag: %s" % e, crit=True)
@@ -98,7 +106,7 @@ class EgressFilters:
     name was seen before: a new permanent address under the same name (re-plug, driver reload), a
     ruleset flushed by someone else, or an earlier failed install is put right on the next event."""
     def __init__(self, nft=None):
-        self.nft = nft or os.environ.get("PRESTIUM_NFT", "nft")
+        self.nft = nft or _test_env("PRESTIUM_NFT", "nft")
         self.installed = {}   # NM device path -> (ifname, permanent address) of the last good install
 
     def ensure(self, dev, iface, perm):
@@ -121,7 +129,7 @@ class EgressFilters:
 # ---------- NetworkManager over D-Bus ----------
 
 def main():
-    if "nomacspoof" in open(os.environ.get("PRESTIUM_CMDLINE", "/proc/cmdline")).read().split():
+    if "nomacspoof" in open(_test_env("PRESTIUM_CMDLINE", "/proc/cmdline")).read().split():
         log("boot option nomacspoof: MAC guard disabled")
         return 0
     import gi

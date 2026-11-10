@@ -8,6 +8,30 @@ Wants=tor@default.service
 [Service]
 Type=simple
 ExecStart=/usr/local/sbin/prestium-clockfix
+# 2.1 (audit L-3): read Tor's cached consensus and journal (dac_read_search), set the clock
+# (sys_time), restart Tor and i2pd through systemd's own socket. Nothing else: no network at all.
+CapabilityBoundingSet=CAP_SYS_TIME CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE
+NoNewPrivileges=yes
+SystemCallFilter=@system-service @clock
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_UNIX
+PrivateNetwork=yes
+ReadOnlyPaths=/var/lib/tor
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectHome=yes
+ProtectSystem=strict
+PrivateTmp=yes
+PrivateDevices=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0022
 
 [Install]
 WantedBy=multi-user.target

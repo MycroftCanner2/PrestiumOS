@@ -5,6 +5,9 @@
 # The requests run as the unprivileged "prestium-htp" user, which the firewall
 # only lets reach Tor's SOCKS port, on their own isolated Tor circuits.
 # The system time zone stays UTC, so every Prestium looks the same.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
+BUILD_FILE=/usr/share/prestium/build-date
+FLAG=/usr/local/lib/prestium/safety-flag
 POOL="www.torproject.org www.debian.org www.eff.org www.wikipedia.org www.kernel.org duckduckgo.com tails.net www.mozilla.org"
 PROXY="socks5h://prestium-htp:$$@127.0.0.1:9050"
 
@@ -31,8 +34,20 @@ n=$(printf '%s\n' $times | grep -c .)
 med=$(printf '%s\n' $times | sort -n | sed -n "$(( (n+1)/2 ))p")
 now=$(date -u +%s); skew=$((med-now)); abs=${skew#-}
 echo "median of $n sources, skew ${skew}s"
+# 2.1 (audit L-3): the same bounds as prestium-set-clock. Never before this image was built (one day
+# of slack) or more than 10 years after it: the clock decides whether Tor's consensus, TLS certificates
+# and the Browser Updater's publisher keys are valid, and the sites' answers come over the network.
+build=$(head -c 32 "$BUILD_FILE" 2>/dev/null | tr -cd 0-9)
+[ -n "$build" ] || { echo "no build date ($BUILD_FILE), clock left as is"; exit 0; }
+if [ "$med" -lt $((build - 86400)) ] || [ "$med" -gt $((build + 315576000)) ]; then
+  echo "answer $(date -u -d "@$med" '+%F %T') UTC is outside the image's bounds, clock left as is"
+  "$FLAG" set clock-sync "The clock sync over Tor got a time ($(date -u -d "@$med" '+%Y-%m-%d %H:%M') UTC) before this image was built or more than 10 years after it, and ignored it. Check the clock before trusting Tor or TLS warnings." 2>/dev/null
+  exit 0
+fi
 if [ "$abs" -gt 10 ]; then
   date -u -s "@$med" >/dev/null && echo "clock set"
+  # a jump of more than a day is unusual after prestium-clockfix: show it, so it isn't silent
+  [ "$abs" -gt 86400 ] && "$FLAG" set clock-sync "The clock sync over Tor moved the clock by $((abs / 3600)) hours, to $(date -u -d "@$med" '+%Y-%m-%d %H:%M') UTC. If that is wrong, the time sources may have been tampered with." 2>/dev/null
   # i2pd needs a correct clock; restart it after a big jump
   [ "$abs" -gt 60 ] && systemctl try-restart i2pd.service
 fi

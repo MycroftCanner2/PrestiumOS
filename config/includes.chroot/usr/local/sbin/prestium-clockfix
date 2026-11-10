@@ -9,6 +9,7 @@
 # skew on its own, the clock is left alone here.
 # prestium-timesync (After=prestium-clockfix) then sets the exact time over Tor once
 # bootstrap has succeeded; the two units are ordered so they do not fight.
+PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 D=/var/lib/tor
 boot_ok(){ journalctl -b -u tor@default -o cat --no-pager 2>/dev/null | grep -q 'Bootstrapped 100'; }
 i=0; first=-1
@@ -28,6 +29,11 @@ while [ $i -lt 90 ]; do
       [ $((i - first)) -ge 12 ] || break
       boot_ok && { echo "Tor bootstrapped despite the skew, clock left as is"; exit 0; }
       new=$((a + 5400))
+      # 2.1 (audit L-3): never before this image was built (one day of slack) or 10 years after it
+      build=$(head -c 32 /usr/share/prestium/build-date 2>/dev/null | tr -cd 0-9)
+      if [ -z "$build" ] || [ "$new" -lt $((build - 86400)) ] || [ "$new" -gt $((build + 315576000)) ]; then
+        echo "consensus time $(date -u -d @$new '+%F %T') UTC is outside the image's bounds, clock left as is"; exit 0
+      fi
       echo "clock $(date -u -d @$now '+%F %T') outside consensus window $va .. $vu UTC: setting $(date -u -d @$new '+%F %T') UTC"
       date -u -s "@$new" >/dev/null
       systemctl restart tor@default.service

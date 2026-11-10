@@ -5,7 +5,15 @@ labwc reads only that directory (labwc -C), never ~/.config/labwc: a file there 
 bindings or window rules that run commands, which an application must not be able to do.
 The touchpad settings (~/.config/prestium/touchpad.json) are only read as four checked values."""
 import json, os, pwd, re, sys
-BASE = os.environ.get("PRESTIUM_WL_BASE", "/run/prestium-wl")
+
+def _test_env(name, default, _installed="/usr/local/sbin/prestium-wl-config"):
+    """2.1 (audit I-1): the PRESTIUM_* overrides are for the test suite, which runs this file from the
+    source tree. The installed copy ignores them, so its paths never depend on sudo's env_reset or on
+    what a unit sets."""
+    if os.path.realpath(__file__) == _installed:
+        return default
+    return os.environ.get(name, default)
+BASE = _test_env("PRESTIUM_WL_BASE", "/run/prestium-wl")
 SRC = "/etc/xdg/labwc"
 uid = int(os.environ.get("SUDO_UID", "-1"))
 if os.geteuid() != 0 or uid <= 0:

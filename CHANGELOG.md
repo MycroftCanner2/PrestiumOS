@@ -176,6 +176,31 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   two minutes). Firefox's policy allows that one folder as its only `file://` exception.
   (`tests/test_thelounge_launch_token.sh`, run against the real The Lounge 4.5.2)
 
+### Fresh audit of 96468c5 (2026-11-10)
+- **The first session password is set only from the lock dialog** (L-2). Any program of the desktop
+  user could run "sudo prestium-session-password set" before the person at the screen did, and so choose
+  the lock password. Now the Wayland broker shows the dialog on the compositor's full socket (no
+  application can draw over it, type into it or read it) and sets the password as root; sudo allows only
+  "status", and the helper refuses "set" through sudo. (`tests/test_session_lock.sh`)
+- **The clock sync over Tor has bounds** (L-3). prestium-timesync and prestium-clockfix now refuse a
+  time before the image was built (one day of slack) or more than 10 years after it, as
+  prestium-set-clock does; timesync raises a safety flag when it refuses, or when it moves the clock by
+  more than a day. (`tests/test_timesync_bounds.sh`)
+- **timesync, clockfix and the USB watchdog have a systemd sandbox** (L-3): bounded capabilities and
+  NoNewPrivileges for all three; a read-only system, a syscall filter and no devices for the two clock
+  services; no network at all for clockfix. The watchdog keeps /tmp, the overlay and
+  /proc/sysrq-trigger reachable, which it must wipe and write.
+- **The Wayland broker refuses system uids and has more of a sandbox** (L-4): only login users (uid
+  1000 to 60000); /usr and /boot read-only, only local and netlink sockets, no namespaces, no new
+  setuid files, native syscalls only. It still has no NoNewPrivileges or syscall filter (sudo and
+  swaylock's helper are setuid), and /etc and the home directory stay writable (chpasswd, screenshots).
+  (`tests/test_service_hardening.sh`)
+- **Root daemons ignore their test overrides when installed** (I-1). The broker, prestium-wl-config and
+  the MAC guard read PRESTIUM_* variables only when run from the source tree, so the installed copies no
+  longer rely on sudo's env_reset. (`tests/test_root_env_overrides.py`)
+- The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
+  every boot), which the audit (I-3) read from the commented template; nothing changed there.
+
 ### Known security limits (from the 2026-11-10 audits)
 Not changed in 2.1, so you know where the edges are:
 - **Unprivileged user namespaces are on**, because the browser sandboxes (bubblewrap) need them. They

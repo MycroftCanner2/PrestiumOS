@@ -21,6 +21,23 @@ CapabilityBoundingSet=CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE CAP_DAC_READ_SEARCH 
 ProtectKernelModules=yes
 ProtectKernelTunables=yes
 LockPersonality=yes
+# 2.1 (audit L-4): what the broker and the tools it starts never need. /usr and /boot read-only
+# (ProtectSystem=yes; "strict" would also block /etc, where chpasswd sets the first session
+# password, and the home directory, where screenshots go). Only local sockets and netlink (PAM's audit
+# messages); no raw or IP sockets. The tools it starts inherit all of this.
+ProtectSystem=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+# Not set, on purpose: NoNewPrivileges and a syscall filter (sudo and swaylock's unix_chkpwd are
+# setuid/setgid), MemoryDenyWriteExecute (Mesa's llvmpipe JIT in VMs without a GPU), PrivateTmp
+# (Xwayland's /tmp/.X11-unix), ProtectHome (screenshots), ProtectProc (it reads /proc/<labwc>/exe).
 
 [Install]
 WantedBy=graphical.target

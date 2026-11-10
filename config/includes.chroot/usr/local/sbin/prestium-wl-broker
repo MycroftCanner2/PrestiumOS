@@ -21,6 +21,7 @@ start in turn is restricted again. Requests (one line on /run/prestium-wl/broker
   menu               open the labwc root menu (panel Menu button)
   panel              start the panel, notifications, wallpaper and idle lock (once per session)
   lock               lock the screen (swaylock); answers when the lock is in place
+  set-password       the first session password, asked in a dialog on the full socket (2.1, audit L-2)
   osk                toggle the on-screen keyboard (wvkbd)
   display-settings   output settings (wdisplays)
   scale              apply ~/.config/prestium/scale to every output (wlr-randr)
@@ -37,12 +38,24 @@ apps can write can't change what they do.
 import array, grp, json, os, pwd, re, signal, socket, socketserver, stat, struct, subprocess
 import sys, syslog, threading, time
 
-BASE = os.environ.get("PRESTIUM_WL_BASE", "/run/prestium-wl")
+def _test_env(name, default, _installed="/usr/local/sbin/prestium-wl-broker"):
+    """2.1 (audit I-1): the PRESTIUM_* overrides are for the test suite, which runs this file from the
+    source tree. The installed copy ignores them, so its paths never depend on sudo's env_reset or on
+    what a unit sets."""
+    if os.path.realpath(__file__) == _installed:
+        return default
+    return os.environ.get(name, default)
+
+BASE = _test_env("PRESTIUM_WL_BASE", "/run/prestium-wl")
 BROKER = os.path.join(BASE, "broker")
-RUNTIME = os.environ.get("PRESTIUM_WL_RUNTIME", "/run/user/%d")   # %d: uid
-LABWC = os.environ.get("PRESTIUM_WL_LABWC", "/usr/bin/labwc")
+RUNTIME = _test_env("PRESTIUM_WL_RUNTIME", "/run/user/%d")   # %d: uid
+LABWC = _test_env("PRESTIUM_WL_LABWC", "/usr/bin/labwc")
 SWAYLOCK_CONF = "/usr/share/prestium/swaylock.conf"
-ETC = os.environ.get("PRESTIUM_WL_ETC", "/etc/xdg")          # override: tests only
+SESSION_PASSWORD = "/usr/local/sbin/prestium-session-password"
+PW_TEXT = ("Set a password to lock the screen.\nYou'll need it to unlock the screen and for administration "
+           "prompts.\nUse at least 8 characters; a few unrelated words are best.\nIt lasts until you shut down.")
+UID_MIN, UID_MAX = 1000, 60000      # login users (login.defs UID_MIN..UID_MAX)
+ETC = _test_env("PRESTIUM_WL_ETC", "/etc/xdg")          # override: tests only
 
 def log(msg, crit=False):
     syslog.syslog(syslog.LOG_CRIT if crit else syslog.LOG_INFO, msg)
@@ -119,7 +132,7 @@ class Session:
     def __init__(self, uid):
         pw = pwd.getpwuid(uid)
         self.uid, self.gid, self.user = uid, pw.pw_gid, pw.pw_name
-        self.home = os.environ.get("PRESTIUM_WL_HOME") or pw.pw_dir      # override: tests only
+        self.home = _test_env("PRESTIUM_WL_HOME", None) or pw.pw_dir      # override: tests only
         self.groups = os.getgrouplist(self.user, self.gid)
         self.rt = RUNTIME % uid
         self.full = os.path.join(self.rt, "wayland-0")
@@ -128,7 +141,7 @@ class Session:
         self.empty = os.path.join(self.dir, "empty")
         self.labwc = None; self.labwc_start = None
         self.ctx_conn = None; self.close_w = None
-        self.kids = {}; self.lock = threading.Lock()
+        self.kids = {}; self.lock = threading.Lock(); self.pw_busy = threading.Lock()
 
     def alive(self):
         return self.labwc is not None and proc_start(self.labwc) == self.labwc_start
@@ -267,6 +280,45 @@ class Session:
                 self.spawn(argv, key=key); started.append(key)
         return "ok " + (" ".join(started) or "running")
 
+    def set_password(self):
+        """2.1 (audit L-2): the first session password is set here, not through sudo: the dialog runs on
+        the compositor's full socket (no application can draw over it, type into it or read it) and the
+        broker, as root, hands the password to prestium-session-password. Any process of the user could
+        run "sudo prestium-session-password set" before; now it can only ask for this dialog, which the
+        person at the screen fills in."""
+        if not self.pw_busy.acquire(blocking=False):
+            return "error a password dialog is already open"
+        try:
+            st = subprocess.run([SESSION_PASSWORD, "status"], capture_output=True, timeout=10)
+            if st.stdout.decode(errors="replace").strip() == "set":
+                return "ok already set"
+            rc, out = self.spawn(["zenity", "--forms", "--title", "Lock Screen", "--text", PW_TEXT,
+                                  "--add-password", "Password", "--add-password", "Confirm password",
+                                  "--separator", "\n"], capture=True, timeout=900)
+            if rc != 0:
+                return "error cancelled"
+            lines = out.split("\n")
+            p1, p2 = (lines + ["", ""])[:2]
+            err = None
+            if not p1 or p1 != p2:
+                err = "The passwords are empty or don't match. The screen was not locked."
+            elif len(p1) < 8:
+                err = "The password is too short: use at least 8 characters. The screen was not locked."
+            elif ":" in p1 or "\r" in p1:
+                err = "The password can't contain ':'. The screen was not locked."
+            if err is None:
+                r = subprocess.run([SESSION_PASSWORD, "set"], input=(p1 + "\n").encode(),
+                                   capture_output=True, timeout=30)
+                if r.returncode == 0:
+                    log("uid %d: session password set from the lock dialog" % self.uid)
+                    return "ok set"
+                err = "Could not set the password. The screen was not locked."
+            self.spawn(["zenity", "--error", "--title", "Lock Screen", "--text", err], wait=True, timeout=300)
+            return "error " + err
+        finally:
+            p1 = p2 = out = None
+            self.pw_busy.release()
+
     def lock_screen(self):
         rc, _ = self.spawn(["swaylock", "-f", "-C", SWAYLOCK_CONF], wait=True, timeout=30)
         return "ok locked" if rc == 0 else "error swaylock exit %d" % rc
@@ -294,7 +346,7 @@ class Session:
         sys.path.insert(0, "/usr/local/lib/prestium")
         import importlib.machinery
         ps = importlib.machinery.SourceFileLoader(
-            "prestium_scale", os.environ.get("PRESTIUM_SCALE", "/usr/local/bin/prestium-scale")).load_module()
+            "prestium_scale", _test_env("PRESTIUM_SCALE", "/usr/local/bin/prestium-scale")).load_module()
         rc, val = self.as_user(["cat", "--", os.path.join(self.home, ".config/prestium/scale")])
         setting = ps.parse_setting(val if rc == 0 else "auto")
         rc, out = self.spawn(["wlr-randr", "--json"], capture=True, timeout=15)
@@ -342,6 +394,9 @@ class Handler(socketserver.StreamRequestHandler):
             line = self.rfile.readline(200).decode(errors="replace").strip()
             if uid == 0:
                 reply = "error refusing root"
+            elif not UID_MIN <= uid <= UID_MAX:
+                # 2.1 (audit L-4): system accounts (services, nobody) get nothing from the broker
+                reply = "error refusing system uid %d" % uid
             else:
                 reply = dispatch(uid, line)
         except Exception as e:
@@ -371,6 +426,8 @@ def dispatch(uid, cmd):
             return s.menu()
     if cmd == "lock":
         return s.lock_screen()
+    if cmd == "set-password":
+        return s.set_password()
     if cmd == "scale":
         return s.scale()
     if cmd in ("screenshot", "screenshot-area"):

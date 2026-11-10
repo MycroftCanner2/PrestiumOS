@@ -8,23 +8,8 @@
 pgrep -x swaylock >/dev/null && exit 0
 st=$(sudo -n /usr/local/sbin/prestium-session-password status 2>/dev/null)
 if [ "$st" != set ]; then
-  out=$(prestium-run zenity --forms --title "Lock Screen" \
-        --text "Set a password to lock the screen.\nYou'll need it to unlock the screen and for administration prompts.\nUse at least 8 characters; a few unrelated words are best.\nIt lasts until you shut down." \
-        --add-password "Password" --add-password "Confirm password" --separator '
-' 2>/dev/null) || exit 0
-  p1=$(printf '%s\n' "$out" | sed -n 1p); p2=$(printf '%s\n' "$out" | sed -n 2p)
-  if [ -z "$p1" ] || [ "$p1" != "$p2" ]; then
-    prestium-run zenity --error --title "Lock Screen" --text "The passwords are empty or don't match. The screen was not locked." 2>/dev/null
-    exit 0
-  fi
-  if [ "${#p1}" -lt 8 ]; then
-    prestium-run zenity --error --title "Lock Screen" --text "The password is too short: use at least 8 characters. The screen was not locked." 2>/dev/null
-    exit 0
-  fi
-  if ! printf '%s\n' "$p1" | sudo -n /usr/local/sbin/prestium-session-password set >/dev/null 2>&1; then
-    prestium-run zenity --error --title "Lock Screen" --text "Could not set the password. The screen was not locked." 2>/dev/null
-    exit 0
-  fi
-  unset p1 p2 out
+  # 2.1 (audit L-2): the broker asks for the password on the compositor's full socket and sets it as
+  # root; "sudo prestium-session-password set" is no longer allowed to the user (or any of its programs)
+  /usr/local/bin/prestium-wl set-password >/dev/null 2>&1 || exit 0
 fi
 exec /usr/local/bin/prestium-wl lock

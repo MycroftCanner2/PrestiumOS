@@ -9,6 +9,31 @@ Wants=tor.service
 Type=oneshot
 ExecStart=/usr/local/sbin/prestium-timesync
 TimeoutStartSec=20min
+# 2.1 (audit L-3): set the clock (sys_time), run curl as prestium-htp (setuid, setgid; audit_write for
+# runuser's PAM), create the safety flag. No ProtectClock, which would forbid the very job. The flag
+# directory is made before the sandbox starts ("+": that one command runs unsandboxed).
+CapabilityBoundingSet=CAP_SYS_TIME CAP_SETUID CAP_SETGID CAP_AUDIT_WRITE CAP_DAC_OVERRIDE
+NoNewPrivileges=yes
+SystemCallFilter=@system-service @clock
+SystemCallErrorNumber=EPERM
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+ExecStartPre=+/usr/bin/install -d -o root -g root -m 0755 /run/prestium /run/prestium/safety
+ReadWritePaths=/run/prestium
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectHome=yes
+ProtectSystem=strict
+PrivateTmp=yes
+PrivateDevices=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+UMask=0022
 
 [Install]
 WantedBy=multi-user.target
