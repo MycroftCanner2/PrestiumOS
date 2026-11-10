@@ -4,8 +4,8 @@
 # scripts/fetch-thirdparty.sh --repin (it verifies the signature, then prints the new SHA to pin).
 # LibreWolf, i2pd and Tor come from their signed apt repositories (config/archives/), not from here.
 
-TB_VERSION=16.0
-TB_SHA256=de3370b67389c2848738cdd515bb2e3b232a4ae93290eae74185c4c43a291a24
+TB_VERSION=16.0.1
+TB_SHA256=5b36ad610c20c81faa72caf27d1cd3a11f14a327c320b4cec581400016ba78b0
 TB_KEY=EF6E286DDA85EA2A4BA7DE684E2C6E8793298290          # Tor Browser Developers (signing key)
 
 FF_VERSION=159.0.1

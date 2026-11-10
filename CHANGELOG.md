@@ -4,6 +4,15 @@
 
 Enhanced security and new features. Changes will be listed here as they land.
 
+### Updates
+- **Tor Browser 16.0.1** (released 2026-11-10: Firefox security fixes, tor 0.4.9.16). `thirdparty/versions.sh`
+  pins the new tarball's SHA-256; its signature verifies with the shipped Tor Browser key through the signing
+  subkey. dist.torproject.org no longer serves 16.0, so the old pin could not build. The Tor daemon and
+  LibreWolf still come from their apt repositories at build time.
+- **Tor 0.4.9.16** (the system Tor daemon). deb.torproject.org's trixie repository has served
+  `0.4.9.16-1~d13.trixie+1` since 2026-11-10, and the next build installs it. Tor isn't pinned to a version, so no
+  other change is needed.
+
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
   when the key that made it has since expired. Every third-party signature (Tor Browser, Firefox,
