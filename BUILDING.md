@@ -52,6 +52,15 @@ which works but is several times slower.
 An interrupted build can be continued with `sudo ./build.sh --resume`; `sudo ./build.sh --clean`
 starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (much longer emulated).
 
+## Checks
+
+`tests/ci.sh` runs what CI runs on every push (`.github/workflows/checks.yml`, Debian 13):
+shellcheck (errors) on every shell script, every AppArmor profile compiled with `apparmor_parser`,
+a scan for committed private keys and tokens, `systemd-analyze security` scores for the hardened
+services, and the test suite. Four tests need a real Wayland session, bwrap and sudo
+(`test_wayland_broker.sh`, `test_wayland_session.sh`, `test_browser_sandbox.sh`,
+`test_onion_grater_identity.py`); run those on a build machine or the live system.
+
 ## Layout
 
 | Path | What it is |
