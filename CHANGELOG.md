@@ -156,6 +156,22 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   old the image is once it is past 45 days. `/etc/os-release` has the build date as `BUILD_ID`.
   (`tests/test_age_notify.sh`)
 
+### Known security limits (from the 2026-11-10 audits)
+Not changed in 2.1, so you know where the edges are:
+- **Unprivileged user namespaces are on**, because the browser sandboxes (bubblewrap) need them. They
+  are a common route for kernel exploits; turning them off would mean a setuid bubblewrap instead.
+- **X11 programs share one Xwayland server**, so an X11-only program can read the keyboard input and
+  windows of the other X11 programs (not of Wayland apps such as the browsers).
+- **The live system is not verified at boot** (no dm-verity, no signed root filesystem): someone who can
+  write to the USB stick can change Prestium for the next boot. Secure Boot checks only the bootloader
+  and kernel. dm-verity would need a hash tree in the image and a root hash in a signed boot chain; it is
+  being evaluated for a later release.
+- **The boot menu can be edited** (no GRUB password): anyone at the keyboard can change the kernel
+  options, for example to boot without AppArmor. A password would not stop someone who can rewrite the
+  stick.
+- **The local-only Firefox's network rule follows a group** (prestium-localweb) that the desktop user's
+  programs can also use; such a program may reach the same three local pages.
+
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
   when the key that made it has since expired. Every third-party signature (Tor Browser, Firefox,
