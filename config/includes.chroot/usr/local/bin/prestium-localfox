@@ -2,7 +2,7 @@
 # Prestium: local-only Firefox for Prestium's own web pages:
 #   I2P Router Console  http://127.0.0.1:7070/  (optional http://i2pd:pass@...)
 #   I2P Torrents        http://127.0.0.1:7685/<per-boot secret>/web/
-#   IRC (The Lounge)    http://127.0.0.1:9000/
+#   IRC (The Lounge)    http://127.0.0.1:9000/ (signed in through a one-off page from prestium-irc)
 # It runs with the primary group "prestium-localweb". The firewall (ferm) lets that
 # group open TCP connections only to 127.0.0.1 ports 7070, 7685 and 9000: no Internet,
 # no Tor or I2P proxies, no IPv6. Prefs/policies (/opt/firefox/distribution/policies.json)
@@ -12,6 +12,8 @@ URL="${1:-http://127.0.0.1:7070/}"
 case "$URL" in
   http://127.0.0.1:7070/*|http://127.0.0.1:7685/*|http://127.0.0.1:9000/*) ;;
   http://i2pd:*@127.0.0.1:7070|http://i2pd:*@127.0.0.1:7070/*) ;;
+  # 2.1 (review): prestium-irc's one-off sign-in page (keeps the token out of the command line)
+  "file://$HOME/.local/share/prestium-localfox/irc-launch/"*.html) ;;
   *) echo "prestium-localfox: only Prestium's local pages (127.0.0.1:7070, 7685, 9000)" >&2; exit 2 ;;
 esac
 case "$URL" in *[!A-Za-z0-9:/._#?=%@-]*) echo "prestium-localfox: bad URL" >&2; exit 2 ;; esac

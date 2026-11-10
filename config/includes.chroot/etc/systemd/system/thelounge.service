@@ -24,7 +24,8 @@ PrivateTmp=yes
 PrivateDevices=yes
 ProtectSystem=strict
 ProtectHome=yes
-ReadWritePaths=/var/lib/thelounge
+# 2.1 (review): the next one-use launcher token (see prestium-thelounge-setup)
+ReadWritePaths=/var/lib/thelounge -/run/prestium-thelounge-launch
 # 2.1 (security audit): config.js and the packages are code The Lounge loads at start; read-only
 # (root:thelounge 0640/0750 in perms.txt, and denied in its AppArmor profile)
 ReadOnlyPaths=/var/lib/thelounge/config.js /var/lib/thelounge/packages

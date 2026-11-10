@@ -2,8 +2,7 @@
 # 2.1 (security audit): The Lounge require()s config.js and every package (autologin, theme) at start,
 # so the thelounge uid must not be able to rewrite them: root-owned (group thelounge, read-only),
 # ReadOnlyPaths= in the unit, and denied in its AppArmor profile. i2pd and Tor (remote input) get
-# ProtectProc=invisible, so they can't read other processes' command lines (the local-only Firefox
-# carries The Lounge's sign-in URL in its argv).
+# ProtectProc=invisible, so they can't read other processes' command lines.
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); I=$R/config/includes.chroot; fail=0
 ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }
 P=$I/usr/share/prestium/build/perms.txt

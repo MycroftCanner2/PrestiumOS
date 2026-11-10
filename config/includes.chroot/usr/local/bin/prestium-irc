@@ -1,8 +1,12 @@
 #!/bin/sh
 # Prestium: open The Lounge (IRC web client on 127.0.0.1:9000) in the local-only Firefox,
-# signed in automatically. The per-boot login token is readable by "user" only; it is
-# passed in the URL fragment (never sent to the server or written to The Lounge's logs)
-# to a small page on The Lounge's own origin that stores it where The Lounge looks for it.
+# signed in automatically. The login token is readable by "user" only and works once (2.1
+# review: The Lounge then gives the browser its own session and writes the next token). It
+# reaches a small page on The Lounge's own origin in the URL fragment (never sent to the server
+# or written to The Lounge's logs), which stores it where The Lounge looks for it.
+# 2.1 (review): never in a command line (other users can read those in /proc): Firefox opens a
+# one-off page in a private directory (0700, the file 0600) that forwards to the sign-in page,
+# and the page is deleted again.
 # 2.0 r6: token presence alone is not enough — require a hex token of expected length and
 # that thelounge.service is active; otherwise tell the user how to recover.
 if ! systemctl is-active --quiet thelounge.service 2>/dev/null; then
@@ -10,7 +14,7 @@ if ! systemctl is-active --quiet thelounge.service 2>/dev/null; then
     --text "The Lounge service is not running. Wait a moment after boot, then try again. If it persists, restart I2P/The Lounge from the Network menu or with: systemctl restart thelounge" 2>/dev/null
   exit 1
 fi
-T=$(cat /run/prestium-thelounge/token 2>/dev/null | tr -d '\n\r')
+T=$(cat /run/prestium-thelounge-launch/token 2>/dev/null | tr -d '\n\r')
 case "$T" in
   ""|*[!0-9a-f]*)
     zenity --title "IRC (The Lounge)" --warning --no-wrap \
@@ -23,4 +27,12 @@ if [ "${#T}" -ne 128 ]; then
     --text "The Lounge sign-in token looks incomplete (${#T} chars). Wait a moment and try again, or: systemctl restart thelounge" 2>/dev/null
   exit 1
 fi
-exec /usr/local/bin/prestium-localfox "http://127.0.0.1:9000/packages/thelounge-prestium-autologin/autologin.html#$T"
+D="$HOME/.local/share/prestium-localfox/irc-launch"
+umask 077
+mkdir -p "$D" && chmod 700 "$D" || exit 1
+find "$D" -maxdepth 1 -type f -name '*.html' -mmin +1 -delete 2>/dev/null
+F="$D/$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n').html"
+printf '%s\n' '<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>The Lounge</title>' \
+  "<script>location.replace(\"http://127.0.0.1:9000/packages/thelounge-prestium-autologin/autologin.html#$T\");</script>" > "$F" || exit 1
+( sleep 120; rm -f "$F" ) >/dev/null 2>&1 &
+exec /usr/local/bin/prestium-localfox "file://$F"

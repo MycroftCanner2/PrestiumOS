@@ -92,11 +92,10 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
 - **The Lounge can't rewrite its own code.** It `require()`s `config.js` and its packages (the sign-in
   page and the theme) at every start, and they belonged to the thelounge uid. They are now root-owned
   and read-only for The Lounge (`root:thelounge` 0640/0750, `ReadOnlyPaths=` in the unit, `deny ... wl`
-  in its AppArmor profile); checked with the real The Lounge 4.5.2, which starts and loads both
-  packages from a read-only tree. i2pd and Tor now run with `ProtectProc=invisible`, so they can't read
-  other processes' command lines, such as the local-only Firefox's, which carries The Lounge's sign-in
-  URL. (The sign-in token stays reusable for the boot: the desktop user's own programs can read its file
-  anyway, so a one-time token would not protect against anything new.) (`tests/test_thelounge_readonly.sh`)
+  in its AppArmor profile). The real The Lounge 4.5.2 still starts and loads both packages with its
+  package files made read-only (checked in a copy, not yet as its own uid on a booted system). i2pd and
+  Tor now run with `ProtectProc=invisible`, so they can't read other processes' command lines.
+  (`tests/test_thelounge_readonly.sh`)
 - **The VM network check no longer runs as root**, and never copies Tor's log text. It runs as its own
   user `prestium-vmcheck` (group systemd-journal, to read Tor's and i2pd's journal) with a tighter
   sandbox (`ProtectProc=invisible`, `IPAddressDeny=any`, `@system-service` syscalls only, no
@@ -163,6 +162,14 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   HOME and XDG_RUNTIME_DIR from the system, not the caller. From the menu, the launchers run as before.
   Claws Mail's passphrase prompt (pinentry) has its own profile too: no files, no programs, no network.
   (`tests/test_browser_launcher_apparmor.sh`, `tests/test_launcher_env.sh`)
+- **The Lounge's sign-in token works once and never appears in a command line.** The launcher token
+  was valid all boot and went to the local-only Firefox in its URL, which every user could read in
+  `/proc`. Now The Lounge (patched at build time) deletes the launcher's session when it is used, gives
+  the browser a session token of its own, and writes the next launcher token to
+  `/run/prestium-thelounge-launch/token` (readable by the desktop user only). "IRC (The Lounge)" hands
+  the token to Firefox through a one-off page in a private folder (0700, the file 0600, deleted after
+  two minutes). Firefox's policy allows that one folder as its only `file://` exception.
+  (`tests/test_thelounge_launch_token.sh`, run against the real The Lounge 4.5.2)
 
 ### Known security limits (from the 2026-11-10 audits)
 Not changed in 2.1, so you know where the edges are:

@@ -52,10 +52,53 @@ install -m 644 "$T/node/LICENSE" /opt/nodejs/LICENSE
 rm -rf /opt/thelounge; install -d -m 755 /opt/thelounge
 tar -xf "$S/thelounge.tar" -C /opt/thelounge
 P=/opt/thelounge/node_modules/thelounge/dist/server/plugins
-python3 - "$P/changelog.js" "$P/packages/index.js" "$P/../client.js" <<'PY'
+python3 - "$P/changelog.js" "$P/packages/index.js" "$P/../client.js" "$P/../server.js" <<'PY'
 # The Lounge must never contact the Internet itself (its blocked GitHub request crashed it)
 import sys
-c, p, cl = sys.argv[1], sys.argv[2], sys.argv[3]
+c, p, cl, sv = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+# 2.1 (review of the security audit): the launcher's sign-in token works once. A session marked
+# "prestiumLaunch" (prestium-thelounge-setup issues the first one) is deleted when it is used, the
+# browser gets a session token of its own (The Lounge's normal "init" token, as after a password
+# sign-in), and a new launch token is written to /run/prestium-thelounge-launch/token (group user)
+# for the next "IRC (The Lounge)" start.
+s = open(sv).read()
+if 'prestiumLaunch' not in s:
+    a = ('        if (Object.prototype.hasOwnProperty.call(client.config.sessions, providedToken)) {\n'
+         '            token = providedToken;\n'
+         '            authCallback(true);\n')
+    assert s.count(a) == 1, "The Lounge server.js: token sign-in code changed"
+    s = s.replace(a, a.replace('            authCallback(true);\n',
+        '            if (client.config.sessions[providedToken].prestiumLaunch) {\n'
+        '                // Prestium: one-use launcher token (see prestium-thelounge-setup)\n'
+        '                delete client.config.sessions[providedToken];\n'
+        '                token = undefined;\n'
+        '                prestiumNextLaunchToken(client);\n'
+        '            }\n'
+        '            authCallback(true);\n'), 1)
+    b = 'function initializeClient(socket, client, token, lastMessage, openChannel) {\n'
+    assert s.count(b) == 1, "The Lounge server.js: initializeClient changed"
+    s = s.replace(b, '''// Prestium: the next one-use launcher token. Only its SHA-512 is kept in the user file; the token
+// goes to /run/prestium-thelounge-launch/token (setgid group "user", 0640) for prestium-irc.
+function prestiumNextLaunchToken(client) {
+    const fs = require("fs");
+    const crypto = require("crypto");
+    const t = crypto.randomBytes(64).toString("hex");
+    client.config.sessions[client.calculateTokenHash(t)] = {lastUse: Date.now(), ip: "127.0.0.1", agent: "Prestium launcher", prestiumLaunch: true};
+    client.save();
+    const dir = "/run/prestium-thelounge-launch";
+    const tmp = dir + "/.token-" + process.pid + "-" + crypto.randomBytes(6).toString("hex");
+    try {
+        fs.writeFileSync(tmp, t + "\\n", {mode: 0o640, flag: "wx"});
+        fs.chmodSync(tmp, 0o640);
+        fs.renameSync(tmp, dir + "/token");
+    }
+    catch (e) {
+        log_1.default.error("Prestium: could not write the next launcher token: " + e.message);
+    }
+}
+''' + b, 1)
+    assert 'const log_1 = ' in s
+    open(sv, 'w').write(s)
 # 2.0 r4: networks never connect by themselves (prestium-thelounge-setup marks them disconnected),
 # so the lobby text for a disconnected network says how to connect instead of blaming the user
 s = open(cl).read()

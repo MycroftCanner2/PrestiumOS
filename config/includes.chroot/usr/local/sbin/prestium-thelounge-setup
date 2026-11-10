@@ -12,8 +12,10 @@
 // - a random password (bcrypt-hashed in the user file; plain copy in
 //   /run/prestium-thelounge/password, readable by "user" only, needed only after "Sign out")
 // - a new random login token on every start; only its SHA-512 is stored in the user file,
-//   the token itself goes to /run/prestium-thelounge/token (readable by "user" only) for
-//   the "IRC (The Lounge)" launcher
+//   the token itself goes to /run/prestium-thelounge-launch/token (readable by "user" only) for
+//   the "IRC (The Lounge)" launcher. 2.1 (review): it works once. The session is marked
+//   "prestiumLaunch"; The Lounge (patched in hook 0200) deletes it when it is used, gives the
+//   browser its own session token, and writes the next launch token to the same file.
 const fs = require("fs");
 const crypto = require("crypto");
 const bcrypt = require("/opt/thelounge/node_modules/bcryptjs");
@@ -23,6 +25,7 @@ const USERS = HOME + "/users";
 const FILE = USERS + "/prestium.json";
 const TEMPLATE = "/usr/local/share/prestium-thelounge/prestium.json";
 const RUN = "/run/prestium-thelounge";
+const LAUNCH = "/run/prestium-thelounge-launch";   // thelounge:user 2750: The Lounge writes the next token
 
 function ids(file, name) {
 	for (const l of fs.readFileSync(file, "utf8").split("\n")) {
@@ -81,6 +84,7 @@ function asThelounge(fn) {
 }
 
 realDir(RUN, 0, ugid, 0o750);       // /run is root's
+realDir(LAUNCH, luid, ugid, 0o2750); // setgid: files The Lounge writes there get group "user"
 realDir(HOME, luid, lgid, 0o700);   // /var/lib is root's; HOME itself belongs to thelounge
 asThelounge(() => {                 // USERS lives inside thelounge's HOME
 	realDir(USERS, luid, lgid, 0o700);
@@ -120,9 +124,16 @@ if (typeof user.password !== "string" || !user.password.startsWith("$2") ||
 for (const n of user.networks) n.userDisconnected = true;   // 2.0 r4: connect only on request
 const token = crypto.randomBytes(64).toString("hex");
 const hash = crypto.createHash("sha512").update(token).digest("hex");
-user.sessions = {[hash]: {lastUse: Date.now(), ip: "127.0.0.1", agent: "Prestium launcher"}};
+user.sessions = {[hash]: {lastUse: Date.now(), ip: "127.0.0.1", agent: "Prestium launcher", prestiumLaunch: true}};
 
 asThelounge(() => writeAtomic(FILE, JSON.stringify(user, null, "\t") + "\n", 0o600, null, null));
 writeAtomic(RUN + "/password", password + "\n", 0o640, 0, ugid);
-writeAtomic(RUN + "/token", token + "\n", 0o640, 0, ugid);
+// written as thelounge, the owner of LAUNCH (group "user" from the setgid directory)
+asThelounge(() => {
+	const tmp = LAUNCH + "/.token-" + process.pid + "-" + crypto.randomBytes(6).toString("hex");
+	fs.writeFileSync(tmp, token + "\n", {mode: 0o640, flag: "wx"});
+	fs.chmodSync(tmp, 0o640);
+	fs.renameSync(tmp, LAUNCH + "/token");
+});
+fs.rmSync(RUN + "/token", {force: true});   // the place before 2.1
 console.log("prestium-thelounge-setup: user prestium ready, new login token issued");

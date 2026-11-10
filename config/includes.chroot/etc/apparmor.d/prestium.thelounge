@@ -37,6 +37,9 @@ profile thelounge flags=(attach_disconnected) {
   /sys/fs/cgroup/** r,
   /sys/devices/system/cpu/** r,
   /tmp/** rwk,
+  # 2.1 (review): the next one-use launcher token
+  /run/prestium-thelounge-launch/ r,
+  /run/prestium-thelounge-launch/{token,.token-*} rw,
   /dev/shm/** rwk,
 
   # 2.1 (security audit): its code and settings are root's: The Lounge require()s config.js and

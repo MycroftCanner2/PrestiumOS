@@ -30,7 +30,7 @@
     "PasswordManagerEnabled": false,
     "OfferToSaveLogins": false,
     "Homepage": {"URL": "http://127.0.0.1:7070/", "StartPage": "homepage"},
-    "WebsiteFilter": {"Block": ["<all_urls>"], "Exceptions": ["http://127.0.0.1/*"]},
+    "WebsiteFilter": {"Block": ["<all_urls>"], "Exceptions": ["http://127.0.0.1/*", "file:///home/user/.local/share/prestium-localfox/irc-launch/*"]},
     "Preferences": {
       "network.dns.disableIPv6": {"Value": true, "Status": "locked"},
       "network.proxy.allow_hijacking_localhost": {"Value": false, "Status": "locked"},
