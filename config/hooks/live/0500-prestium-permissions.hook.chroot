@@ -14,4 +14,9 @@ done
 chmod 0440 /etc/sudoers.d/*
 visudo -c >/dev/null
 chown -R user:user /home/user
+# 2.1 (review of db6601c, L-2): passwd is not setuid. The live user starts with no password, and passwd
+# asks a user with an empty password for no old one, so any program of the user could choose the first
+# session password with it. Root (the Wayland broker's dialog) still sets it; nobody else needs passwd.
+dpkg-statoverride --list /usr/bin/passwd >/dev/null 2>&1 || dpkg-statoverride --update --add root root 0755 /usr/bin/passwd
+[ ! -u /usr/bin/passwd ] || { echo "E: /usr/bin/passwd still setuid"; exit 1; }
 echo "P: permissions restored"

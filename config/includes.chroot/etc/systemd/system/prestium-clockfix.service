@@ -17,6 +17,9 @@ SystemCallErrorNumber=EPERM
 RestrictAddressFamilies=AF_UNIX
 PrivateNetwork=yes
 ReadOnlyPaths=/var/lib/tor
+# 2.1 (review): the safety flag when it refuses a consensus time
+ExecStartPre=+/usr/bin/install -d -o root -g root -m 0755 /run/prestium /run/prestium/safety
+ReadWritePaths=/run/prestium
 ProtectKernelModules=yes
 ProtectKernelTunables=yes
 ProtectControlGroups=yes

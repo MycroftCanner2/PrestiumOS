@@ -74,6 +74,21 @@ if command -v apparmor_parser >/dev/null; then
       grep -qF "deny $d," <<<"$x" && ok "$f: deny $d" || bad "$f: no deny $d"; done
     grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* [a-z]*w' <<<"$al" && bad "$f: write anywhere in the home"
     grep -Eq '^\S* \s*(owner\s+)?(@\{HOME\}/\*\*|/\*\*) r' <<<"$al" && bad "$f: read anywhere"
+    # 2.1 (review of db6601c): no unconfined or environment-keeping exec; only ix, Cx, Px, Pix
+    ux=$(grep -vE '^\S* \s*(signal|unix|dbus|ptrace)' <<<"$al" | grep -E '\s[a-zA-Z]*(Ux|ux|Ix)[a-zA-Z]*( -> \S+)?,\s*$')
+    [ -z "$ux" ] && ok "$f: no unconfined exec" || bad "$f: $ux"
+    # child profiles (bwrap, dirmngr) never wider than the parent on /run, /dev, /proc and secrets
+    ch=$(grep -E '^(bwrap|dirmngr) ' <<<"$al")
+    if [ -n "$ch" ]; then
+      wide=$(grep -E '\s(owner\s+)?(/run/\*\*|@\{run\}/\*\*|/dev/\*\*|@\{PROC\}/\*\*|/proc/\*\*)\s+[a-z]*w' <<<"$ch")
+      [ -z "$wide" ] && ok "$f: child profiles get no blanket /run, /dev or /proc writes" || bad "$f child: $wide"
+      grep -E '^(bwrap|dirmngr) .*(/dev/video|/dev/hidraw|/dev/snd|@\{run\}/user/[^ ]*bus|gnupg/S\.gpg-agent|/run/i2pd)' <<<"$ch" && bad "$f child: camera, key, sound, bus, agent or I2P"
+      if grep -q '^bwrap ' <<<"$ch"; then
+        for d in '@{HOME}/.ssh/** rw' '@{run}/user/** rw' '/dev/video* rw' '/dev/hidraw* rw' '@{HOME}/.gnupg/** rw'; do
+          awk '/^[[:space:]]*profile bwrap/{c=1} c' <<<"$x" | grep -qF "deny $d," && ok "$f//bwrap: deny $d" || bad "$f//bwrap: no deny $d"; done
+      fi
+    fi
   done <<<"$TABLE"
+  grep -q 'deny @{HOME}/.gnupg/\*.conf{,.\*} w,' "$A/usr.bin.kleopatra" && ok "kleopatra: GnuPG configs read-only" || bad "kleopatra may write GnuPG configs"
 else echo "SKIP apparmor_parser missing (compile, expanded checks)"; fi
 exit $fail

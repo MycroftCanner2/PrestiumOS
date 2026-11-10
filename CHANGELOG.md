@@ -229,6 +229,20 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   (timesync 3.2, clockfix 2.1, USB watchdog 4.9 after this release; they were 9.4), except the Wayland
   broker (5.4, down from 7.9), the early firewall and the two shutdown wipes, which need the whole
   system by design. It runs the offline analysis in a user namespace when it isn't root.
+- **Review of db6601c:**
+  - Plain `passwd` is no longer setuid (hook 0500, checked), and confined apps may not run passwd,
+    gpasswd, chsh, chfn, chage or expiry. Before, a program of the user could still choose the first
+    session password with passwd, which asks a user with an empty password for no old one.
+  - The bubblewrap children of Loupe, mat2 and Metadata Cleaner are no wider than their parents: no
+    session /run (bus, gpg-agent, Wayland, I2P, Tor), only bubblewrap's own few /dev nodes (never a
+    camera, sound or hardware-key node), only their own /proc entries, and the same secrets denies.
+  - Kleopatra may no longer write the GnuPG configuration files (~/.gnupg/*.conf), which can name
+    helper programs for a gpg-agent or dirmngr that systemd starts outside Kleopatra's profile. Its
+    settings dialog can't change them.
+  - prestium-safety-notify checks the 12 new profiles; clockfix raises a safety flag when it refuses a
+    consensus time, and its bounds are tested on a run; ci.sh gives each score exemption its own
+    ceiling and fails, as root, on a unit it can't score; the viewer test also checks for unconfined
+    exec and for the child profiles' /run, /dev and /proc rules.
 - The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
   every boot), which the audit (I-3) read from the commented template; nothing changed there.
 
@@ -252,6 +266,11 @@ Not changed in 2.1, so you know where the edges are:
 - **Most confined apps share ~/Downloads** (Claws Mail, Gajim, Pidgin, LibreWolf, the local Firefox,
   LibreOffice and the file viewers can write there), so a compromised one could change a file another
   app later opens. Separate folders per app would change where your files end up; not done in 2.1.
+- **The i2pd console's per-boot password is readable by the desktop user's programs**
+  (/run/prestium/i2pd-console.pass, root:user 0640), because the local-only Firefox's launcher runs
+  as the user and needs it.
+- **GnuPG's socket-started daemons** (gpg-agent, dirmngr) may run outside Kleopatra's and Claws Mail's
+  profiles; their configuration files are read-only to Kleopatra. Check on a booted ISO.
 - **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need.
 - **Programs of the desktop user may change NetworkManager's system connections** (to add Wi-Fi). The
   MAC guard and the firewall keep the real MAC address and real IP address from leaking that way.

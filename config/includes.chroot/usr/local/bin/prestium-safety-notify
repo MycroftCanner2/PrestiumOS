@@ -14,7 +14,7 @@ alert() {   # $1 key, $2 text
 toram=; grep -qw toram /proc/cmdline && toram=1
 AA_ENABLED=${PRESTIUM_AA_ENABLED:-/sys/module/apparmor/parameters/enabled}
 AA_PROFILES=${PRESTIUM_AA_PROFILES:-/sys/kernel/security/apparmor/profiles}
-AA_PRESTIUM_PROFILES="torbrowser_firefox librewolf prestium-localfox claws-mail gajim pidgin onionshare feather libreoffice thelounge"
+AA_PRESTIUM_PROFILES="torbrowser_firefox librewolf prestium-localfox claws-mail gajim pidgin onionshare feather libreoffice thelounge loupe ristretto vlc file-roller xarchiver featherpad mat2 metadata-cleaner gimp audacity keepassxc kleopatra"
 sleep 15
 while :; do
   for f in "$D"/*; do

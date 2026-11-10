@@ -23,6 +23,11 @@ import re,sys
 s=open(sys.argv[1]).read(); f=s[s.index("def set_password"):s.index("def lock_screen")]
 sys.exit(0 if 'self.spawn(["zenity", "--forms"' in f and "prestium-run" not in f else 1)
 PY
+# 2.1 (review of db6601c): plain passwd isn't setuid (an empty password asks for no old one), and no
+# confined app may run passwd or its relatives
+grep -q 'dpkg-statoverride --update --add root root 0755 /usr/bin/passwd' "$R/config/hooks/live/0500-prestium-permissions.hook.chroot" \
+  && grep -q 'still setuid' "$R/config/hooks/live/0500-prestium-permissions.hook.chroot" && ok "hook 0500: passwd not setuid, checked" || bad "passwd setuid"
+grep -q 'deny /{,usr/}{,s}bin/{passwd,gpasswd,chsh,chfn,chage,expiry} mrwx,' "$I/etc/apparmor.d/abstractions/prestium-no-admin" && ok "no-admin: denies passwd" || bad "no-admin passwd"
 P=$I/etc/pam.d/swaylock
 grep -qE '^auth\s+optional\s+pam_faildelay\.so delay=4000000$' "$P" && ok "pam: 4 s per wrong password" || bad "pam faildelay"
 grep -qE '^auth\s+include\s+login$' "$P" && ok "pam: then the login stack" || bad "pam include login"

@@ -31,7 +31,17 @@ if [ "$far" -le $((b + 315576000)) ]; then
   [ "$(cat "$T/set" 2>/dev/null)" = "$far" ] && grep -q 'clock-sync.*moved the clock' "$T/flag" && ok "5-day jump: set and flagged" || bad "5-day jump: $o"
 fi
 C=$I/usr/local/sbin/prestium-clockfix
-grep -q 'build - 86400' "$C" && grep -q 'build + 315576000' "$C" && ok "clockfix: same bounds" || bad "clockfix bounds"
+# clockfix, run: a fake consensus far in the past, Tor never bootstrapped, a fake clock
+mkdir -p "$T/tor"; printf '#!/bin/sh\nexit 0\n' > "$T/bin/journalctl"; printf '#!/bin/sh\nexit 0\n' > "$T/bin/sleep"; chmod 755 "$T/bin/"*
+cf(){ rm -f "$T/set" "$T/flag"
+  printf 'valid-after %s\nvalid-until %s\n' "$1" "$2" > "$T/tor/cached-microdesc-consensus"
+  sed -e "s#^PATH=.*#PATH=$T/bin:/usr/bin:/bin; export PATH#" -e "s#^D=/var/lib/tor#D=$T/tor#" \
+      -e "s#/usr/share/prestium/build-date#$T/build#" -e "s#/usr/local/lib/prestium/safety-flag#$T/flag.sh#" \
+      -e "s#date -u -s \"@\$new\" >/dev/null#echo \"\$new\" > $T/set#" "$C" > "$T/cf"; sh "$T/cf" 2>&1; }
+o=$(cf "2020-01-01 00:00:00" "2020-01-01 03:00:00"); { [ ! -e "$T/set" ] && grep -q clock-sync "$T/flag"; } && ok "clockfix: consensus before the build refused, flagged" || bad "clockfix old consensus: $o"
+in=$(( $(cat "$T/build") + 30*86400 )); va=$(date -u -d "@$in" '+%F %T'); vu=$(date -u -d "@$((in+10800))" '+%F %T')
+if [ "$(date -u +%s)" -lt $((in - 600)) ]; then
+  o=$(cf "$va" "$vu"); [ "$(cat "$T/set" 2>/dev/null)" = "$((in + 5400))" ] && ok "clockfix: consensus in bounds sets valid-after + 90 min" || bad "clockfix in bounds: $o"; fi
 U=$I/etc/systemd/system
 for u in prestium-timesync prestium-clockfix prestium-usb-watchdog; do
   grep -q '^CapabilityBoundingSet=' "$U/$u.service" && ok "$u: bounded capabilities" || bad "$u: no CapabilityBoundingSet"

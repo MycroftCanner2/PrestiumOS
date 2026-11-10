@@ -7,6 +7,7 @@
   deny /{,usr/}{,s}bin/doas mrwx,
   deny /{,usr/}{,s}bin/run0 mrwx,
   deny /{,usr/}{,s}bin/chpasswd mrwx,
+  deny /{,usr/}{,s}bin/{passwd,gpasswd,chsh,chfn,chage,expiry} mrwx,
   deny /usr/local/sbin/** mrwx,
   deny /usr/local/lib/prestium/** mrwx,
   deny /usr/local/bin/prestium-tunnel-hops mrwx,

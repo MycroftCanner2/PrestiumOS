@@ -32,7 +32,9 @@ while [ $i -lt 90 ]; do
       # 2.1 (audit L-3): never before this image was built (one day of slack) or 10 years after it
       build=$(head -c 32 /usr/share/prestium/build-date 2>/dev/null | tr -cd 0-9)
       if [ -z "$build" ] || [ "$new" -lt $((build - 86400)) ] || [ "$new" -gt $((build + 315576000)) ]; then
-        echo "consensus time $(date -u -d @$new '+%F %T') UTC is outside the image's bounds, clock left as is"; exit 0
+        echo "consensus time $(date -u -d @$new '+%F %T') UTC is outside the image's bounds, clock left as is"
+        /usr/local/lib/prestium/safety-flag set clock-sync "Tor's consensus gave a time ($(date -u -d @$new '+%Y-%m-%d %H:%M') UTC) before this image was built or more than 10 years after it; the clock was not changed. Check the clock." 2>/dev/null
+        exit 0
       fi
       echo "clock $(date -u -d @$now '+%F %T') outside consensus window $va .. $vu UTC: setting $(date -u -d @$new '+%F %T') UTC"
       date -u -s "@$new" >/dev/null

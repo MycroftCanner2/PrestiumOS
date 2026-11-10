@@ -42,7 +42,8 @@ step "systemd-analyze security (gated: 5.0)"
 # 2.1 (audit of 96468c5): every Prestium unit scores 5.0 or lower, except these, which need the whole
 # system by design: the Wayland broker (the session tools it starts inherit its sandbox; 5.4 in 2.1),
 # the early firewall (iptables before any network), and the two shutdown wipes (memory, session files).
-ALLOW=" prestium-wl-broker prestium-firewall-early prestium-initramfs-shutdown prestium-wipe-session "
+# Each exemption has its own ceiling (its 2.1 score), so it can't get worse unnoticed.
+CEIL="prestium-wl-broker=5.4 prestium-firewall-early=9.4 prestium-initramfs-shutdown=9.4 prestium-wipe-session=9.4"
 if command -v systemd-analyze >/dev/null; then
   D=config/includes.chroot/etc/systemd/system
   score(){ # offline analysis needs a writable /run/systemd: as root, or in a user namespace
@@ -51,9 +52,11 @@ if command -v systemd-analyze >/dev/null; then
          | tail -n 1 | grep -o '[0-9]*\.[0-9]'; }
   for f in "$D"/prestium-*.service "$D"/thelounge.service; do
     u=$(basename "$f" .service); s=$(score "$u")
-    if [ -z "$s" ]; then echo "SKIP $u: n/a (needs root or user namespaces)"; continue; fi
-    case "$ALLOW" in *" $u "*) echo "INFO $u: $s (allowed above 5.0)"; continue;; esac
-    if awk -v s="$s" 'BEGIN{exit !(s > 5.0)}'; then echo "FAIL $u: $s (above 5.0)"; fail=1; else echo "OK   $u: $s"; fi
+    if [ -z "$s" ]; then
+      if [ "$(id -u)" = 0 ]; then echo "FAIL $u: could not be scored"; fail=1; else echo "SKIP $u: n/a (needs root or user namespaces)"; fi
+      continue; fi
+    max=5.0; for c in $CEIL; do [ "${c%%=*}" = "$u" ] && max=${c#*=}; done
+    if awk -v s="$s" -v m="$max" 'BEGIN{exit !(s > m)}'; then echo "FAIL $u: $s (above $max)"; fail=1; else echo "OK   $u: $s (max $max)"; fi
   done
 else echo "SKIP systemd-analyze missing"; fi
 

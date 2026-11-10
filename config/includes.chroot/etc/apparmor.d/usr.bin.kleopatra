@@ -30,6 +30,11 @@ profile kleopatra /usr/bin/{kleopatra,kwatchgnupg} {
   /usr/bin/dirmngr mrCx -> dirmngr,
   /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11,-qt} Px -> prestium_pinentry,
   /etc/alternatives/pinentry{,-x11} r,
+  # 2.1 (review of db6601c): never the GnuPG configuration files, which can name helper programs that
+  # a socket-started (unconfined) gpg-agent or dirmngr would run. Kleopatra's settings dialog can't
+  # change them here; edit them outside Kleopatra if needed.
+  deny @{HOME}/.gnupg/*.conf{,.*} w,
+  deny @{HOME}/.gnupg/common.conf w,
   owner @{HOME}/.gnupg/ rw,
   owner @{HOME}/.gnupg/** rwkl,
   owner @{run}/user/[0-9]*/gnupg/ rw,

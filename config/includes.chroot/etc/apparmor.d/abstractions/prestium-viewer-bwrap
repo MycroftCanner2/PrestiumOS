@@ -4,6 +4,7 @@
 # network, no part of the home but the file folders (read), no writes outside /tmp and /run.
   include <abstractions/base>
   include <abstractions/prestium-no-admin>
+  include <abstractions/prestium-app-secrets>
   userns,
   capability sys_admin,
   capability sys_chroot,
@@ -39,8 +40,28 @@
   /var/lib/ r,
   @{HOME}/ r,
   include <abstractions/prestium-user-files>
-  /dev/** rw,
-  /proc/** rw,
+  # 2.1 (review of db6601c): no more than its parent. The few device nodes bubblewrap's own /dev holds,
+  # its own /proc entries, its base under /tmp; never the session's /run (bus, gpg-agent, I2P, Wayland)
+  # or a camera, sound or hardware-key node.
+  /dev/ r,
+  /dev/{null,zero,full,random,urandom,tty} rw,
+  /dev/pts/ r,
+  /dev/pts/* rw,
+  owner /dev/shm/** rwk,
+  @{PROC}/ r,
+  @{PROC}/sys/** r,
+  owner @{PROC}/@{pid}/** r,
+  owner @{PROC}/@{pid}/{uid_map,gid_map,setgroups,oom_score_adj} rw,
   owner /tmp/** rwlk,
-  owner /run/** rwlk,
+  /run/ r,
+  deny @{run}/user/** rw,
+  deny @{run}/prestium-wl/** rw,
+  deny @{run}/i2pd/** rw,
+  deny @{run}/tor/** rw,
+  deny @{run}/onion-grater/** rw,
+  deny /dev/video* rw,
+  deny /dev/hidraw* rw,
+  deny /dev/snd/** rw,
   deny @{HOME}/** w,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/**.kdbx rw,
