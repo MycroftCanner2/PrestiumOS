@@ -24,7 +24,7 @@ shellcheck -S error "${SH[@]}" || fail=1
 
 step "AppArmor profiles compile"
 if command -v apparmor_parser >/dev/null; then
-  W=$(mktemp -d); cp -r /etc/apparmor.d/. "$W"/ 2>/dev/null; cp -r config/includes.chroot/etc/apparmor.d/. "$W"/
+  W=$(mktemp -d); cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; cp -r config/includes.chroot/etc/apparmor.d/. "$W"/
   for p in config/includes.chroot/etc/apparmor.d/*; do
     [ -f "$p" ] || continue; n=$(basename "$p")
     if apparmor_parser -Q -K -b "$W" "$W/$n" >/dev/null 2>"$W/.err"; then echo "OK   $n"

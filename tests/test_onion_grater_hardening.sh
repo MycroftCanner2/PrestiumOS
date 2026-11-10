@@ -38,7 +38,7 @@ done
 grep -q 'usr.local.sbin.prestium-onion-grater' "$H" && ok "hook 0600 enforces and parses it" || bad "hook 0600 misses it"
 grep -q '/etc/apparmor.d/usr.local.sbin.prestium-onion-grater$' "$I/usr/share/prestium/build/perms.txt" && ok "perms.txt" || bad "perms.txt"
 if command -v apparmor_parser >/dev/null; then
-  W=$(mktemp -d); trap 'rm -rf "$W"' EXIT; cp -r /etc/apparmor.d/. "$W"/ 2>/dev/null; cp -r "$I/etc/apparmor.d"/. "$W"/
+  W=$(mktemp -d); trap 'rm -rf "$W"' EXIT; cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; cp -r "$I/etc/apparmor.d"/. "$W"/
   apparmor_parser -QK -b "$W" "$W/usr.local.sbin.prestium-onion-grater" 2>/dev/null && ok "profile compiles" || bad "profile compiles"
 else echo "SKIP apparmor_parser missing (the build hook compiles it)"; fi
 exit $fail
