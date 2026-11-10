@@ -83,6 +83,12 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   `/proc/*/mem`. Tor Browser's profile allows that read (`ptrace (readby)`), since AppArmor checks both
   sides. Not yet run on a booted ISO: NEWNYM and the circuit display must still work there.
   (`tests/test_onion_grater_hardening.sh`)
+- **i2pd and Tor can no longer reach Prestium's local services.** Both had a blanket firewall accept
+  that also covered loopback, so a compromised i2pd or Tor could connect to The Lounge (9000), the
+  i2pd console (7070) and the torrent RPC (7685). Their accepts are now for the network only; on
+  loopback i2pd keeps only its SOCKS outproxy tunnel (4500) and Tor only the kernel's ephemeral ports
+  32768-60999, where its pluggable transports listen. Bridges must be re-checked on a booted ISO.
+  (`tests/test_ferm_loopback.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
