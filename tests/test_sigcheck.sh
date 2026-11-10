@@ -65,10 +65,24 @@ st=$(gpg --status-fd 1 --verify "$W/two.sig" "$W/data" 2>/dev/null) || true
 o=$(sigstatus_detached_ok two "$st" "$GOOD") && bad "two signatures accepted" || ok "two signatures refused ($o)"
 st=$(gpg --status-fd 1 --verify "$W/good.sig" "$W/data" 2>/dev/null) || true
 o=$(sigstatus_detached_ok good "$st" "$GOOD") && ok "detached good signature accepted" || bad "detached good refused: $o"
+# 2.1 audit: Node.js: the signer must be one of the pinned current releasers (the keybox has old ones too)
+o=$(sigstatus_oneof_ok node "$st" "$OTHER $GOOD") && ok "one of the pinned keys: accepted" || bad "pinned list refused: $o"
+o=$(sigstatus_oneof_ok node "$st" "$OTHER") && bad "key outside the list accepted" || ok "key outside the list refused ($o)"
+o=$(sigstatus_oneof_ok node "$st" "") && bad "empty list accepted" || ok "empty list refused"
+st=$(gpg --status-fd 1 --verify "$W/exp.sig" "$W/data" 2>/dev/null) || true
+o=$(sigstatus_oneof_ok node "$st" "$EXP") && bad "expired key in the list accepted" || ok "expired key refused even when listed"
+# 2.1 audit: per-publisher keyrings, import errors not hidden, Node keys pinned
+F=$R/scripts/fetch-thirdparty.sh
+grep -q 'gpg -q --import "$TOP"/thirdparty/keys/\*.asc' "$F" && bad "shared keyring still imported" || ok "no shared keyring"
+grep -q 'gpg --homedir "$h" --batch -q --import "$4" || { echo "ERROR: cannot import' "$F" && ok "each check imports only its publisher key, failure stops" || bad "sigok keyring"
+for k in '"$TB_KEY" "$K/torbrowser.asc"' '"$FF_KEY" "$K/mozilla.asc"' '"$FEATHER_KEY" "$K/feather.asc"'; do
+  grep -qF "$k" "$F" && ok "sigok with its own key file: $k" || bad "sigok key file: $k"; done
+. "$R/thirdparty/versions.sh"
+[ "$(wc -w <<<"$NODE_KEYS")" -ge 1 ] && ! tr ' ' '\n' <<<"$NODE_KEYS" | grep -qvE '^[0-9A-F]{40}$' && ok "NODE_KEYS: $(wc -w <<<"$NODE_KEYS") fingerprints" || bad "NODE_KEYS malformed"
 # fetch-thirdparty.sh must use the policy for every signature, gpgv (Node.js) included
 F=$R/scripts/fetch-thirdparty.sh
 grep -q '^\. "\$TOP/scripts/sigcheck.sh"' "$F" && grep -q 'sigstatus_detached_ok "\$2" "\$st" "\$3"' "$F" \
-  && grep -q 'NST=\$(gpgv --status-fd 1' "$F" && grep -q 'sigstatus_ok "Node SHASUMS256.txt" "\$NST"' "$F" \
+  && grep -q 'NST=\$(gpgv --status-fd 1' "$F" && grep -q 'sigstatus_oneof_ok "Node SHASUMS256.txt" "\$NST" "\$NODE_KEYS"' "$F" \
   && ok "fetch-thirdparty.sh: gpg and gpgv paths use sigstatus_ok" || bad "fetch-thirdparty.sh does not use sigstatus_ok everywhere"
 # 2.1: the image ships the same policy for the Browser Updater (browser_update.py and the root helper)
 cmp -s "$R/scripts/sigcheck.sh" "$R/config/includes.chroot/usr/local/lib/prestium/sigcheck.sh" \

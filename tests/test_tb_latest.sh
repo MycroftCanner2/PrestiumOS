@@ -26,7 +26,7 @@ grep -q 'binary' "$R/scripts/tb-latest.sh" && bad "tb-latest.sh reads a URL from
 grep -q -- '--max-redirs 0' "$R/scripts/tb-latest.sh" && grep -q -- '--proto =https' "$R/scripts/tb-latest.sh" && ok "list fetched over HTTPS, no redirects" || bad "list fetch options"
 grep -q 'get https://dist.torproject.org/torbrowser/$TB_VERSION/$TBF $TBF' "$F" && ok "tarball from dist.torproject.org" || bad "download URL"
 awk '/^# Tor Browser/,/^# Firefox/' "$F" > "$T/tb"
-grep -q 'sigok "$TBW/$TBF.asc" "$TBW/$TBF" "$TB_KEY"$' "$T/tb" && ok "signature always checked with TB_KEY" || bad "signature check missing"
+grep -q 'sigok "$TBW/$TBF.asc" "$TBW/$TBF" "$TB_KEY" "$K/torbrowser.asc"$' "$T/tb" && ok "signature always checked with TB_KEY" || bad "signature check missing"
 [ "$(grep -n 'sigok' "$T/tb" | head -1 | cut -d: -f1)" -lt "$(grep -n 'TB_SHA256=$(sha "$TBW' "$T/tb" | cut -d: -f1)" ] && ok "SHA recorded only after the signature passed" || bad "order"
 grep -q 'pin TB "$TBW/$TBF" "$TB_SHA256"' "$T/tb" && ok "pinned mode still checks the SHA-256" || bad "pinned SHA check gone"
 grep -q 'tb_version_ge "$TB_VERSION" "$TB_MIN_VERSION"' "$T/tb" && ok "pinned version also held to the minimum" || bad "pinned minimum"

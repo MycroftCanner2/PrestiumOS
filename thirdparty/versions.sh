@@ -20,6 +20,10 @@ FF_KEY=14F26682D0916CDD81E37B6D61B7B526D98F0353          # Mozilla Software Rele
 
 NODE_VERSION=v24.22.2
 NODE_SHA256=48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75   # node-$V-linux-x64.tar.xz; SHASUMS256.txt.asc signed by a Node.js releaser
+# 2.1 (security audit): Node.js releasers allowed to sign SHASUMS256.txt (primary keys, from the
+# "Release keys" list in https://github.com/nodejs/node#release-keys, 2026-11-10). The keybox in
+# thirdparty/keys has these and every past releaser's key; only these count.
+NODE_KEYS="5BE8A3F6C8A5C01D106C0AD820B1A390B168D356 DD792F5973C6DE52C432CBDAC77ABFA00DDBF2B7 CC68F5A3106FF448322E48ED27F5E38D5B0A215F 890C08DB8579162FEE0DF9DB8BEAB4DFCF555EF4 C82FA3AE1CBEDC6BE46B9360C43CEC45C17AB93C 108F52B48DB57BB0CC439B2997B01419BD92F80A 655F3B5C1FB3FA8D1A0CA6BDE4A7D232B936D2FD A363A499291CBBC940DD62E41F10027AF002F8B0"
 
 THELOUNGE_VERSION=4.5.2                                  # npm; package-lock.json integrity hashes pinned in thirdparty/thelounge/
 # irc-framework 4.14.0 is a git dependency of The Lounge (kiwiirc/irc-framework#9578e59a1056499e4a03a0f0fd2c260e9aadc541)

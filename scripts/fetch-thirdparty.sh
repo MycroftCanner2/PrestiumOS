@@ -19,7 +19,9 @@ exec 8>"$C/.fetch.lock"
 flock -w 3600 8 || { echo "ERROR: another fetch-thirdparty.sh holds $C/.fetch.lock"; exit 1; }
 S=$TOP/config/includes.chroot/usr/src/prestium-thirdparty
 export GNUPGHOME=$(mktemp -d); trap 'rm -rf "$GNUPGHOME"' EXIT
-gpg -q --import "$TOP"/thirdparty/keys/*.asc 2>/dev/null
+# 2.1 (security audit): no shared keyring; each signature is checked against its own publisher's key
+# only (sigok imports it into a throw-away home), and an import failure stops the build
+K=$TOP/thirdparty/keys
 get(){ [ -s "$C/$2" ] || { curl -sfL --proto =https --proto-redir =https --retry 3 -m 1800 -o "$C/$2.part" "$1" && mv "$C/$2.part" "$C/$2"; }; }
 sha(){ sha256sum "$1" | cut -c1-64; }
 pin(){ # name file expected
@@ -34,8 +36,11 @@ treehash(){ # sha256 over package.json, package-lock.json, .npmrc and every file
   (cd "$1" && { find node_modules -type f -print0; printf '%s\0' package.json package-lock.json .npmrc; } \
     | LC_ALL=C sort -z | xargs -0 sha256sum) | sha256sum | cut -c1-64; }
 . "$TOP/scripts/sigcheck.sh"
-sigok(){ # sigfile datafile fpr (detached signatures only)
-  local st; st=$(gpg --status-fd 1 --verify "$1" "$2" 2>/dev/null) || true
+sigok(){ # sigfile datafile fpr keyfile (detached signatures only; a keyring with only that key)
+  local h st; h=$(mktemp -d "$GNUPGHOME/key.XXXXXX")
+  gpg --homedir "$h" --batch -q --import "$4" || { echo "ERROR: cannot import the key $4"; exit 1; }
+  st=$(gpg --homedir "$h" --batch --status-fd 1 --verify "$1" "$2" 2>/dev/null) || true
+  gpgconf --homedir "$h" --kill all >/dev/null 2>&1; rm -rf "$h"
   sigstatus_detached_ok "$2" "$st" "$3" || exit 1; }
 
 # Tor Browser (2.1: the newest release unless versions.sh or PRESTIUM_TB_VERSION pins one)
@@ -53,7 +58,7 @@ get https://dist.torproject.org/torbrowser/$TB_VERSION/$TBF $TBF
 get https://dist.torproject.org/torbrowser/$TB_VERSION/$TBF.asc $TBF.asc
 # 2.1 audit: verify, hash and stage one private copy (the shared cache can change between reads)
 TBW=$GNUPGHOME/tb; mkdir -m 700 "$TBW"; cp "$C/$TBF" "$TBW/$TBF"; cp "$C/$TBF.asc" "$TBW/$TBF.asc"
-sigok "$TBW/$TBF.asc" "$TBW/$TBF" "$TB_KEY"
+sigok "$TBW/$TBF.asc" "$TBW/$TBF" "$TB_KEY" "$K/torbrowser.asc"
 if [ "$TB_LATEST" = 1 ]; then
   # no pin to compare with: the signature by TB_KEY (checked above) is the trust anchor; record what was used
   TB_SHA256=$(sha "$TBW/$TBF"); echo "OK TB $TB_SHA256 (Tor Browser $TB_VERSION, signature verified, not pinned)"
@@ -70,7 +75,7 @@ FFF=firefox-$FF_VERSION.tar.xz
 get https://archive.mozilla.org/pub/firefox/releases/$FF_VERSION/SHA256SUMS ff-$FF_VERSION.SHA256SUMS
 get https://archive.mozilla.org/pub/firefox/releases/$FF_VERSION/SHA256SUMS.asc ff-$FF_VERSION.SHA256SUMS.asc
 get https://archive.mozilla.org/pub/firefox/releases/$FF_VERSION/linux-x86_64/en-US/$FFF $FFF
-sigok "$C/ff-$FF_VERSION.SHA256SUMS.asc" "$C/ff-$FF_VERSION.SHA256SUMS" "$FF_KEY"
+sigok "$C/ff-$FF_VERSION.SHA256SUMS.asc" "$C/ff-$FF_VERSION.SHA256SUMS" "$FF_KEY" "$K/mozilla.asc"
 grep -q "^$(sha "$C/$FFF")  linux-x86_64/en-US/$FFF\$" "$C/ff-$FF_VERSION.SHA256SUMS" || { echo "ERROR: Firefox not in signed SHA256SUMS"; exit 1; }
 pin FF "$C/$FFF" "$FF_SHA256"
 
@@ -78,12 +83,13 @@ pin FF "$C/$FFF" "$FF_SHA256"
 NF=node-$NODE_VERSION-linux-x64.tar.xz
 get https://nodejs.org/dist/$NODE_VERSION/SHASUMS256.txt.asc node-$NODE_VERSION.SHASUMS256.txt.asc
 get https://nodejs.org/dist/$NODE_VERSION/$NF $NF
-# gpgv exits 0 for a good signature by an expired key too: apply the same status-line policy (any key in
-# the Node.js releasers' keybox; the keybox itself is the pin)
+# gpgv exits 0 for a good signature by an expired key too: apply the same status-line policy. 2.1
+# (security audit): the keybox holds every past releaser's key; only the current releasers'
+# primary keys (NODE_KEYS in versions.sh, from the Node.js README) may have signed
 rm -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp"
 NST=$(gpgv --status-fd 1 --keyring "$TOP/thirdparty/keys/node-release-keys.kbx" --output "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp" \
   "$C/node-$NODE_VERSION.SHASUMS256.txt.asc" 2>/dev/null) || true
-sigstatus_ok "Node SHASUMS256.txt" "$NST" "" || { rm -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp"; exit 1; }
+sigstatus_oneof_ok "Node SHASUMS256.txt" "$NST" "$NODE_KEYS" || { rm -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp"; exit 1; }
 mv -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp" "$C/node-$NODE_VERSION.SHASUMS256.txt"
 grep -q "^$(sha "$C/$NF")  $NF\$" "$C/node-$NODE_VERSION.SHASUMS256.txt" || { echo "ERROR: Node not in signed SHASUMS"; exit 1; }
 pin NODE "$C/$NF" "$NODE_SHA256"
@@ -92,7 +98,7 @@ pin NODE "$C/$NF" "$NODE_SHA256"
 FEF=feather-$FEATHER_VERSION-linux.zip
 get https://featherwallet.org/files/releases/linux/$FEF $FEF
 get https://featherwallet.org/files/releases/linux/$FEF.asc $FEF.asc
-sigok "$C/$FEF.asc" "$C/$FEF" "$FEATHER_KEY"; pin FEATHER "$C/$FEF" "$FEATHER_SHA256"
+sigok "$C/$FEF.asc" "$C/$FEF" "$FEATHER_KEY" "$K/feather.asc"; pin FEATHER "$C/$FEF" "$FEATHER_SHA256"
 
 # irc-framework (a git dependency of The Lounge, commit-pinned, no integrity in the lockfile). 2.1: npm
 # never sees the git URL: packing a git dependency runs its "prepare" script (babel + webpack, caret-ranged

@@ -41,3 +41,16 @@ sigstatus_detached_ok(){
   [ "$n" = 1 ] || { echo "ERROR: $name: expected exactly one signature, found $n"; return 1; }
   sigstatus_ok "$@"
 }
+
+# 2.1 (security audit): like sigstatus_ok, but the signature's primary key (the last VALIDSIG field)
+# must be one of a list of pinned fingerprints (Node.js: the current releasers).
+# sigstatus_oneof_ok NAME STATUS-TEXT "FPR1 FPR2 ..."
+sigstatus_oneof_ok(){
+  local name=$1 st=$2 list=$3 p f
+  [ -n "$list" ] || { echo "ERROR: $name: no pinned keys"; return 1; }
+  sigstatus_ok "$name" "$st" "" || return 1
+  p=$(printf '%s\n' "$st" | awk '$1 == "[GNUPG:]" && $2 == "VALIDSIG" { print $NF }')
+  [ "$(printf '%s\n' "$p" | grep -c .)" = 1 ] || { echo "ERROR: $name: expected exactly one signature"; return 1; }
+  for f in $list; do [ "$p" = "$f" ] && return 0; done
+  echo "ERROR: $name is signed by $p, which is not one of the pinned keys"; return 1
+}

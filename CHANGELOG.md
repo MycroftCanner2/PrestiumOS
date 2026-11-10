@@ -124,6 +124,13 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   at least 8 characters, and the dialog suggests a few unrelated words. Each wrong password at the lock
   screen costs at least 4 seconds (`/etc/pam.d/swaylock`, pam_faildelay). There is no lockout, which
   would shut the only user out of the session. (`tests/test_session_lock.sh`)
+- **Signature checks at build time use one publisher key each.** The build imported every publisher key
+  into one keyring and hid import errors; each signature is now checked in a throw-away keyring that
+  holds only its publisher's key (Tor Browser, Mozilla, Feather), and a failed import stops the build.
+  Node.js: the releasers' keybox holds 29 keys, 9 of them expired and most of them retired; the
+  signature must now come from one of the 8 current releasers' primary keys (`NODE_KEYS` in
+  `thirdparty/versions.sh`, from the Node.js README on 2026-11-10; Node 24.22.2 is signed by one of
+  them). (`tests/test_sigcheck.sh`)
 
 ### Security review fixes
 - **Expired and revoked publisher keys are refused.** gpg and gpgv report a good signature, and exit 0,
