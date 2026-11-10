@@ -1,6 +1,6 @@
 #!/bin/bash
-# Prestium 2.1 (security audit): the checks CI runs on every push (.github/workflows/checks.yml), and
-# that can be run by hand on Debian 13 with the same packages installed:
+# Prestium 2.1 (security audit): every check in one script, run by hand on Debian 13 with the
+# needed packages installed (no hosted CI):
 #   1. shellcheck (errors) on every shell script in the tree
 #   2. every Prestium AppArmor profile compiles (apparmor_parser -Q -K)
 #   3. no private keys or tokens committed

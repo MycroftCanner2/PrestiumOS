@@ -134,10 +134,10 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   `/var/lib/i2pd/i2pd.conf` (SAM was on there); hook 0700 now installs the live file in its place. The
   desktop user is no longer in group i2pd, which gave it nothing (`/var/lib/i2pd` is 0700). It stays in
   prestium-localweb, which the local-only Firefox needs. (`tests/test_i2pd_config_copy.sh`)
-- **Continuous checks.** A GitHub Actions job (Debian 13) runs `tests/ci.sh` on every push: shellcheck at
-  error level on all 82 shell scripts (none today), every AppArmor profile compiled, a scan for committed
-  private keys and tokens, `systemd-analyze security` scores, and the tests that don't need a live
-  Wayland session. The checkout action is pinned to a commit and the job can only read the repository.
+- **One script for all checks.** `tests/ci.sh` (run by hand on Debian 13) runs shellcheck at error
+  level on all shell scripts, compiles every AppArmor profile, scans for committed private keys and
+  tokens, prints `systemd-analyze security` scores, and runs the tests that don't need a live Wayland
+  session.
 - **Release files for a signed download.** `build.sh` now also writes `SHA256SUMS` (the ISO, its manifest
   and its package list) and `Prestium-<version>-amd64.manifest`: the image's SHA-256 and size, build
   date, source commit, Debian package count, the Tor Browser version and SHA-256 that went in, the pinned

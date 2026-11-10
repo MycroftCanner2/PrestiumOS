@@ -59,7 +59,7 @@ bit-for-bit reproducible; compare two builds with their `.manifest` files.
 
 ## Checks
 
-`tests/ci.sh` runs what CI runs on every push (`.github/workflows/checks.yml`, Debian 13):
+`tests/ci.sh` runs every check by hand (on Debian 13, with the same packages installed):
 shellcheck (errors) on every shell script, every AppArmor profile compiled with `apparmor_parser`,
 a scan for committed private keys and tokens, `systemd-analyze security` scores for the hardened
 services, and the test suite. Four tests need a real Wayland session, bwrap and sudo
