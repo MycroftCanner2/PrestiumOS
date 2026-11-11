@@ -6,7 +6,7 @@
 #                   with the system Tor, TOR_SKIP_LAUNCH) + Prestium policies.json and uBlock Origin
 #   Firefox      -> /opt/firefox (local-only browser for Prestium's own pages) + policies.json
 #   Node.js      -> /opt/nodejs (runtime only: bin/node + LICENSE)
-#   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch
+#   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch and 320s IRC ping timeout
 #   Feather      -> /usr/local/bin/feather
 set -e
 S=/usr/src/prestium-thirdparty
@@ -123,6 +123,36 @@ if 'Prestium' not in s:
     open(p, 'w').write(s)
 print("P: The Lounge offline patch applied")
 PY
+# 2.1: IRC over I2P (IRC2P, Ilita) hits irc-framework's 120s ping timeout too often.
+# The Lounge 4.5.2 has no config.js option; this sets ping_timeout: 320 on the Client
+# (ping_interval stays the default 30). The expected text must appear exactly once, or
+# the build stops (a later Lounge version can't skip the patch unnoticed). Idempotent.
+N=/opt/thelounge/node_modules/thelounge/dist/server/models/network.js
+python3 - "$N" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+if "ping_timeout: 320" not in s:
+    a = (
+        "            enable_chghost: true,\n"
+        "            enable_echomessage: true,\n"
+        "            enable_setname: true,\n"
+        "            auto_reconnect: true,\n"
+    )
+    assert s.count(a) == 1, "The Lounge network.js: Client options changed (ping_timeout patch)"
+    s = s.replace(
+        a,
+        a
+        + "            // Prestium: 320s IRC ping timeout (I2P; irc-framework default is 120s)\n"
+        + "            ping_timeout: 320,\n",
+        1,
+    )
+    open(p, "w").write(s)
+assert s.count("ping_timeout: 320") == 1, "The Lounge network.js: ping_timeout: 320 not present once"
+assert "ping_interval" not in s, "The Lounge network.js: ping_interval must stay the default (30)"
+print("P: The Lounge ping_timeout is 320")
+PY
+/opt/nodejs/bin/node --check "$N"
 chown -R root:root /opt/thelounge; chmod -R u+rwX,go+rX,go-w /opt/thelounge
 echo "P: The Lounge $(sed -n 's/.*"version": "\(.*\)".*/\1/p' /opt/thelounge/node_modules/thelounge/package.json | head -1)"
 

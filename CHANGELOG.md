@@ -165,6 +165,10 @@ This is one combined list of everything that changed since the last release, 2.0
   is loaded from outside; Theme Factory's fonts map to ones Prestium ships. The sign-in splash uses
   Tech Innovation's colours. Palettes: Theme Factory (github.com/anthropics/skills, commit
   `8a1541c4a3ffa5a20a5a91de0dcf3f0bab1d1ef4`), Apache License 2.0.
+- **The Lounge waits 320 seconds for an IRC ping reply**, so connections over I2P (IRC2P and Ilita)
+  are less likely to drop with "Ping timeout". irc-framework's default is 120 seconds. Hook 0200 sets
+  `ping_timeout: 320` where The Lounge creates the client; `ping_interval` stays 30 seconds. If a later
+  Lounge version changes that code, the build stops.
 - **Mail (I2P) asks for your account on first start**, instead of shipping a placeholder
   `username@mail.i2p` account. Claws Mail can generate a PGP key again (an empty name line had made
   GnuPG refuse). To use your own key, import it with Kleopatra; both use the same `~/.gnupg`.
