@@ -3,6 +3,16 @@
   "description": "Packages for The Lounge (Prestium). No network installs: this list is local only.",
   "dependencies": {
     "thelounge-prestium-autologin": "1.0.0",
-    "thelounge-theme-prestium": "1.0.0"
+    "thelounge-theme-arctic-frost": "1.0.0",
+    "thelounge-theme-botanical-garden": "1.0.0",
+    "thelounge-theme-desert-rose": "1.0.0",
+    "thelounge-theme-forest-canopy": "1.0.0",
+    "thelounge-theme-golden-hour": "1.0.0",
+    "thelounge-theme-midnight-galaxy": "1.0.0",
+    "thelounge-theme-modern-minimalist": "1.0.0",
+    "thelounge-theme-ocean-depths": "1.0.0",
+    "thelounge-theme-prestium": "1.0.0",
+    "thelounge-theme-sunset-boulevard": "1.0.0",
+    "thelounge-theme-tech-innovation": "1.0.0"
   }
 }

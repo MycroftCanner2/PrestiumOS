@@ -84,6 +84,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/bootloaders/` | boot menu entries: Prestium 2.0, nomodeset, camera and microphone off |
 | `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile |
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |
+| `scripts/thelounge-themes.py` | regenerates The Lounge's 10 Theme Factory theme packages from `scripts/thelounge-theme.css.in` and checks their contrast (`--check` only verifies; the generated files are committed) |
 | `build.sh` | the whole build |
 
 ### Hooks

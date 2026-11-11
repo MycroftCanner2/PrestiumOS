@@ -5,6 +5,22 @@
 Enhanced security and new features. Changes will be listed here as they land.
 
 ### Updates
+- **The Lounge ships the 10 Theme Factory themes, and Tech Innovation is the new default.** Ocean
+  Depths, Sunset Boulevard, Forest Canopy, Modern Minimalist, Golden Hour, Arctic Frost, Desert Rose,
+  Tech Innovation, Botanical Garden and Midnight Galaxy are local theme packages
+  (`/var/lib/thelounge/packages/node_modules/thelounge-theme-*`, root-owned and read-only like the
+  others). Prestium and The Lounge's own themes can still be picked in Settings. This replaces the
+  Prestium theme as the default (see below): in it, your own messages were dimmed and Settings fields
+  could show black text on a dark box. Every theme now sets the colour and background of text fields
+  (Settings, Connect, message box and placeholders) and of chat text explicitly; chat text is white on
+  the dark themes and a dark palette colour on the light ones, and each text/background pair is at
+  least 4.5:1 (WCAG AA), using a slightly lighter or darker shade of a palette colour where the raw one
+  fell short. Nothing is loaded from outside: no web fonts, images or URLs; Theme Factory's fonts map
+  to ones Prestium ships (DejaVu Sans, Nimbus Sans, Nimbus Roman, C059). The sign-in splash uses Tech
+  Innovation's colours. Palettes: Theme Factory (github.com/anthropics/skills, commit
+  `8a1541c4a3ffa5a20a5a91de0dcf3f0bab1d1ef4`), Apache License 2.0, notice in
+  `/var/lib/thelounge/packages/THEME-FACTORY-NOTICE.txt`. The CSS is generated from one template by
+  `scripts/thelounge-themes.py` (`tests/test_thelounge_theme.sh`).
 - **Node.js 24.22.3** (security release, 2026-11-11). The Lounge's runtime is the official
   linux-x64 tarball in `/opt/nodejs`, pinned in `thirdparty/versions.sh`. This release
   fixes high-severity HTTP/2 and TLS issues in 24.x. The signed `SHASUMS256.txt` verifies
