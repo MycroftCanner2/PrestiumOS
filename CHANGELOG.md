@@ -102,9 +102,12 @@ This is one combined list of everything that changed since the last release, 2.0
 - **onion-grater can only read, not trace**, and it checks how a Python client was started. Its unit
   filters out ptrace and process_vm syscalls; a new AppArmor profile allows `ptrace (read)` only. A
   client started with `PYTHON*` (other than a short allow-list), `LD_*` or code from outside `/usr`
-  and `/lib` is refused. The profile allows `identify()` to stat only the Nyx, Tor Connection
-  Assistant and OnionShare script paths (through `/proc/<pid>/root` and on the host), so those apps
-  are accepted again; Tor Browser was already fine.
+  and `/lib` is refused (libffi's own `/memfd:libffi` trampolines excepted). The profile allows
+  `identify()` to stat only the Nyx, Tor Connection Assistant and OnionShare script paths (through
+  `/proc/<pid>/root` and on the host). The filter also holds `CAP_DAC_READ_SEARCH`, read-only, because
+  a client's `/proc/<pid>/environ` is readable by its owner only; its unit hides the shadow files,
+  sudoers, `/etc/ssh` and `/var/lib` from it. Every refusal is logged with its reason
+  (`journalctl -u prestium-onion-grater`).
 - **The Lounge can't rewrite its own code.** `config.js` and its packages are root-owned and read-only
   for The Lounge. The sign-in token works once and never appears in a command line: it is handed to
   the local-only Firefox through a one-off page in a private folder, which is the only `file://`
@@ -113,7 +116,8 @@ This is one combined list of everything that changed since the last release, 2.0
   runs in its own empty network namespace. Its single-instance check still listens on that private
   loopback, the microphone still works, and a second start joins the first namespace through a session
   socket (no ptrace, which `ptrace_scope=2` would block). After joining, start is refused unless the
-  namespace has only loopback.
+  namespace has only loopback. Audacity may start its own plug-in host (the same program, same
+  profile, same namespace), so the Measure RMS plug-in (`rms.ny`) is no longer reported incompatible.
 - **prestium-gnupg-check** (a root timer) raises a safety flag when an unconfined GnuPG daemon is
   running and that user's configuration names a helper outside `/usr`. Claws Mail and Kleopatra still
   share `~/.gnupg` and the session's gpg-agent; nothing is masked or killed.
@@ -166,9 +170,11 @@ This is one combined list of everything that changed since the last release, 2.0
   GnuPG refuse). To use your own key, import it with Kleopatra; both use the same `~/.gnupg`.
 - **Kleopatra's self-test passes.** scdaemon is now installed, so the "scdaemon Configuration Check"
   no longer fails at every start.
-- **The Tor Connection Assistant and Nyx can use the control-port filter again.** A missing AppArmor
-  rule had made onion-grater refuse them (`ConnectionError`, and Nyx's terminal just closed). The
-  assistant's status line shows the filter's reply.
+- **The Tor Connection Assistant and Nyx can use the control-port filter again.** onion-grater had
+  refused them (`ConnectionError`, then `510 ... client not allowed` or `Broken pipe`, and Nyx's
+  terminal just closed): a missing AppArmor rule, then no permission to read their environment as
+  another user, and for the assistant the libffi memory GTK callbacks use. The assistant says when the
+  filter refused it and where to look; Nyx's window stays open when Nyx fails (`prestium-nyx`).
 - **The local-only Firefox launcher no longer builds a command string**, so a home directory with a
   quote in its name can't change the command.
 

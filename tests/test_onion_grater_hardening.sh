@@ -10,7 +10,7 @@ P=$I/etc/apparmor.d/usr.local.sbin.prestium-onion-grater
 H=$R/config/hooks/live/0600-prestium-apparmor.hook.chroot
 grep -qx 'SystemCallFilter=~@debug' "$U" && ok "unit: no @debug syscalls (ptrace, process_vm_*)" || bad "unit: @debug not filtered"
 grep -qx 'SystemCallFilter=@system-service' "$U" && ok "unit: @system-service allow-list" || bad "unit: no allow-list"
-grep -qx 'CapabilityBoundingSet=CAP_SYS_PTRACE' "$U" && ok "unit: only CAP_SYS_PTRACE" || bad "unit: capability set"
+grep -qx 'CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH' "$U" && ok "unit: only CAP_SYS_PTRACE and CAP_DAC_READ_SEARCH (/proc/<pid>/environ is 0400)" || bad "unit: capability set"
 grep -qx 'NoNewPrivileges=yes' "$U" && ok "unit: no_new_privs" || bad "unit: NoNewPrivileges"
 grep -q '^profile prestium_onion_grater /usr/local/sbin/prestium-onion-grater ' "$P" && ok "profile attaches to the filter" || bad "profile attach"
 grep -q 'flags=(.*complain' "$P" && bad "profile in complain mode" || ok "profile enforced"

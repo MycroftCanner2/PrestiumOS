@@ -380,6 +380,7 @@
 0440 root root /etc/sudoers.d/prestium-tor-mode
 0755 root root /usr/local/sbin/prestium-tor-mode
 0755 root root /usr/local/bin/prestium-tor-assistant
+0755 root root /usr/local/bin/prestium-nyx
 0755 root root /usr/local/lib/prestium/ptdns-resolve
 0644 root root /etc/tor/torrc.d/50-prestium-assistant.conf
 0644 root root /etc/ferm/prestium-tor-pt.conf

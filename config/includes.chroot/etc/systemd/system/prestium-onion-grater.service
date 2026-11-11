@@ -13,8 +13,15 @@ SupplementaryGroups=debian-tor prestium-tbb
 RuntimeDirectory=onion-grater
 RuntimeDirectoryMode=0755
 # read /proc/<pid>/exe of the connecting app (another uid)
-AmbientCapabilities=CAP_SYS_PTRACE
-CapabilityBoundingSet=CAP_SYS_PTRACE
+# 2.1 (ISO test after ba6ff54): CAP_DAC_READ_SEARCH too. /proc/<pid>/environ is mode 0400, owned by
+# the client's uid: CAP_SYS_PTRACE passes the ptrace check, but the open is a plain file permission
+# check, so without it every Python client (Nyx, the Tor Connection Assistant, OnionShare) was refused
+# with "cannot inspect environment: Permission denied" while Tor Browser (no environ check) worked.
+# Read-only; the AppArmor profile still limits which files the filter can open, open_by_handle_at is
+# outside @system-service, and the secrets of the system are hidden from the filter below.
+AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+InaccessiblePaths=-/etc/shadow -/etc/shadow- -/etc/gshadow -/etc/gshadow- -/etc/sudoers -/etc/sudoers.d -/etc/ssh -/var/lib
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

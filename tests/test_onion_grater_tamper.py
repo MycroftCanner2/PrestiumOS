@@ -32,6 +32,23 @@ for e in (b"PYTHONPATH=/home/user/x", b"PYTHONHOME=/tmp/py", b"PYTHONSTARTUP=/tm
 for m in ("7f40-7f50 r-xp 00000000 08:01 9 /home/user/evil.so\n", "7f40-7f50 r-xp 00000000 08:01 9 /tmp/x/_mod.cpython-313.so\n",
           "7f40-7f50 r-xp 00000000 08:01 9 /dev/shm/x (deleted)\n"):
     r = case(clean, SYS_MAPS + m); (ok if r else bad)("refused: code from %s (%s)" % (m.split()[-1], r))
+# 2.1 (ISO test after ba6ff54): libffi's closure trampolines (every PyGObject/GTK and ctypes callback) live in
+# a shared memfd named "libffi", mapped rw-s and r-xs; the Tor Connection Assistant was refused for it
+FFI = ("7f50-7f51 rw-s 00000000 00:01 7 /memfd:libffi (deleted)\n"
+       "7f51-7f52 r-xs 00000000 00:01 7 /memfd:libffi (deleted)\n")
+r = case(clean, SYS_MAPS + FFI); (ok if r is None else bad)("libffi trampoline memfd accepted (%s)" % r)
+for m in ("7f40-7f50 r-xs 00000000 00:01 9 /memfd:evil (deleted)\n", "7f40-7f50 r-xp 00000000 00:01 9 /memfd:libffi (deleted)\n",
+          "7f40-7f50 r-xs 00000000 00:01 9 /memfd:libffi\n", "7f40-7f50 r-xs 00000000 08:01 9 /home/user/memfd:libffi (deleted)\n"):
+    r = case(clean, SYS_MAPS + m); (ok if r else bad)("refused: %s %s (%s)" % (m.split()[1], m.split(None, 5)[5].strip(), r))
+# the same check on a real process of this machine: python3 with a ctypes callback (a libffi closure)
+import subprocess
+p = subprocess.Popen([sys.executable, "-c", "import ctypes,sys,time; f=ctypes.CFUNCTYPE(ctypes.c_int)(lambda: 1); "
+                      "print(f(), flush=True); time.sleep(5)"], stdout=subprocess.PIPE, env={"PATH": "/usr/bin:/bin"})
+p.stdout.readline()
+maps = open("/proc/%d/maps" % p.pid).read()
+r = tampered(p.pid); p.kill(); p.wait()
+(ok if r is None else bad)("a real python3 with a ctypes callback is accepted (%s; libffi memfd %s)"
+                           % (r, "present" if "/memfd:libffi" in maps else "not used here"))
 r = case(clean, SYS_MAPS + "7f40-7f50 r--p 00000000 08:01 9 /home/user/data.bin\n")
 (ok if r is None else bad)("a non-executable mapping from the home is fine (%s)" % r)
 d = tempfile.mkdtemp(); r = tampered(42, proc=d); (ok if r else bad)("unreadable /proc entry refused (%s)" % r)

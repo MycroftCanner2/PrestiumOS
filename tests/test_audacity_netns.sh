@@ -105,7 +105,11 @@ grep -qE '^\s*profile \S+ /usr/bin/audacity' "$PF" && bad "profile still attache
 grep -qx '  network inet stream,' "$PF" && ok "profile: TCP for the listener (inside the namespace)" || bad "profile: no inet stream (Audacity would not start)"
 grep -qx '  owner @{run}/user/\[0-9\]\*/pipewire-\[0-9\]\* rw,' "$PF" && ok "profile: PipeWire socket (microphone)" || bad "profile: no PipeWire socket"
 grep -qx '  deny /dev/video\* rw,' "$PF" && ok "profile: no camera" || bad "profile: camera"
-grep -vE '^\s*#' "$PF" | grep -E '(bwrap|nsenter|prestium-audacity|/usr/bin/audacity|audacity-ns)\b.*\b[a-zA-Z]*x[a-zA-Z]*,' | grep -v "$REAL mr," && bad "profile may exec the sandbox tools" || ok "profile: no exec of bwrap, nsenter, wrapper, helper or shim"
+grep -vE '^\s*#' "$PF" | grep -E '(bwrap|nsenter|prestium-audacity|/usr/bin/audacity|audacity-ns)\b.*\b[a-zA-Z]*x[a-zA-Z]*,' | grep -v "$REAL mrix," && bad "profile may exec the sandbox tools" || ok "profile: no exec of bwrap, nsenter, wrapper, helper or shim"
+# 2.1: Audacity validates new plug-ins (rms.ny) in its plug-in host, "<own executable> --host <port>":
+# the real program may run itself, inheriting this profile (ix), never under another profile or unconfined
+grep -qx "  $REAL mrix," "$PF" && ok "profile: Audacity may start its plug-in host (itself, ix)" || bad "profile: no ix for $REAL (rms.ny reported incompatible)"
+grep -vE '^\s*(#|profile )' "$PF" | grep -F "$REAL" | grep -qvx "  $REAL mrix," && bad "profile: another rule for $REAL" || ok "profile: one rule for $REAL"
 grep -vE '^\s*#' "$PF" | grep -qE '\s(Ux|ux|Ix|Pux|pux|Cux|cux)\b|\s[a-z]*U[a-z]*x,' && bad "profile: unconfined exec" || ok "profile: no unconfined exec"
 grep -q '<action name="Execute" command="prestium-run audacity" />' "$I/etc/xdg/labwc/menu.xml" && ok "menu: prestium-run audacity (restricted Wayland socket, then the shim)" || bad "menu entry"
 o=$(grep -rlF "$REAL" "$I" "$R/config/hooks" | grep -vE "usr/local/bin/prestium-audacity$|usr/local/lib/prestium/audacity-ns$|etc/apparmor.d/usr.bin.audacity$|0620-prestium-audacity-netns.hook.chroot$")

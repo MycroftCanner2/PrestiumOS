@@ -123,6 +123,12 @@ def read_json(path, default):
     except Exception:
         return default
 
+class FilterRefused(ConnectionError):
+    """onion-grater (Prestium's control-port filter) answered 510: it did not accept this program."""
+
+REFUSED_TEXT = ("Prestium's control-port filter (onion-grater) refused the assistant; Tor itself is not "
+                "affected. Reason: journalctl -u prestium-onion-grater -b")
+
 class ControlMonitor(threading.Thread):
     """One persistent connection to the onion-grater filter: GETINFO every second, async events."""
     def __init__(self, cb_status, cb_log):
@@ -148,6 +154,10 @@ class ControlMonitor(threading.Thread):
                 self.stop.wait(1.0); continue
             try:
                 self.session()
+            except FilterRefused:
+                # retrying every second would only fill the filter's journal with the same refusal
+                GLib.idle_add(self.cb_status, None, REFUSED_TEXT, False)
+                self.stop.wait(10.0); continue
             except Exception as e:
                 detail = (str(e) or e.__class__.__name__).strip()[:80]
                 GLib.idle_add(self.cb_status, None, "Tor is starting (control port: %s) ..." % detail, False)
@@ -158,10 +168,23 @@ class ControlMonitor(threading.Thread):
         s.settimeout(5)
         s.connect(CONTROL)
         f = s.makefile("rwb", buffering=0)
+        def refused(line):
+            if line.startswith("510 Prestium onion-grater"):
+                raise FilterRefused(line.strip()[:80])
         def send(c):
-            f.write((c + "\r\n").encode())
+            try:
+                f.write((c + "\r\n").encode())
+            except OSError:
+                # 2.1: the filter writes its 510 and closes; a write after that fails with "Broken
+                # pipe", which hid the refusal. Its reply is still readable: show that instead.
+                try:
+                    s.settimeout(0.5); refused(s.recv(4096).decode(errors="replace"))
+                except OSError:
+                    pass
+                raise
         send("AUTHENTICATE")
         l = f.readline().decode(errors="replace")
+        refused(l)
         if not l.startswith("250"):
             raise ConnectionError(l.strip()[:60])
         send("SETEVENTS STATUS_CLIENT NOTICE WARN ERR")
@@ -201,6 +224,7 @@ class ControlMonitor(threading.Thread):
                         text += " (%s)" % warn.group(1)
                     GLib.idle_add(self.cb_status, pct, text, circ)
                 elif line.startswith(("5", "4")):
+                    refused(line)
                     raise ConnectionError(line[:60])
 
 class Assistant(Gtk.ApplicationWindow):

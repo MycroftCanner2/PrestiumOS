@@ -7,11 +7,12 @@
 #   4. systemd-analyze security scores for the hardened services (printed, not gated)
 #   5. the test suite, except the tests that need a real Wayland session, bwrap and sudo
 #      (test_wayland_broker.sh, test_wayland_session.sh, test_browser_sandbox.sh,
-#      test_onion_grater_identity.py): those run on a Prestium build machine or the live system.
+#      test_onion_grater_identity.py, test_onion_grater_peer_uid.py): those run on a Prestium build
+#      machine or the live system.
 set -u
 R=$(cd "$(dirname "$0")/.." && pwd); cd "$R" || exit 1
 fail=0; step(){ echo; echo "== $*"; }
-LIVE_ONLY="test_wayland_broker.sh test_wayland_session.sh test_browser_sandbox.sh test_onion_grater_identity.py"
+LIVE_ONLY="test_wayland_broker.sh test_wayland_session.sh test_browser_sandbox.sh test_onion_grater_identity.py test_onion_grater_peer_uid.py"
 
 step "shellcheck (errors)"
 mapfile -t SH < <(git ls-files | while read -r f; do

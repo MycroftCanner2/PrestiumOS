@@ -118,6 +118,12 @@ def same_file(a, b):
 ENV_BAD = re.compile(rb"^(PYTHON(?!DONTWRITEBYTECODE=|UNBUFFERED=|IOENCODING=|UTF8=|NOUSERSITE=)[A-Z_]*|LD_[A-Z_]+|GCONV_PATH|GLIBC_TUNABLES)=")
 # (GTK, GIO and Qt module paths need no entry here: code they load from elsewhere shows in the maps)
 EXEC_OK = ("/usr/", "/lib/", "/lib64/", "/opt/tor-browser/")
+# 2.1 (ISO test after ba6ff54): libffi (Debian trixie, 3.4.8) makes its closure trampolines in a memfd
+# it names "libffi" and maps twice, shared: writable, and readable+executable. PyGObject needs one for
+# every GTK callback and ctypes for every callback, so the Tor Connection Assistant always has it and
+# was refused ("runs code from /memfd:libffi (deleted)"). Only that exact name, only a shared
+# mapping: it is created by code already running in the process, not loaded from a file.
+FFI_TRAMP = "/memfd:libffi (deleted)"
 
 def tampered(pid, proc="/proc"):
     """None if the process looks like an unmodified start, else the reason."""
@@ -134,6 +140,8 @@ def tampered(pid, proc="/proc"):
     for line in maps:
         parts = line.split(None, 5)
         if len(parts) == 6 and "x" in parts[1] and parts[5].startswith("/"):
+            if parts[5] == FFI_TRAMP and parts[1].endswith("s"):
+                continue
             if not parts[5].startswith(EXEC_OK):
                 return "runs code from %s" % parts[5]
     return None
@@ -300,9 +308,15 @@ async def handle(creader, cwriter):
     sock = cwriter.get_extra_info("socket")
     profile, why, pid = identify(sock)
     if profile is None:
-        log("refused pid %s: %s" % (pid, why))
+        # the reason (never a command's data) goes to the journal: journalctl -u prestium-onion-grater
+        log("refused pid %s: %s" % (pid, str(why)[:300]))
         cwriter.write(b"510 Prestium onion-grater: client not allowed\r\n")
-        await cwriter.drain(); cwriter.close(); return
+        await cwriter.drain()
+        # 2.1: let the client's first command (AUTHENTICATE / PROTOCOLINFO) arrive before closing, so
+        # it reads this 510 instead of failing to write with "Broken pipe" (seen in the assistant)
+        try: await asyncio.wait_for(creader.readline(), 1.0)
+        except Exception: pass
+        cwriter.close(); return
     log("client pid %s: profile %s" % (pid, profile))
     try:
         treader, twriter = await asyncio.open_unix_connection(TOR_SOCK)

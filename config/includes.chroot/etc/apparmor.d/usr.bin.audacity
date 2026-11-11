@@ -20,7 +20,14 @@ profile audacity /usr/libexec/prestium-audacity {
   include <abstractions/prestium-viewer-core>
   network inet stream,
   include <abstractions/prestium-viewer-write>
-  /usr/libexec/prestium-audacity mr,
+  # 2.1 (ISO test): Audacity 3.x checks new plug-ins in a second copy of itself, its plug-in host
+  # (PluginHost::Start: wxExecute("<own executable> --host <port>"), which reports back over TCP on
+  # 127.0.0.1). rms.ny ("Measure RMS") is the one Nyquist plug-in Debian ships that is not in
+  # Audacity's built-in list (kShippedEffects), so it is checked that way at the first start. With
+  # "mr" only, that exec was denied and Audacity reported "Incompatible plugin(s) found ... rms.ny".
+  # ix: the host stays in this profile and in the same empty network namespace (inherited; the
+  # wrapper and the shim are not run again).
+  /usr/libexec/prestium-audacity mrix,
   /usr/lib/@{multiarch}/audacity/** mr,
   /usr/lib/{lv2,ladspa,vst,vst3}/** mr,
   /usr/lib/@{multiarch}/{lv2,ladspa}/** mr,

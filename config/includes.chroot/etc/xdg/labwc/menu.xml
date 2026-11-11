@@ -144,7 +144,7 @@
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-browser-updater" />
     </item>
     <item label="Tor Monitor (Nyx)">
-      <action name="Execute" command="prestium-run foot nyx -s /run/onion-grater/control" />
+      <action name="Execute" command="prestium-run foot prestium-nyx -s /run/onion-grater/control" />
     </item>
   </menu>
   <separator />

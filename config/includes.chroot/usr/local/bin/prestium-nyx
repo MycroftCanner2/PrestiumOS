@@ -1,0 +1,15 @@
+#!/bin/sh
+# Prestium 2.1: Nyx in a terminal window (menu "Tor Monitor (Nyx)": prestium-run foot prestium-nyx ...).
+# Nyx is run as a child, unchanged ("/usr/bin/python3 /usr/bin/nyx ARGS", the same environment), so
+# onion-grater identifies it exactly as before. When Nyx fails (for example "Unable to connect to
+# tor" after the control-port filter refused it), foot used to close at once and the message was
+# never seen: now the window stays open until Enter is pressed.
+/usr/bin/nyx "$@"
+rc=$?
+if [ "$rc" -ne 0 ]; then
+	printf '\nNyx stopped (exit status %s).\n' "$rc"
+	printf 'If it could not connect, the reason is in the control-port filter'"'"'s log:\n'
+	printf '  journalctl -u prestium-onion-grater -b\n\nPress Enter to close this window. '
+	read -r _ || true
+fi
+exit "$rc"

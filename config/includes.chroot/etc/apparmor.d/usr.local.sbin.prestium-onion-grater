@@ -1,5 +1,5 @@
 # Prestium 2.1 (security audit): onion-grater, the Tor control-port filter, ENFORCED.
-# It needs CAP_SYS_PTRACE only to read who is connecting (/proc/<pid>/status, exe, cmdline and a
+# It needs CAP_SYS_PTRACE (and CAP_DAC_READ_SEARCH for the 0400 /proc/<pid>/environ) only to read who is connecting (/proc/<pid>/status, exe, cmdline and a
 # stat through /proc/<pid>/root) for processes of other uids. That capability also allows attaching
 # to and writing the memory of any process, root's included; this profile keeps the read-only use:
 # "ptrace (read)" is what the kernel asks for those /proc reads, tracing and /proc/<pid>/mem are
@@ -17,6 +17,10 @@ profile prestium_onion_grater /usr/local/sbin/prestium-onion-grater flags=(attac
   include <abstractions/python>
 
   capability sys_ptrace,
+  # 2.1 (ISO test after ba6ff54): /proc/<pid>/environ is 0400 and owned by the client, so reading it
+  # for another uid is a DAC check (CAP_DAC_READ_SEARCH), not only a ptrace one. Read-only; the file
+  # rules below still decide what the filter may open.
+  capability dac_read_search,
   ptrace (read),
   deny ptrace (trace),
   deny @{PROC}/*/mem rwx,
