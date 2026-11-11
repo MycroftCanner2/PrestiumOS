@@ -6,7 +6,7 @@
 #                   with the system Tor, TOR_SKIP_LAUNCH) + Prestium policies.json and uBlock Origin
 #   Firefox      -> /opt/firefox (local-only browser for Prestium's own pages) + policies.json
 #   Node.js      -> /opt/nodejs (runtime only: bin/node + LICENSE)
-#   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch and 320s IRC ping timeout
+#   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch, 320s IRC ping timeout, and connecting lobby text only when a connection starts
 #   Feather      -> /usr/local/bin/feather
 set -e
 S=/usr/src/prestium-thirdparty
@@ -153,6 +153,67 @@ assert "ping_interval" not in s, "The Lounge network.js: ping_interval must stay
 print("P: The Lounge ping_timeout is 320")
 PY
 /opt/nodejs/bin/node --check "$N"
+# 2.1: The Lounge's connection plugin always said "Network created, connecting to host:port..."
+# when it attached, even if the network was marked userDisconnected and irc.connect() was not
+# called (Prestium's default). Gate that message, and add an equivalent line in connect.js so
+# /connect and the Connect menu still show "Connecting to host:port...". The expected text must
+# appear exactly once, or the build stops. Idempotent. Reconnect handlers are left unchanged.
+C=/opt/thelounge/node_modules/thelounge/dist/server/plugins/irc-events/connection.js
+I=/opt/thelounge/node_modules/thelounge/dist/server/plugins/inputs/connect.js
+python3 - "$C" "$I" <<'PY'
+import sys
+c, i = sys.argv[1], sys.argv[2]
+
+s = open(c).read()
+if "Prestium: connecting message only when a connection actually starts" not in s:
+    a = (
+        "    network.getLobby().pushMessage(client, new msg_1.default({\n"
+        "        text: \"Network created, connecting to \" + network.host + \":\" + network.port + \"...\",\n"
+        "    }), true);\n"
+    )
+    assert s.count(a) == 1, "The Lounge connection.js: Network created message changed"
+    s = s.replace(
+        a,
+        "    // Prestium: connecting message only when a connection actually starts\n"
+        "    if (!network.userDisconnected) {\n"
+        "        network.getLobby().pushMessage(client, new msg_1.default({\n"
+        "            text: \"Network created, connecting to \" + network.host + \":\" + network.port + \"...\",\n"
+        "        }), true);\n"
+        "    }\n",
+        1,
+    )
+    open(c, "w").write(s)
+assert s.count("Network created, connecting to ") == 1, "The Lounge connection.js: Network created message not present once"
+assert s.count("if (!network.userDisconnected)") == 1, "The Lounge connection.js: userDisconnected guard missing"
+assert "irc.on(\"reconnecting\"" in s and "Connected to the network." in s, "The Lounge connection.js: reconnect/connected handlers missing"
+print("P: The Lounge connecting lobby text is gated on userDisconnected")
+
+s = open(i).read()
+if "Prestium: tell the user when a connection actually starts" not in s:
+    a = (
+        "            return;\n"
+        "        }\n"
+        "        irc.connect();\n"
+    )
+    assert s.count(a) == 1, "The Lounge connect.js: irc.connect() after already-connected check changed"
+    s = s.replace(
+        a,
+        "            return;\n"
+        "        }\n"
+        "        // Prestium: tell the user when a connection actually starts (/connect or the Connect menu)\n"
+        "        network.getLobby().pushMessage(this, new msg_1.default({\n"
+        "            text: \"Connecting to \" + network.host + \":\" + network.port + \"...\",\n"
+        "        }), true);\n"
+        "        irc.connect();\n",
+        1,
+    )
+    open(i, "w").write(s)
+assert s.count('"Connecting to " + network.host + ":" + network.port + "..."') == 1, "The Lounge connect.js: Connecting to message not present once"
+assert s.count("irc.connect();") == 1, "The Lounge connect.js: irc.connect() not present once"
+print("P: The Lounge /connect shows Connecting to host:port")
+PY
+/opt/nodejs/bin/node --check "$C"
+/opt/nodejs/bin/node --check "$I"
 chown -R root:root /opt/thelounge; chmod -R u+rwX,go+rX,go-w /opt/thelounge
 echo "P: The Lounge $(sed -n 's/.*"version": "\(.*\)".*/\1/p' /opt/thelounge/node_modules/thelounge/package.json | head -1)"
 

@@ -169,6 +169,10 @@ This is one combined list of everything that changed since the last release, 2.0
   are less likely to drop with "Ping timeout". irc-framework's default is 120 seconds. Hook 0200 sets
   `ping_timeout: 320` where The Lounge creates the client; `ping_interval` stays 30 seconds. If a later
   Lounge version changes that code, the build stops.
+- **The Lounge no longer says it is connecting when it is not.** On boot the lobby still printed
+  "Network created, connecting to 127.0.0.1:6668..." even though Prestium leaves networks
+  disconnected. That line now appears only when a connection actually starts; `/connect` and the
+  Connect menu show "Connecting to 127.0.0.1:6668...".
 - **Mail (I2P) asks for your account on first start**, instead of shipping a placeholder
   `username@mail.i2p` account. Claws Mail can generate a PGP key again (an empty name line had made
   GnuPG refuse). To use your own key, import it with Kleopatra; both use the same `~/.gnupg`.

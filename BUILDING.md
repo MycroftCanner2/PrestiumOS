@@ -94,7 +94,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `0001-prestium-build-dns` | build only: gives the hooks a resolver (Prestium's own `resolv.conf` has none) |
 | `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
-| `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + uBlock Origin), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, 320s IRC ping timeout), Feather |
+| `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + uBlock Origin), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, connecting line only when a connection starts, 320s IRC ping timeout), Feather |
 | `0300-prestium-lurch` | builds lurch 0.7.0 (OMEMO for Pidgin) from the pinned source and purges the build tools again |
 | `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives (iptables/ip6tables pinned to legacy, the backend ferm and `prestium-firewall-early` share), CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them) |
@@ -137,7 +137,7 @@ thelounge's `github:kiwiirc/irc-framework#<commit>` request becomes the locked v
 is left; no package.json override, which npm 9.2.0 rejects with "Invalid comparator" and then
 misreports as a missing package-lock.json). npm then runs with `--git=false`, and the image ships the committed package.json and lockfile. Every
 installed irc-framework file is still checked against a git checkout of the commit, and `dist/` must
-be absent. Hook 0200 then patches The Lounge in the image (no outbound fetches, lobby text for disconnected networks, and a 320-second IRC ping timeout); those exact source strings must still be present, or the build stops. If upstream's file list changes, update `IRC_FRAMEWORK_FILES` with the commit. LibreWolf, i2pd and Tor come from their
+be absent. Hook 0200 then patches The Lounge in the image (no outbound fetches, lobby text for disconnected networks, a connecting line only when a connection starts, and a 320-second IRC ping timeout); those exact source strings must still be present, or the build stops. If upstream's file list changes, update `IRC_FRAMEWORK_FILES` with the commit. LibreWolf, i2pd and Tor come from their
 signed apt repositories and are always the newest at build time.
 
 ## Tor Connection Assistant and DNS
