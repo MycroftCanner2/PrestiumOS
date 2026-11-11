@@ -269,6 +269,10 @@ Not changed in 2.1, so you know where the edges are:
 - **The i2pd console's per-boot password is readable by the desktop user's programs**
   (/run/prestium/i2pd-console.pass, root:user 0640), because the local-only Firefox's launcher runs
   as the user and needs it.
+- **The bubblewrap children of Loupe, mat2 and Metadata Cleaner keep bubblewrap's mount rights**, so a
+  compromised parent could present files at a path the child may write (rules are path-based). Device
+  nodes stay protected, since their owner rules don't match root-owned nodes. Same class as the browser
+  launchers' bubblewrap children.
 - **GnuPG's socket-started daemons** (gpg-agent, dirmngr) may run outside Kleopatra's and Claws Mail's
   profiles; their configuration files are read-only to Kleopatra. Check on a booted ISO.
 - **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need.
