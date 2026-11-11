@@ -1,0 +1,269 @@
+#!/usr/bin/python3
+# Prestium: start or join Audacity's empty network namespace without ptrace.
+#
+# serve SOCK -- REAL [args...]
+#   Already in the namespace (called from bubblewrap). Publish the user and
+#   network namespace file descriptors on SOCK, then exec REAL.
+# check SOCK
+#   Connect to SOCK, enter those namespaces, require only loopback, then
+#   exit 0 (the wrapper execs join only after this succeeds).
+# join SOCK -- REAL [args...]
+#   Connect to SOCK, enter those namespaces, require that the only interface
+#   is loopback, then exec REAL. Exit 1 without exec if the socket is missing,
+#   stale, or the namespace is not empty (so a same-user replacement of the
+#   socket cannot put Audacity back on the host network).
+#
+# A filesystem Unix socket is used (not an abstract one) so the host-side
+# join can reach it. Opening /proc/<pid>/ns/* is avoided: Yama ptrace_scope=2
+# would block that on Prestium.
+
+import array
+import ctypes
+import errno
+import os
+import signal
+import socket
+import struct
+import sys
+
+CLONE_NEWUSER = 0x10000000
+CLONE_NEWNET = 0x40000000
+PR_SET_PDEATHSIG = 1
+PR_SET_NO_NEW_PRIVS = 38
+SO_PEERCRED = 17
+
+_libc = ctypes.CDLL("libc.so.6", use_errno=True)
+_libc.setns.argtypes = [ctypes.c_int, ctypes.c_int]
+_libc.prctl.argtypes = [
+    ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong
+]
+
+
+def _die(code=1):
+    sys.exit(code)
+
+
+def _prctl(option, arg2=0):
+    if _libc.prctl(option, arg2, 0, 0, 0) != 0:
+        e = ctypes.get_errno()
+        raise OSError(e, os.strerror(e))
+
+
+def no_new_privs():
+    _prctl(PR_SET_NO_NEW_PRIVS, 1)
+
+
+def setns(fd, nstype):
+    if _libc.setns(int(fd), nstype) != 0:
+        e = ctypes.get_errno()
+        raise OSError(e, os.strerror(e))
+
+
+def only_loopback():
+    names = []
+    with open("/proc/net/dev") as f:
+        next(f)
+        next(f)
+        for line in f:
+            name = line.split(":", 1)[0].strip()
+            if name:
+                names.append(name)
+    return names == ["lo"]
+
+
+def peer_uid(conn):
+    # Linux struct ucred is pid_t, uid_t, gid_t (three 32-bit ints on amd64)
+    creds = conn.getsockopt(socket.SOL_SOCKET, SO_PEERCRED, 12)
+    _pid, uid, _gid = struct.unpack("iII", creds)
+    return uid
+
+
+def send_fds(conn, fds):
+    conn.sendmsg(
+        [b"ns"],
+        [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds).tobytes())],
+    )
+
+
+def recv_fds(conn, n):
+    _data, anc, _flags, _addr = conn.recvmsg(16, socket.CMSG_SPACE(4 * n))
+    if _data != b"ns":
+        raise OSError("bad namespace handshake")
+    fds = []
+    for level, typ, raw in anc:
+        if level == socket.SOL_SOCKET and typ == socket.SCM_RIGHTS:
+            fds.extend(array.array("i", raw).tolist())
+    if len(fds) != n:
+        raise OSError("expected %d file descriptors, got %d" % (n, len(fds)))
+    return fds
+
+
+def bind_sock(path):
+    if os.path.islink(path) or os.path.exists(path):
+        os.unlink(path)
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.bind(path)
+        os.chmod(path, 0o600)
+        sock.listen(8)
+    except OSError:
+        sock.close()
+        raise
+    return sock
+
+
+def serve_loop(lsock):
+    while True:
+        try:
+            conn, _addr = lsock.accept()
+        except OSError:
+            break
+        try:
+            if peer_uid(conn) != os.getuid():
+                conn.close()
+                continue
+            net = os.open("/proc/self/ns/net", os.O_RDONLY)
+            user = os.open("/proc/self/ns/user", os.O_RDONLY)
+            try:
+                send_fds(conn, [user, net])
+            finally:
+                os.close(net)
+                os.close(user)
+        except OSError:
+            pass
+        try:
+            conn.close()
+        except OSError:
+            pass
+
+
+def _exec(real, args):
+    no_new_privs()
+    os.execv(real, [real] + args)
+
+
+def serve(path, real, args):
+    if not only_loopback():
+        _die()
+    try:
+        lsock = bind_sock(path)
+    except OSError as e:
+        if e.errno == errno.EADDRINUSE:
+            join(path, real, args)
+        _die()
+    pid = os.fork()
+    if pid == 0:
+        try:
+            _prctl(PR_SET_PDEATHSIG, signal.SIGTERM)
+            if os.getppid() == 1:
+                os._exit(0)
+            serve_loop(lsock)
+        finally:
+            os._exit(0)
+    try:
+        lsock.close()
+    except OSError:
+        pass
+    _exec(real, args)
+
+
+def join(path, real, args):
+    if os.path.islink(path) or not os.path.exists(path):
+        _die()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(2)
+        sock.connect(path)
+        if peer_uid(sock) != os.getuid():
+            _die()
+        user_fd, net_fd = recv_fds(sock, 2)
+    except OSError:
+        _die()
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+    try:
+        setns(user_fd, CLONE_NEWUSER)
+        setns(net_fd, CLONE_NEWNET)
+    except OSError:
+        _die()
+    finally:
+        try:
+            os.close(user_fd)
+        except OSError:
+            pass
+        try:
+            os.close(net_fd)
+        except OSError:
+            pass
+    if not only_loopback():
+        _die()
+    _exec(real, args)
+
+
+def check(path):
+    """Exit 0 if SOCK yields an empty (loopback-only) network namespace."""
+    if os.path.islink(path) or not os.path.exists(path):
+        _die()
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    try:
+        sock.settimeout(2)
+        sock.connect(path)
+        if peer_uid(sock) != os.getuid():
+            _die()
+        user_fd, net_fd = recv_fds(sock, 2)
+    except OSError:
+        _die()
+    finally:
+        try:
+            sock.close()
+        except OSError:
+            pass
+    try:
+        setns(user_fd, CLONE_NEWUSER)
+        setns(net_fd, CLONE_NEWNET)
+    except OSError:
+        _die()
+    finally:
+        try:
+            os.close(user_fd)
+        except OSError:
+            pass
+        try:
+            os.close(net_fd)
+        except OSError:
+            pass
+    if not only_loopback():
+        _die()
+    sys.exit(0)
+
+
+def main():
+    if len(sys.argv) >= 3 and sys.argv[1] == "check" and sys.argv[2].startswith("/"):
+        if len(sys.argv) != 3:
+            sys.stderr.write("usage: audacity-ns check SOCK\n")
+            _die(2)
+        check(sys.argv[2])
+    if (
+        len(sys.argv) < 5
+        or sys.argv[1] not in ("serve", "join")
+        or sys.argv[3] != "--"
+        or not sys.argv[2].startswith("/")
+        or not sys.argv[4].startswith("/")
+    ):
+        sys.stderr.write(
+            "usage: audacity-ns {serve|join} SOCK -- REAL [args...]\n"
+            "       audacity-ns check SOCK\n"
+        )
+        _die(2)
+    cmd, path, real, args = sys.argv[1], sys.argv[2], sys.argv[4], sys.argv[5:]
+    if cmd == "serve":
+        serve(path, real, args)
+    else:
+        join(path, real, args)
+
+
+if __name__ == "__main__":
+    main()

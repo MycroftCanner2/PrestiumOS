@@ -4,7 +4,8 @@
 # of them gets no network, no admin tools, no other app's data (mail, chat, browser profiles), no
 # OpenPGP keys and no KeePassXC databases: only the user's file folders, which it may read. Each
 # profile adds where it may write. Profiles include prestium-viewer (this plus no IPv4 TCP); only
-# Audacity includes this directly, because its single-instance check needs a TCP socket on 127.0.0.1.
+# Audacity includes this directly, because its single-instance check needs a TCP socket on 127.0.0.1
+# (in its own network namespace, so only its own loopback; /usr/local/bin/prestium-audacity).
   include <abstractions/prestium-app-common>
   include <abstractions/prestium-app-secrets>
   deny @{HOME}/.gnupg/** rw,

@@ -174,13 +174,27 @@ allow gimp /usr/bin/gimp-script-fu-interpreter-3.0 x:i
 deny gimp /etc/shadow r
 EOT
 
-echo "== Audacity (audio through PipeWire)"
+echo "== Audacity (audio through PipeWire; started in its own network namespace by prestium-audacity)"
 run usr.bin.audacity <<EOT
+allow audacity /usr/libexec/prestium-audacity mr
 allow audacity /usr/lib/audacity/lib-ipc.so mr
+allow audacity /usr/lib/audacity/modules/mod-flac.so mr
+allow audacity /usr/lib/lv2/x.lv2/x.so mr
+allow audacity /usr/lib/ladspa/x.so mr
+allow audacity /usr/share/audacity/x r
 allow audacity /run/user/1000/pipewire-0 rw
+allow audacity /dev/snd/pcmC0D0c rw
 allow audacity /run/user/1000/pulse/native rw
 allow audacity $H/.local/share/audacity/x rw
+allow audacity $H/.config/audacity/audacity.cfg rw
+allow audacity $H/Music/take1.aup3 rw
 deny audacity $G/pubring.kbx r
+deny audacity /dev/video0 rw
+deny audacity /usr/bin/bwrap x
+deny audacity /usr/bin/nsenter x
+deny audacity /usr/local/bin/prestium-audacity x
+deny audacity /usr/local/lib/prestium/audacity-ns x
+deny audacity /usr/bin/audacity x
 EOT
 
 echo "== The browser launchers' bubblewrap children (Tor Browser, LibreWolf from mail and chat)"
@@ -203,5 +217,7 @@ allow vlc /usr/lib/x86_64-linux-gnu/vlc/vlc-cache-gen x:i
 allow vlc $H/.config/vlc/vlcrc rw
 deny vlc $G/pubring.kbx r
 EOT
-# network: only Audacity has a TCP rule among the viewers, and only "inet stream" (test_viewer_confinement.sh)
+# network: only Audacity has a TCP rule among the viewers, and only "inet stream" (test_viewer_confinement.sh);
+# it is started only in its own, empty network namespace, so that reaches its own loopback only
+# (tests/test_audacity_netns.sh)
 [ $fail = 0 ] && echo "apparmor startup: OK"; exit $fail

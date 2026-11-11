@@ -1,0 +1,68 @@
+#!/bin/sh
+# Prestium 2.1 (review of 6d14434): Audacity runs only in its own, empty network namespace.
+# /usr/bin/audacity is a shim (hook 0620) that runs this; the real program is
+# /usr/libexec/prestium-audacity (dpkg-divert), confined by AppArmor (profile "audacity").
+#
+# The namespace has nothing but its own loopback. Audacity's single-instance check can still listen
+# on 127.0.0.1 there, but nothing in it can reach the host's loopback (Tor's SOCKS port, I2P's
+# proxies), any other address, or an abstract Unix socket of the host.
+# Nothing else changes. bubblewrap always starts from an empty root, so the whole filesystem is bound
+# in (--dev-bind / /, nosuid, with no_new_privs): the file folders, Audacity's settings, the plug-ins,
+# /dev/snd, PipeWire's and PulseAudio's sockets in $XDG_RUNTIME_DIR (the microphone), the session bus,
+# the Wayland socket prestium-run chose and Xwayland's /tmp/.X11-unix socket stay as they are.
+# X11: libxcb tries Xwayland's abstract socket first and, when that is refused (as in any new network
+# namespace), connects to /tmp/.X11-unix/X<n>, so DISPLAY=:<n> works unchanged and is left alone
+# (DISPLAY=unix:<n> fails with libxcb even outside a namespace).
+# SysV IPC is not separated, so Audacity's semaphores see an Audacity that is already running. A
+# second start must join that Audacity's namespace to hand it the files. Prestium sets
+# kernel.yama.ptrace_scope=2, so nsenter --target of that process would fail; instead the first start
+# publishes its namespace file descriptors on a Unix socket in $XDG_RUNTIME_DIR, and the second start
+# joins through that (no ptrace). After joining, start is refused unless the namespace has only
+# loopback, so a same-user replacement of the socket cannot put Audacity back on the host network.
+# Fails closed: if bubblewrap can't make the namespace, or there is no session runtime directory,
+# Audacity is not started. Fixed paths only.
+REAL=/usr/libexec/prestium-audacity
+BWRAP=/usr/bin/bwrap
+NS=/usr/local/lib/prestium/audacity-ns
+PY=/usr/bin/python3
+
+fail() {
+	/usr/bin/notify-send -u critical "Audacity" "$1" 2>/dev/null
+	echo "Audacity: $1" >&2
+	exit 1
+}
+
+[ -x "$REAL" ] || fail "Audacity is not installed correctly ($REAL is missing). It was not started."
+[ -x "$BWRAP" ] || fail "The network sandbox (bubblewrap) is missing. Audacity was not started."
+[ -x "$NS" ] && [ -x "$PY" ] || fail "The network sandbox helper is missing. Audacity was not started."
+
+case "${XDG_RUNTIME_DIR:-}" in
+	/*) [ -d "$XDG_RUNTIME_DIR" ] || fail "No session runtime directory. Audacity was not started." ;;
+	*) fail "No session runtime directory. Audacity was not started." ;;
+esac
+DIR=$XDG_RUNTIME_DIR/prestium-audacity
+SOCK=$DIR/ns.sock
+
+if [ -L "$DIR" ]; then
+	fail "Audacity's session directory is not safe. Audacity was not started."
+fi
+if [ -e "$DIR" ]; then
+	[ -d "$DIR" ] && [ -O "$DIR" ] || fail "Audacity's session directory is not safe. Audacity was not started."
+	/usr/bin/chmod 0700 "$DIR" || fail "Audacity's session directory is not safe. Audacity was not started."
+else
+	/usr/bin/mkdir -m 0700 "$DIR" || fail "Cannot create Audacity's session directory. Audacity was not started."
+	[ ! -L "$DIR" ] && [ -d "$DIR" ] && [ -O "$DIR" ] || fail "Audacity's session directory is not safe. Audacity was not started."
+fi
+
+# Join an already-running instance's namespace if its socket is there. The helper is exec'd
+# only after a check (enter the namespace, require only loopback): on success the helper
+# replaces this process, so a later exit of Audacity cannot fall through into a new namespace.
+# If the socket is stale or is not an empty network namespace, start a new one instead.
+if [ -S "$SOCK" ] && [ ! -L "$SOCK" ] && "$NS" check "$SOCK"; then
+	exec "$NS" join "$SOCK" -- "$REAL" "$@"
+fi
+
+# A new namespace. Check that bubblewrap can make one first: never Audacity without it.
+"$BWRAP" --dev-bind / / --unshare-net --die-with-parent -- /usr/bin/true 2>/dev/null \
+	|| fail "The network sandbox (bubblewrap) could not be started. Audacity was not started."
+exec "$BWRAP" --dev-bind / / --unshare-net --die-with-parent -- "$NS" serve "$SOCK" -- "$REAL" "$@"

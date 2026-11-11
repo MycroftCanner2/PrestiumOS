@@ -312,6 +312,28 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
     code). The hook fails the build if the disable does not take effect, including in the chroot
     where `/etc/environment` is not loaded. (`tests/test_python_usersite.sh`,
     `tests/test_onion_grater_tamper.py`)
+- **Review of 6d14434:**
+  - **Audacity can no longer reach the network**, not even the Tor and I2P proxy ports on 127.0.0.1.
+    It runs in its own, empty network namespace (bubblewrap `--unshare-net --die-with-parent`), whose
+    127.0.0.1 belongs to it alone: the single-instance check still listens there, so its AppArmor TCP
+    rule reaches nothing else. Every way to start it goes through the namespace. Hook 0620 moves the
+    real program to `/usr/libexec/prestium-audacity` (dpkg-divert; from there its RPATH still finds
+    `/usr/lib/audacity`) and makes `/usr/bin/audacity` a shim for `/usr/local/bin/prestium-audacity`.
+    So the menu (`prestium-run audacity`), a terminal and Debian's desktop file all reach the shim,
+    and the AppArmor profile now attaches to the real program. The whole filesystem stays visible.
+    PipeWire's and PulseAudio's sockets, `/dev/snd` (the microphone), the session bus, the Wayland
+    socket and the file folders work as before. X11 works too: libxcb falls back from Xwayland's
+    abstract socket to `/tmp/.X11-unix`. A second start joins the running Audacity's namespace and
+    hands it the files, through a Unix socket in the session runtime directory that passes the
+    namespace file descriptors (not `nsenter --target` of the first process, which Prestium's
+    `ptrace_scope=2` would block). After joining, start is refused unless the namespace has only
+    loopback, so a same-user replacement of that socket cannot put Audacity back on the host network.
+    With no bubblewrap, no session runtime directory, or if the namespace can't be made, Audacity
+    doesn't start, and a notification says why. (`tests/test_audacity_netns.sh`: the wrapper, the
+    helper, the hook on a stand-in tree, the profile's attachment, and live isolation where
+    bubblewrap works: no connection to a listener on the host's 127.0.0.1, a listener of its own,
+    a second start that does not call nsenter, Unix sockets and X11 still connect, a host-network
+    socket is refused)
 - The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
   every boot), which the audit (I-3) read from the commented template; nothing changed there.
 
@@ -345,10 +367,15 @@ Not changed in 2.1, so you know where the edges are:
 - **GnuPG's socket-started daemons** (gpg-agent, dirmngr) may run outside Kleopatra's and Claws Mail's
   profiles; their configuration files are read-only to Kleopatra, their pinentry is confined, and
   prestium-gnupg-check flags a helper program from outside /usr.
-- **Audacity may open IPv4 TCP sockets** (its single-instance check needs one on 127.0.0.1). The
-  firewall still limits the desktop user to the listed local proxies, so a compromised Audacity could
-  reach Tor's or I2P's proxy ports, unlike the other file viewers. Running it in its own network
-  namespace would close that; not done in 2.1.
+- **Audacity keeps an IPv4 TCP rule**, which its single-instance check needs. Since the review of
+  6d14434 the rule only works inside Audacity's own network namespace, which has nothing but its own
+  loopback. Abstract Unix sockets of the desktop (such as Xwayland's) can't be reached from there
+  either, so anything that depends on one won't work in Audacity, though X11 still connects through
+  `/tmp/.X11-unix`. The real program in `/usr/libexec` can still be started by hand outside the
+  namespace (its profile still applies). Two first starts at the same instant can still race. A
+  booted ISO must still confirm that Audacity starts, records from the microphone, hands a second
+  file to the running window, can't reach 127.0.0.1:9050 or the I2P proxies, and leaves a clean
+  DENIED log.
 - **AppArmor's D-Bus rules are not enforced on Debian 13's kernel** (6.12 has no D-Bus mediation), so
   the confined apps may still call any session-bus service. Should the image move to a kernel that
   enforces them, Kleopatra (which quits when it can't take its bus name) and the GTK apps that

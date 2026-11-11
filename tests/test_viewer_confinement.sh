@@ -17,7 +17,7 @@ featherpad /usr/bin/featherpad usr.bin.featherpad
 mat2 /usr/bin/mat2 usr.bin.mat2
 metadata-cleaner /usr/bin/metadata-cleaner usr.bin.metadata-cleaner
 gimp /usr/bin/gimp-3.0 usr.bin.gimp
-audacity /usr/bin/audacity usr.bin.audacity
+audacity /usr/libexec/prestium-audacity usr.bin.audacity
 keepassxc /usr/bin/keepassxc usr.bin.keepassxc
 kleopatra /usr/bin/kleopatra usr.bin.kleopatra"
 # every default handler in mimeapps.list is in the table
@@ -58,9 +58,13 @@ if command -v apparmor_parser >/dev/null; then
     al=$(awk '/^[[:space:]]*profile /{p=$2} {print p" "$0}' <<<"$x" | grep -v '^\S* \s*#' | grep -Ev '^\S* \s*(audit\s+)?deny\s')
     inet=$(grep -E '^\S* \s*network (inet|inet6)' <<<"$al" | grep -v '^dirmngr ')
     # 2.1 (review of 7242e00): Audacity alone may open IPv4 TCP sockets (its single-instance check
-    # listens on 127.0.0.1); never UDP, raw or IPv6
+    # listens on 127.0.0.1); never UDP, raw or IPv6. 2.1 (review of 778baf7): only in its own, empty
+    # network namespace (hook 0620 and prestium-audacity; tests/test_audacity_netns.sh), so the rule
+    # reaches only that namespace's loopback, never the host's network.
     if [ "$f" = usr.bin.audacity ]; then
-      [ "$inet" = "audacity   network inet stream," ] && ok "$f: IPv4 TCP only (single-instance listener)" || bad "$f: IP network: $inet"
+      [ "$inet" = "audacity   network inet stream," ] && ok "$f: IPv4 TCP only (single-instance listener, in its own network namespace)" || bad "$f: IP network: $inet"
+      grep -q 'unshare-net' "$I/usr/local/bin/prestium-audacity" 2>/dev/null && [ -f "$R/config/hooks/live/0620-prestium-audacity-netns.hook.chroot" ] \
+        && ok "$f: Audacity starts only in its own network namespace (wrapper and hook 0620)" || bad "$f: TCP allowed but no network namespace wrapper/hook"
       for d in 'network inet dgram' 'network inet raw' 'network inet6'; do
         grep -qF "deny $d," <<<"$x" && ok "$f: deny $d" || bad "$f: no deny $d"; done
     else

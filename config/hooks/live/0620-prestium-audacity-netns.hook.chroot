@@ -1,0 +1,42 @@
+#!/bin/sh
+# Prestium 2.1 (review of 6d14434): Audacity never runs on the host's network. Its single-instance
+# check needs a TCP socket on 127.0.0.1, and AppArmor can't limit TCP to the loopback, so Audacity
+# runs in its own, empty network namespace (prestium-audacity, bubblewrap --unshare-net), where
+# 127.0.0.1 is its own and the host's Tor and I2P proxy ports can't be reached.
+# Every way to start it goes through that: the real program is moved to /usr/libexec/prestium-audacity
+# (dpkg-divert keeps it there through package upgrades; in /usr/libexec its RPATH, $ORIGIN/../lib/audacity,
+# still finds /usr/lib/audacity), and /usr/bin/audacity becomes a shim that runs the wrapper. So the
+# menu (prestium-run audacity), a terminal and Debian's audacity.desktop ("env GDK_BACKEND=x11 audacity
+# %F") all start it in the namespace. The AppArmor profile "audacity" attaches to the real program.
+# Safe to run again (the divert is added once).
+set -e
+B=/usr/bin/audacity
+REAL=/usr/libexec/prestium-audacity
+W=/usr/local/bin/prestium-audacity
+NS=/usr/local/lib/prestium/audacity-ns
+D=/usr/share/applications/audacity.desktop
+[ -x "$W" ] || { echo "E: $W is missing"; exit 1; }
+[ -x "$NS" ] || { echo "E: $NS is missing"; exit 1; }
+if ! dpkg-divert --list "$B" | grep -q "$REAL"; then
+	[ -e "$B" ] || { echo "E: $B is missing (audacity not installed?)"; exit 1; }
+	dpkg-divert --quiet --local --rename --divert "$REAL" --add "$B"
+fi
+[ "$(dpkg-divert --truename "$B")" = "$REAL" ] || { echo "E: $B is not diverted to $REAL"; exit 1; }
+cat > "$B" <<'SHIM'
+#!/bin/sh
+# Prestium (hook 0620): Audacity runs only in its own network namespace. The real program is
+# /usr/libexec/prestium-audacity; this starts it through /usr/local/bin/prestium-audacity.
+exec /usr/local/bin/prestium-audacity "$@"
+SHIM
+chown root:root "$B"
+chmod 0755 "$B"
+# the real program: an ELF binary whose libraries all resolve from /usr/libexec
+head -c 4 "$REAL" | grep -q 'ELF' || { echo "E: $REAL is not the Audacity binary"; exit 1; }
+if ldd "$REAL" | grep -q 'not found'; then echo "E: $REAL: libraries not found:"; ldd "$REAL" | grep 'not found'; exit 1; fi
+# Debian's desktop file must start "audacity" from PATH (the shim), never the real program
+[ -f "$D" ] || { echo "E: $D is missing"; exit 1; }
+grep '^Exec=' "$D" | grep -qvE '^Exec=(env GDK_BACKEND=x11 )?(/usr/bin/)?audacity( %[fFuU])?$' \
+	&& { echo "E: $D starts Audacity another way: update hook 0620"; grep '^Exec=' "$D"; exit 1; }
+grep -rlsF "$REAL" /usr/share/applications /etc/xdg 2>/dev/null && { echo "E: a menu entry starts $REAL directly"; exit 1; }
+grep -q 'prestium-audacity' "$B" || { echo "E: $B is not the shim"; exit 1; }
+echo "P: Audacity starts in its own network namespace"

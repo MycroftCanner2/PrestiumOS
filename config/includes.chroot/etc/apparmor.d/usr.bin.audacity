@@ -1,19 +1,26 @@
-# Prestium 2.1 (audit of 96468c5, M-1): Audacity, ENFORCED. No network but a loopback TCP listener (below), no camera, no other app's data, no keys; it opens and
-# saves sound files and projects in the file folders only.
+# Prestium 2.1 (audit of 96468c5, M-1): Audacity, ENFORCED. No network (a TCP listener in its own,
+# empty network namespace only; below), no camera, no other app's data, no keys; it opens and saves
+# sound files and projects in the file folders only.
+# 2.1 (review of 778baf7): the profile attaches to the real program, /usr/libexec/prestium-audacity
+# (hook 0620 diverts /usr/bin/audacity there; /usr/bin/audacity is a shim that runs
+# /usr/local/bin/prestium-audacity, which starts it with bubblewrap --unshare-net). The file keeps its
+# old name.
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
 
-profile audacity /usr/bin/audacity {
+profile audacity /usr/libexec/prestium-audacity {
   # 2.1 (review of 7242e00): prestium-viewer-core, not prestium-viewer. Audacity's single-instance
   # check (AudacityApp::CreateSingleInstanceChecker) listens on a TCP socket on 127.0.0.1; if it
   # can't create one, Audacity shows "Audacity Startup Failure" and quits. So IPv4 TCP is allowed;
-  # UDP, raw and IPv6 sockets stay denied, and ferm still limits the desktop user to the listed local
-  # proxies (a known limit: a compromised Audacity could reach Tor's SOCKS port).
+  # UDP, raw and IPv6 sockets stay denied.
+  # 2.1 (review of 778baf7): this TCP rule reaches only the loopback of Audacity's own network
+  # namespace (prestium-audacity): nothing else is in it, so not the host's 127.0.0.1 (Tor's SOCKS
+  # port, I2P's proxies) and no other address. No exec of bwrap, nsenter, the wrapper or the shim.
   include <abstractions/prestium-viewer-core>
   network inet stream,
   include <abstractions/prestium-viewer-write>
-  /usr/bin/audacity mr,
+  /usr/libexec/prestium-audacity mr,
   /usr/lib/@{multiarch}/audacity/** mr,
   /usr/lib/{lv2,ladspa,vst,vst3}/** mr,
   /usr/lib/@{multiarch}/{lv2,ladspa}/** mr,
