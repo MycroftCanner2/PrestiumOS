@@ -217,6 +217,8 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   Tor), and passphrase prompts go to the pinentry profile.
 - Files outside the file folders (for example a text file directly in the home directory, or in a dot
   directory) can no longer be opened in these programs; move them into Documents first.
+  VLC has no network access, so it can no longer play network streams (URLs, DLNA, internet radio);
+  it plays local files only.
 - **onion-grater checks how a Python client was started** (L-1). Before, any program of the user could
   start the real nyx, OnionShare or Tor Connection Assistant with its own PYTHONPATH or LD_PRELOAD and
   get that client's allow-list. A client whose environment sets PYTHON* (other than
