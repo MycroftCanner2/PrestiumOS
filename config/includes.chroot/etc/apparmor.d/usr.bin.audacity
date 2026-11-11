@@ -1,11 +1,17 @@
-# Prestium 2.1 (audit of 96468c5, M-1): Audacity, ENFORCED. No network, no camera, no other app's data, no keys; it opens and
+# Prestium 2.1 (audit of 96468c5, M-1): Audacity, ENFORCED. No network but a loopback TCP listener (below), no camera, no other app's data, no keys; it opens and
 # saves sound files and projects in the file folders only.
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
 
 profile audacity /usr/bin/audacity {
-  include <abstractions/prestium-viewer>
+  # 2.1 (review of 7242e00): prestium-viewer-core, not prestium-viewer. Audacity's single-instance
+  # check (AudacityApp::CreateSingleInstanceChecker) listens on a TCP socket on 127.0.0.1; if it
+  # can't create one, Audacity shows "Audacity Startup Failure" and quits. So IPv4 TCP is allowed;
+  # UDP, raw and IPv6 sockets stay denied, and ferm still limits the desktop user to the listed local
+  # proxies (a known limit: a compromised Audacity could reach Tor's SOCKS port).
+  include <abstractions/prestium-viewer-core>
+  network inet stream,
   include <abstractions/prestium-viewer-write>
   /usr/bin/audacity mr,
   /usr/lib/@{multiarch}/audacity/** mr,
@@ -23,5 +29,7 @@ profile audacity /usr/bin/audacity {
   owner @{HOME}/.audacity-data/ rw,
   owner @{HOME}/.audacity-data/** rwk,
   deny /dev/video* rw,
+  # PortAudio plays and records through ALSA, which pipewire-alsa routes to PipeWire's socket
+  owner @{run}/user/[0-9]*/pipewire-[0-9]* rw,
   include if exists <local/usr.bin.audacity>
 }

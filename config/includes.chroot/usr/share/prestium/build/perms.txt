@@ -379,6 +379,7 @@
 0644 root root /etc/apparmor.d/abstractions/prestium-app-secrets
 0644 root root /etc/apparmor.d/abstractions/prestium-user-files
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer
+0644 root root /etc/apparmor.d/abstractions/prestium-viewer-core
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer-write
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer-bwrap
 0644 root root /etc/apparmor.d/usr.bin.loupe

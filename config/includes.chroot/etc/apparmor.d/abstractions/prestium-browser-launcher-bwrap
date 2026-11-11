@@ -31,6 +31,12 @@
   signal (send, receive) peer=@{profile_name},
   ptrace (read, trace) peer=@{profile_name},
   /usr/bin/bwrap mr,
+  # 2.1 (review of 7242e00): bubblewrap's own setup. It mounts a tmpfs on /tmp, pivots into it and builds
+  # the sandbox under /newroot (mount points, the files it binds over, symlinks) before the final
+  # pivot, so these paths exist only in its private mount namespace. Without them bubblewrap stops at
+  # "mkdir /proc" or "/newroot/usr" and the sandboxed program never starts.
+  /newroot/{,**} r,
+  owner /newroot/{,**} rw,
   /** r,
   # the new root (a tmpfs on /tmp before pivot_root) and the sandbox's own /run
   /dev/** rw,

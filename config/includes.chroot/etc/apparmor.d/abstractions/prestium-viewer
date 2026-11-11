@@ -3,29 +3,6 @@
 # crafted image, video, sound file, archive or document that exploits one of them gets no network, no
 # admin tools, no other app's data (mail, chat, browser profiles), no OpenPGP keys and no KeePassXC
 # databases: only the user's file folders, which it may read. Each profile adds where it may write.
-  include <abstractions/prestium-app-common>
-  include <abstractions/prestium-app-secrets>
-  deny @{HOME}/.gnupg/** rw,
-  deny @{HOME}/**.kdbx rw,
-  deny @{HOME}/**.{key,keyx} rw,
-  # base and gnome allow writes and ix there (ecryptfs, ~/tmp); not for a file viewer
-  deny @{HOME}/.Private/** wx,
-  deny @{HOME}/tmp/** wx,
-
-  # no network at all (ferm would stop a real-IP leak, but not data sent out over Tor)
-  network unix stream,
-  network unix dgram,
-  network netlink dgram,
+  include <abstractions/prestium-viewer-core>
+  # no IPv4 at all, TCP included (prestium-viewer-core already denies IPv6, UDP and raw sockets)
   deny network inet,
-  deny network inet6,
-  deny network packet,
-  deny network raw,
-
-  # the file folders (read)
-  include <abstractions/prestium-user-files>
-  # the trash (delete from a viewer)
-  owner @{HOME}/.local/share/Trash/ rw,
-  owner @{HOME}/.local/share/Trash/** rwk,
-  # thumbnails
-  owner @{HOME}/.cache/thumbnails/ rw,
-  owner @{HOME}/.cache/thumbnails/** rwk,

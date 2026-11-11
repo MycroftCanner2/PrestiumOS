@@ -238,6 +238,42 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
     an unconfined gpg-agent, dirmngr, scdaemon or keyboxd runs and that user's GnuPG configuration names
     a helper program outside /usr. It logs which GnuPG daemons run and under which profile.
   - Confined apps may not run newgrp or sg either.
+- **Review of 7242e00:**
+  - prestium-gnupg-check resolves a helper path before it decides whether the helper is a system one:
+    the path must be absolute, lie in a root-only system directory as written (/usr, or the merged-/usr
+    /bin, /sbin, /lib, or /etc/alternatives) once "." and ".." are removed, and really resolve under
+    /usr. So "/usr/../home/...", a relative name, an empty value, and a link in the home that points
+    into /usr (its owner could point it elsewhere) are flagged; /usr/bin/pinentry through the
+    alternatives link is not. The value is the whole rest of the line, quotes removed, as GnuPG reads
+    it. It logs only when the result changes (daemons, profiles, or the finding), not every two
+    minutes, and raises the flag once per new finding. Claws Mail and Kleopatra still share ~/.gnupg
+    and the session's gpg-agent; nothing is masked, blocked or killed.
+    (`tests/test_gnupg_check.sh`)
+  - **The bubblewrap sandboxes could not start under their child profiles.** bubblewrap builds the
+    sandbox in a private tmpfs, under /newroot (and creates /proc there) before its final pivot, and
+    the child profiles allowed no writes there. Loupe's decoders, mat2's ffmpeg and exiftool, and the
+    browser launchers' sandboxes (Tor Browser and LibreWolf from Claws Mail, Gajim or Pidgin) would
+    have stopped at "mkdir". The children may now write only bubblewrap's own /newroot and /proc
+    mount point.
+  - Loupe may list / (glycin recreates the /lib64 and other lib links in the decoders' sandbox from
+    it; without that no image opens), and its decoders may read the font caches.
+  - mat2's "Remove metadata" for videos and other exiftool formats: ffmpeg or exiftool writes the
+    "<name>.cleaned.<ext>" copy in the sandbox at the file folder's path; that one name may be
+    written there now. The children still write nothing directly in the home or in a dot directory;
+    Loupe's and Metadata Cleaner's write nothing in the home at all.
+  - **Audacity would not start**: its single-instance check listens on a TCP socket on 127.0.0.1 and
+    quits ("Audacity Startup Failure") when it can't. Its profile now allows IPv4 TCP sockets (not
+    UDP, raw or IPv6), and PipeWire's socket for sound through ALSA. See Known security limits.
+  - GIMP may read its system configuration (/etc/gimp: gimprc, unitrc, templaterc and the others)
+    and start its Python plug-ins ("#!/usr/bin/env python3") and JavaScript ones (gjs-console).
+  - Kleopatra may keep libkleo's settings (libkleopatrarc) and its window state
+    (~/.local/state/kleopatrastaterc), start the GnuPG Log Viewer (kwatchgnupg), and its dirmngr may
+    name its threads. Its self-test (gpgconf with every component, gpg, gpgsm, gpg-agent, scdaemon,
+    keyboxd, dirmngr, the UI server, libkleopatrarc), key generation, signing, encryption, import and
+    export were checked against the compiled profile, as was Claws Mail's GnuPG child on the same
+    keyring and agent. The GnuPG configuration files stay read-only to Kleopatra.
+    (`tests/test_apparmor_startup.sh`, `tests/aa_eval.py`: what each app needs to start and what must
+    stay denied, on the compiled profiles)
 - **Review of db6601c:**
   - Plain `passwd` is no longer setuid (hook 0500, checked), and confined apps may not run passwd,
     gpasswd, chsh, chfn, chage or expiry. Before, a program of the user could still choose the first
@@ -285,6 +321,14 @@ Not changed in 2.1, so you know where the edges are:
 - **GnuPG's socket-started daemons** (gpg-agent, dirmngr) may run outside Kleopatra's and Claws Mail's
   profiles; their configuration files are read-only to Kleopatra, their pinentry is confined, and
   prestium-gnupg-check flags a helper program from outside /usr.
+- **Audacity may open IPv4 TCP sockets** (its single-instance check needs one on 127.0.0.1). The
+  firewall still limits the desktop user to the listed local proxies, so a compromised Audacity could
+  reach Tor's or I2P's proxy ports, unlike the other file viewers. Running it in its own network
+  namespace would close that; not done in 2.1.
+- **AppArmor's D-Bus rules are not enforced on Debian 13's kernel** (6.12 has no D-Bus mediation), so
+  the confined apps may still call any session-bus service. Should the image move to a kernel that
+  enforces them, Kleopatra (which quits when it can't take its bus name) and the GTK apps that
+  register theirs need bind rules first.
 - **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need.
 - **Programs of the desktop user may change NetworkManager's system connections** (to add Wi-Fi). The
   MAC guard and the firewall keep the real MAC address and real IP address from leaking that way.

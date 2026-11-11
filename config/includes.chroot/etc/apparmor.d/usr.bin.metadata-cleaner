@@ -25,6 +25,8 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
+    # (Metadata Cleaner has mat2 write the cleaned copy to /tmp, then moves it itself)
+    deny @{HOME}/** w,
     /usr/bin/{ffmpeg,exiftool,perl} mrix,
     /usr/share/perl5/** r,
     /usr/lib/@{multiarch}/perl*/** mr,

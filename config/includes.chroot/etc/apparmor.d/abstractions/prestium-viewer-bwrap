@@ -1,7 +1,8 @@
 # Prestium 2.1 (audit of 96468c5, M-1): bubblewrap as a viewer starts it for its own decoders (Loupe's
 # glycin loaders, mat2's ffmpeg and exiftool). bubblewrap builds its own user, mount and network
 # namespaces; the child profile that includes this adds only the programs it may run. Still no
-# network, no part of the home but the file folders (read), no writes outside /tmp and /run.
+# network, no part of the home but the file folders (read), no writes outside /tmp and bubblewrap's
+# private /newroot (and, for mat2 only, its ".cleaned" copies).
   include <abstractions/base>
   include <abstractions/prestium-no-admin>
   include <abstractions/prestium-app-secrets>
@@ -29,6 +30,13 @@
   deny network inet6,
   signal (send, receive) peer=@{profile_name},
   /usr/bin/bwrap mr,
+  # 2.1 (review of 7242e00): bubblewrap's own setup. It mounts a tmpfs on /tmp, pivots into it and builds
+  # the sandbox under /newroot (mount points, the files it binds over, symlinks) before the final
+  # pivot, so these paths exist only in its private mount namespace. Without them bubblewrap stops at
+  # "mkdir /proc" or "/newroot/usr" and the sandboxed program never starts.
+  owner @{PROC}/ w,
+  /newroot/{,**} r,
+  owner /newroot/{,**} rw,
   # the system (read-only) and the user's file folders; not the rest of the home directory
   / r,
   /usr/ r,
@@ -62,6 +70,10 @@
   deny /dev/video* rw,
   deny /dev/hidraw* rw,
   deny /dev/snd/** rw,
-  deny @{HOME}/** w,
+  # nothing directly in the home and nothing in a dot directory; the file folders stay read-only too
+  # unless a child adds one rule (mat2's ".cleaned" copy). Loupe's and Metadata Cleaner's children
+  # deny every home write.
+  deny @{HOME}/* w,
+  deny @{HOME}/.** w,
   deny @{HOME}/.gnupg/** rw,
   deny @{HOME}/**.kdbx rw,

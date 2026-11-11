@@ -4,10 +4,26 @@
 # fault. It becomes one when such a daemon runs unconfined and a GnuPG config of that user names a
 # helper program outside /usr (a *-program option): then raise the "gnupg-helper" safety flag.
 # Runs as root from prestium-gnupg-check.timer; only reads /proc and the users' ~/.gnupg configs.
+# Review of 7242e00: helper paths are canonicalized before the /usr test (so /usr/../home/... and
+# relative or empty values are flagged), and it logs only when the result changes, not every run.
 case "$0" in
-  /usr/local/*) P=/proc; FLAG=/usr/local/lib/prestium/safety-flag ;;
-  *) P=${PRESTIUM_PROC:-/proc}; FLAG=${PRESTIUM_FLAG:-/usr/local/lib/prestium/safety-flag} ;;
+  /usr/local/*) P=/proc; FLAG=/usr/local/lib/prestium/safety-flag; STATE=/run/prestium/gnupg-check.state ;;
+  *) P=${PRESTIUM_PROC:-/proc}; FLAG=${PRESTIUM_FLAG:-/usr/local/lib/prestium/safety-flag}
+     STATE=${PRESTIUM_STATE:-/run/prestium/gnupg-check.state} ;;
 esac
+# system_helper PATH: true only if PATH is absolute, its lexical form (.. and . removed, no symlinks
+# followed) lies in a root-only system directory, and the file it really resolves to lies under /usr/.
+# Debian 13 is merged-/usr, so /bin, /sbin and /lib* are symlinks into /usr; /etc/alternatives holds
+# root-made links such as pinentry. A link in the home that points into /usr is not accepted: its
+# owner could point it elsewhere before the daemon next starts.
+system_helper() {
+  case "$1" in /*) ;; *) return 1 ;; esac
+  lex=$(realpath -m -s -- "$1" 2>/dev/null) || return 1
+  case "$lex" in /usr/*|/bin/*|/sbin/*|/lib/*|/lib64/*|/etc/alternatives/*) ;; *) return 1 ;; esac
+  res=$(realpath -m -- "$1" 2>/dev/null) || return 1
+  case "$res" in /usr/*) return 0 ;; esac
+  return 1
+}
 bad=; info=
 for d in "$P"/[0-9]*; do
   [ -r "$d/comm" ] || continue
@@ -16,21 +32,39 @@ for d in "$P"/[0-9]*; do
   uid=$(awk '/^Uid:/{print $2; exit}' "$d/status" 2>/dev/null)
   [ -n "$uid" ] && [ "$uid" -ge 1000 ] 2>/dev/null || continue
   l=$(cat "$d/attr/apparmor/current" 2>/dev/null || cat "$d/attr/current" 2>/dev/null)
-  info="$info ${c}[${d##*/}]=${l:-unknown}"
-  case "$l" in unconfined*|'') ;; *) continue ;; esac
+  l=${l:-unknown}
+  # no PIDs here, so the summary (and the log) changes only when daemons or profiles change
+  case " $info " in *" $c($uid)=$l "*) ;; *) info="$info $c($uid)=$l" ;; esac
+  case "$l" in unconfined*|unknown) ;; *) continue ;; esac
   h=$(awk -F: -v u="$uid" '$3==u{print $6; exit}' "${PRESTIUM_PASSWD:-/etc/passwd}")
   [ -n "$h" ] || continue
   for f in "$h"/.gnupg/*.conf; do
     [ -f "$f" ] || continue
-    o=$(awk '{sub(/^[ \t]+/,"")} /^[a-z-]*-program[ \t]/{p=$2; if (p !~ /^\/usr\//) print FILENAME": "$1" "p}' "$f")
-    [ -n "$o" ] && bad="$bad $o;"
+    # GnuPG takes the rest of the line as the value (optionally in double quotes)
+    o=$(awk '{sub(/^[ \t]+/,""); sub(/[ \t\r]+$/,"")}
+      /^[a-z0-9-]*-program([ \t=]|$)/{k=$0; sub(/[ \t=].*$/,"",k); v=substr($0,length(k)+1)
+        sub(/^[ \t=]+/,"",v); if (v ~ /^".*"$/) v=substr(v,2,length(v)-2); print k "\t" v}' "$f") || continue
+    [ -n "$o" ] || continue
+    tab=$(printf '\t')
+    while IFS="$tab" read -r k v; do
+      system_helper "$v" || bad="$bad $f: $k ${v:-(empty)};"
+    done <<EOT
+$o
+EOT
   done
 done
-logger -t prestium-gnupg-check "GnuPG daemons:${info:- none}" 2>/dev/null
+[ -n "$bad" ] && now="flag:$bad" || now="ok"
+prev=; [ -r "$STATE" ] && prev=$(cat "$STATE" 2>/dev/null)
+newstate="$now|${info:- none}"
+if [ "$newstate" != "$prev" ]; then
+  logger -t prestium-gnupg-check "GnuPG daemons:${info:- none}; ${bad:+helper outside /usr:$bad}${bad:-helpers OK}" 2>/dev/null
+fi
 if [ -n "$bad" ]; then
-  "$FLAG" set gnupg-helper "An unconfined GnuPG daemon may run a helper program from outside the system:$bad Remove that option unless you added it yourself."
+  # set (and its critical log line) only when the finding is new or changed
+  [ "${prev%%|*}" = "$now" ] || "$FLAG" set gnupg-helper "An unconfined GnuPG daemon may run a helper program from outside the system:$bad Remove that option unless you added it yourself."
   echo "gnupg-check: flagged:$bad"
 else
   "$FLAG" clear gnupg-helper; echo "gnupg-check: OK:${info:- none}"
 fi
+printf '%s\n' "$newstate" > "$STATE.tmp" 2>/dev/null && mv -f "$STATE.tmp" "$STATE" 2>/dev/null
 exit 0

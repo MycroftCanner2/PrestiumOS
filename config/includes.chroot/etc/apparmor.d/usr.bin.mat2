@@ -26,6 +26,12 @@ profile mat2 /usr/bin/mat2 {
     /usr/bin/{ffmpeg,exiftool,perl} mrix,
     /usr/share/perl5/** r,
     /usr/lib/@{multiarch}/perl*/** mr,
+    # 2.1 (review of 7242e00): mat2 mounts an empty temporary directory over the file's folder and
+    # ffmpeg or exiftool writes "<name>.cleaned.<ext>" there; mat2 then copies it next to the file.
+    # Inside the sandbox that write has the file folder's path. Only that name, only there.
+    owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/**.cleaned.* w,
+    owner "@{HOME}/Tor Browser/**.cleaned.*" w,
+    /media/**.cleaned.* w,
   }
   include if exists <local/usr.bin.mat2>
 }

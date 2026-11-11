@@ -8,6 +8,9 @@ include <tunables/global>
 profile loupe /usr/bin/loupe {
   include <abstractions/prestium-viewer>
   /usr/bin/loupe mr,
+  # 2.1 (review of 7242e00): glycin lists / to find /lib64 and the other lib symlinks it recreates in
+  # the decoders' sandbox; without them no decoder can start and no image opens. (Names only.)
+  / r,
   owner @{HOME}/.config/loupe/ rw,
   owner @{HOME}/.config/loupe/** rwk,
   owner @{HOME}/.cache/loupe/ rw,
@@ -18,6 +21,12 @@ profile loupe /usr/bin/loupe {
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
     /usr/libexec/glycin-loaders/** mrix,
+    deny @{HOME}/** w,
+    # the SVG decoder's fontconfig: the font caches glycin binds in, read-only
+    /var/cache/fontconfig/ r,
+    /var/cache/fontconfig/** mr,
+    owner @{HOME}/.cache/fontconfig/ r,
+    owner @{HOME}/.cache/fontconfig/** mr,
   }
   include if exists <local/usr.bin.loupe>
 }

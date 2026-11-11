@@ -46,7 +46,7 @@ while read -r id bin f; do
   grep -qx "0644 root root /etc/apparmor.d/$f" "$PM" && ok "perms: $f" || bad "perms: $f"
 done <<<"$TABLE"
 grep -q '^rm -f /etc/apparmor.d/loupe /etc/apparmor.d/local/loupe$' "$H" && ok "hook drops Debian's unconfined loupe profile" || bad "Debian loupe profile kept"
-for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-viewer prestium-viewer-write prestium-viewer-bwrap; do
+for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-viewer prestium-viewer-core prestium-viewer-write prestium-viewer-bwrap; do
   grep -qx "0644 root root /etc/apparmor.d/abstractions/$a" "$PM" || bad "perms: abstraction $a"; done
 if command -v apparmor_parser >/dev/null; then
   W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
@@ -57,7 +57,17 @@ if command -v apparmor_parser >/dev/null; then
     # allow rules only (no comments, no denies), with the profile each sits in
     al=$(awk '/^[[:space:]]*profile /{p=$2} {print p" "$0}' <<<"$x" | grep -v '^\S* \s*#' | grep -Ev '^\S* \s*(audit\s+)?deny\s')
     inet=$(grep -E '^\S* \s*network (inet|inet6)' <<<"$al" | grep -v '^dirmngr ')
-    [ -z "$inet" ] && ok "$f: no IP network (expanded)" || bad "$f: IP network: $inet"
+    # 2.1 (review of 7242e00): Audacity alone may open IPv4 TCP sockets (its single-instance check
+    # listens on 127.0.0.1); never UDP, raw or IPv6
+    if [ "$f" = usr.bin.audacity ]; then
+      [ "$inet" = "audacity   network inet stream," ] && ok "$f: IPv4 TCP only (single-instance listener)" || bad "$f: IP network: $inet"
+      for d in 'network inet dgram' 'network inet raw' 'network inet6'; do
+        grep -qF "deny $d," <<<"$x" && ok "$f: deny $d" || bad "$f: no deny $d"; done
+    else
+      [ -z "$inet" ] && ok "$f: no IP network (expanded)" || bad "$f: IP network: $inet"
+      case $f in usr.bin.keepassxc|usr.bin.kleopatra) ;; *)
+        grep -qF "deny network inet," <<<"$x" && ok "$f: deny network inet" || bad "$f: no deny network inet";; esac
+    fi
     oth=$(grep -E '@\{HOME\}/(\.claws-mail|\.purple|\.local/share/gajim|\.config/gajim|\.tor-browser|\.librewolf|\.mozilla|\.ssh|\.local/share/keyrings|\.config/libreoffice)' <<<"$al")
     [ -z "$oth" ] && ok "$f: no other app's data or keys (expanded)" || bad "$f: $oth"
     if [ "$f" != usr.bin.kleopatra ]; then

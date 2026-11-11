@@ -22,6 +22,9 @@ profile kleopatra /usr/bin/{kleopatra,kwatchgnupg} {
   deny network inet6,
 
   /usr/bin/{kleopatra,kwatchgnupg} mr,
+  # Tools > GnuPG Log Viewer (same profile as when it is started on its own)
+  /usr/bin/kwatchgnupg ix,
+  /usr/bin/watchgnupg mrix,
   /usr/lib/@{multiarch}/qt6/** mr,
   /usr/lib/@{multiarch}/qt5/** mr,
   /usr/bin/{gpg,gpgsm,gpgconf,gpg-agent,gpg-connect-agent,gpgtar,gpgv,gpg-wks-client,gpgme-json,gpgsm-gencert.sh} mrix,
@@ -43,6 +46,10 @@ profile kleopatra /usr/bin/{kleopatra,kwatchgnupg} {
   owner @{HOME}/.config/kleopatra/ rw,
   owner @{HOME}/.config/kleopatra/** rwk,
   owner @{HOME}/.config/{kdeglobals,QtProject.conf,kwatchgnupgrc} rwk,
+  # 2.1 (review of 7242e00): libkleo's settings (its self-test reads them), and KF6's window state
+  owner @{HOME}/.config/libkleopatrarc* rwk,
+  owner @{HOME}/.local/state/ rw,
+  owner @{HOME}/.local/state/kleopatrastaterc* rwk,
   owner @{HOME}/.local/share/kleopatra/ rw,
   owner @{HOME}/.local/share/kleopatra/** rwk,
   owner @{HOME}/.local/share/kxmlgui5/ r,
@@ -73,6 +80,8 @@ profile kleopatra /usr/bin/{kleopatra,kwatchgnupg} {
     owner @{run}/user/[0-9]*/gnupg/ r,
     owner @{run}/user/[0-9]*/gnupg/S.dirmngr rw,
     owner @{PROC}/@{pid}/** r,
+    # npth names its threads
+    owner @{PROC}/@{pid}/task/@{tid}/comm rw,
   }
   include if exists <local/usr.bin.kleopatra>
 }

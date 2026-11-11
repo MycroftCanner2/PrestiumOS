@@ -18,7 +18,12 @@ profile gimp /usr/bin/{gimp,gimp-3,gimp-3.0,gimp-console,gimp-console-3,gimp-con
   /usr/bin/python3* ix,
   /usr/lib/python3/** mr,
   /usr/lib/python3.*/** mr,
-  /usr/bin/{gs,gjs,lua*} mrix,
+  /usr/bin/{gs,gjs,gjs-console,lua*} mrix,
+  # 2.1 (review of 7242e00): GIMP's system gimprc, sessionrc, templaterc, unitrc, toolrc, controllerrc;
+  # and the Python plug-ins start with "#!/usr/bin/env python3" (env stays in this profile)
+  /etc/gimp/ r,
+  /etc/gimp/** r,
+  /usr/bin/env ix,
   /{,usr/}bin/{sh,dash,bash} ix,
   owner @{HOME}/.config/GIMP/ rw,
   owner @{HOME}/.config/GIMP/** rwk,
