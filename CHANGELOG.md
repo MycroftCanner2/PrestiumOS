@@ -5,6 +5,10 @@
 Enhanced security and new features. Changes will be listed here as they land.
 
 ### Updates
+- **Node.js 24.22.3** (security release, 2026-11-11). The Lounge's runtime is the official
+  linux-x64 tarball in `/opt/nodejs`, pinned in `thirdparty/versions.sh`. This release
+  fixes high-severity HTTP/2 and TLS issues in 24.x. The signed `SHASUMS256.txt` verifies
+  with a current Node.js releaser key (`NODE_KEYS`). The previous pin was 24.22.2.
 - **Tor Browser 16.0.1** (released 2026-11-10: Firefox security fixes, tor 0.4.9.16). `thirdparty/versions.sh`
   pins the new tarball's SHA-256; its signature verifies with the shipped Tor Browser key through the signing
   subkey. dist.torproject.org no longer serves 16.0, so the old pin could not build. The Tor daemon and

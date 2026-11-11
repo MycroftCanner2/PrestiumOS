@@ -18,8 +18,8 @@ FF_VERSION=159.0.1
 FF_SHA256=469ce17120018e1c95411d254cf3c5f8db2dd1768a7acde5a2a089b00072ac65
 FF_KEY=14F26682D0916CDD81E37B6D61B7B526D98F0353          # Mozilla Software Releases
 
-NODE_VERSION=v24.22.2
-NODE_SHA256=48cc0e21e048790e54c0cf5749c2725005313d652651c40b7a21feb9697aaf75   # node-$V-linux-x64.tar.xz; SHASUMS256.txt.asc signed by a Node.js releaser
+NODE_VERSION=v24.22.3
+NODE_SHA256=4f2b175a6d53a5c617a80dba2676238a0688cef28c6da4eba35c7d844e66fcfb   # node-$V-linux-x64.tar.xz; SHASUMS256.txt.asc signed by a Node.js releaser
 # 2.1 (security audit): Node.js releasers allowed to sign SHASUMS256.txt (primary keys, from the
 # "Release keys" list in https://github.com/nodejs/node#release-keys, 2026-11-10). The keybox in
 # thirdparty/keys has these and every past releaser's key; only these count.
