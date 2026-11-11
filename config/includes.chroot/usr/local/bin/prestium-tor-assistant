@@ -149,7 +149,8 @@ class ControlMonitor(threading.Thread):
             try:
                 self.session()
             except Exception as e:
-                GLib.idle_add(self.cb_status, None, "Tor is starting (control port: %s) ..." % e.__class__.__name__, False)
+                detail = (str(e) or e.__class__.__name__).strip()[:80]
+                GLib.idle_add(self.cb_status, None, "Tor is starting (control port: %s) ..." % detail, False)
             self.stop.wait(1.0)
 
     def session(self):

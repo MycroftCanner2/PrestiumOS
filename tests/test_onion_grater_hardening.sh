@@ -24,6 +24,15 @@ for x in /run/onion-grater/control /run/tor/control /run/tor/control.authcookie 
   grep -q "$x" "$I/usr/local/sbin/prestium-onion-grater" || continue
   grep -q "^  $x " "$P" && ok "profile allows $x" || bad "profile lacks $x"
 done
+# identify() uses same_file(/proc/<pid>/root/<script>, <script>) for Python clients.
+# @{PROC}/[0-9]*/root/ is the directory only; without the script paths the assistant
+# and Nyx are refused while Tor Browser still works.
+for x in /usr/bin/onionshare /usr/bin/onionshare-cli /usr/bin/nyx /usr/local/bin/prestium-tor-assistant; do
+  grep -qx "  $x r," "$P" && ok "profile allows $x" || bad "profile lacks $x"
+  grep -qxF "  @{PROC}/[0-9]*/root$x r," "$P" && ok "profile allows /proc/<pid>/root$x" || bad "profile lacks /proc/<pid>/root$x"
+done
+# must not be a blanket read of the client's filesystem
+grep -qE '@\{PROC\}/\[0-9\]\*/root/\*\*' "$P" && bad "profile: blanket /proc/<pid>/root/**" || ok "profile: no blanket /proc/<pid>/root/**"
 # AppArmor checks ptrace on both sides when the tracee's profile has ptrace rules: Tor Browser's has
 grep -qx '  ptrace (readby) peer=prestium_onion_grater,' "$I/etc/apparmor.d/torbrowser.Browser.firefox" \
   && ok "Tor Browser's profile lets onion-grater read its identity" || bad "torbrowser_firefox lacks ptrace readby"

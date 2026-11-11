@@ -5,7 +5,9 @@
 # "ptrace (read)" is what the kernel asks for those /proc reads, tracing and /proc/<pid>/mem are
 # denied. Its unit adds SystemCallFilter=~@debug (no ptrace, process_vm_* syscalls at all).
 # Attached by path (the script), so if the profile were missing the filter still starts.
-# Not yet tested on a booted ISO.
+# After a booted ISO: the filter must be able to stat each Python client's script through
+# /proc/<pid>/root (same_file); without that, identify() fails closed. Tor Browser only
+# stats /proc/<pid>/exe and this binary, so it still worked.
 abi <abi/4.0>,
 include <tunables/global>
 
@@ -38,6 +40,16 @@ profile prestium_onion_grater /usr/local/sbin/prestium-onion-grater flags=(attac
 
   /opt/tor-browser/Browser/firefox.real r,
   /usr/bin/onionshare r,
+  /usr/bin/onionshare-cli r,
+  /usr/bin/nyx r,
+  /usr/local/bin/prestium-tor-assistant r,
+  # identify() calls same_file(/proc/<pid>/root/<script>, <script>). @{PROC}/[0-9]*/root/ is the
+  # directory only; these are the scripts of the Python clients. A broader /proc/<pid>/root/**
+  # would let the filter read the client's whole filesystem.
+  @{PROC}/[0-9]*/root/usr/bin/onionshare r,
+  @{PROC}/[0-9]*/root/usr/bin/onionshare-cli r,
+  @{PROC}/[0-9]*/root/usr/bin/nyx r,
+  @{PROC}/[0-9]*/root/usr/local/bin/prestium-tor-assistant r,
   /run/onion-grater/ rw,
   /run/onion-grater/control rw,
   /run/tor/control rw,

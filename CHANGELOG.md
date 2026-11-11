@@ -334,6 +334,17 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
     bubblewrap works: no connection to a listener on the host's 127.0.0.1, a listener of its own,
     a second start that does not call nsenter, Unix sockets and X11 still connect, a host-network
     socket is refused)
+- **Review of 772dfbf:**
+  - **The Tor Connection Assistant and Nyx can use the control-port filter again.** onion-grater's
+    AppArmor profile allowed a client's `/proc/<pid>/exe`, environment and maps, but not the
+    script path `identify()` compares with `same_file` through `/proc/<pid>/root` (and not
+    `/usr/bin/nyx` or `/usr/local/bin/prestium-tor-assistant` on the host). The check failed
+    closed, so those two got `510 client not allowed` (the assistant showed
+    `ConnectionError`; Nyx exited and the terminal closed). Tor Browser only stats
+    `/proc/<pid>/exe` and `/opt/tor-browser/Browser/firefox.real`, which were already
+    allowed, so it kept working. The profile now allows those script paths only, not the
+    client's whole filesystem. The assistant's status line also shows the filter's reply,
+    not only the exception class. (`tests/test_onion_grater_hardening.sh`)
 - The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
   every boot), which the audit (I-3) read from the commented template; nothing changed there.
 
