@@ -119,14 +119,16 @@ pin IRC_FRAMEWORK_TAR "$IT" "$IRC_FRAMEWORK_TAR_SHA256"
 
 # The Lounge: npm ci from the committed lockfile (registry tarballs checked against their sha512 integrity;
 # .npmrc: ignore-scripts, save-exact, min-release-age=7 for lockfile regeneration, see BUILDING.md)
-L=$C/thelounge-$THELOUNGE_VERSION-r21   # r21: new cache name (older trees were built with irc-framework's prepare)
+L=$C/thelounge-$THELOUNGE_VERSION-r22   # r21: older trees were built with irc-framework's prepare; r22: parent spec rewrite (hidden lockfile differs)
 if [ ! -s "$L/.done" ]; then   # 2.0 r7: empty .done (older builds) = no recorded tree hash, install again
   rm -rf "$L"; mkdir -p "$L"
   cp "$TOP/thirdparty/thelounge/package.json" "$TOP/thirdparty/thelounge/package-lock.json" "$TOP/thirdparty/thelounge/.npmrc" "$L/"
   cp "$IT" "$L/irc-framework.tar"
   [ "$(sha "$L/irc-framework.tar")" = "$IRC_FRAMEWORK_TAR_SHA256" ] || [ "$REPIN" = 1 ] \
     || { echo "ERROR: staged irc-framework tarball does not match its pinned SHA-256"; exit 1; }
-  # working copies only: lockfile entry -> file:irc-framework.tar + its sha512, package.json override
+  # working copies only: lockfile entry -> file:irc-framework.tar + its sha512, and thelounge's
+  # "github:kiwiirc/irc-framework#..." dependency spec -> the locked version; no package.json override
+  # (npm 9.2.0, Debian 13, throws "Invalid comparator" on an override meeting a git spec)
   python3 "$TOP/scripts/npm-local-tarball.py" "$L" irc-framework irc-framework.tar >/dev/null
   # --git=false: if npm still wanted the git URL, the install fails instead of cloning and packing it
   ( cd "$L" && npm ci --omit=dev --omit=optional --ignore-scripts --git=false --no-audit --no-fund >/dev/null )

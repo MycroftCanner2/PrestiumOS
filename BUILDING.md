@@ -126,13 +126,15 @@ the value in, rebuild. The Lounge is updated by regenerating `thirdparty/theloun
 release published minutes ago; review the lockfile diff), then set `IRC_FRAMEWORK_COMMIT` in `versions.sh` to the commit the
 lockfile resolves irc-framework to, if it changed, set `IRC_FRAMEWORK_TAR_SHA256` to `""` and run
 `--repin` for its new value. The build itself only runs `npm ci --ignore-scripts`, which installs
-exactly the lockfile with any npm. irc-framework is a git dependency with no lockfile integrity, and
+exactly the lockfile; Debian 13's apt npm (9.2.0) is enough, and npm 11 works too. irc-framework is a git dependency with no lockfile integrity, and
 npm packing it would run its `prepare` script (babel + webpack, unpinned) even with `--ignore-scripts`.
 So the build exports `IRC_FRAMEWORK_COMMIT` with `git archive --format=tar --prefix=package/ <commit>
 $IRC_FRAMEWORK_FILES` (the files npm ships, per the package's `.npmignore`), checks the tarball against
 `IRC_FRAMEWORK_TAR_SHA256`, and points a working copy of the lockfile at it
-(`scripts/npm-local-tarball.py`: `file:` tarball with its sha512, plus a package.json override). npm
-then runs with `--git=false`, and the image ships the committed package.json and lockfile. Every
+(`scripts/npm-local-tarball.py`: irc-framework's entry gets the `file:` tarball and its sha512, and
+thelounge's `github:kiwiirc/irc-framework#<commit>` request becomes the locked version, so no git spec
+is left; no package.json override, which npm 9.2.0 rejects with "Invalid comparator" and then
+misreports as a missing package-lock.json). npm then runs with `--git=false`, and the image ships the committed package.json and lockfile. Every
 installed irc-framework file is still checked against a git checkout of the commit, and `dist/` must
 be absent. If upstream's file list changes, update `IRC_FRAMEWORK_FILES` with the commit. LibreWolf, i2pd and Tor come from their
 signed apt repositories and are always the newest at build time.

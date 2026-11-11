@@ -288,6 +288,18 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
     consensus time, and its bounds are tested on a run; ci.sh gives each score exemption its own
     ceiling and fails, as root, on a unit it can't score; the viewer test also checks for unconfined
     exec and for the child profiles' /run, /dev and /proc rules.
+- **Review of d327e65:**
+  - **The Lounge's `npm ci` failed on Debian 13's npm (9.2.0)** with "can only install with an existing
+    package-lock.json", although the lockfile was there. The real error was npm 9's "Invalid comparator:
+    github:kiwiirc/irc-framework#9578e59": the package.json override that pointed irc-framework at the
+    local tarball made npm compare thelounge's git request as a version range. The working copy of the
+    lockfile now has thelounge's request rewritten to the locked version (4.14.0, which the tarball
+    entry satisfies) and no override at all; npm still runs with `--git=false`, never packs the git
+    dependency, and the image still ships the committed package.json and lockfile. Checked with npm
+    9.2.0 and npm 11 on the real lockfile (same files, irc-framework identical to the commit, no
+    `dist/`); the test runs the offline install with both when npm 9.2.0 is available. New cache
+    directory (`-r22`): the hidden lockfile in node_modules differs. (`scripts/npm-local-tarball.py`,
+    `tests/test_irc_framework_tarball.sh`)
 - The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
   every boot), which the audit (I-3) read from the commented template; nothing changed there.
 
