@@ -47,7 +47,7 @@ which works but is several times slower.
    Browser Updater, and keeps `/usr/share/prestium/opt-overlay`; when a key or `sigcheck.sh` changes,
    update both copies; `tests/test_browser_install.py` and `tests/test_sigcheck.sh` compare them)
 2. runs `lb config` (options in `auto/config`);
-3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.0-amd64.iso` and `Prestium-2.0-amd64.iso.sha256`.
+3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-amd64.iso`, `Prestium-2.1-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest` and the `.packages` list.
 
 An interrupted build can be continued with `sudo ./build.sh --resume`; `sudo ./build.sh --clean`
 starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (much longer emulated).
@@ -81,7 +81,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
 | `config/hooks/live/*.hook.chroot` | setup steps, in order (below) |
 | `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels |
-| `config/bootloaders/` | boot menu entries: Prestium 2.0, nomodeset, camera and microphone off |
+| `config/bootloaders/` | boot menu entries: Prestium 2.1, nomodeset, camera and microphone off |
 | `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile |
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |
 | `scripts/thelounge-themes.py` | regenerates The Lounge's 10 Theme Factory theme packages from `scripts/thelounge-theme.css.in` and checks their contrast (`--check` only verifies; the generated files are committed) |

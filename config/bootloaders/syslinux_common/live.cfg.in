@@ -1,24 +1,24 @@
 label live-@FLAVOUR@
-	menu label ^Prestium 2.0
+	menu label ^Prestium 2.1
 	menu default
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@
 
 label live-@FLAVOUR@-nomodeset
-	menu label Prestium 2.0 (nomodeset)
+	menu label Prestium 2.1 (nomodeset)
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE_FAILSAFE@
 
 label live-@FLAVOUR@-nocammic
-	menu label Prestium 2.0 (camera and microphone off)
+	menu label Prestium 2.1 (camera and microphone off)
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ prestium.nocammic
 
 label live-@FLAVOUR@-nomacspoof
-	menu label Prestium 2.0 (MAC address spoofing off)
+	menu label Prestium 2.1 (MAC address spoofing off)
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ nomacspoof

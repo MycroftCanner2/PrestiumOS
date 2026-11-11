@@ -6,11 +6,11 @@ PrestiumOS is a privacy-focused live operating system for USB sticks, with Tor a
 is built with Debian's **live-build** on Debian 13 "trixie" (amd64), and it follows Tails for hardware
 support: the same Debian release, kernel line and firmware set, with Secure Boot through shim and GRUB.
 
-**Status:** active development. PrestiumOS starts from **Prestium 2.0**, a full modernization of the
-2023 Prestium build. Version **2.1** is in progress here, with enhanced security and new features.
+**Status:** Prestium **2.1** is the current release. It builds on **Prestium 2.0**, a full
+modernization of the 2023 Prestium build, with tighter security and new features.
 
-- **Download:** the 2.0 ISO through [`Prestium-2.0-amd64.iso.torrent`](Prestium-2.0-amd64.iso.torrent)
-- **Build it yourself:** [BUILDING.md](BUILDING.md) (`sudo ./build.sh`)
+- **Download:** build the 2.1 ISO with [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). The previous
+  2.0 ISO is still available through [`Prestium-2.0-amd64.iso.torrent`](Prestium-2.0-amd64.iso.torrent).
 - **What changed:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Highlights
@@ -23,8 +23,11 @@ support: the same Debian release, kernel line and firmware set, with Secure Boot
   no screen capture, input injection or window snooping. A root broker keeps the full socket away from apps.
 - **Sandboxed browsers:** Tor Browser and LibreWolf (I2P Browser) run in bubblewrap with their own empty
   network namespace. Tor Browser can reach only Tor, and LibreWolf only i2pd's HTTP proxy.
+- **Browser Updater:** install the latest publisher-signed Tor Browser or I2P Browser for this session,
+  over Tor or the I2P outproxy, and reset to the copy on the image.
 - **Enforced AppArmor profiles** for the browsers, Claws Mail, Gajim, Pidgin, OnionShare, Feather,
-  LibreOffice, The Lounge and the local-only Firefox.
+  LibreOffice, The Lounge, the local-only Firefox, KeePassXC, Kleopatra and the programs that open
+  downloaded files.
 - **Network privacy:** MAC address spoofing with a guard against leaks of the real address,
   default-deny firewall that stays closed when stopped, no system DNS, IPv6 off, no LAN access.
 - **Tor Connection Assistant:** Direct, Snowflake, WebTunnel, obfs4 and meek, with bootstrap progress,
@@ -67,8 +70,9 @@ front, the WebTunnel bridge's host). In 2.0:
 
 Check a download before you write it to a USB stick.
 
-- **Releases with `SHA256SUMS` and `SHA256SUMS.asc`** (from 2.1 on, once they are signed): import the
-  Prestium release key, compare its full fingerprint with the one published with the release, then
+- **2.1** writes `SHA256SUMS` (the ISO, its manifest and its package list). When a release is signed
+  (`SHA256SUMS.asc` from `scripts/sign-release.sh`): import the Prestium release key, compare its full
+  fingerprint with the one published with the release, then
 
   ```
   gpg --verify SHA256SUMS.asc SHA256SUMS

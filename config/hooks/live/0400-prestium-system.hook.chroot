@@ -1,9 +1,9 @@
 #!/bin/sh
-# Prestium 2.0: system setup carried over from earlier releases (services, masks, diversions, alternatives,
+# Prestium 2.1: system setup carried over from earlier releases (services, masks, diversions, alternatives,
 # CA list, dconf, plymouth, locale, version strings) plus the 2.0 audio stack.
 set -e
 B=/usr/share/prestium/build
-VERSION=2.0
+VERSION=2.1
 
 ## services: exactly the units earlier releases enabled (+ PipeWire for 2.0); everything else package
 ## postinsts enabled is disabled again

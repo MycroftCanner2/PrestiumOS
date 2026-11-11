@@ -1,16 +1,16 @@
 #!/bin/bash
-# Prestium 2.0: build Prestium-2.0-amd64.iso with live-build.
+# Prestium 2.1: build Prestium-2.1-amd64.iso with live-build.
 #   sudo ./build.sh            fetch+verify third-party software, lb config, lb build, checksum
 #   sudo ./build.sh --resume   continue an interrupted build (keeps chroot and stage files)
 #   sudo ./build.sh --clean    lb clean --purge first
 # Host: Debian 13 (trixie) with live-build, debootstrap, squashfs-tools, xorriso, curl, gpg, gpgv,
 # git, unzip, npm. On a non-amd64 host also qemu-user-static with a binfmt_misc entry for x86-64
-# (flag F), so the amd64 chroot runs emulated. Output: ./Prestium-2.0-amd64.iso and .sha256, and (2.1)
+# (flag F), so the amd64 chroot runs emulated. Output: ./Prestium-2.1-amd64.iso and .sha256,
 # SHA256SUMS, the .manifest and the .packages list for a signed release (scripts/sign-release.sh).
 set -euo pipefail
 cd "$(dirname "$0")"
 TOP=$(pwd)
-OUT=Prestium-2.0-amd64.iso
+OUT=Prestium-2.1-amd64.iso
 LOG=${PRESTIUM_BUILD_LOG:-$TOP/build.log}
 [ "$(id -u)" = 0 ] || { echo "run as root (sudo)"; exit 1; }
 MODE=${1:-}
@@ -106,7 +106,7 @@ run_lb binary
 run_lb source   # no-op unless sources are enabled (same stages as "lb build")
 
 # 4. name + checksum
-ISO=$(ls -t Prestium-2.0-amd64.hybrid.iso live-image-amd64.hybrid.iso Prestium-2.0*.iso 2>/dev/null | head -1 || true)
+ISO=$(ls -t Prestium-2.1-amd64.hybrid.iso live-image-amd64.hybrid.iso Prestium-2.1*.iso 2>/dev/null | head -1 || true)
 [ -n "$ISO" ] || { echo "no ISO produced"; exit 1; }
 [ "$ISO" = "$OUT" ] || mv -f "$ISO" "$OUT"
 sha256sum "$OUT" > "$OUT.sha256"

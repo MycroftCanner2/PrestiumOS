@@ -1012,7 +1012,7 @@ class Image(unittest.TestCase):
         self.assertIn("d /run/prestium/browsers 0755 root root -", t)
         h4 = open(os.path.join(T.ROOT, "config/hooks/live/0400-prestium-system.hook.chroot")).read()
         self.assertIn("install -d -m 0755 -o root -g root /var/lib/prestium/browser-updates", h4)
-        self.assertIn("\nVERSION=2.0\n", h4)
+        self.assertIn("\nVERSION=2.1\n", h4)
 
     def test_menu_and_desktop(self):
         menu = open(os.path.join(T.INC, "etc/xdg/labwc/menu.xml")).read()
