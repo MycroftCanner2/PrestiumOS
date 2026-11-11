@@ -7,7 +7,9 @@
 abi <abi/4.0>,
 include <tunables/global>
 
-profile prestium_pinentry {
+# 2.1 (review of 4ccd585): attached to the pinentry binaries, so a prompt started by the session's own
+# gpg-agent (socket-started, outside any app profile) is confined too, not only Claws' and Kleopatra's.
+profile prestium_pinentry /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11} {
   include <abstractions/base>
   include <abstractions/nameservice-strict>
   include <abstractions/fonts>

@@ -229,6 +229,13 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
   (timesync 3.2, clockfix 2.1, USB watchdog 4.9 after this release; they were 9.4), except the Wayland
   broker (5.4, down from 7.9), the early firewall and the two shutdown wipes, which need the whole
   system by design. It runs the offline analysis in a user namespace when it isn't root.
+- **Review of 4ccd585:**
+  - The GnuPG passphrase prompt's profile (prestium_pinentry) is attached to the pinentry programs, so a
+    prompt started by the session's own gpg-agent is confined too.
+  - New prestium-gnupg-check (a root timer, every 2 minutes) raises the "gnupg-helper" safety flag when
+    an unconfined gpg-agent, dirmngr, scdaemon or keyboxd runs and that user's GnuPG configuration names
+    a helper program outside /usr. It logs which GnuPG daemons run and under which profile.
+  - Confined apps may not run newgrp or sg either.
 - **Review of db6601c:**
   - Plain `passwd` is no longer setuid (hook 0500, checked), and confined apps may not run passwd,
     gpasswd, chsh, chfn, chage or expiry. Before, a program of the user could still choose the first
@@ -274,7 +281,8 @@ Not changed in 2.1, so you know where the edges are:
   nodes stay protected, since their owner rules don't match root-owned nodes. Same class as the browser
   launchers' bubblewrap children.
 - **GnuPG's socket-started daemons** (gpg-agent, dirmngr) may run outside Kleopatra's and Claws Mail's
-  profiles; their configuration files are read-only to Kleopatra. Check on a booted ISO.
+  profiles; their configuration files are read-only to Kleopatra, their pinentry is confined, and
+  prestium-gnupg-check flags a helper program from outside /usr.
 - **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need.
 - **Programs of the desktop user may change NetworkManager's system connections** (to add Wi-Fi). The
   MAC guard and the firewall keep the real MAC address and real IP address from leaking that way.

@@ -1,0 +1,34 @@
+# Prestium 2.1 (review of 4ccd585): see /usr/local/sbin/prestium-gnupg-check
+[Unit]
+Description=Prestium check of GnuPG daemons started outside the app profiles
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/prestium-gnupg-check
+ExecStartPre=+/usr/bin/install -d -o root -g root -m 0755 /run/prestium /run/prestium/safety
+# reads other users' /proc entries and ~/.gnupg; writes only the safety flag
+CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/prestium
+ProtectHome=read-only
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0022

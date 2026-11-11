@@ -17,7 +17,7 @@ if command -v apparmor_parser >/dev/null; then
 else echo "SKIP apparmor_parser missing (compile)"; fi
 for n in prestium_tor_browser_launcher prestium_librewolf_launcher; do
   grep -qx "profile $n {" "$L" && ok "$n: named, no attachment (the menu's launch is unchanged)" || bad "$n header"; done
-grep -qx 'profile prestium_pinentry {' "$PE" && ok "prestium_pinentry: named" || bad "pinentry header"
+grep -qx 'profile prestium_pinentry /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11} {' "$PE" && ok "prestium_pinentry: attached to the pinentry programs" || bad "pinentry header"
 for a in usr.bin.claws-mail usr.bin.gajim usr.bin.pidgin; do
   grep -Eq '\bUx,' "$A/$a" && bad "$a still has Ux" || ok "$a: no Ux"
   grep -q '/usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,' "$A/$a" && ok "$a: tor-browser Px" || bad "$a: tor-browser not Px"

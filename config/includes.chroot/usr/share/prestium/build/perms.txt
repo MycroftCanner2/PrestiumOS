@@ -455,3 +455,6 @@
 0644 root root /usr/share/prestium/opt-overlay/librewolf/distribution/extensions/uBlock0@raymondhill.net.xpi
 0644 root root /usr/share/prestium/opt-overlay/librewolf/distribution/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi
 0755 root root /var/lib/prestium/browser-updates
+0644 root root /etc/systemd/system/prestium-gnupg-check.service
+0644 root root /etc/systemd/system/prestium-gnupg-check.timer
+0755 root root /usr/local/sbin/prestium-gnupg-check

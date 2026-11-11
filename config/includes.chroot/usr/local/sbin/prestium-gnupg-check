@@ -1,0 +1,36 @@
+#!/bin/sh
+# Prestium 2.1 (review of 4ccd585): GnuPG's agent, dirmngr, scdaemon and keyboxd may be started by
+# systemd's user sockets, outside Kleopatra's and Claws Mail's profiles. That is a known limit, not a
+# fault. It becomes one when such a daemon runs unconfined and a GnuPG config of that user names a
+# helper program outside /usr (a *-program option): then raise the "gnupg-helper" safety flag.
+# Runs as root from prestium-gnupg-check.timer; only reads /proc and the users' ~/.gnupg configs.
+case "$0" in
+  /usr/local/*) P=/proc; FLAG=/usr/local/lib/prestium/safety-flag ;;
+  *) P=${PRESTIUM_PROC:-/proc}; FLAG=${PRESTIUM_FLAG:-/usr/local/lib/prestium/safety-flag} ;;
+esac
+bad=; info=
+for d in "$P"/[0-9]*; do
+  [ -r "$d/comm" ] || continue
+  read -r c < "$d/comm" 2>/dev/null || continue
+  case "$c" in gpg-agent|dirmngr|scdaemon|keyboxd) ;; *) continue ;; esac
+  uid=$(awk '/^Uid:/{print $2; exit}' "$d/status" 2>/dev/null)
+  [ -n "$uid" ] && [ "$uid" -ge 1000 ] 2>/dev/null || continue
+  l=$(cat "$d/attr/apparmor/current" 2>/dev/null || cat "$d/attr/current" 2>/dev/null)
+  info="$info ${c}[${d##*/}]=${l:-unknown}"
+  case "$l" in unconfined*|'') ;; *) continue ;; esac
+  h=$(awk -F: -v u="$uid" '$3==u{print $6; exit}' "${PRESTIUM_PASSWD:-/etc/passwd}")
+  [ -n "$h" ] || continue
+  for f in "$h"/.gnupg/*.conf; do
+    [ -f "$f" ] || continue
+    o=$(awk '{sub(/^[ \t]+/,"")} /^[a-z-]*-program[ \t]/{p=$2; if (p !~ /^\/usr\//) print FILENAME": "$1" "p}' "$f")
+    [ -n "$o" ] && bad="$bad $o;"
+  done
+done
+logger -t prestium-gnupg-check "GnuPG daemons:${info:- none}" 2>/dev/null
+if [ -n "$bad" ]; then
+  "$FLAG" set gnupg-helper "An unconfined GnuPG daemon may run a helper program from outside the system:$bad Remove that option unless you added it yourself."
+  echo "gnupg-check: flagged:$bad"
+else
+  "$FLAG" clear gnupg-helper; echo "gnupg-check: OK:${info:- none}"
+fi
+exit 0

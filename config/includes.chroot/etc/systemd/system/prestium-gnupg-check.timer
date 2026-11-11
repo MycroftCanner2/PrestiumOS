@@ -1,0 +1,10 @@
+[Unit]
+Description=Prestium GnuPG daemon check, every two minutes
+
+[Timer]
+OnBootSec=90s
+OnUnitActiveSec=2min
+AccuracySec=15s
+
+[Install]
+WantedBy=timers.target
