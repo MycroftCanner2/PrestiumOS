@@ -3,19 +3,87 @@
 # (~/.local/lib/python3.X/site-packages). A .pth file or usercustomize.py there runs inside every
 # Python program the user starts, including the clients that onion-grater lets use Tor's control
 # port (nyx, OnionShare, the Tor Connection Assistant), and any program of the user could put one
-# there. Nothing on Prestium installs packages per user (no pip). Fails the build if site.py changed.
+# there. Nothing on Prestium installs packages per user (no pip).
+#
+# Python 3.11+ loads site as a frozen module, so patching site.py on disk has no effect
+# (ENABLE_USER_SITE stays at the frozen default, then check_enableusersite() turns it True).
+# Install Prestium's sitecustomize for every Python 3.x (dpkg-divert keeps it through package
+# upgrades and still runs Debian's apport hook). Session processes also get PYTHONNOUSERSITE=1
+# from /etc/environment, which stops a .pth in an already-existing user-site directory from
+# running before sitecustomize. Fails the build if the disable does not take effect.
 set -e
+SRC=/usr/local/lib/prestium/sitecustomize.py
+[ -f "$SRC" ] || { echo "E: $SRC is missing"; exit 1; }
+grep -q 'PYTHONNOUSERSITE=1' /etc/environment \
+	|| { echo "E: /etc/environment does not set PYTHONNOUSERSITE=1"; exit 1; }
+
 n=0
-for f in /usr/lib/python3.*/site.py; do
-	[ -f "$f" ] || continue
-	grep -qx 'ENABLE_USER_SITE = None' "$f" || grep -qx 'ENABLE_USER_SITE = False  # Prestium' "$f" \
-		|| { echo "E: $f: no 'ENABLE_USER_SITE = None' line"; exit 1; }
-	sed -i 's/^ENABLE_USER_SITE = None$/ENABLE_USER_SITE = False  # Prestium/' "$f"
-	grep -qx 'ENABLE_USER_SITE = False  # Prestium' "$f" || { echo "E: $f not patched"; exit 1; }
-	rm -f "$(dirname "$f")"/__pycache__/site.*.pyc
+for lib in /usr/lib/python3.*; do
+	[ -d "$lib" ] || continue
+	ver=$(basename "$lib")
+	case "$ver" in python3.*) ;; *) continue ;; esac
+	etc=/etc/$ver
+	mkdir -p "$etc"
+	target=$etc/sitecustomize.py
+	# Debian ships /usr/lib/python3.X/sitecustomize.py as a symlink to /etc/python3.X/.
+	# Divert the /etc file (or a regular file in lib) once, then install ours at /etc.
+	if [ -e "$target" ] || [ -L "$target" ]; then
+		if ! dpkg-divert --list "$target" | grep -q sitecustomize.py.debian; then
+			dpkg-divert --quiet --local --rename --divert "$target.debian" --add "$target"
+		fi
+	fi
+	libsc=$lib/sitecustomize.py
+	if [ -e "$libsc" ] || [ -L "$libsc" ]; then
+		# Keep a symlink at the stdlib path; divert a regular file so upgrades don't restore it
+		if [ ! -L "$libsc" ]; then
+			if ! dpkg-divert --list "$libsc" | grep -q sitecustomize.py.debian; then
+				dpkg-divert --quiet --local --rename --divert "$libsc.debian" --add "$libsc"
+			fi
+			ln -sf "$target" "$libsc"
+		fi
+	else
+		ln -sf "$target" "$libsc"
+	fi
+	cp "$SRC" "$target"
+	chown root:root "$target"
+	chmod 0644 "$target"
 	n=$((n + 1))
 done
-[ "$n" -gt 0 ] || { echo "E: no Python site.py found"; exit 1; }
+[ "$n" -gt 0 ] || { echo "E: no Python 3.x found"; exit 1; }
+
+# The chroot hook is not a PAM session, so /etc/environment is not loaded here.
+# sitecustomize must turn the user site off on its own.
+unset PYTHONNOUSERSITE || true
 python3 -c 'import site, sys; sys.exit(0 if site.ENABLE_USER_SITE is False else 1)' \
 	|| { echo "E: Python still enables the user site"; exit 1; }
+
+# A user-site directory with a .pth and usercustomize.py
+v=$(python3 -c 'import sys; print("%d.%d" % sys.version_info[:2])')
+T=$(mktemp -d)
+trap 'rm -rf "$T"' EXIT
+export HOME="$T"
+export PRESTIUM_MARKER="$T/pth-ran"
+mkdir -p "$T/.local/lib/python$v/site-packages"
+printf '%s\n' 'import os; open(os.environ["PRESTIUM_MARKER"], "w").write("pth")' \
+	> "$T/.local/lib/python$v/site-packages/prestium-probe.pth"
+printf '%s\n' 'import os; open(os.environ["PRESTIUM_MARKER"] + ".uc", "w").write("uc")' \
+	> "$T/.local/lib/python$v/site-packages/usercustomize.py"
+
+python3 -c '
+import os, site, sys
+assert site.ENABLE_USER_SITE is False, site.ENABLE_USER_SITE
+assert site.USER_SITE not in sys.path, sys.path
+assert not os.path.exists(os.environ["PRESTIUM_MARKER"] + ".uc"), "usercustomize ran"
+' || { echo "E: sitecustomize did not disable the user site when the directory exists"; exit 1; }
+
+# With PYTHONNOUSERSITE (as in the live session), a .pth must not run either
+rm -f "$PRESTIUM_MARKER" "$PRESTIUM_MARKER.uc"
+PYTHONNOUSERSITE=1 python3 -c '
+import os, site, sys
+assert site.ENABLE_USER_SITE is False, site.ENABLE_USER_SITE
+assert site.USER_SITE not in sys.path, sys.path
+assert not os.path.exists(os.environ["PRESTIUM_MARKER"]), "user-site .pth ran"
+assert not os.path.exists(os.environ["PRESTIUM_MARKER"] + ".uc"), "usercustomize ran"
+' || { echo "E: PYTHONNOUSERSITE did not stop a user-site .pth from running"; exit 1; }
+
 echo "P: Python user site-packages off ($n)"

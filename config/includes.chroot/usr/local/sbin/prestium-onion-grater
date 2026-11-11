@@ -114,8 +114,8 @@ def same_file(a, b):
 # but a program of the same user could start that pair with its own environment (PYTHONPATH,
 # LD_PRELOAD, ...) and inherit the client's allow-list. Refuse a client whose environment points the
 # interpreter or the dynamic loader elsewhere, or that runs executable code from outside the system
-# directories. (The user's own site-packages are off system-wide: hook 0460 sets ENABLE_USER_SITE.)
-ENV_BAD = re.compile(rb"^(PYTHON(?!DONTWRITEBYTECODE=|UNBUFFERED=|IOENCODING=|UTF8=)[A-Z_]*|LD_[A-Z_]+|GCONV_PATH|GLIBC_TUNABLES)=")
+# directories. (The user's own site-packages are off system-wide: hook 0460 installs sitecustomize, and the session sets PYTHONNOUSERSITE.)
+ENV_BAD = re.compile(rb"^(PYTHON(?!DONTWRITEBYTECODE=|UNBUFFERED=|IOENCODING=|UTF8=|NOUSERSITE=)[A-Z_]*|LD_[A-Z_]+|GCONV_PATH|GLIBC_TUNABLES)=")
 # (GTK, GIO and Qt module paths need no entry here: code they load from elsewhere shows in the maps)
 EXEC_OK = ("/usr/", "/lib/", "/lib64/", "/opt/tor-browser/")
 

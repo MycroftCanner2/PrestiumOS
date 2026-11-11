@@ -300,6 +300,18 @@ Two source audits of `95f2f6c` (no booted ISO). Each item has a regression test.
     `dist/`); the test runs the offline install with both when npm 9.2.0 is available. New cache
     directory (`-r22`): the hidden lockfile in node_modules differs. (`scripts/npm-local-tarball.py`,
     `tests/test_irc_framework_tarball.sh`)
+- **Review of 778baf7:**
+  - **Hook 0460 no longer patches `site.py`.** Python 3.13 loads `site` as a frozen module, so that
+    edit never ran and the hook failed the image build (`ENABLE_USER_SITE` stayed True). It now
+    installs `/usr/local/lib/prestium/sitecustomize.py` as `sitecustomize` for every Python 3.x
+    (`dpkg-divert` keeps Debian's apport hook and the file through upgrades). That sets
+    `ENABLE_USER_SITE` to False, drops any user-site path already on `sys.path`, and stops
+    `usercustomize.py`. Session processes also get `PYTHONNOUSERSITE=1` from `/etc/environment`,
+    which stops a `.pth` in an already-existing user-site directory from running before
+    sitecustomize; onion-grater allows that variable (it does not point the interpreter at other
+    code). The hook fails the build if the disable does not take effect, including in the chroot
+    where `/etc/environment` is not loaded. (`tests/test_python_usersite.sh`,
+    `tests/test_onion_grater_tamper.py`)
 - The i2pd web console already has a per-boot password (prestium-i2pd-port sets auth, user and pass
   every boot), which the audit (I-3) read from the commented template; nothing changed there.
 

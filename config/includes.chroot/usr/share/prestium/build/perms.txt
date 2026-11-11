@@ -362,6 +362,7 @@
 0644 root root /etc/udev/rules.d/90-prestium-backlight.rules
 0644 root root /etc/X11/xorg.conf.d/40-libinput-touchpad.conf
 0755 root root /usr/local/lib/prestium/safefile
+0644 root root /usr/local/lib/prestium/sitecustomize.py
 0644 root root /usr/share/prestium/torrents-theme/prestium-dark.css
 0755 root root /usr/local/lib/prestium/safety-flag
 0755 root root /usr/local/bin/prestium-safety-notify

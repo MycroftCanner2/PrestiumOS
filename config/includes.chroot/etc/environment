@@ -6,3 +6,5 @@ HTTPS_PROXY="http://127.0.0.1:4450/"
 FTP_PROXY="http://127.0.0.1:4450/"
 no_proxy="127.0.0.1,localhost,::1"
 NO_PROXY="127.0.0.1,localhost,::1"
+
+PYTHONNOUSERSITE=1

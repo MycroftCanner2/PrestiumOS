@@ -24,6 +24,7 @@ def case(env, maps=SYS_MAPS):
     return tampered(42, proc=d)
 clean = [b"HOME=/home/user", b"PATH=/usr/bin", b"WAYLAND_DISPLAY=/run/prestium-wl/1000/apps", b"PYTHONDONTWRITEBYTECODE=1"]
 r = case(clean); (ok if r is None else bad)("a normal start is accepted (%s)" % r)
+r = case(clean + [b"PYTHONNOUSERSITE=1"]); (ok if r is None else bad)("PYTHONNOUSERSITE is accepted (%s)" % r)
 for e in (b"PYTHONPATH=/home/user/x", b"PYTHONHOME=/tmp/py", b"PYTHONSTARTUP=/tmp/s.py", b"PYTHONUSERBASE=/tmp",
           b"LD_PRELOAD=/home/user/evil.so", b"LD_LIBRARY_PATH=/tmp", b"LD_AUDIT=/tmp/a.so", b"GCONV_PATH=/tmp",
           b"GLIBC_TUNABLES=glibc.x=1"):
@@ -40,5 +41,12 @@ aa = open(os.path.join(I, "etc/apparmor.d/usr.local.sbin.prestium-onion-grater")
 (ok if "@{PROC}/[0-9]*/environ r," in aa and "@{PROC}/[0-9]*/maps r," in aa and "deny @{PROC}/*/mem rwx," in aa else bad)(
     "onion-grater profile: environ and maps readable, memory never")
 h = open(os.path.join(R, "config/hooks/live/0460-prestium-python-usersite.hook.chroot")).read()
-(ok if "ENABLE_USER_SITE = False  # Prestium" in h and "exit 1" in h else bad)("hook 0460 turns the user site off, or fails the build")
+sc = open(os.path.join(I, "usr/local/lib/prestium/sitecustomize.py")).read()
+env = open(os.path.join(I, "etc/environment")).read()
+(ok if "sitecustomize" in h and "ENABLE_USER_SITE is False" in h and "exit 1" in h else bad)(
+    "hook 0460 installs sitecustomize and fails the build if the user site stays on")
+(ok if "ENABLE_USER_SITE = False" in sc and "_drop_user_site_paths" in sc else bad)(
+    "sitecustomize turns ENABLE_USER_SITE off and drops user-site paths")
+(ok if "PYTHONNOUSERSITE=1" in env and "PYTHONNOUSERSITE" in h else bad)(
+    "/etc/environment sets PYTHONNOUSERSITE, and the hook requires it")
 sys.exit(fail)
