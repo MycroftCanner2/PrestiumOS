@@ -500,3 +500,4 @@
 0644 root root /etc/systemd/system/prestium-gnupg-check.service
 0644 root root /etc/systemd/system/prestium-gnupg-check.timer
 0755 root root /usr/local/sbin/prestium-gnupg-check
+0644 root root /usr/share/applications/prestium-audacity.desktop

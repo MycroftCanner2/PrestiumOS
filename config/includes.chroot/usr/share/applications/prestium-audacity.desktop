@@ -1,0 +1,9 @@
+[Desktop Entry]
+# Prestium 2.1: not a menu entry. Lets the panel find Audacity's icon if its window still reports the
+# diverted program's name (app_id "prestium-audacity").
+Type=Application
+Name=Audacity
+Exec=/usr/bin/audacity %F
+Icon=audacity
+StartupWMClass=prestium-audacity
+NoDisplay=true

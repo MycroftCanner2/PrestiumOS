@@ -139,7 +139,10 @@ def serve_loop(lsock):
 
 def _exec(real, args):
     no_new_privs()
-    os.execv(real, [real] + args)
+    # argv[0] is /usr/bin/audacity (the shim), not the diverted path, so the window's app_id / WM_CLASS
+    # is "audacity" and the panel finds Audacity's own icon (with "prestium-audacity" it matched
+    # another Prestium launcher's icon). A re-exec of argv[0] still goes through the shim.
+    os.execv(real, ["/usr/bin/audacity"] + args)
 
 
 def serve(path, real, args):
