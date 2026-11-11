@@ -11,7 +11,7 @@ n=0; while read -r mode own grp path; do n=$((n+1))
   case $path in */) want=0750;; *) want=0640;; esac
   [ "$mode $own $grp" = "$want root thelounge" ] || bad "perms: $mode $own $grp $path"
 done < /tmp/tl.perms.$$; rm -f /tmp/tl.perms.$$
-[ "$n" -ge 54 ] && ok "perms: config.js and $((n-1)) package entries root:thelounge, read-only" || bad "perms: only $n entries"
+[ "$n" -ge 50 ] && ok "perms: config.js and $((n-1)) package entries root:thelounge, read-only" || bad "perms: only $n entries"
 # every shipped file under packages/ has an entry
 ( cd "$I" && find var/lib/thelounge/packages -type f ) | while read -r f; do
   grep -q " /$f$" "$P" || echo "FAIL perms.txt misses /$f"; done | grep . && fail=1 || ok "every package file listed in perms.txt"

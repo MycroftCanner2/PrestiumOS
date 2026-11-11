@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prestium 2.1: The Lounge's theme packages (the 10 Theme Factory themes and Prestium) are installed,
+# Prestium 2.1: The Lounge's theme packages (the 10 Theme Factory themes) are installed,
 # enabled and well-formed, Tech Innovation is the server default, every theme loads nothing from outside,
 # the generated themes match scripts/thelounge-themes.py (which also checks WCAG contrast >= 4.5:1),
 # and every file has a perms.txt entry. No network, no Node needed.
@@ -7,7 +7,7 @@ set -u
 R=$(cd "$(dirname "$0")/.." && pwd); I=$R/config/includes.chroot
 P=$I/var/lib/thelounge/packages; PERMS=$I/usr/share/prestium/build/perms.txt
 DEFAULT=thelounge-theme-tech-innovation
-THEMES="ocean-depths sunset-boulevard forest-canopy modern-minimalist golden-hour arctic-frost desert-rose tech-innovation botanical-garden midnight-galaxy prestium"
+THEMES="ocean-depths sunset-boulevard forest-canopy modern-minimalist golden-hour arctic-frost desert-rose tech-innovation botanical-garden midnight-galaxy"
 fail=0; ok(){ echo "OK   $*"; }; bad(){ echo "FAIL $*"; fail=1; }
 n=0
 for s in $THEMES; do
@@ -28,7 +28,7 @@ PY
     grep -qx "0640 root thelounge /var/lib/thelounge/packages/node_modules/$pkg/$f" "$PERMS" && ok "$pkg: perms $f" || bad "$pkg: perms $f"; done
   grep -qx "0750 root thelounge /var/lib/thelounge/packages/node_modules/$pkg/" "$PERMS" && ok "$pkg: perms directory" || bad "$pkg: perms directory"
 done
-[ "$n" = 11 ] && ok "11 theme packages" || bad "theme count $n"
+[ "$n" = 10 ] && ok "10 theme packages" || bad "theme count $n"
 # Theme Factory display names, exactly as in the skill
 python3 - "$P/node_modules" <<'PY' && ok "Theme Factory display names" || bad "display names"
 import json,sys
@@ -44,7 +44,7 @@ D=$P/node_modules/$DEFAULT
 grep -q 'color-scheme: dark;' "$D/theme.css" && grep -q -- '--t-fg: #ffffff;' "$D/theme.css" && grep -q -- '--t-in-fg: #ffffff;' "$D/theme.css" \
   && ok "default: dark, chat and field text #ffffff" || bad "default theme text colours"
 # text fields get an explicit colour and background in every generated theme
-for s in $THEMES; do [ "$s" = prestium ] && continue
+for s in $THEMES; do
   grep -q '^textarea,$' "$P/node_modules/thelounge-theme-$s/theme.css" && grep -q '^#chat .self .content,$' "$P/node_modules/thelounge-theme-$s/theme.css" \
     && ok "thelounge-theme-$s: explicit field and chat text colours" || bad "thelounge-theme-$s: no explicit field / chat text colours"; done
 python3 "$R/scripts/thelounge-themes.py" --check && ok "generated themes match scripts/thelounge-themes.py, contrast >= 4.5:1" || bad "generator check"

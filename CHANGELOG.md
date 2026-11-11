@@ -9,8 +9,8 @@ Enhanced security and new features. Changes will be listed here as they land.
   Depths, Sunset Boulevard, Forest Canopy, Modern Minimalist, Golden Hour, Arctic Frost, Desert Rose,
   Tech Innovation, Botanical Garden and Midnight Galaxy are local theme packages
   (`/var/lib/thelounge/packages/node_modules/thelounge-theme-*`, root-owned and read-only like the
-  others). Prestium and The Lounge's own themes can still be picked in Settings. This replaces the
-  Prestium theme as the default (see below): in it, your own messages were dimmed and Settings fields
+  others). The old Prestium theme package is removed; The Lounge's own themes can still be picked in
+  Settings. In the Prestium theme (see below), your own messages were dimmed and Settings fields
   could show black text on a dark box. Every theme now sets the colour and background of text fields
   (Settings, Connect, message box and placeholders) and of chat text explicitly; chat text is white on
   the dark themes and a dark palette colour on the light ones, and each text/background pair is at
