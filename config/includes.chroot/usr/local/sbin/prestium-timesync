@@ -15,12 +15,13 @@
 #    time it sent (sdwdate's clock randomization);
 #  - never earlier than the image's build date (one day of slack), the last time this boot set, or
 #    /etc/minimum-unixtime; never more than 10 years after the build (time replay protection);
-#  - the first sync of a boot, or a difference over 3 minutes, steps the clock; smaller ones are slewed
+#  - the first sync of a boot, or a difference over 10 seconds, steps the clock; smaller ones are
+#    slewed by the kernel (adjtime)
 #    in steps of a few milliseconds, so the clock never jumps visibly to a watching web page.
 # Then it sleeps a random 60 to 180 minutes (a failed round: 1 to 5 minutes) and starts again.
 # State for the panel goes to /run/prestium/timesync/waybar.json; the log keeps "skew Ns" lines,
 # which prestium-vm-netcheck reads.
-import json, os, random, re, secrets, statistics, subprocess, sys, threading, time
+import calendar, ctypes, json, os, random, re, secrets, statistics, subprocess, sys, threading, time
 from email.utils import parsedate_to_datetime
 
 POOLS = "/usr/share/prestium/timesync/pools.conf"
@@ -33,7 +34,7 @@ CONSENSUS = ("/var/lib/tor/cached-microdesc-consensus", "/var/lib/tor/cached-con
 SOCKS = "127.0.0.1:9050"
 HTP_USER = "prestium-htp"
 MAX_FAILURE_RATIO = 0.34
-STEP_LIMIT = 180                    # seconds; larger differences are stepped, smaller ones slewed
+STEP_LIMIT = 10                     # seconds; larger differences are stepped, smaller ones slewed by the kernel
 TEN_YEARS = 315576000
 ONION = re.compile(r"^https?://([a-z0-9-]+\.)*[a-z2-7]{56}\.onion(:[0-9]{1,5})?$")
 NS = 1_000_000_000
@@ -103,7 +104,7 @@ def consensus_window():
         va = re.search(r"^valid-after (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)$", head, re.M)
         vu = re.search(r"^valid-until (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)$", head, re.M)
         if va and vu:
-            conv = lambda s: int(time.mktime(time.strptime(s, "%Y-%m-%d %H:%M:%S")) - time.timezone)
+            conv = lambda s: calendar.timegm(time.strptime(s, "%Y-%m-%d %H:%M:%S"))
             return conv(va.group(1)), conv(vu.group(1))
     return None
 
@@ -183,13 +184,16 @@ def set_clock(target_ns, now_ns, step):
     if step:
         time.clock_settime_ns(time.CLOCK_REALTIME, target_ns + (time.clock_gettime_ns(time.CLOCK_REALTIME) - now_ns))
         return
-    # slew: move a few random milliseconds every tenth of a second until the difference is gone
-    left = target_ns - now_ns
-    while left:
-        d = min(abs(left), random.randint(4, 9) * 1_000_000) * (1 if left > 0 else -1)
-        time.clock_settime_ns(time.CLOCK_REALTIME, time.clock_gettime_ns(time.CLOCK_REALTIME) + d)
-        left -= d
-        time.sleep(0.1)
+    # slew: the kernel's adjtime(3) moves the clock smoothly at up to 0.5 ms per second; a later call
+    # replaces any slew still in progress, so each round aims at its own answer
+    left_us = (target_ns - now_ns) // 1000
+
+    class Timeval(ctypes.Structure):
+        _fields_ = [("tv_sec", ctypes.c_long), ("tv_usec", ctypes.c_long)]
+    libc = ctypes.CDLL("libc.so.6", use_errno=True)
+    tv = Timeval(*divmod(left_us, 1_000_000))
+    if libc.adjtime(ctypes.byref(tv), None) != 0:
+        raise OSError(ctypes.get_errno(), "adjtime failed")
 
 
 def one_round(pools, first):

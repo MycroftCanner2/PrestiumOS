@@ -138,11 +138,11 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   firewalled `prestium-htp` user, and uses the median. A pool with more than a third of its members
   failing aborts the round. An answer outside the current Tor consensus window is rejected. The clock is
   never set earlier than the build date, the last time it set this boot, or `/etc/minimum-unixtime`
-  (time replay protection). Up to one second of random nanoseconds is added. The first sync steps the
-  clock; later differences under 3 minutes are slewed a few milliseconds at a time. It re-syncs at random
+  (time replay protection). Up to one second of random nanoseconds is added. The first sync, and any
+  later difference over 10 seconds, steps the clock; smaller ones are slewed smoothly by the kernel. It re-syncs at random
   60 to 180 minute intervals instead of once per boot.
-- **Boot clock randomization.** `prestium-bootclock.service` moves the clock a random 0 to 180 seconds
-  into the past or future, with random nanoseconds, before Tor, i2pd and the time sync start.
+- **Boot clock randomization.** `prestium-bootclock.service` moves the clock a random 0 to 50 seconds
+  into the past or future (inside the 60 s i2pd allows between peers), with random nanoseconds, before Tor, i2pd and the time sync start.
 - **Clock-sync symbol in the bar.** An amber clock symbol shows until the time is set over Tor, and a red
   one if the sync refused a time it could not trust. It disappears once the clock is synced. The
   previous one-shot sync from clearnet HTTPS sites is gone.
@@ -202,7 +202,8 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **A floating bar.** waybar floats with rounded corners and margins and uses Font Awesome symbols. Its
   status area is icons only (network, volume capped at 100 %, battery) with a two-line clock: time over
   date, in UTC, no tooltip. Tor and I2P pills show connecting (amber), ready (cyan) or failed (red), and
-  a click opens the matching Connection Assistant. The state comes from `prestium-netstatus.service`
+  a click opens the matching Connection Assistant. With no network
+  connection the Tor pill goes back to amber instead of staying ready. The state comes from `prestium-netstatus.service`
   (its own user, read-only, writes only `/run/prestium/netstatus`, never copies log text). A clock symbol
   shows until the time is set over Tor (see Network). Hover colours fade in; labwc and mako have no open
   or close animations.
@@ -215,7 +216,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   "Claws Mail (Email, I2P)"). Every entry has an icon Debian ships, and wording, ellipses and title case
   are the same everywhere.
 - **Notifications.** One look per urgency (low: grey edge, 5 s; normal: blue edge, 8 s; critical: red
-  edge, stays and always shows), with app icons; only identical repeats are grouped. The volume and
+  edge, stays and always shows), with app icons drawn at no more than 32 px so small ones stay sharp; only identical repeats are grouped. The volume and
   brightness display is compact, at the top centre. Optional quiet sounds, off by default (System,
   Notification Sounds (On/Off)). The VM, image-age and safety notices are no longer held up at login.
 - **Wallpapers and lock screen.** Three Prestium wallpapers (Horizon, Circuit, Mark) are picked in

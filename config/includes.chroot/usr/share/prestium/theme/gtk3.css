@@ -29,7 +29,7 @@ entry:focus, spinbutton:focus:not(.vertical), textview:focus { border-color: #00
 
 button.suggested-action, button.default:not(.flat) {
   background-image: none; background-color: #0066ff; border-color: #0052cc; color: #ffffff; text-shadow: none; }
-button.suggested-action:hover { background-color: #1a75ff; }
+button.suggested-action:hover { background-color: #0a6cff; }
 button.suggested-action:active, button.suggested-action:checked { background-color: #0052cc; }
 button.suggested-action:disabled { background-color: #24324d; color: #a8a8a8; }
 

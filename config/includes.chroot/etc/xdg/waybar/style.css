@@ -10,7 +10,7 @@ tooltip label { color: #ffffff; padding: 2px 4px; }
 /* menu button */
 #custom-menu { padding: 0 14px; margin: 4px 4px 4px 5px; background: #0066ff; color: #ffffff; border-radius: 10px; font-weight: bold;
   transition: background-color 150ms ease-in-out; }
-#custom-menu:hover { background: #1a75ff; }
+#custom-menu:hover { background: #0a6cff; }
 
 /* windows */
 #taskbar button { padding: 0 8px; margin: 4px 2px; min-width: 0; color: #a8a8a8; border-radius: 8px; border: none;

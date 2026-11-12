@@ -88,6 +88,12 @@ os.path.exists(T + "/state") and os.remove(T + "/state")
 r, o = run({"zero": [at(600)], "one": [at(600)], "two": [at(600)]}, first=False)
 (ok if " step" in o else bad)("10-minute difference: stepped")
 os.path.exists(T + "/state") and os.remove(T + "/state")
+r, o = run({"zero": [at(30)], "one": [at(30)], "two": [at(30)]}, first=False)
+(ok if " step" in o else bad)("30-second difference: stepped (over the 10 s slew limit)")
+src = open(I + "/usr/local/sbin/prestium-timesync").read()
+(ok if "libc.adjtime(" in src and "time.sleep(0.1)" not in src else bad)("slew: kernel adjtime, no stepping loop")
+(ok if "calendar.timegm(" in src and "time.mktime" not in src else bad)("consensus times parsed as UTC with timegm")
+os.path.exists(T + "/state") and os.remove(T + "/state")
 
 # an answer outside Tor's consensus window is a failure; too many failures abort the round
 r, o = run({"zero": [at(5)], "one": [at(5)], "two": [at(30 * 86400)] * 20})
@@ -113,11 +119,11 @@ src = open(I + "/usr/local/sbin/prestium-timesync").read()
 
 # boot clock randomization
 bc = open(I + "/usr/local/sbin/prestium-bootclock").read()
-(ok if "randbelow(360 * NS + 1) - 180 * NS" in bc else bad)("bootclock: uniform -180..+180 s with nanoseconds")
+(ok if "randbelow(100 * NS + 1) - 50 * NS" in bc else bad)("bootclock: uniform -50..+50 s with nanoseconds (inside i2pd's 60 s)")
 import subprocess
 o = subprocess.run([sys.executable, I + "/usr/local/sbin/prestium-bootclock", "--dry-run"], capture_output=True, text=True).stdout
 m = re.search(r"by ([+-]\d+\.\d{9})s", o)
-(ok if m and abs(float(m.group(1))) <= 180 else bad)("bootclock dry run: " + o.strip())
+(ok if m and abs(float(m.group(1))) <= 50 else bad)("bootclock dry run: " + o.strip())
 
 # units
 U = I + "/etc/systemd/system"

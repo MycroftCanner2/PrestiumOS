@@ -1,0 +1,4 @@
+#!/bin/sh
+# fixture: a default route exists unless PRESTIUM_FIXTURE_NOROUTE=1
+[ "$PRESTIUM_FIXTURE_NOROUTE" = 1 ] && exit 0
+case "$*" in *"route show default"*) echo "default via 10.0.2.2 dev eth0" ;; esac

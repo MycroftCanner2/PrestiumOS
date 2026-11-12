@@ -1,14 +1,15 @@
 #!/usr/bin/python3
 # Prestium 2.1: boot clock randomization, modelled on Kicksecure's bootclockrandomization
 # (https://www.kicksecure.com/wiki/Boot_Clock_Randomization). Early in boot, before Tor, i2pd and the
-# clock sync start, move the clock a random 0 to 180 seconds into the past or future, with random
+# clock sync start, move the clock a random 0 to 50 seconds into the past or future (Kicksecure uses
+# 180; 50 keeps i2pd, which refuses peers more than 60 s apart, connecting quickly), with random
 # nanoseconds (0 to 5 seconds is not excluded: that helped fingerprinting). Until prestium-timesync has
 # set the time over Tor, this computer's clock then differs from its hardware clock, its host's clock
 # (in a VM) and other Prestium systems in a way no one can predict.
 import secrets, sys, time
 
 NS = 1_000_000_000
-offset = secrets.randbelow(360 * NS + 1) - 180 * NS
+offset = secrets.randbelow(100 * NS + 1) - 50 * NS
 if "--dry-run" in sys.argv:
     print("would move the clock by %+.9fs" % (offset / NS)); sys.exit(0)
 time.clock_settime_ns(time.CLOCK_REALTIME, time.clock_gettime_ns(time.CLOCK_REALTIME) + offset)

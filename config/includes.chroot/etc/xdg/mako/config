@@ -21,7 +21,7 @@ icons=1
 # inheritance, so list the themes Prestium inherits from in the same order
 # 2.1 (design batch): Papirus-Dark first, like the Prestium icon theme
 icon-path=/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:/usr/share/icons/Papirus:/usr/share/icons/AdwaitaLegacy:/usr/share/icons/gnome:/usr/share/icons/Adwaita
-max-icon-size=40
+max-icon-size=32
 icon-location=left
 progress-color=over #0066ff
 # 2.1: only identical repeats collapse (same app and summary); critical alerts are never hidden
