@@ -225,11 +225,17 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   is read-only and disappears once both connect.
 
 ### Desktop
+- **The logo and wallpapers are final.** `prestium-logo-256.png` is rendered again from the final
+  `prestium-logo.svg`; the old PNG still had an earlier gradient. The three wallpapers (Horizon,
+  Circuit, Mark) stay 2560x1440 and are recompressed losslessly with their metadata stripped, so the
+  pixels don't change (2.8, 2.8 and 2.5 MB, about 2 % smaller). Every volume, microphone and
+  brightness OSD icon and the notification-sound icons exist in Papirus-Dark itself (its panel icons
+  are shared with Papirus), so no names or fallbacks change. Tests: `test_design_assets.py`.
 - **A new Prestium look.** One palette everywhere: dark grey surfaces, an Electric Blue `#0066ff` accent
   and Neon Cyan `#00ffff` highlights (the colours of The Lounge's Tech Innovation theme), with Cantarell
   as the UI font. GTK 3 and 4 (libadwaita) apps are dark (prefer-dark, dconf `accent-color='blue'`) and
   take the palette from a colour-only `gtk.css`; GTK 2 (Pidgin) uses Adwaita-dark. Qt 5 and 6 apps use
-  Kvantum with a "Prestium" theme (`QT_STYLE_OVERRIDE=kvantum`; adwaita-qt is gone). KDE apps use a
+  Kvantum with a "Prestium" theme (`QT_STYLE_OVERRIDE=kvantum`). KDE apps use a
   `Prestium` colour scheme, and Kleopatra picks it by default (`/etc/xdg/kleopatrarc`) instead of
   Breeze Dark. Audacity, KeePassXC and the foot terminal (11 pt, readable red, blue, magenta and grey)
   are dark too. Tor Browser keeps its own fonts. The build fails if the system dconf database isn't
