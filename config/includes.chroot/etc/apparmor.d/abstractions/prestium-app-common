@@ -1,6 +1,8 @@
 # Prestium 2.1 (audit of 96468c5): the desktop part of prestium-app-base (X11 and Wayland, GTK/Qt,
-# fonts, audio, GPU, locale, the session's caches), without the denies, so profiles that need a
+# fonts, GPU, locale, the session's caches), without the denies, so profiles that need a
 # different set (the file viewers, KeePassXC, Kleopatra) can build on it. Includes prestium-no-admin.
+# 2.1 (audit of a5fd1fb, I-8): no sound here. prestium-app-base, VLC and Audacity add the audio abstraction;
+# the viewers, editors, KeePassXC and Kleopatra can't open the microphone.
   include <abstractions/base>
   include <abstractions/fonts>
   include <abstractions/freedesktop.org>
@@ -9,7 +11,6 @@
   include <abstractions/gnome>
   include if exists <abstractions/qt5>
   include if exists <abstractions/qt6>
-  include <abstractions/audio>
   include <abstractions/dri-enumerate>
   include <abstractions/mesa>
   include <abstractions/ibus>

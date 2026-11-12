@@ -86,4 +86,13 @@ assert not os.path.exists(os.environ["PRESTIUM_MARKER"]), "user-site .pth ran"
 assert not os.path.exists(os.environ["PRESTIUM_MARKER"] + ".uc"), "usercustomize ran"
 ' || { echo "E: PYTHONNOUSERSITE did not stop a user-site .pth from running"; exit 1; }
 
+# 2.1 (audit of a5fd1fb, L-6): without PYTHONNOUSERSITE, CPython runs user-site .pth lines before it
+# imports sitecustomize. This documents that (expected here); onion-grater therefore requires the variable.
+rm -f "$PRESTIUM_MARKER"
+env -u PYTHONNOUSERSITE python3 -c 'pass' >/dev/null 2>&1 || true
+if [ -e "$PRESTIUM_MARKER" ]; then echo "I: as expected, a user-site .pth runs when PYTHONNOUSERSITE is unset"
+else echo "I: a user-site .pth did not run without PYTHONNOUSERSITE (Python changed?)"; fi
+grep -q 'b"PYTHONNOUSERSITE=1" not in env' /usr/local/sbin/prestium-onion-grater \
+  || { echo "E: onion-grater does not require PYTHONNOUSERSITE=1"; exit 1; }
+
 echo "P: Python user site-packages off ($n)"

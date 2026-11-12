@@ -22,9 +22,11 @@ def case(env, maps=SYS_MAPS):
     open(d + "/42/environ", "wb").write(b"\0".join(env) + b"\0")
     open(d + "/42/maps", "w").write(maps)
     return tampered(42, proc=d)
-clean = [b"HOME=/home/user", b"PATH=/usr/bin", b"WAYLAND_DISPLAY=/run/prestium-wl/1000/apps", b"PYTHONDONTWRITEBYTECODE=1"]
+clean = [b"HOME=/home/user", b"PATH=/usr/bin", b"WAYLAND_DISPLAY=/run/prestium-wl/1000/apps", b"PYTHONDONTWRITEBYTECODE=1", b"PYTHONNOUSERSITE=1"]
 r = case(clean); (ok if r is None else bad)("a normal start is accepted (%s)" % r)
-r = case(clean + [b"PYTHONNOUSERSITE=1"]); (ok if r is None else bad)("PYTHONNOUSERSITE is accepted (%s)" % r)
+# 2.1 (audit of a5fd1fb, L-6): a user-site .pth runs before sitecustomize, so the variable is required
+r = case([e for e in clean if not e.startswith(b"PYTHONNOUSERSITE=")]); (ok if r else bad)("refused: PYTHONNOUSERSITE absent (%s)" % r)
+r = case([e for e in clean if not e.startswith(b"PYTHONNOUSERSITE=")] + [b"PYTHONNOUSERSITE=0"]); (ok if r else bad)("refused: PYTHONNOUSERSITE=0 (%s)" % r)
 for e in (b"PYTHONPATH=/home/user/x", b"PYTHONHOME=/tmp/py", b"PYTHONSTARTUP=/tmp/s.py", b"PYTHONUSERBASE=/tmp",
           b"LD_PRELOAD=/home/user/evil.so", b"LD_LIBRARY_PATH=/tmp", b"LD_AUDIT=/tmp/a.so", b"GCONV_PATH=/tmp",
           b"GLIBC_TUNABLES=glibc.x=1"):
@@ -43,7 +45,7 @@ for m in ("7f40-7f50 r-xs 00000000 00:01 9 /memfd:evil (deleted)\n", "7f40-7f50 
 # the same check on a real process of this machine: python3 with a ctypes callback (a libffi closure)
 import subprocess
 p = subprocess.Popen([sys.executable, "-c", "import ctypes,sys,time; f=ctypes.CFUNCTYPE(ctypes.c_int)(lambda: 1); "
-                      "print(f(), flush=True); time.sleep(5)"], stdout=subprocess.PIPE, env={"PATH": "/usr/bin:/bin"})
+                      "print(f(), flush=True); time.sleep(5)"], stdout=subprocess.PIPE, env={"PATH": "/usr/bin:/bin", "PYTHONNOUSERSITE": "1"})
 p.stdout.readline()
 maps = open("/proc/%d/maps" % p.pid).read()
 r = tampered(p.pid); p.kill(); p.wait()

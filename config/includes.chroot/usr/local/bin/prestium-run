@@ -12,4 +12,6 @@ if [ -S "$S" ]; then
 else
   export WAYLAND_DISPLAY=prestium-no-wayland GDK_BACKEND=x11 QT_QPA_PLATFORM=xcb MOZ_ENABLE_WAYLAND=0
 fi
+# 2.1 (audit of a5fd1fb, L-6): onion-grater requires this for its Python clients
+export PYTHONNOUSERSITE=1
 exec "$@"

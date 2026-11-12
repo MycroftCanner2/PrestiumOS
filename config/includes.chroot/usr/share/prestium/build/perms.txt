@@ -86,6 +86,7 @@
 0644 root root /etc/wgetrc
 0644 root root /etc/xdg/mimeapps.list
 0644 root root /etc/xdg/pcmanfm/default/pcmanfm.conf
+0644 root root /etc/xdg/libfm/libfm.conf
 0644 root root /etc/xdg/user-dirs.defaults
 0600 user user /home/user/.claws-mail/accountrc.tmpl
 0600 user user /home/user/.claws-mail/clawsrc

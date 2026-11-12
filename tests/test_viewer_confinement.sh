@@ -105,4 +105,11 @@ if command -v apparmor_parser >/dev/null; then
   done <<<"$TABLE"
   grep -q 'deny @{HOME}/.gnupg/\*.conf{,.\*} w,' "$A/usr.bin.kleopatra" && ok "kleopatra: GnuPG configs read-only" || bad "kleopatra may write GnuPG configs"
 else echo "SKIP apparmor_parser missing (compile, expanded checks)"; fi
+# 2.1 (audit of a5fd1fb, L-7): the unconfined file manager makes no thumbnails and mounts nothing by itself
+L="$R/config/includes.chroot/etc/xdg/libfm/libfm.conf" P="$R/config/includes.chroot/etc/xdg/pcmanfm/default/pcmanfm.conf"
+grep -qx 'show_thumbnail=0' "$L" 2>/dev/null && ok "libfm: thumbnails off" || bad "libfm: thumbnails not off"
+grep -qx 'mount_removable=0' "$P" && grep -qx 'mount_on_startup=0' "$P" && ok "pcmanfm: no automount" || bad "pcmanfm automounts"
+for f in "$A"/usr.bin.{loupe,ristretto,file-roller,xarchiver,featherpad,mat2,metadata-cleaner,gimp,keepassxc,kleopatra}; do
+  grep -q 'abstractions/audio' "$f" && bad "$(basename "$f"): sound access" || ok "$(basename "$f"): no sound access"; done
+grep -q 'abstractions/audio' "$R/config/includes.chroot/etc/apparmor.d/abstractions/prestium-app-common" && bad "app-common gives sound" || ok "app-common: no sound"
 exit $fail

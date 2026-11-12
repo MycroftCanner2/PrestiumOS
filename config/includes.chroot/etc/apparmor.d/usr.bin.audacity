@@ -17,6 +17,7 @@ profile audacity /usr/libexec/prestium-audacity {
   # 2.1 (review of 778baf7): this TCP rule reaches only the loopback of Audacity's own network
   # namespace (prestium-audacity): nothing else is in it, so not the host's 127.0.0.1 (Tor's SOCKS
   # port, I2P's proxies) and no other address. No exec of bwrap, nsenter, the wrapper or the shim.
+  include <abstractions/audio>
   include <abstractions/prestium-viewer-core>
   network inet stream,
   include <abstractions/prestium-viewer-write>

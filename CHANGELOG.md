@@ -79,6 +79,11 @@ This is one combined list of everything that changed since the last release, 2.0
   press Reset to shipped copy.
 
 ### App confinement and sandboxes
+- **The file manager makes no thumbnails and mounts no drives by itself.** PCManFM isn't confined, so it no
+  longer decodes downloaded pictures for previews (`/etc/xdg/libfm/libfm.conf`). USB drives are mounted with
+  a click, not on insert or at start-up.
+- **The file viewers, editors, KeePassXC and Kleopatra have no sound or microphone access.** VLC, Audacity,
+  the browsers and the chat and mail apps keep it.
 - **Programs that open downloaded files are confined:** Loupe, Ristretto, VLC, File Roller, Xarchiver,
   FeatherPad, mat2, Metadata Cleaner, GIMP and Audacity run under enforced AppArmor profiles (no
   network, no camera, no admin tools, no other app's mail/chat/browser data, no OpenPGP keys or
@@ -125,6 +130,11 @@ This is one combined list of everything that changed since the last release, 2.0
   and the MAC guard read `PRESTIUM_*` variables only when run from the source tree.
 
 ### Network, firewall and privileges
+- **The control-port filter checks Python clients more strictly.** Nyx, OnionShare and the Tor Connection
+  Assistant must start with `PYTHONNOUSERSITE=1` (`prestium-run` and `prestium-nyx` set it), because Python
+  runs `.pth` files from the user's site-packages before `sitecustomize` can switch them off. The filter's
+  service won't start without its AppArmor profile.
+- **The Wayland broker's socket is open to group `user` only** (0660, was 0666).
 - **i2pd and Tor can no longer reach Prestium's local services.** Their firewall accepts are for the
   network only. On loopback, i2pd keeps only its SOCKS outproxy tunnel (4500) and Tor only the kernel's
   ephemeral ports 32768-60999, where its pluggable transports listen, and OnionShare's web server
@@ -215,7 +225,8 @@ Not changed in 2.1, so you know where the edges are:
   `/usr/libexec` can still be started by hand outside the namespace. Two first starts at the same
   instant can still race.
 - **AppArmor's D-Bus rules are not enforced on Debian 13's kernel** (6.12 has no D-Bus mediation).
-- **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need.
+- **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need. It may also reach
+  127.0.0.1:17600-17650, where OnionShare's web server listens for its onion services.
 - **Programs of the desktop user may change NetworkManager's system connections** (to add Wi-Fi). The
   MAC guard and the firewall keep the real MAC address and real IP address from leaking that way.
 - **The local-only Firefox's network rule follows a group** (`prestium-localweb`) that the desktop

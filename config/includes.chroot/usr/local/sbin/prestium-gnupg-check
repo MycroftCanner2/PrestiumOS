@@ -38,8 +38,10 @@ for d in "$P"/[0-9]*; do
   case "$l" in unconfined*|unknown) ;; *) continue ;; esac
   h=$(awk -F: -v u="$uid" '$3==u{print $6; exit}' "${PRESTIUM_PASSWD:-/etc/passwd}")
   [ -n "$h" ] || continue
+  # 2.1 (audit of a5fd1fb, I-9): this runs as root, so never follow a link the user made
+  [ -L "$h/.gnupg" ] && continue
   for f in "$h"/.gnupg/*.conf; do
-    [ -f "$f" ] || continue
+    [ -f "$f" ] && [ ! -L "$f" ] || continue
     # GnuPG takes the rest of the line as the value (optionally in double quotes)
     o=$(awk '{sub(/^[ \t]+/,""); sub(/[ \t\r]+$/,"")}
       /^[a-z0-9-]*-program([ \t=]|$)/{k=$0; sub(/[ \t=].*$/,"",k); v=substr($0,length(k)+1)

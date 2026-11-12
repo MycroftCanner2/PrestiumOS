@@ -466,7 +466,12 @@ def main():
     old = os.umask(0o111)
     srv = Server(BROKER, Handler)
     os.umask(old)
-    os.chmod(BROKER, 0o666)
+    # 2.1 (audit of a5fd1fb, L-4): only group "user" (the session and its apps) may connect; system
+    # uids were refused anyway. Without that group (tests), keep the old mode.
+    try:
+        os.chown(BROKER, 0, grp.getgrnam("user").gr_gid); os.chmod(BROKER, 0o660)
+    except KeyError:
+        os.chmod(BROKER, 0o666)
     threading.Thread(target=reaper, daemon=True).start()
     subprocess.run(["systemd-notify", "--ready"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     log("listening on %s" % BROKER)

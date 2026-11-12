@@ -16,7 +16,7 @@ module.exports = {
 	https: {enable: false, key: "", certificate: "", ca: ""},
 	// 2.1: Tech Innovation, one of the 10 Theme Factory themes shipped as local packages
 	// (packages/node_modules/thelounge-theme-*, listed in packages/package.json; The Lounge falls back to
-	// "default" with a warning if it is missing). Users can still pick Prestium or another in Settings.
+	// "default" with a warning if it is missing). Users can still pick another theme in Settings.
 	theme: "thelounge-theme-tech-innovation",
 	prefetch: false,
 	disableMediaPreview: true,

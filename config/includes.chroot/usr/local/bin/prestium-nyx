@@ -4,6 +4,7 @@
 # onion-grater identifies it exactly as before. When Nyx fails (for example "Unable to connect to
 # tor" after the control-port filter refused it), foot used to close at once and the message was
 # never seen: now the window stays open until Enter is pressed.
+export PYTHONNOUSERSITE=1  # required by onion-grater (audit of a5fd1fb, L-6)
 /usr/bin/nyx "$@"
 rc=$?
 if [ "$rc" -ne 0 ]; then

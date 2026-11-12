@@ -1,6 +1,7 @@
 # Prestium 2.0 r9: what every confined desktop app needs (X11, GTK/Qt, fonts, audio, GPU, locale),
 # and nothing in $HOME beyond the app's own directories (each profile adds those). Includes
 # prestium-no-admin: no sudo/su/pkexec, no Prestium helpers, no Tor control socket, no system bus.
+  include <abstractions/audio>
   include <abstractions/prestium-app-common>
   include <abstractions/prestium-app-secrets>
   # and, for every app built on this: no OpenPGP keys, no KeePassXC databases, no Tor Browser downloads

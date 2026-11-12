@@ -21,6 +21,8 @@ RuntimeDirectoryMode=0755
 # outside @system-service, and the secrets of the system are hidden from the filter below.
 AmbientCapabilities=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
 CapabilityBoundingSet=CAP_SYS_PTRACE CAP_DAC_READ_SEARCH
+# 2.1 (audit of a5fd1fb, I-7): no "-" prefix, so the filter never runs without its profile (fail closed)
+AppArmorProfile=prestium_onion_grater
 InaccessiblePaths=-/etc/shadow -/etc/shadow- -/etc/gshadow -/etc/gshadow- -/etc/sudoers -/etc/sudoers.d -/etc/ssh -/var/lib
 NoNewPrivileges=yes
 ProtectSystem=strict

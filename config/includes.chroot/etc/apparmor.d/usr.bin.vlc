@@ -6,6 +6,7 @@ abi <abi/4.0>,
 include <tunables/global>
 
 profile vlc /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} {
+  include <abstractions/audio>
   include <abstractions/prestium-viewer>
   /{,usr/}bin/{sh,dash,bash} ix,
   /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} mr,
