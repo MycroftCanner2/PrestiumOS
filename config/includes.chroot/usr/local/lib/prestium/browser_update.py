@@ -716,7 +716,7 @@ def prepare_update(name, transport, cancel=None, progress=None, log=None, home=N
     cdir = cache_dir(home)
     check(name, cdir)
     t = transport if isinstance(transport, Transport) else Transport(transport)
-    progress("Checking %s ..." % ("Tor" if t.name == "tor" else "the I2P HTTP proxy"), 0, None)
+    progress("Checking %s…" % ("Tor" if t.name == "tor" else "the I2P HTTP proxy"), 0, None)
     t.probe()
     f = fetcher or Fetcher(name, t, cancel, progress, log)
     sdir = staging_dir(name, home)
@@ -725,7 +725,7 @@ def prepare_update(name, transport, cancel=None, progress=None, log=None, home=N
     work = tempfile.mkdtemp(prefix="work.", dir=cdir)
     ok = False
     try:
-        progress("Checking for the latest version ...", 0, None)
+        progress("Checking for the latest version…", 0, None)
         if name == "tor-browser":
             meta = f.fetch(TB_JSON, os.path.join(work, "update.json"), 65536, "update information")
             v = parse_tb_json(read_text(meta))
@@ -735,7 +735,7 @@ def prepare_update(name, transport, cancel=None, progress=None, log=None, home=N
             n, url, asc = tb_urls(v)
             f.fetch(asc, os.path.join(sdir, n + ".asc"), 65536, "signature")
             f.fetch(url, os.path.join(sdir, n), ARTEFACT_CAP, n)
-            progress("Verifying signature ...", 0, None)
+            progress("Verifying signature…", 0, None)
             gpg_verify(n, name, work, sig=os.path.join(sdir, n + ".asc"), data=os.path.join(sdir, n))
             sha = sha256_file(os.path.join(sdir, n))
             hint = {"version": v, "file": n, "url": url}
@@ -748,7 +748,7 @@ def prepare_update(name, transport, cancel=None, progress=None, log=None, home=N
             n, url, sums, sasc = ff_urls(v)
             f.fetch(sums, os.path.join(sdir, "SHA256SUMS"), 4 * MiB, "SHA256SUMS")
             f.fetch(sasc, os.path.join(sdir, "SHA256SUMS.asc"), 65536, "signature")
-            progress("Verifying signature ...", 0, None)
+            progress("Verifying signature…", 0, None)
             gpg_verify("SHA256SUMS", name, work, sig=os.path.join(sdir, "SHA256SUMS.asc"),
                        data=os.path.join(sdir, "SHA256SUMS"))
             f.fetch(url, os.path.join(sdir, n), ARTEFACT_CAP, n)
@@ -759,7 +759,7 @@ def prepare_update(name, transport, cancel=None, progress=None, log=None, home=N
             inr = f.fetch(LW_INRELEASE, os.path.join(sdir, "InRelease"), META_CAP, "InRelease")
             with open(inr, "rb") as fh:
                 check_clearsigned_shape(fh.read())
-            progress("Verifying signature ...", 0, None)
+            progress("Verifying signature…", 0, None)
             plain = os.path.join(work, "Release")
             gpg_verify("InRelease", name, work, clearsigned=inr, out=plain)
             _, sums = parse_release(read_text(plain, META_CAP))
@@ -781,7 +781,7 @@ def prepare_update(name, transport, cancel=None, progress=None, log=None, home=N
                 check_ram(name, size, lw_installed_size(st), meminfo=meminfo)
             deb = os.path.join(sdir, "librewolf.deb")
             f.fetch(LW_BASE + st["Filename"], deb, ARTEFACT_CAP, os.path.basename(st["Filename"]), size)
-            progress("Verifying the package ...", 0, None)
+            progress("Verifying the package…", 0, None)
             sha = sha256_file(deb)
             if sha != st["SHA256"]:
                 raise SignatureError("the LibreWolf package does not match the signed Packages index")

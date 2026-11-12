@@ -20,7 +20,7 @@ d="$HOME/.claws-mail"
 rc="$d/accountrc"
 IN=${PRESTIUM_CLAWS_ACCOUNT_IN:-/usr/local/share/prestium-claws/accountrc.in}
 log(){ logger -t prestium "claws-mail-i2p: $*" 2>/dev/null; echo "claws-mail-i2p: $*" >&2; }
-T="Mail (I2P)"
+T="Claws Mail (Email, I2P)"
 
 first_start(){
   command -v zenity >/dev/null 2>&1 || return 1   # no form: Claws' wizard runs (template defaults)

@@ -273,7 +273,7 @@ class Window(Gtk.ApplicationWindow):
         self.update_buttons()
         via = "Tor" if transport == "tor" else "the I2P outproxy"
         self.log("%s: update using %s" % (bu.TITLES[name], via))
-        self.set_status(name, "Checking ...")
+        self.set_status(name, "Checking…")
 
         def progress(label, done, total):
             if total:
@@ -319,7 +319,7 @@ class Window(Gtk.ApplicationWindow):
             # from here on the root helper runs: no Cancel (a root unpack is never killed)
             self.can_cancel = False
             GLib.idle_add(self.update_buttons)
-            GLib.idle_add(self.set_status, name, "Installing ...")
+            GLib.idle_add(self.set_status, name, "Installing…")
             try:
                 res = bu.run_helper("install", name,
                                     on_event=lambda d: GLib.idle_add(self.set_status, name, d.get("message", "")))
@@ -342,7 +342,7 @@ class Window(Gtk.ApplicationWindow):
     def cancel_job(self):
         if self.job and self.cancel and self.can_cancel:
             self.cancel.set()
-            self.set_status(self.job[0], "Cancelling ...")
+            self.set_status(self.job[0], "Cancelling…")
 
     # ------------------------------------------------------------- reset
     def start_reset(self, name):
@@ -351,7 +351,7 @@ class Window(Gtk.ApplicationWindow):
         self.info.hide()
         self.job, self.cancel, self.can_cancel = (name, "reset", None), None, False
         self.update_buttons()
-        self.set_status(name, "Restoring the shipped copy ...")
+        self.set_status(name, "Restoring the shipped copy…")
         self.log("%s: reset to shipped copy" % bu.TITLES[name])
 
         def work():

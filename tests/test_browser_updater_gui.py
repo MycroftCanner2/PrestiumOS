@@ -197,7 +197,7 @@ class TestWindow(unittest.TestCase):
         def helper(cmd, name, on_event=None):
             seen["helper"] = (cmd, name)
             seen["cancel_in_helper"] = self.w.sections[name].cancel_btn._sensitive
-            on_event({"event": "phase", "message": "Installing ..."})
+            on_event({"event": "phase", "message": "Installing…"})
             return {"ok": True, "version": "16.0", "message": "Tor Browser 16.0 is installed for this session. " + bu.RESET_HINT}
         with mock.patch.object(bu, "prepare_update", prep), mock.patch.object(bu, "run_helper", helper):
             self.w.sections["tor-browser"].tor_btn.click()

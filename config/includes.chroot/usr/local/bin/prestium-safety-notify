@@ -8,8 +8,8 @@ declare -A shown
 alert() {   # $1 key, $2 text
   [ -n "${shown[$1]}" ] && return
   shown[$1]=1
-  notify-send -a "Prestium Safety" -i dialog-warning -u critical -t 0 "Prestium: protection NOT active" "$2" 2>/dev/null
-  zenity --warning --no-markup --width=460 --title "Prestium: protection NOT active" --text "$2" >/dev/null 2>&1 &
+  notify-send -a Prestium -i dialog-warning -u critical -t 0 "Protection NOT active" "$2" 2>/dev/null
+  zenity --warning --no-markup --width=460 --title "Protection NOT Active" --text "$2" >/dev/null 2>&1 &
 }
 toram=; grep -qw toram /proc/cmdline && toram=1
 AA_ENABLED=${PRESTIUM_AA_ENABLED:-/sys/module/apparmor/parameters/enabled}

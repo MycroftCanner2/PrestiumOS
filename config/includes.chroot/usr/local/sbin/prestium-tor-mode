@@ -130,7 +130,7 @@ def resolve(hosts):
     if not missing:
         return pins, {}
     event("resolving", "Resolving %d host name(s) through the I2P outproxy (DNS-over-HTTPS, "
-          "several providers in parallel) ..." % len(missing), hosts=missing)
+          "several providers in parallel)…" % len(missing), hosts=missing)
     errs = {}
     try:
         resolver_proc = subprocess.Popen(RESOLVER + missing, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
@@ -327,7 +327,7 @@ def cmd_apply():
     signal.signal(signal.SIGHUP, on_term)
     backup()
     try:
-        event("stopping", "Stopping Tor ...")
+        event("stopping", "Stopping Tor…")
         ok, err = tor("stop")
         if not ok:
             raise RuntimeError("Tor could not be stopped: %s" % err)
@@ -350,7 +350,7 @@ def cmd_apply():
                                    % ", ".join(need))
             if mode == "snowflake" and opt and not any(h in pins for h in opt):
                 raise RuntimeError("could not resolve any STUN server for Snowflake")
-        event("writing", "Writing the configuration ...")
+        event("writing", "Writing the configuration…")
         write_hosts(pins)
         atomic_write(FERM_INC, ferm_text(mode))
         ferm_reload()
@@ -358,7 +358,7 @@ def cmd_apply():
         ok, err = tor_verify_config()
         if not ok:
             raise RuntimeError("Tor rejected the configuration: %s" % err)
-        event("starting", "Starting Tor ...")
+        event("starting", "Starting Tor…")
         ok, err = tor("start")
         if not ok:
             raise RuntimeError("Tor did not start: %s" % err)

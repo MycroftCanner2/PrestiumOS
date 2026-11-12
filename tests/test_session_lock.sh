@@ -1,5 +1,5 @@
 #!/bin/bash
-# 2.1 (security audit): the session password (screen lock, admin prompts) has at least 8 characters,
+# 2.1 (security audit): the session password (screen lock) has at least 8 characters,
 # and each wrong password at the lock screen costs at least 4 seconds (pam_faildelay), no lockout.
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); I=$R/config/includes.chroot; fail=0
 ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }
@@ -23,6 +23,14 @@ import re,sys
 s=open(sys.argv[1]).read(); f=s[s.index("def set_password"):s.index("def lock_screen")]
 sys.exit(0 if 'self.dialog(["zenity", "--forms"' in f and "prestium-run" not in f else 1)
 PY
+# 2.1 (UI audit A1, A2): the dialog promises only the screen lock; automatic locks without a password notify
+grep -q 'administration' "$B" && bad "lock dialog still mentions administration prompts" || ok "lock dialog: screen lock only"
+grep -q 'prestium-lock-screen --auto", *$' "$B" && [ "$(grep -c 'prestium-lock-screen --auto"' "$B")" = 3 ] && ok "swayidle: --auto for timeout, before-sleep, lock" || bad "swayidle --auto"
+mkdir -p "$T/bin"; printf '#!/bin/sh\necho unset\n' > "$T/bin/sudo"; printf '#!/bin/sh\necho "$@" > %s/notified\n' "$T" > "$T/bin/notify-send"
+printf '#!/bin/sh\ntouch %s/dialog\n' "$T" > "$T/bin/prestium-wl"; chmod +x "$T/bin/"*
+sed "s#/usr/local/bin/prestium-wl#$T/bin/prestium-wl#g" "$L" > "$T/ls"
+PATH=$T/bin:$PATH sh "$T/ls" --auto; [ -s "$T/notified" ] && [ ! -e "$T/dialog" ] && grep -q 'Screen not locked' "$T/notified" && ok "auto lock, no password: notification, no dialog" || bad "auto lock without password"
+rm -f "$T/notified"; PATH=$T/bin:$PATH sh "$T/ls"; [ -e "$T/dialog" ] && [ ! -e "$T/notified" ] && ok "Lock Screen, no password: asks for one" || bad "manual lock without password"
 # 2.1 (review of db6601c): plain passwd isn't setuid (an empty password asks for no old one), and no
 # confined app may run passwd or its relatives
 grep -q 'dpkg-statoverride --update --add root root 0755 /usr/bin/passwd' "$R/config/hooks/live/0500-prestium-permissions.hook.chroot" \

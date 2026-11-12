@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Refresh I2P reseed (via Tor)
+Name=Refresh I2P Reseed (via Tor)
 Comment=Download a fresh, signature-checked I2P reseed file over Tor and make I2P reseed from it
 Exec=/usr/local/bin/prestium-i2p-reseed-gui
 Icon=view-refresh

@@ -1082,7 +1082,7 @@ def publish(name, new_srcs, v, extra_ids=()):
     cur = unit_binds(name)
     if cur:
         refuse_if_running(name, extra_ids)
-        event("Removing the previous update of this session ...")
+        event("Removing the previous update of this session…")
         try:
             unmount_all([c[2] for c in cur])
         except MountError as e:
@@ -1231,12 +1231,12 @@ def install(name):
         os.makedirs(base, mode=0o700, exist_ok=True)
         os.chmod(base, 0o700)
         work = tempfile.mkdtemp(dir=base)
-        event("Copying the downloaded files ...")
+        event("Copying the downloaded files…")
         for n in need_files:
             cap = bu.ARTEFACT_CAP if n.endswith((".tar.xz", ".deb")) else \
                 (bu.PACKAGES_CAP if n == "Packages" else (4 * MiB if n == "SHA256SUMS" else bu.META_CAP))
             copy_as_user(os.path.join(sdir, n), os.path.join(work, n), cap)
-        event("Verifying signature ...")
+        event("Verifying signature…")
         if name == "tor-browser":
             bu.gpg_verify(art, name, work, sig=os.path.join(work, art + ".asc"), data=os.path.join(work, art))
             sha = bu.sha256_file(os.path.join(work, art))
@@ -1249,17 +1249,17 @@ def install(name):
             v, sha = lw_signed(work)
         check_newer(name, v)
         clear_stale(name)
-        event("Unpacking %s %s ..." % (bu.TITLES[name], v))
+        event("Unpacking %s %s…" % (bu.TITLES[name], v))
         if name == "librewolf":
             deb = os.path.join(work, "librewolf.deb")
-            event("Checking dependencies ...")
+            event("Checking dependencies…")
             apt_simulate(deb)
             new_srcs = build_lw_unit(work, deb, v, layout)
         else:
             new_srcs = build_tarball_unit(name, work, os.path.join(work, art), v)
         shutil.rmtree(work, ignore_errors=True)        # the artefact copy: free the RAM before publish
         refuse_if_running(name, factory)
-        event("Installing ...")
+        event("Installing…")
         with shielded():
             publish(name, new_srcs, v, factory)
             ok = True           # published: from here on a failure must not report "not updated"
@@ -1310,7 +1310,7 @@ def revert(name):
         out({"ok": True, "message": "%s is already the shipped copy." % bu.TITLES[name], "nothing": True})
         return
     refuse_if_running(name, stamp_factory_ids(name))
-    event("Restoring the shipped copy ...")
+    event("Restoring the shipped copy…")
     # signals are held from the unmount through the stamp removal, the tmpfs release and the printed
     # result: a deferred SIGTERM must not leave the old stamp or the tmpfs behind once the shipped copy
     # is visible again (the window would then have no Reset to finish the cleanup)

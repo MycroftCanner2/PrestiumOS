@@ -70,7 +70,7 @@ class Dialog(Gtk.Window):
         os.makedirs(CONF_DIR, exist_ok=True)
         with open(SETTING, "w") as f:
             f.write(val + "\n")
-        self.status.set_text("Applying ...")
+        self.status.set_text("Applying…")
         def work():
             s = scale_cmd("--apply")
             GLib.idle_add(self.status.set_text, "Scale %s %% applied." % (s or "?"))

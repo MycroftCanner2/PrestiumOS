@@ -110,8 +110,8 @@ o=$(run_notify); [ -z "$o" ] && ok "notifier: no VM file, no alert" || bad "noti
 echo kvm > "$T/n/virt"
 o=$(run_notify); case "$o" in "Prestium is running in a virtual machine (kvm)|The host operating system and the virtualization software can see and record"*) ok "notifier: VM warning";; *) bad "no VM warning: $o";; esac
 echo "Running in QEMU. Tor NOT connected" > "$T/n/network"
-o=$(run_notify); case "$o" in *"Prestium: network problem in the virtual machine|Running in QEMU. Tor NOT connected"*) ok "notifier: shows the diagnosis";; *) bad "no diagnosis alert: $o";; esac
-[ "$(printf '%s\n' "$o" | grep -c 'network problem')" = 1 ] && ok "notifier: same diagnosis shown once" || bad "repeated alerts"
+o=$(run_notify); case "$o" in *"Network problem in the virtual machine|Running in QEMU. Tor NOT connected"*) ok "notifier: shows the diagnosis";; *) bad "no diagnosis alert: $o";; esac
+[ "$(printf '%s\n' "$o" | grep -c 'Network problem')" = 1 ] && ok "notifier: same diagnosis shown once" || bad "repeated alerts"
 echo "Set <clock offset='utc'> & retry" > "$T/n/network"
 o=$(run_notify); case "$o" in *"Set &lt;clock offset='utc'&gt; &amp; retry"*) ok "notifier: markup escaped for mako";; *) bad "markup not escaped: $o";; esac
 printf 'evil$(touch %s/pwned)\n' "$T" > "$T/n/virt"; run_notify >/dev/null; [ ! -e "$T/pwned" ] && ok "notifier: virt name is not executed" || bad "virt name executed"

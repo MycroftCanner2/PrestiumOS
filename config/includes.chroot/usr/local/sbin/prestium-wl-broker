@@ -54,8 +54,8 @@ RUNTIME = _test_env("PRESTIUM_WL_RUNTIME", "/run/user/%d")   # %d: uid
 LABWC = _test_env("PRESTIUM_WL_LABWC", "/usr/bin/labwc")
 SWAYLOCK_CONF = "/usr/share/prestium/swaylock.conf"
 SESSION_PASSWORD = "/usr/local/sbin/prestium-session-password"
-PW_TEXT = ("Set a password to lock the screen.\nYou'll need it to unlock the screen and for administration "
-           "prompts.\nUse at least 8 characters; a few unrelated words are best.\nIt lasts until you shut down.")
+PW_TEXT = ("Set a password to lock the screen.\nYou'll need it to unlock the screen.\n"
+           "Use at least 8 characters; a few unrelated words are best.\nIt lasts until you shut down.")
 UID_MIN, UID_MAX = 1000, 60000      # login users (login.defs UID_MIN..UID_MAX)
 I2P_MODE = _test_env("PRESTIUM_WL_I2P_MODE", "/usr/local/sbin/prestium-i2p-mode")
 I2P_SHARE = {"low": "Low", "medium": "Medium", "high": "High"}
@@ -362,9 +362,9 @@ class Session:
                 ("swaybg", ["swaybg", "-c", "#1a1b1e", "-i", "/usr/share/backgrounds/prestium/dark.png", "-m", "fill"]),
                 ("waybar", ["waybar", "-c", ETC + "/waybar/config.jsonc", "-s", ETC + "/waybar/style.css"]),
                 ("mako", ["mako", "-c", ETC + "/mako/config"]),
-                ("swayidle", ["swayidle", "-w", "timeout", "600", "/usr/local/bin/prestium-lock-screen",
-                              "before-sleep", "/usr/local/bin/prestium-lock-screen",
-                              "lock", "/usr/local/bin/prestium-lock-screen"])):
+                ("swayidle", ["swayidle", "-w", "timeout", "600", "/usr/local/bin/prestium-lock-screen --auto",
+                              "before-sleep", "/usr/local/bin/prestium-lock-screen --auto",
+                              "lock", "/usr/local/bin/prestium-lock-screen --auto"])):
             if not self.running(key):
                 self.spawn(argv, key=key); started.append(key)
         return "ok " + (" ".join(started) or "running")

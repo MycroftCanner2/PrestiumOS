@@ -20,7 +20,7 @@ def status():
         return ""
 
 def notify(msg):
-    subprocess.run(["zenity", "--title", "I2P Torrents", "--warning", "--no-markup", "--width", "460", "--text", msg])
+    subprocess.run(["zenity", "--title", "Torrents (I2P)", "--warning", "--no-markup", "--width", "460", "--text", msg])
 
 def add(b, item):
     args = {"filename": item} if item.startswith("magnet:") else \
@@ -38,14 +38,14 @@ def add(b, item):
 st = status()
 b = base()
 if st.startswith("disabled:"):
-    notify("I2P Torrents is disabled on this boot:\n%s\n\nFix the problem and restart I2P (Network menu)." % st[9:])
+    notify("Torrents (I2P) is disabled on this boot:\n%s\n\nFix the problem, then restart I2P (Terminal: systemctl restart i2pd) or the computer." % st[9:])
     sys.exit(1)
 if not b:
     # No status yet, or ready not written: still starting vs never set up.
     if st == "ready":
-        notify("The torrent client URL is missing even though setup reported ready. Restart I2P.")
+        notify("The torrent client URL is missing even though setup reported ready. Restart I2P (Terminal: systemctl restart i2pd).")
     else:
-        notify("I2P Torrents isn't ready yet (still starting, or I2P has not finished its start job). Wait for I2P, then try again.")
+        notify("Torrents (I2P) isn't ready yet (still starting, or I2P has not finished its start job). Wait for I2P, then try again.")
     sys.exit(1)
 if len(sys.argv) > 1:
     item = sys.argv[1]

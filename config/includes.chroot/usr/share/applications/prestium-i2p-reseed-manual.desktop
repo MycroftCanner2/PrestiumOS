@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=Manual reseed file
+Name=Manual Reseed File
 Comment=Install an I2P reseed file (.su3) you downloaded, after checking its signature
 Exec=/usr/local/bin/prestium-i2p-reseed-gui --manual
 Icon=document-open

@@ -218,6 +218,18 @@ This is one combined list of everything that changed since the last release, 2.0
   red, blue, magenta and grey are easier to read on its dark background. Notifications show their icons
   (mako's `icon-path` lists the installed themes), and Minimize and Maximize have icons in the window menu.
 
+- **One menu, grouped by task, that names each app's network.** New Security (KeePassXC, Kleopatra,
+  Metadata Cleaner, Unlock Encrypted Volume, Feather) and Sharing (OnionShare, Torrents) submenus.
+  Networked apps say which network they use: "Gajim (XMPP, Tor)", "The Lounge (IRC, I2P)",
+  "Claws Mail (Email, I2P)". Log Out… sits beside Restart… and Shut Down…. The Tor Connection
+  Assistant has Tor's onion icon. Ellipses, title case and notification senders ("Prestium") are the same everywhere.
+- **The lock-screen password dialog no longer promises admin prompts it doesn't serve.** No prompt in
+  Prestium asks for it, so lxpolkit is no longer started. **When the screen is due to lock automatically
+  and no password is set, a notification says it is not locked** instead of opening a dialog nobody sees.
+- Restart… in the I2P Connection Assistant uses the same confirmation as the menu (with the live-system
+  warning). The image-age notice mentions the Browser Updater. The README says command-line tools use
+  the I2P outproxy (`http_proxy`), not Tor. The reseed and torrent messages point to steps that exist.
+
 ### Apps
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
   at every start, and sets:

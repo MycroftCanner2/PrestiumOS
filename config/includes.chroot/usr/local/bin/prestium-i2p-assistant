@@ -21,7 +21,8 @@ from gi.repository import Gtk, Gdk, GLib, Gio
 APP_ID = "org.prestium.I2PConnectionAssistant"   # matches its .desktop file (panel icon)
 HELPER = ["/usr/bin/sudo", "-n", "/usr/local/sbin/prestium-i2p-mode"]
 RESEED = "/usr/local/bin/prestium-i2p-reseed-gui"
-REBOOT = ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+# 2.1 (UI audit A4): the same confirmation as Restart… in the menu (with the live-system warning)
+REBOOT = ["/usr/local/bin/prestium-power", "reboot"]
 # 2.1 (review N-2): Apply goes through the Wayland broker, which shows the change in a dialog only the
 # person at the screen can answer, then runs the helper as root
 BROKER_APPLY = ["/usr/local/bin/prestium-wl", "i2p-apply"]
@@ -236,13 +237,7 @@ class Assistant(Gtk.ApplicationWindow):
         if p: Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(str(p), -1)
 
     def do_reboot(self, *_):
-        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                              buttons=Gtk.ButtonsType.NONE, text="Restart the computer now?")
-        d.format_secondary_text("Open windows will close.")
-        d.add_button("_Cancel", Gtk.ResponseType.CANCEL); d.add_button("_Restart", Gtk.ResponseType.OK)
-        r = d.run(); d.destroy()
-        if r == Gtk.ResponseType.OK:
-            subprocess.Popen(REBOOT, start_new_session=True)
+        subprocess.Popen(REBOOT, start_new_session=True)
 
 class App(Gtk.Application):
     def __init__(self):

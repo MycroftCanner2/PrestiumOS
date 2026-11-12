@@ -1,6 +1,8 @@
 [Desktop Entry]
 # 2.0 r20: lets the panel show an icon for prestium-localfox windows (app_id / WM class below).
-# Hidden from menus; open it through IRC (The Lounge), the I2P console or I2P Torrents.
+# Hidden from menus; open it through The Lounge (IRC, I2P), the I2P console or Torrents (I2P).
+# 2.1 (UI audit C8): two identical files on purpose. Firefox's Wayland app_id can be either its --name
+# (prestium-localfox) or its --class (PrestiumLocalFirefox), and waybar matches the app_id to a file name.
 Type=Application
 Name=Local Firefox (Prestium pages)
 Exec=/usr/local/bin/prestium-localfox

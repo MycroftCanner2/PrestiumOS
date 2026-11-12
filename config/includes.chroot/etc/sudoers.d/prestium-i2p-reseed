@@ -1,4 +1,4 @@
-# Prestium 2.0: Network > Refresh I2P reseed (via Tor) / Manual reseed file. user may run only this
+# Prestium 2.0: Network > Refresh I2P Reseed (via Tor) / Manual Reseed File. user may run only this
 # helper, either with no arguments (download over Tor) or with "--file PATH" (the helper takes exactly
 # two arguments, refuses symlinks and reads PATH as the invoking user, never as root).
 user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-i2p-reseed "", /usr/local/sbin/prestium-i2p-reseed --file /*

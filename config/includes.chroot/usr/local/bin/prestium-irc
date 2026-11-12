@@ -10,20 +10,20 @@
 # 2.0 r6: token presence alone is not enough — require a hex token of expected length and
 # that thelounge.service is active; otherwise tell the user how to recover.
 if ! systemctl is-active --quiet thelounge.service 2>/dev/null; then
-  zenity --title "IRC (The Lounge)" --warning --no-markup --width=460 \
+  zenity --title "The Lounge (IRC, I2P)" --warning --no-markup --width=460 \
     --text "The Lounge service is not running. Wait a moment after boot, then try again. If it keeps happening, restart Prestium." 2>/dev/null
   exit 1
 fi
 T=$(cat /run/prestium-thelounge-launch/token 2>/dev/null | tr -d '\n\r')
 case "$T" in
   ""|*[!0-9a-f]*)
-    zenity --title "IRC (The Lounge)" --warning --no-markup --width=460 \
+    zenity --title "The Lounge (IRC, I2P)" --warning --no-markup --width=460 \
       --text "The Lounge sign-in token is missing or invalid. Wait a few seconds after boot for setup to finish, then try again. If it keeps happening, restart Prestium." 2>/dev/null
     exit 1 ;;
 esac
 # setup writes 64 random bytes as hex => 128 chars
 if [ "${#T}" -ne 128 ]; then
-  zenity --title "IRC (The Lounge)" --warning --no-markup --width=460 \
+  zenity --title "The Lounge (IRC, I2P)" --warning --no-markup --width=460 \
     --text "The Lounge sign-in token looks incomplete (${#T} chars). Wait a moment and try again. If it keeps happening, restart Prestium." 2>/dev/null
   exit 1
 fi

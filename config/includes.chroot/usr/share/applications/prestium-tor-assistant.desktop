@@ -3,7 +3,7 @@ Type=Application
 Name=Tor Connection Assistant
 Comment=Show Tor's connection status and choose Direct, Snowflake, WebTunnel, obfs4 or meek
 Exec=/usr/local/bin/prestium-tor-assistant
-Icon=network-wired
+Icon=/opt/tor-browser/Browser/browser/chrome/icons/default/default128.png
 Terminal=false
 StartupNotify=true
 # 2.1: the window's app_id, so the panel finds this file's name and icon

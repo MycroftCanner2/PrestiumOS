@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
-Name=I2P Torrents
+Name=Torrents (I2P)
 Comment=Download and share torrents over I2P (i2pd built-in client)
 Exec=/usr/local/bin/prestium-torrents %u
 Icon=folder-download

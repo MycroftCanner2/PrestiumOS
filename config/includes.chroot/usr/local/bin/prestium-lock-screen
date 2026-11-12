@@ -8,6 +8,13 @@
 pgrep -x swaylock >/dev/null && exit 0
 st=$(sudo -n /usr/local/sbin/prestium-session-password status 2>/dev/null)
 if [ "$st" != set ]; then
+  # 2.1 (UI audit A2): swayidle (idle, before sleep, logind lock) passes --auto. Without a password the
+  # screen can't be locked, and a dialog nobody is there to see would only hide that: say it instead.
+  if [ "${1:-}" = --auto ]; then
+    notify-send -a Prestium -i system-lock-screen -u critical -t 0 "Screen not locked" \
+      "No password is set, so Prestium could not lock the screen. Choose Lock Screen… in the System menu or press Super+L to set one." 2>/dev/null
+    exit 0
+  fi
   # 2.1 (audit L-2): the broker asks for the password on the compositor's full socket and sets it as
   # root; "sudo prestium-session-password set" is no longer allowed to the user (or any of its programs)
   /usr/local/bin/prestium-wl set-password >/dev/null 2>&1 || exit 0

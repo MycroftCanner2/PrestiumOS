@@ -149,8 +149,8 @@ class ControlMonitor(threading.Thread):
             st = self.unit_state()
             if st not in ("active", "reloading"):
                 GLib.idle_add(self.cb_status, None, {"inactive": "Tor is stopped", "failed": "Tor failed to start",
-                                                     "activating": "Tor is starting ...",
-                                                     "deactivating": "Tor is stopping ..."}.get(st, "Tor: " + st), False)
+                                                     "activating": "Tor is starting…",
+                                                     "deactivating": "Tor is stopping…"}.get(st, "Tor: " + st), False)
                 self.stop.wait(1.0); continue
             try:
                 self.session()
@@ -160,7 +160,7 @@ class ControlMonitor(threading.Thread):
                 self.stop.wait(10.0); continue
             except Exception as e:
                 detail = (str(e) or e.__class__.__name__).strip()[:80]
-                GLib.idle_add(self.cb_status, None, "Tor is starting (control port: %s) ..." % detail, False)
+                GLib.idle_add(self.cb_status, None, "Tor is starting (control port: %s)…" % detail, False)
             self.stop.wait(1.0)
 
     def session(self):
@@ -473,7 +473,7 @@ class Assistant(Gtk.ApplicationWindow):
         if resp == 1 and self.last_request:
             self.start_apply(self.last_request)
         elif resp == 2:
-            self.run_simple("revert", "Reverting to the previous settings and starting Tor ...")
+            self.run_simple("revert", "Reverting to the previous settings and starting Tor…")
 
     def log(self, msg):
         b = self.log_view.get_buffer()
@@ -521,7 +521,7 @@ class Assistant(Gtk.ApplicationWindow):
         self.last_request = req
         self.info.hide()
         self.set_phase("applying")
-        self.status.set_text("Applying %s ..." % TITLES[req["mode"]])
+        self.status.set_text("Applying %s…" % TITLES[req["mode"]])
         self.log("apply: %s" % TITLES[req["mode"]])
         def work():
             final = None
@@ -567,7 +567,7 @@ class Assistant(Gtk.ApplicationWindow):
         if res.get("ok"):
             self.describe(res)
             self.set_phase("connecting")
-            self.status.set_text("Tor started; connecting ...")
+            self.status.set_text("Tor started; connecting…")
             self.log("configuration applied; Tor is connecting")
         else:
             self.set_phase("idle")
@@ -590,7 +590,7 @@ class Assistant(Gtk.ApplicationWindow):
         if self.phase not in ("applying", "connecting"):
             return
         self.set_phase("cancelling")
-        self.status.set_text("Cancelling ...")
+        self.status.set_text("Cancelling…")
         self.log("cancel requested")
         def work():
             try:
@@ -648,7 +648,7 @@ class Assistant(Gtk.ApplicationWindow):
     def on_simple_done(self, cmd, res):
         if res.get("ok"):
             self.set_phase("connecting")
-            self.status.set_text("Tor restarted; connecting ...")
+            self.status.set_text("Tor restarted; connecting…")
             mode, lines = read_dropin()
             self.describe(dict(read_json(STATE, {}), mode=mode, bridges=len(lines)))
             if cmd == "revert":
@@ -661,7 +661,7 @@ class Assistant(Gtk.ApplicationWindow):
         return False
 
     def on_reconnect(self, _b):
-        self.run_simple("reconnect", "Restarting Tor ...")
+        self.run_simple("reconnect", "Restarting Tor…")
 
     def on_delete(self, *_a):
         self.save_conf()
