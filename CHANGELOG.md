@@ -56,6 +56,15 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   root hash is in the release files (`Prestium-2.1-amd64.roothash`, the manifest, `SHA256SUMS`), so
   a signed release signs it too. The kernel, initramfs and boot menu are not covered (see Known security limits).
 
+- **Locked boot menus.** Nobody at the keyboard can edit a boot entry or open GRUB's command line, so
+  nobody can boot with AppArmor off or with `init=`. GRUB (UEFI) has a superuser with a PBKDF2 password
+  hash, and every boot entry is `--unrestricted`, so booting needs no password; only "UEFI Firmware
+  Settings" asks for it. isolinux (BIOS) takes no added options (`allowoptions 0`, `noescape 1`). The
+  hash comes from `PRESTIUM_GRUB_PASSWORD_HASH` or the gitignored `grub-password.pbkdf2`
+  (`scripts/grub-pbkdf2.py` makes it). Without one, the build locks the menu with the hash of a random
+  password nobody knows and prints a warning. Hook 9020 also stops the build if any entry passes
+  `apparmor=` other than 1, `security=` other than apparmor, `lsm=`, `init=` or `break=`.
+
 ### Base system
 - **Tor Browser 16.0.1** (or newer, as above) with Firefox security fixes and tor 0.4.9.16.
   **System Tor 0.4.9.16** comes from deb.torproject.org at build time. LibreWolf and the local Firefox
@@ -347,8 +356,10 @@ Not changed in 2.1, so you know where the edges are:
   unified kernel image (kernel, initramfs and command line in one Secure Boot-signed file), which
   Debian's shim and GRUB don't offer for a live image yet. The hash tree's salt is random, so two
   builds of the same commit have different root hashes.
-- **The boot menu can be edited** (no GRUB password): anyone at the keyboard can change the kernel
-  options, for example to boot without AppArmor.
+- **The boot menu lock is only as strong as the USB stick.** It stops changes made at the keyboard,
+  not someone who can write `grub.cfg` on the stick (see dm-verity above). The password hash is on the
+  stick, so a chosen password needs to be long; the default random one can't be guessed. Firmware
+  boot menus and other boot media are outside Prestium's control; a firmware password helps there.
 - **Programs running as the desktop user can still attach a disk image** (udisks loop-setup). The
   confined apps can't reach udisks, and rarely used filesystem drivers can't be loaded.
 - **Most confined apps share ~/Downloads**, so a compromised one could change a file another app later

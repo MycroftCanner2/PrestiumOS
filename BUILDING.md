@@ -49,6 +49,18 @@ which works but is several times slower.
 2. runs `lb config` (options in `auto/config`);
 3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-amd64.iso`, `Prestium-2.1-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
 
+**Boot menu password.** The boot menus are locked (hook 9020): the entries boot without a password,
+but editing an entry or GRUB's command line needs the GRUB superuser `prestium`. To set its password,
+make a hash once and keep it next to the tree (gitignored; only the hash, never the password):
+
+    scripts/grub-pbkdf2.py > grub-password.pbkdf2
+    sudo ./build.sh
+
+or pass it as `sudo PRESTIUM_GRUB_PASSWORD_HASH=grub.pbkdf2.sha512.... ./build.sh` (a hash from
+`grub-mkpasswd-pbkdf2` works too). Without one, the build uses the hash of a random password nobody
+knows: the menu is locked for everyone, which is the safe default for a release; build with your own
+hash when you need to edit boot entries. The manifest says which (`boot_menu_lock`).
+
 An interrupted build can be continued with `sudo ./build.sh --resume`; `sudo ./build.sh --clean`
 starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (much longer emulated).
 
@@ -81,6 +93,8 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
 | `config/hooks/live/*.hook.chroot` | setup steps, in order (below) |
 | `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels |
+| `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash), every entry `--unrestricted`; isolinux `allowoptions 0`; no entry may turn AppArmor off |
+| `scripts/grub-pbkdf2.py` | makes the GRUB password hash (`--random` for one nobody knows) |
 | `config/hooks/live/9010-prestium-verity-boot.hook.binary` | checks the image against its dm-verity hash tree and puts the root hash on every boot entry |
 | `config/bootloaders/` | boot menu entries: Prestium 2.1, nomodeset, camera and microphone off |
 | `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile |

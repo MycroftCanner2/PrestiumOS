@@ -24,5 +24,7 @@ __pycache__/
 /*.manifest
 /*.roothash
 /prestium-roothash.tmp
+/prestium-bootlock.tmp
+/grub-password.pbkdf2
 /SHA256SUMS
 /SHA256SUMS.asc

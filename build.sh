@@ -29,6 +29,20 @@ fi
 
 if [ "$MODE" = --clean ]; then lb clean --purge; fi
 
+# 2.1: the GRUB superuser's password hash for the locked boot menu (hook 9020): PRESTIUM_GRUB_PASSWORD_HASH,
+# or the gitignored file grub-password.pbkdf2 (PRESTIUM_GRUB_PASSWORD_FILE), made with scripts/grub-pbkdf2.py.
+# Neither: hook 9020 locks the menu with a random password nobody knows (a warning, not an error).
+GPF=${PRESTIUM_GRUB_PASSWORD_FILE:-$TOP/grub-password.pbkdf2}
+if [ -z "${PRESTIUM_GRUB_PASSWORD_HASH:-}" ] && [ -f "$GPF" ]; then
+	PRESTIUM_GRUB_PASSWORD_HASH=$(tr -d '[:space:]' < "$GPF")
+fi
+if [ -n "${PRESTIUM_GRUB_PASSWORD_HASH:-}" ]; then
+	python3 -I scripts/grub-pbkdf2.py --check "$PRESTIUM_GRUB_PASSWORD_HASH" || { echo "PRESTIUM_GRUB_PASSWORD_HASH / $GPF: not a grub.pbkdf2.sha512 hash (scripts/grub-pbkdf2.py)"; exit 1; }
+	export PRESTIUM_GRUB_PASSWORD_HASH
+else
+	echo "W: no GRUB password hash: the boot menu will be locked with a random password (see BUILDING.md)"
+fi
+
 # 1. third-party software (signature + pinned SHA-256), staged for the chroot hooks
 CACHE=${PRESTIUM_CACHE:-$TOP/cache/thirdparty}
 PRESTIUM_CACHE=$CACHE scripts/fetch-thirdparty.sh
@@ -136,6 +150,7 @@ for f in live-image-amd64.packages chroot.packages.live; do [ -s "$f" ] && { cp 
 	echo "image_bytes: $(stat -c %s "$OUT")"
 	echo "build_date_utc: $(date -u -d "@$(cat chroot/usr/share/prestium/build-date 2>/dev/null || date -u +%s)" '+%Y-%m-%dT%H:%M:%SZ')"
 	echo "source_commit: $(git rev-parse HEAD 2>/dev/null || echo unknown)$(git diff --quiet HEAD 2>/dev/null || echo ' (with local changes)')"
+	echo "boot_menu_lock: $(cat prestium-bootlock.tmp 2>/dev/null || echo unknown) (GRUB superuser; isolinux without options)"
 	echo "dm_verity_root_hash: $(cat "$ROOTHASH") (live/filesystem.squashfs, sha256, 4096-byte blocks)"
 	echo "debian: trixie, $(grep -c . "$PKGS" 2>/dev/null || echo 0) packages (see $PKGS)"
 	echo "tor_browser: $(cat "$TP/tor-browser.version" 2>/dev/null || echo unknown) sha256 $(sha256sum "$TP/tor-browser.tar.xz" 2>/dev/null | cut -c1-64)"

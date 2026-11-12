@@ -1,0 +1,62 @@
+#!/bin/sh
+# Prestium 2.1: locked boot menus. Nobody at the keyboard can edit a boot entry or open a boot command
+# line, so nobody can boot with AppArmor off (apparmor=0, security=...), init=/bin/sh, break=... and
+# the like. Booting the listed entries needs no password.
+#  - GRUB (UEFI): a superuser with a PBKDF2 password hash; every boot entry is --unrestricted, editing
+#    ("e") and the command line ("c") ask for the superuser. The firmware-settings entry stays restricted.
+#    The hash comes from PRESTIUM_GRUB_PASSWORD_HASH (build.sh: from the environment or the gitignored
+#    grub-password.pbkdf2, made with scripts/grub-pbkdf2.py). Unset: the hash of a random password
+#    nobody knows (printed as a warning), so the menu is locked for everyone; set a hash to be able to edit.
+#  - isolinux (BIOS): no options may be added (allowoptions 0), no escape to the boot: prompt (noescape 1).
+#  - no entry may pass apparmor= other than 1 or security= other than apparmor.
+# Runs in binary/ on the build host, after 9000 (labels) and 9010 (dm-verity root hash).
+set -e
+G=boot/grub/grub.cfg
+[ -f "$G" ] || { echo "E: $G missing"; exit 1; }
+PBK=../scripts/grub-pbkdf2.py
+HASH=${PRESTIUM_GRUB_PASSWORD_HASH:-}
+if [ -z "$HASH" ]; then
+	HASH=$(python3 -I "$PBK" --random)
+	echo "W: PRESTIUM_GRUB_PASSWORD_HASH is not set: the boot menu is locked with a random password nobody knows."
+	echo "W: To be able to edit boot entries, build with a hash from scripts/grub-pbkdf2.py (see BUILDING.md)."
+	MODE=random
+else
+	MODE=build-setting
+fi
+python3 -I "$PBK" --check "$HASH" || { echo "E: PRESTIUM_GRUB_PASSWORD_HASH is not a grub.pbkdf2.sha512 hash (10000+ iterations)"; exit 1; }
+grep -q '^set superusers=' "$G" && { echo "E: $G already has superusers"; exit 1; }
+# superuser first, right after config.cfg (sourced first, as live-build's template has it)
+awk -v h="$HASH" 'NR == 1 && $0 == "source /boot/grub/config.cfg" {
+	print; print ""; print "# Prestium: locked menu (hook 9020): entries boot without a password, editing needs the superuser"
+	print "set superusers=\"prestium\""; print "password_pbkdf2 prestium " h; done = 1; next }
+	{ print } END { if (!done) exit 3 }' "$G" > "$G.tmp" || { rm -f "$G.tmp"; echo "E: $G does not start with 'source /boot/grub/config.cfg'"; exit 1; }
+mv "$G.tmp" "$G"
+for f in boot/grub/*.cfg; do
+	# every menuentry and submenu without its own --unrestricted/--users gets --unrestricted, except fwsetup
+	awk '
+	/^[[:space:]]*(menuentry|submenu)[[:space:]]/ && !/--unrestricted/ && !/--users/ && !/UEFI Firmware Settings/ {
+		sub(/[[:space:]]*\{[[:space:]]*$/, " --unrestricted {") }
+	{ print }' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+	if grep -E '^[[:space:]]*(menuentry|submenu)[[:space:]]' "$f" | grep -v -e '--unrestricted' -e 'UEFI Firmware Settings' | grep -q .; then
+		echo "E: $f: a boot entry is neither --unrestricted nor the firmware entry"; exit 1
+	fi
+done
+if [ -d isolinux ]; then
+	for f in isolinux/isolinux.cfg; do
+		[ -f "$f" ] || { echo "E: $f missing"; exit 1; }
+		grep -q '^allowoptions 0$' "$f" || sed -i '1i # Prestium: locked menu (hook 9020): no added kernel options, no escape to the boot: prompt\nallowoptions 0\nnoescape 1' "$f"
+	done
+	sed -i 's/^menu tabmsg .*/menu tabmsg Press ENTER to boot/' isolinux/*.cfg
+	grep -rqi '^[[:space:]]*allowoptions[[:space:]]*1' isolinux/ && { echo "E: an isolinux file allows options"; exit 1; }
+	grep -rqi '^[[:space:]]*noescape[[:space:]]*0' isolinux/ && { echo "E: an isolinux file allows escape"; exit 1; }
+fi
+# no boot entry may turn the security modules off
+for f in boot/grub/*.cfg isolinux/*.cfg; do
+	[ -f "$f" ] || continue
+	if grep -nE '(^|[[:space:]])(apparmor=([^1[:space:]]|[[:space:]]|$)|apparmor=1[^[:space:]]|security=([^a[:space:]]|[[:space:]]|$|a[^p]|apparmor[^[:space:]])|lsm=|selinux=|init=|rd\.break|break=|single([[:space:]]|$)|systemd\.unit=)' "$f"; then
+		echo "E: $f: a boot entry overrides security or init options"; exit 1
+	fi
+done
+echo "P: boot menus locked (GRUB superuser: $MODE)"
+echo "$MODE" > ../prestium-bootlock.tmp
+exit 0
