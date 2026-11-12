@@ -2,6 +2,9 @@
 7zip
 adduser
 adwaita-icon-theme
+# 2.1: Qt 5 and 6 apps in the same dark Adwaita look (QT_STYLE_OVERRIDE=Adwaita-Dark)
+adwaita-qt
+adwaita-qt6
 alsa-topology-conf
 alsa-ucm-conf
 apparmor

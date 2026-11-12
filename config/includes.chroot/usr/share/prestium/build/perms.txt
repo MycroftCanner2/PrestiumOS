@@ -297,6 +297,7 @@
 0644 root root /usr/share/themes/Fresh-Theme/openbox-3/shade.xbm
 0644 root root /usr/share/themes/Fresh-Theme/openbox-3/shade_toggled.xbm
 0644 root root /usr/share/themes/Fresh-Theme/openbox-3/themerc
+0644 root root /usr/share/themes/Prestium-Dark/openbox-3/themerc
 0644 i2pd i2pd /var/lib/i2pd/i2pd.conf
 0644 i2pd i2pd /var/lib/i2pd/stormycloud-i2pseeds.su3
 0754 i2pd i2pd /var/lib/i2pd/subscriptions.txt
@@ -449,6 +450,7 @@
 # 2.0 r10: Wayland desktop, MAC guard, browser sandbox
 0644 root root /etc/dconf/db/local.d/10-prestium-desktop
 0644 root root /etc/gtk-3.0/settings.ini
+0644 root root /etc/gtk-4.0/settings.ini
 0644 root root /etc/systemd/system/NetworkManager.service.d/prestium-mac-guard.conf
 0644 root root /etc/systemd/system/prestium-mac-guard.service
 0644 root root /etc/xdg/labwc/autostart

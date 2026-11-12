@@ -1,13 +1,16 @@
-/* Prestium 2.0 r10: panel colours as the tint2 panel (black, white text) */
-* { font-family: sans-serif; font-size: 13px; min-height: 0; }
-window#waybar { background: #000000; color: #ffffff; }
-#taskbar button { padding: 0 4px; min-width: 0; color: #dddddd; border-radius: 0; }
-#taskbar button.active { background: #333333; color: #ffffff; }
-#taskbar button:hover { background: #222222; }
-#tray, #pulseaudio, #battery, #clock { padding: 0 8px; }
-#battery.warning:not(.charging) { color: #ffcc00; }
-#battery.critical:not(.charging) { color: #ff4444; font-weight: bold; }
-#pulseaudio.muted { color: #888888; }
+/* Prestium 2.1: dark Adwaita colours, like the window titlebars (labwc theme Prestium-Dark) */
+* { font-family: Cantarell, sans-serif; font-size: 13px; min-height: 0; }
+window#waybar { background: #242424; color: #ffffff; border-bottom: 1px solid #1e1e1e; }
+#taskbar button { padding: 0 8px; margin: 3px 2px; min-width: 0; color: #c0c0c0; border-radius: 6px; border: none; }
+#taskbar button.active { background: #3a3a3a; color: #ffffff; box-shadow: inset 0 -2px #3584e4; }
+#taskbar button:hover { background: #333333; color: #ffffff; }
+#tray, #pulseaudio, #battery, #clock { padding: 0 10px; }
+#clock { font-weight: bold; }
+#battery.warning:not(.charging) { color: #f8e45c; }
+#battery.critical:not(.charging) { color: #ff7b63; font-weight: bold; }
+#pulseaudio.muted { color: #9a9a9a; }
 /* 2.0 r19: menu button */
-#custom-menu { padding: 0 10px; background: #1a1a1a; font-weight: bold; }
-#custom-menu:hover { background: #333333; }
+#custom-menu { padding: 0 12px; margin: 3px 4px; background: #3584e4; color: #ffffff; border-radius: 6px; font-weight: bold; }
+#custom-menu:hover { background: #4a90e8; }
+tooltip { background: #383838; border: 1px solid #1e1e1e; border-radius: 8px; }
+tooltip label { color: #ffffff; }

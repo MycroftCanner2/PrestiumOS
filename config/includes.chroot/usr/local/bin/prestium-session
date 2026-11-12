@@ -6,6 +6,8 @@ export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=labwc:wlroots XDG_SESSION_DE
 export MOZ_ENABLE_WAYLAND=1 GDK_BACKEND=wayland,x11 QT_QPA_PLATFORM='wayland;xcb' \
        SDL_VIDEODRIVER=wayland,x11 CLUTTER_BACKEND=wayland _JAVA_AWT_WM_NONREPARENTING=1 \
        ELECTRON_OZONE_PLATFORM_HINT=wayland QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+# 2.1: one dark look: Qt 5 and 6 apps use adwaita-qt's dark style, like GTK's Adwaita-dark
+export QT_STYLE_OVERRIDE=Adwaita-Dark
 unset DISPLAY
 # 2.1: in a virtual machine labwc draws with wlroots' software renderer (pixman) instead of
 # OpenGL ES. VM graphics (virtio-gpu, QXL, VMware SVGA, VirtualBox) are emulated or software GL

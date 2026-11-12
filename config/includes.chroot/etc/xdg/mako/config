@@ -1,11 +1,18 @@
 # Prestium 2.0 r10: notifications (mako, replaces notification-daemon)
+# 2.1: dark Adwaita colours, rounded, like the windows and the bar
 anchor=top-right
 default-timeout=8000
-background-color=#202020
+font=Cantarell 10
+background-color=#303030
 text-color=#ffffff
-border-color=#606060
+border-color=#1e1e1e
 border-size=1
+border-radius=12
+padding=12
+margin=10
+width=360
 max-visible=5
 [urgency=critical]
 default-timeout=0
-border-color=#ff4444
+border-color=#ff7b63
+border-size=2

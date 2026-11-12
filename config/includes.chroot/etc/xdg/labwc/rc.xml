@@ -16,13 +16,14 @@
   </core>
   <placement><policy>center</policy></placement>
   <theme>
-    <name>Fresh-Theme</name>
+    <name>Prestium-Dark</name>
     <titlebar><layout>icon:iconify,max,close</layout></titlebar>
-    <cornerRadius>0</cornerRadius>
-    <font place="ActiveWindow"><name>sans</name><size>10</size><weight>bold</weight></font>
-    <font place="InactiveWindow"><name>sans</name><size>10</size><weight>bold</weight></font>
-    <font place="MenuItem"><name>sans</name><size>10</size></font>
-    <font place="OnScreenDisplay"><name>sans</name><size>10</size><weight>bold</weight></font>
+    <cornerRadius>8</cornerRadius>
+    <dropShadows>yes</dropShadows>
+    <font place="ActiveWindow"><name>Cantarell</name><size>10</size><weight>bold</weight></font>
+    <font place="InactiveWindow"><name>Cantarell</name><size>10</size><weight>bold</weight></font>
+    <font place="MenuItem"><name>Cantarell</name><size>10</size></font>
+    <font place="OnScreenDisplay"><name>Cantarell</name><size>10</size><weight>bold</weight></font>
   </theme>
   <focus><followMouse>no</followMouse><raiseOnFocus>no</raiseOnFocus></focus>
   <desktops number="4"><popupTime>875</popupTime></desktops>

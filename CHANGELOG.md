@@ -167,6 +167,13 @@ This is one combined list of everything that changed since the last release, 2.0
   user-mode networking, a VM clock set to local time, or a host firewall blocking I2P). The diagnosis
   is read-only and disappears once both connect.
 
+### Desktop
+- **One dark look across the desktop.** GTK 3 and 4 apps use Adwaita-dark. Qt 5 and 6 apps use the
+  same dark Adwaita style (`adwaita-qt`, `adwaita-qt6`, `QT_STYLE_OVERRIDE=Adwaita-Dark`). A new
+  labwc theme, Prestium-Dark, has Adwaita colours, rounded corners, shadows and labwc's own buttons.
+  The bar, notifications and menus match, and Cantarell is the UI font. Tor Browser keeps its own
+  fonts.
+
 ### Apps
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
   at every start, and sets:
