@@ -127,7 +127,8 @@ This is one combined list of everything that changed since the last release, 2.0
 ### Network, firewall and privileges
 - **i2pd and Tor can no longer reach Prestium's local services.** Their firewall accepts are for the
   network only. On loopback, i2pd keeps only its SOCKS outproxy tunnel (4500) and Tor only the kernel's
-  ephemeral ports 32768-60999, where its pluggable transports listen.
+  ephemeral ports 32768-60999, where its pluggable transports listen, and OnionShare's web server
+  (127.0.0.1:17600-17650), which its onion services forward to.
 - **The early firewall reports failure.** `prestium-firewall-early` checks every step, applies as much
   drop-all as it can, and exits non-zero if IPv4 or IPv6 isn't DROP with only loopback allowed.
   iptables and ip6tables are pinned to the legacy xtables backend, and the build fails if that pin

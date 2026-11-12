@@ -19,8 +19,12 @@ n=$(grep -cE 'uid-owner \$i2pd_uid outerface lo ' <<<"$rules")
 grep -qE 'uid-owner \$i2pd_uid outerface lo daddr 127\.0\.0\.1 proto \(tcp udp\) dport 4500 ACCEPT;' <<<"$rules" && [ "$n" = 1 ] \
   && ok "i2pd: loopback only 4500" || bad "i2pd loopback rules ($n)"
 lo_tor=$(grep -E 'outerface lo .*uid-owner \$tor_uid' <<<"$rules")
-[ "$(wc -l <<<"$lo_tor")" = 1 ] && grep -qE 'daddr 127\.0\.0\.1 proto tcp syn dport 32768:60999 ' <<<"$lo_tor" \
-  && ok "Tor: loopback only ephemeral ports 32768-60999" || bad "Tor loopback rules: $lo_tor"
+[ "$(wc -l <<<"$lo_tor")" = 2 ] && grep -qE 'daddr 127\.0\.0\.1 proto tcp syn dport 32768:60999 ' <<<"$lo_tor" \
+  && grep -qE 'daddr 127\.0\.0\.1 proto tcp syn dport 17600:17650 ' <<<"$lo_tor" \
+  && ok "Tor: loopback only ephemeral ports 32768-60999 and OnionShare 17600-17650" || bad "Tor loopback rules: $lo_tor"
+# OnionShare's onion-grater target range and the firewall's agree
+grep -q '17600-17650' config/includes.chroot/usr/local/sbin/prestium-onion-grater 2>/dev/null || grep -q '17600-17650' "$R/config/includes.chroot/usr/local/sbin/prestium-onion-grater" \
+  && ok "onion-grater OnionShare targets match the firewall" || bad "OnionShare port range differs"
 for p in 4444 4447 4450 4500 6665 6672 7070 7656 7659 7660 7685 9000 9050 9051 17600 17650 30000; do
   [ "$p" -ge 32768 ] && bad "service port $p inside Tor's loopback range"; done
 ok "fixed local service ports are below Tor's loopback range"
