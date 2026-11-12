@@ -14,6 +14,7 @@
 /etc/systemd/system/multi-user.target.wants/prestium-netstatus.service /etc/systemd/system/prestium-netstatus.service
 /etc/systemd/system/multi-user.target.wants/remote-fs.target /usr/lib/systemd/system/remote-fs.target
 /etc/systemd/system/multi-user.target.wants/thelounge.service /etc/systemd/system/thelounge.service
+/etc/systemd/system/multi-user.target.wants/thelounge-tor.service /etc/systemd/system/thelounge-tor.service
 /etc/systemd/system/multi-user.target.wants/tor.service /usr/lib/systemd/system/tor.service
 /etc/systemd/system/multi-user.target.wants/wpa_supplicant.service /usr/lib/systemd/system/wpa_supplicant.service
 /etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service /usr/lib/systemd/system/NetworkManager-wait-online.service

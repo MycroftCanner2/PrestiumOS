@@ -25,7 +25,7 @@ grep -qx 'ProtectSystem=strict' "$U/prestium-wl-broker.service" && bad "wl-broke
 B=$R/config/includes.chroot/usr/local/sbin/prestium-wl-broker
 grep -q 'not UID_MIN <= uid <= UID_MAX' "$B" && grep -q '^UID_MIN, UID_MAX = 1000, 60000' "$B" && ok "wl-broker: refuses system uids" || bad "wl-broker uid range"
 if command -v systemd-analyze >/dev/null; then
-  for u in prestium-wl-broker prestium-mac-guard prestium-onion-grater prestium-vm-netcheck thelounge prestium-timesync prestium-clockfix prestium-usb-watchdog; do
+  for u in prestium-wl-broker prestium-mac-guard prestium-onion-grater prestium-vm-netcheck thelounge thelounge-tor prestium-timesync prestium-clockfix prestium-usb-watchdog; do
     systemd-analyze security --offline=yes "$U/$u.service" 2>/dev/null | tail -n 1 | sed "s/^/INFO $u: /"; done
 else echo "SKIP systemd-analyze missing"; fi
 exit $fail

@@ -2,7 +2,8 @@
 # Prestium 2.0: users and groups (same names, uids and memberships as earlier releases).
 #   user (1000)          the live user: empty password until set (prestium-session-password), autologin
 #   i2pd (2000)          i2pd runs as uid/gid 2000 (ferm.conf, file ownership)
-#   thelounge            The Lounge IRC web client (127.0.0.1:9000)
+#   thelounge            The Lounge IRC web client, IRC over I2P (127.0.0.1:9000)
+#   thelounge-tor        (2.1) its second instance, IRC over Tor only (127.0.0.1:9010)
 #   onion-grater         Tor control-port filter
 #   prestium-htp         Tor-only clock sync
 #   prestium-ptdns       (2.0) DoH look-ups for Tor's pluggable transports, via the I2P outproxy
@@ -29,6 +30,7 @@ fi
 usermod -d /var/lib/i2pd -s /usr/sbin/nologin i2pd
 
 sysuser thelounge /var/lib/thelounge ""
+sysuser thelounge-tor /var/lib/thelounge-tor ""   # 2.1: IRC (Tor); the firewall lets it reach only 127.0.0.1:9050
 sysuser onion-grater /nonexistent "Prestium Tor control filter"
 sysuser prestium-htp /nonexistent ""
 sysuser prestium-ptdns /nonexistent "Prestium DoH lookups for Tor bridges (via I2P)"
@@ -58,4 +60,4 @@ chown -R user:user /home/user; chmod 700 /home/user
 
 # root: locked (1.8+); no root login at all
 passwd -l root >/dev/null
-echo "P: users: $(getent passwd user i2pd thelounge onion-grater prestium-htp prestium-ptdns | cut -d: -f1,3 | tr '\n' ' ')"
+echo "P: users: $(getent passwd user i2pd thelounge thelounge-tor onion-grater prestium-htp prestium-ptdns | cut -d: -f1,3 | tr '\n' ' ')"

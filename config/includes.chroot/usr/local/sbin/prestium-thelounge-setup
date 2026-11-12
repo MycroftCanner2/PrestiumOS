@@ -13,19 +13,34 @@
 //   /run/prestium-thelounge/password, readable by "user" only, needed only after "Sign out")
 // - a new random login token on every start; only its SHA-512 is stored in the user file,
 //   the token itself goes to /run/prestium-thelounge-launch/token (readable by "user" only) for
-//   the "IRC (The Lounge)" launcher. 2.1 (review): it works once. The session is marked
+//   the "IRC (I2P)" or "IRC (Tor)" launcher. 2.1 (review): it works once. The session is marked
 //   "prestiumLaunch"; The Lounge (patched in hook 0200) deletes it when it is used, gives the
 //   browser its own session token, and writes the next launch token to the same file.
+// - 2.1: one script for both instances. No argument: IRC (I2P), thelounge.service, user "thelounge".
+//   "tor": IRC (Tor), thelounge-tor.service, user "thelounge-tor", its own state, run and launch
+//   directories and template (OFTC, Libera.Chat, hackint, Ergo, AlphaChat, DarkScience, Pirate IRC,
+//   IRCNow). On every start each of its networks is set to use Tor's SOCKS port 127.0.0.1:9050 with a
+//   new random SOCKS username/password of its own (Tor isolates circuits by them; IsolateSOCKSAuth).
 const fs = require("fs");
 const crypto = require("crypto");
 const bcrypt = require("/opt/thelounge/node_modules/bcryptjs");
 
-const HOME = "/var/lib/thelounge";
+const INSTANCES = {
+	i2p: {name: "thelounge", home: "/var/lib/thelounge", template: "/usr/local/share/prestium-thelounge/prestium.json",
+		run: "/run/prestium-thelounge", launch: "/run/prestium-thelounge-launch", tor: false},
+	tor: {name: "thelounge-tor", home: "/var/lib/thelounge-tor", template: "/usr/local/share/prestium-thelounge-tor/prestium.json",
+		run: "/run/prestium-thelounge-tor", launch: "/run/prestium-thelounge-tor-launch", tor: true},
+};
+if (process.argv.length > 3 || !Object.prototype.hasOwnProperty.call(INSTANCES, process.argv[2] || "i2p")) {
+	throw new Error("usage: prestium-thelounge-setup [i2p|tor]");
+}
+const INST = INSTANCES[process.argv[2] || "i2p"];
+const HOME = INST.home;
 const USERS = HOME + "/users";
 const FILE = USERS + "/prestium.json";
-const TEMPLATE = "/usr/local/share/prestium-thelounge/prestium.json";
-const RUN = "/run/prestium-thelounge";
-const LAUNCH = "/run/prestium-thelounge-launch";   // thelounge:user 2750: The Lounge writes the next token
+const TEMPLATE = INST.template;
+const RUN = INST.run;
+const LAUNCH = INST.launch;   // <user>:user 2750: The Lounge writes the next token
 
 function ids(file, name) {
 	for (const l of fs.readFileSync(file, "utf8").split("\n")) {
@@ -34,7 +49,7 @@ function ids(file, name) {
 	}
 	throw new Error(`${name} not found in ${file}`);
 }
-const [luid, lgid] = ids("/etc/passwd", "thelounge");
+const [luid, lgid] = ids("/etc/passwd", INST.name);
 const [ugid] = ids("/etc/group", "user");
 
 // 2.0 r4 (security audit): HOME and USERS belong to thelounge, so nothing in them is trusted:
@@ -122,6 +137,18 @@ if (typeof user.password !== "string" || !user.password.startsWith("$2") ||
 	user.password = bcrypt.hashSync(password, 10);
 }
 for (const n of user.networks) n.userDisconnected = true;   // 2.0 r4: connect only on request
+if (INST.tor) {
+	// 2.1: IRC (Tor). Every network through Tor's SOCKS port, each with new random SOCKS credentials on
+	// every start (its own circuits). The Lounge (hook 0200, PRESTIUM_LOUNGE_TOR=1) also forces the proxy
+	// at connect time, and the firewall refuses anything else, so a network edited in the UI can't leak.
+	for (const n of user.networks) {
+		n.proxyEnabled = true;
+		n.proxyHost = "127.0.0.1";
+		n.proxyPort = 9050;
+		n.proxyUsername = "prestium-" + crypto.randomBytes(12).toString("hex");
+		n.proxyPassword = crypto.randomBytes(12).toString("hex");
+	}
+}
 const token = crypto.randomBytes(64).toString("hex");
 const hash = crypto.createHash("sha512").update(token).digest("hex");
 user.sessions = {[hash]: {lastUse: Date.now(), ip: "127.0.0.1", agent: "Prestium launcher", prestiumLaunch: true}};
@@ -136,4 +163,4 @@ asThelounge(() => {
 	fs.renameSync(tmp, LAUNCH + "/token");
 });
 fs.rmSync(RUN + "/token", {force: true});   // the place before 2.1
-console.log("prestium-thelounge-setup: user prestium ready, new login token issued");
+console.log(`prestium-thelounge-setup: ${INST.name}: user prestium ready, new login token issued`);

@@ -212,7 +212,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   level has I2P Browser, Tor Browser, I2P Router Console, Text Editor and File Manager, then Office,
   Multimedia, Accessories, Security (KeePassXC, Kleopatra, Metadata Cleaner, Unlock Encrypted Volume,
   Feather), Communication, Sharing (OnionShare, Torrents), Network and System, then Log Out…, Restart…
-  and Shut Down…. Networked apps name their network ("Gajim (XMPP, Tor)", "The Lounge (IRC, I2P)",
+  and Shut Down…. Networked apps name their network ("Gajim (XMPP, Tor)", "IRC (I2P)", "IRC (Tor)",
   "Claws Mail (Email, I2P)"). Every entry has an icon Debian ships, and wording, ellipses and title case
   are the same everywhere.
 - **Notifications.** One look per urgency (low: grey edge, 5 s; normal: blue edge, 8 s; critical: red
@@ -250,6 +250,23 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   outproxy (`http_proxy`), not Tor. The reseed and torrent messages point to steps that exist.
 
 ### Apps
+- **New: IRC (Tor)**, a second The Lounge (Communication menu, next to *IRC (I2P)*, which was "The Lounge
+  (IRC, I2P)"). It reaches IRC only through Tor: its own system user `thelounge-tor`, state directory
+  `/var/lib/thelounge-tor`, root-owned read-only `config.js`, web UI on 127.0.0.1:9010, systemd unit
+  `thelounge-tor.service` with the same sandbox, and AppArmor profile `thelounge-tor`. It shares
+  `/opt/thelounge`, Node.js, the one-use sign-in token, the local-only Firefox and the 10 themes (Tech
+  Innovation by default) with the I2P instance, and neither can read the other's files. The firewall
+  lets `thelounge-tor` reach only Tor's SOCKS port 127.0.0.1:9050: no clearnet, no DNS, no other local
+  service. Every network goes through that port (hook 0200 forces it, whatever a network's proxy
+  setting says), the server name is resolved by Tor, never locally, and each network has its own
+  random SOCKS username, so its own Tor circuits. Networks start disconnected with a random nick each,
+  as on I2P. Presets, all onion services: OFTC (default, no registration), Libera.Chat, hackint,
+  AlphaChat and Pirate IRC (through `MapAddress` lines in torrc, so their TLS certificates check
+  out), Ergo, DarkScience and IRCNow (plain IRC on the onion, which already encrypts). OFTC's onion
+  takes TLS but its certificate is for irc.oftc.net, so certificate checking is off for that one only.
+  Libera.Chat over Tor needs SASL EXTERNAL (client certificate) or ECDSA-NIST256P-CHALLENGE, not a
+  password, and the account and certificate must be set up beforehand over a normal connection;
+  AlphaChat needs SASL with a verified account, and Pirate IRC likely SASL too.
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
   at every start, and sets:
   - tunnel hops, 1 to 7 (default 3);

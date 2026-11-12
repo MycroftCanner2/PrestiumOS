@@ -93,8 +93,11 @@
     <item label="Pidgin (Chat, Tor)" icon="pidgin">
       <action name="Execute" command="prestium-run /usr/local/bin/pidgin-tor" />
     </item>
-    <item label="The Lounge (IRC, I2P)" icon="user-available">
+    <item label="IRC (I2P)" icon="user-available">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
+    </item>
+    <item label="IRC (Tor)" icon="user-available">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc tor" />
     </item>
   </menu>
   <menu id="/Sharing" label="Sharing" icon="folder-publicshare">

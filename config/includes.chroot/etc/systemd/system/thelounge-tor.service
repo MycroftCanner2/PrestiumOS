@@ -1,0 +1,57 @@
+# Prestium 2.1: The Lounge IRC web client, second instance "IRC (Tor)" (https://thelounge.chat).
+# The same program, sandbox and sign-in as thelounge.service (IRC (I2P)), with its own user
+# "thelounge-tor", state directory /var/lib/thelounge-tor, web UI on 127.0.0.1:9010 only (private
+# mode, per-boot one-use sign-in token, see /usr/local/sbin/prestium-thelounge-setup tor) and
+# AppArmor profile. IRC goes only through Tor's SOCKS port 127.0.0.1:9050 (PRESTIUM_LOUNGE_TOR=1,
+# hook 0200); ferm lets the "thelounge-tor" user reach nothing else, not even DNS.
+[Unit]
+Description=The Lounge IRC web client (127.0.0.1:9010, IRC via Tor)
+After=network.target ferm.service tor@default.service apparmor.service
+
+[Service]
+Type=simple
+User=thelounge-tor
+Group=thelounge-tor
+Environment=THELOUNGE_HOME=/var/lib/thelounge-tor NODE_ENV=production
+Environment=PRESTIUM_LOUNGE_TOR=1 PRESTIUM_LOUNGE_LAUNCH=/run/prestium-thelounge-tor-launch
+# io_uring is disabled system-wide (kernel.io_uring_disabled=2); make libuv use its thread pool from the start
+Environment=UV_USE_IO_URING=0
+ExecStartPre=+/usr/local/sbin/prestium-thelounge-setup tor
+ExecStart=/opt/nodejs/bin/node /opt/thelounge/node_modules/thelounge/index.js start
+Restart=on-failure
+RestartSec=5
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+# the next one-use launcher token (see prestium-thelounge-setup)
+ReadWritePaths=/var/lib/thelounge-tor -/run/prestium-thelounge-tor-launch
+# config.js and the packages are code The Lounge loads at start; read-only (root:thelounge-tor
+# 0640/0750 in perms.txt and hook 0500, and denied in its AppArmor profile)
+ReadOnlyPaths=/var/lib/thelounge-tor/config.js /var/lib/thelounge-tor/packages
+# nothing of the I2P instance, and no unix socket of Tor's (only its TCP SOCKS port, by firewall uid)
+InaccessiblePaths=-/var/lib/thelounge -/run/prestium-thelounge -/run/prestium-thelounge-launch
+InaccessiblePaths=-/run/tor -/run/onion-grater -/run/prestium-tbb
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+IPAddressDeny=any
+IPAddressAllow=localhost
+# No "-" prefix: if the profile isn't loaded, The Lounge (Tor) doesn't start (fail closed).
+AppArmorProfile=thelounge-tor
+
+[Install]
+WantedBy=multi-user.target

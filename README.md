@@ -26,7 +26,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Browser Updater:** install the latest publisher-signed Tor Browser or I2P Browser for this session,
   over Tor or the I2P outproxy, and reset to the copy on the image.
 - **Enforced AppArmor profiles** for the browsers, Claws Mail, Gajim, Pidgin, OnionShare, Feather,
-  LibreOffice, The Lounge, the local-only Firefox, KeePassXC, Kleopatra and the programs that open
+  LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra and the programs that open
   downloaded files.
 - **Network privacy:** MAC address spoofing with a guard against leaks of the real address,
   default-deny firewall that stays closed when stopped, no system DNS, IPv6 off, no LAN access.
@@ -35,7 +35,14 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Tor Connection Assistant:** Direct, Snowflake, WebTunnel, obfs4 and meek, with bootstrap progress,
   Cancel, Retry and Revert at any point.
 - **I2P:** i2pd with a per-boot port, signature-checked reseeding (over Tor or from a file), I2P mail
-  (Claws Mail), IRC (The Lounge), torrents and Feather on I2P.
+  (Claws Mail), IRC, torrents and Feather on I2P.
+- **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
+  signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
+  SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets for OFTC
+  (default), Libera.Chat, hackint, Ergo, AlphaChat, DarkScience, Pirate IRC and IRCNow, and its own
+  Tor circuits per network. Networks connect only when you choose Connect. Libera.Chat over Tor needs
+  an account and client certificate (SASL EXTERNAL) set up beforehand without Tor; AlphaChat and
+  Pirate IRC need SASL.
 - **Fail-closed safety alerts** when the USB watchdog, MAC guard, Wayland broker, ptrace protection or
   shutdown memory wipe isn't working.
 - **Hardware:** current firmware, PipeWire audio, HiDPI scaling, laptop keys, touchpad settings and an

@@ -1,8 +1,9 @@
 # Prestium 2.0 r9: the local-only Firefox (/opt/firefox, "prestium-localfox") for Prestium's own
-# pages (I2P console, I2P Torrents, The Lounge), ENFORCED. Those pages show content from the I2P
-# network (torrent names, IRC messages), so the browser is confined like LibreWolf: its own profile,
-# ~/Downloads, no other files in $HOME, no sudo or Prestium helpers, no Tor. The firewall already
-# limits it to 127.0.0.1 ports 7070, 7685 and 9000. Derived from the LibreWolf profile.
+# pages (I2P console, I2P Torrents, The Lounge: IRC (I2P) and IRC (Tor)), ENFORCED. Those pages show
+# content from the I2P and Tor networks (torrent names, IRC messages), so the browser is confined like
+# LibreWolf: its own profile, ~/Downloads, no other files in $HOME, no sudo or Prestium helpers, no Tor.
+# The firewall already limits it to 127.0.0.1 ports 7070, 7685, 9000 and 9010. Derived from the
+# LibreWolf profile.
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>

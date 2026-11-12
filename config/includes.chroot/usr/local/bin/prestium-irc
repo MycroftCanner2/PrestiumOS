@@ -1,29 +1,36 @@
 #!/bin/sh
-# Prestium: open The Lounge (IRC web client on 127.0.0.1:9000) in the local-only Firefox,
-# signed in automatically. The login token is readable by "user" only and works once (2.1
-# review: The Lounge then gives the browser its own session and writes the next token). It
-# reaches a small page on The Lounge's own origin in the URL fragment (never sent to the server
-# or written to The Lounge's logs), which stores it where The Lounge looks for it.
+# Prestium: open The Lounge (IRC web client) in the local-only Firefox, signed in automatically.
+#   prestium-irc       IRC (I2P): thelounge.service on 127.0.0.1:9000
+#   prestium-irc tor   IRC (Tor): thelounge-tor.service on 127.0.0.1:9010 (2.1)
+# The login token is readable by "user" only and works once (2.1 review: The Lounge then gives the
+# browser its own session and writes the next token). It reaches a small page on The Lounge's own
+# origin in the URL fragment (never sent to the server or written to The Lounge's logs), which
+# stores it where The Lounge looks for it.
 # 2.1 (review): never in a command line (other users can read those in /proc): Firefox opens a
 # one-off page in a private directory (0700, the file 0600) that forwards to the sign-in page,
 # and the page is deleted again.
 # 2.0 r6: token presence alone is not enough — require a hex token of expected length and
-# that thelounge.service is active; otherwise tell the user how to recover.
-if ! systemctl is-active --quiet thelounge.service 2>/dev/null; then
-  zenity --title "The Lounge (IRC, I2P)" --warning --no-markup --width=460 \
+# that the service is active; otherwise tell the user how to recover.
+case "${1:-i2p}" in
+  i2p) N="IRC (I2P)"; SVC=thelounge.service; PORT=9000; TOK=/run/prestium-thelounge-launch/token ;;
+  tor) N="IRC (Tor)"; SVC=thelounge-tor.service; PORT=9010; TOK=/run/prestium-thelounge-tor-launch/token ;;
+  *) echo "usage: prestium-irc [i2p|tor]" >&2; exit 2 ;;
+esac
+if ! systemctl is-active --quiet "$SVC" 2>/dev/null; then
+  zenity --title "$N" --warning --no-markup --width=460 \
     --text "The Lounge service is not running. Wait a moment after boot, then try again. If it keeps happening, restart Prestium." 2>/dev/null
   exit 1
 fi
-T=$(cat /run/prestium-thelounge-launch/token 2>/dev/null | tr -d '\n\r')
+T=$(cat "$TOK" 2>/dev/null | tr -d '\n\r')
 case "$T" in
   ""|*[!0-9a-f]*)
-    zenity --title "The Lounge (IRC, I2P)" --warning --no-markup --width=460 \
+    zenity --title "$N" --warning --no-markup --width=460 \
       --text "The Lounge sign-in token is missing or invalid. Wait a few seconds after boot for setup to finish, then try again. If it keeps happening, restart Prestium." 2>/dev/null
     exit 1 ;;
 esac
 # setup writes 64 random bytes as hex => 128 chars
 if [ "${#T}" -ne 128 ]; then
-  zenity --title "The Lounge (IRC, I2P)" --warning --no-markup --width=460 \
+  zenity --title "$N" --warning --no-markup --width=460 \
     --text "The Lounge sign-in token looks incomplete (${#T} chars). Wait a moment and try again. If it keeps happening, restart Prestium." 2>/dev/null
   exit 1
 fi
@@ -33,6 +40,6 @@ mkdir -p "$D" && chmod 700 "$D" || exit 1
 find "$D" -maxdepth 1 -type f -name '*.html' -mmin +1 -delete 2>/dev/null
 F="$D/$(od -An -N16 -tx1 /dev/urandom | tr -d ' \n').html"
 printf '%s\n' '<!doctype html><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>The Lounge</title>' \
-  "<script>location.replace(\"http://127.0.0.1:9000/packages/thelounge-prestium-autologin/autologin.html#$T\");</script>" > "$F" || exit 1
+  "<script>location.replace(\"http://127.0.0.1:$PORT/packages/thelounge-prestium-autologin/autologin.html#$T\");</script>" > "$F" || exit 1
 ( sleep 120; rm -f "$F" ) >/dev/null 2>&1 &
 exec /usr/local/bin/prestium-localfox "file://$F"

@@ -1,0 +1,65 @@
+# Prestium 2.1: The Lounge's second instance, IRC (Tor), ENFORCED. Applied by thelounge-tor.service
+# (AppArmorProfile=thelounge-tor), on top of its systemd sandbox and its own uid "thelounge-tor".
+# The same rules as the I2P instance's profile (prestium.thelounge) for its own paths: it may read
+# Node, The Lounge and its state directory /var/lib/thelounge-tor, listen on 127.0.0.1:9010 and
+# connect to Tor's SOCKS port 127.0.0.1:9050 (the firewall allows only that; AppArmor can't limit
+# ports). Nothing of the I2P instance, no Tor unix sockets.
+abi <abi/4.0>,
+include <tunables/global>
+
+# 2.0 r20: attach_disconnected. systemd opens the service's stdin (/dev/null) on the host before it
+# moves the process into its private mount namespace (PrivateDevices=, PrivateTmp=), so in there
+# fd 0 is a "disconnected path". Without this flag AppArmor denies Node's fstat(0) with EACCES and
+# Node aborts at once in PlatformInit (SIGABRT, core-dump), which is what the first r18 boot showed.
+# See systemd issue #12302. The profile's path rules are unchanged.
+profile thelounge-tor flags=(attach_disconnected) {
+  include <abstractions/base>
+  include <abstractions/nameservice>
+  include <abstractions/ssl_certs>
+  include <abstractions/prestium-no-admin>
+
+  network inet stream,
+  network inet6 stream,
+  network unix stream,
+  network netlink raw,
+
+  /opt/nodejs/bin/node mrix,
+  /opt/nodejs/** r,
+  /opt/thelounge/** r,
+  /opt/thelounge/**.node mr,
+  /var/lib/thelounge-tor/ r,
+  /var/lib/thelounge-tor/** rwk,
+  /usr/share/zoneinfo/** r,
+  /etc/thelounge/** r,
+  @{PROC}/@{pid}/** r,
+  @{PROC}/sys/kernel/** r,
+  @{PROC}/meminfo r,
+  @{PROC}/cpuinfo r,
+  @{PROC}/stat r,
+  /sys/fs/cgroup/** r,
+  /sys/devices/system/cpu/** r,
+  /tmp/** rwk,
+  # the next one-use launcher token
+  /run/prestium-thelounge-tor-launch/ r,
+  /run/prestium-thelounge-tor-launch/{token,.token-*} rw,
+  /dev/shm/** rwk,
+
+  # its code and settings are root's: The Lounge require()s config.js and every package at start,
+  # so it must not be able to rewrite them (or replace the directory)
+  deny /var/lib/thelounge-tor/config.js wl,
+  deny /var/lib/thelounge-tor/packages{,/**} wl,
+
+  # nothing of the I2P instance, no Tor or onion-grater unix sockets
+  deny /var/lib/thelounge/** rwl,
+  deny /run/prestium-thelounge/** rw,
+  deny /run/prestium-thelounge-launch/** rw,
+  deny /run/tor/** rw,
+  deny /run/onion-grater/** rw,
+  deny /run/prestium-tbb/** rw,
+
+  # no home directories at all, no other programs
+  deny /home/** rw,
+  deny /root/** rw,
+
+  include if exists <local/prestium.thelounge-tor>
+}

@@ -1,6 +1,6 @@
 #!/bin/bash
 # 2.1 (security audit): i2pd and Tor parse remote network input, so neither may reach Prestium's
-# local services on loopback (The Lounge 9000, i2pd console 7070, I2P Torrents 7685, IRC tunnels,
+# local services on loopback (The Lounge 9000 and 9010, i2pd console 7070, I2P Torrents 7685, IRC tunnels,
 # mail tunnels). i2pd: loopback only 4500 (its SOCKS outproxy tunnel). Tor: loopback only the
 # kernel's ephemeral ports (its pluggable transports listen on 127.0.0.1:0). Static checks on
 # ferm.conf; renders it with ferm when installed.
@@ -25,7 +25,7 @@ lo_tor=$(grep -E 'outerface lo .*uid-owner \$tor_uid' <<<"$rules")
 # OnionShare's onion-grater target range and the firewall's agree
 grep -q '17600-17650' config/includes.chroot/usr/local/sbin/prestium-onion-grater 2>/dev/null || grep -q '17600-17650' "$R/config/includes.chroot/usr/local/sbin/prestium-onion-grater" \
   && ok "onion-grater OnionShare targets match the firewall" || bad "OnionShare port range differs"
-for p in 4444 4447 4450 4500 6665 6672 7070 7656 7659 7660 7685 9000 9050 9051 17600 17650 30000; do
+for p in 4444 4447 4450 4500 6665 6672 7070 7656 7659 7660 7685 9000 9010 9050 9051 17600 17650 30000; do
   [ "$p" -ge 32768 ] && bad "service port $p inside Tor's loopback range"; done
 ok "fixed local service ports are below Tor's loopback range"
 cat "$R"/config/includes.chroot/etc/sysctl.d/* "$R"/config/includes.chroot/usr/lib/sysctl.d/* 2>/dev/null \

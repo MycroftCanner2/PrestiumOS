@@ -47,6 +47,11 @@ profile thelounge flags=(attach_disconnected) {
   deny /var/lib/thelounge/config.js wl,
   deny /var/lib/thelounge/packages{,/**} wl,
 
+  # 2.1: nothing of the Tor instance (IRC (Tor), profile thelounge-tor)
+  deny /var/lib/thelounge-tor/** rwl,
+  deny /run/prestium-thelounge-tor/** rw,
+  deny /run/prestium-thelounge-tor-launch/** rw,
+
   # no home directories at all, no other programs
   deny /home/** rw,
   deny /root/** rw,

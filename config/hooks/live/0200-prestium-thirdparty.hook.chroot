@@ -6,7 +6,8 @@
 #                   with the system Tor, TOR_SKIP_LAUNCH) + Prestium policies.json and uBlock Origin
 #   Firefox      -> /opt/firefox (local-only browser for Prestium's own pages) + policies.json
 #   Node.js      -> /opt/nodejs (runtime only: bin/node + LICENSE)
-#   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch, 320s IRC ping timeout, and connecting lobby text only when a connection starts
+#   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch, 320s IRC ping timeout, and connecting lobby text only when a connection starts;
+#                   shared by both instances, IRC (I2P) and IRC (Tor) (Tor: every network through 127.0.0.1:9050)
 #   Feather      -> /usr/local/bin/feather
 set -e
 S=/usr/src/prestium-thirdparty
@@ -60,7 +61,7 @@ c, p, cl, sv = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 # "prestiumLaunch" (prestium-thelounge-setup issues the first one) is deleted when it is used, the
 # browser gets a session token of its own (The Lounge's normal "init" token, as after a password
 # sign-in), and a new launch token is written to /run/prestium-thelounge-launch/token (group user)
-# for the next "IRC (The Lounge)" start.
+# for the next "IRC (I2P)" start (the Tor instance: /run/prestium-thelounge-tor-launch, "IRC (Tor)").
 s = open(sv).read()
 if 'prestiumLaunch' not in s:
     a = ('        if (Object.prototype.hasOwnProperty.call(client.config.sessions, providedToken)) {\n'
@@ -79,13 +80,15 @@ if 'prestiumLaunch' not in s:
     assert s.count(b) == 1, "The Lounge server.js: initializeClient changed"
     s = s.replace(b, '''// Prestium: the next one-use launcher token. Only its SHA-512 is kept in the user file; the token
 // goes to /run/prestium-thelounge-launch/token (setgid group "user", 0640) for prestium-irc.
+// 2.1: the Tor instance (thelounge-tor.service) names its own directory in PRESTIUM_LOUNGE_LAUNCH.
 function prestiumNextLaunchToken(client) {
     const fs = require("fs");
     const crypto = require("crypto");
     const t = crypto.randomBytes(64).toString("hex");
     client.config.sessions[client.calculateTokenHash(t)] = {lastUse: Date.now(), ip: "127.0.0.1", agent: "Prestium launcher", prestiumLaunch: true};
     client.save();
-    const dir = "/run/prestium-thelounge-launch";
+    const dir = process.env.PRESTIUM_LOUNGE_LAUNCH === "/run/prestium-thelounge-tor-launch"
+        ? "/run/prestium-thelounge-tor-launch" : "/run/prestium-thelounge-launch";
     const tmp = dir + "/.token-" + process.pid + "-" + crypto.randomBytes(6).toString("hex");
     try {
         fs.writeFileSync(tmp, t + "\\n", {mode: 0o640, flag: "wx"});
@@ -105,8 +108,11 @@ s = open(cl).read()
 if 'Prestium' not in s:
     a = 'You have manually disconnected from this network before, use the /connect command to connect again.'
     assert s.count(a) == 1
-    s = s.replace(a, 'Not connected (Prestium never connects automatically). When I2P is ready, '
-                     'right-click this network in the list and choose Connect, or type /connect here.')
+    # 2.1: "Tor" in the Tor instance (thelounge-tor.service sets PRESTIUM_LOUNGE_TOR=1)
+    s = s.replace('"' + a + '"', '"Not connected (Prestium never connects automatically). When " + '
+                     '(process.env.PRESTIUM_LOUNGE_TOR === "1" ? "Tor" : "I2P") + " is ready, '
+                     'right-click this network in the list and choose Connect, or type /connect here."')
+    assert s.count('(process.env.PRESTIUM_LOUNGE_TOR === "1" ? "Tor" : "I2P")') == 1
     s = s.replace('const msg_1 = ', '// Prestium: lobby text for disconnected networks changed\nconst msg_1 = ', 1)
     open(cl, 'w').write(s)
 s = open(c).read()
@@ -214,6 +220,43 @@ print("P: The Lounge /connect shows Connecting to host:port")
 PY
 /opt/nodejs/bin/node --check "$C"
 /opt/nodejs/bin/node --check "$I"
+# 2.1: IRC (Tor), The Lounge's second instance (thelounge-tor.service, PRESTIUM_LOUNGE_TOR=1). Every
+# network goes through Tor's SOCKS port 127.0.0.1:9050, whatever its proxy settings say (a network the
+# user adds or edits with the proxy off would otherwise try a direct connection and a local DNS lookup;
+# the firewall refuses both, this keeps them from being tried at all). irc-framework hands the host name
+# to the SOCKS5 proxy (socks: ATYP 3, "domain name"), so Tor resolves it, and .onion names and torrc's
+# MapAddress lines work. Each network keeps its own SOCKS username (Tor isolates circuits by it): the one
+# prestium-thelounge-setup gives it, or one from the network's uuid. The I2P instance is unchanged.
+# The expected text must appear exactly once, or the build stops. Idempotent.
+NS=/opt/thelounge/node_modules/thelounge/dist/server/models/network.js
+python3 - "$NS" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+if "Prestium: the Tor instance sends every network through Tor" not in s:
+    a = "        if (this.proxyEnabled) {\n            this.irc.options.socks = {\n"
+    assert s.count(a) == 1, "The Lounge network.js: proxy options changed (Tor instance patch)"
+    s = s.replace(
+        a,
+        "        // Prestium: the Tor instance sends every network through Tor (127.0.0.1:9050, names resolved by Tor)\n"
+        "        if (process.env.PRESTIUM_LOUNGE_TOR === \"1\") {\n"
+        "            this.irc.options.socks = {\n"
+        "                host: \"127.0.0.1\",\n"
+        "                port: 9050,\n"
+        "                user: this.proxyUsername || (\"prestium-\" + this.uuid),\n"
+        "                pass: this.proxyPassword || \"prestium\",\n"
+        "            };\n"
+        "        }\n"
+        "        else if (this.proxyEnabled) {\n            this.irc.options.socks = {\n",
+        1,
+    )
+    open(p, "w").write(s)
+assert s.count("Prestium: the Tor instance sends every network through Tor") == 1, "The Lounge network.js: Tor patch not present once"
+assert s.count('if (process.env.PRESTIUM_LOUNGE_TOR === "1") {') == 1
+assert s.count("else if (this.proxyEnabled) {") == 1, "The Lounge network.js: proxyEnabled branch missing"
+print("P: The Lounge Tor instance: every network through 127.0.0.1:9050")
+PY
+/opt/nodejs/bin/node --check "$NS"
 chown -R root:root /opt/thelounge; chmod -R u+rwX,go+rX,go-w /opt/thelounge
 echo "P: The Lounge $(sed -n 's/.*"version": "\(.*\)".*/\1/p' /opt/thelounge/node_modules/thelounge/package.json | head -1)"
 

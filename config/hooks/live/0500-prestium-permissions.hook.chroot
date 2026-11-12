@@ -10,6 +10,16 @@ grep -v '^#' "$M" | while read -r mode owner group path; do
 	[ -L "$p" ] && continue
 	chown "$owner:$group" "$p" && chmod "$mode" "$p"
 done
+# 2.1: The Lounge's Tor instance (IRC (Tor)) loads the same packages as the I2P one (sign-in page, the 10
+# Theme Factory themes): its own copy, root-owned and read-only for it (group thelounge-tor, 0750/0640),
+# like the I2P instance's (root:thelounge in the manifest). Neither instance can read the other's.
+TP=/var/lib/thelounge-tor/packages
+rm -rf "$TP"; cp -R /var/lib/thelounge/packages "$TP"
+chown -R root:thelounge-tor "$TP"
+find "$TP" -type d -exec chmod 0750 {} +; find "$TP" -type f -exec chmod 0640 {} +
+[ -z "$(find "$TP" ! -type d ! -type f)" ] || { echo "E: $TP: not only files and directories"; exit 1; }
+[ -f "$TP/node_modules/thelounge-prestium-autologin/autologin.html" ] && [ -f "$TP/node_modules/thelounge-theme-tech-innovation/theme.css" ] \
+	|| { echo "E: $TP incomplete"; exit 1; }
 # directories created by includes that the manifest does not list keep root:root 0755
 chmod 0440 /etc/sudoers.d/*
 visudo -c >/dev/null

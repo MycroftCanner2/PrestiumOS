@@ -35,10 +35,10 @@ want=$(printf '%s\n' --name prestium-localfox --class PrestiumLocalFirefox --pro
 [ "$(cat "$T/argv" 2>/dev/null)" = "$want" ] && ok "HOME with a quote: argv passed through unchanged" || { bad "argv differs:"; cat "$T/argv"; }
 [ ! -e "$T/PWNED" ] && ok "no command substitution from HOME" || bad "HOME was evaluated by a shell"
 [ "$(stat -c %a "$H/.local/share/prestium-localfox")" = 700 ] && ok "profile is mode 700" || bad "profile mode"
-for u in http://127.0.0.1:7070/ "http://127.0.0.1:7685/abc/web/" http://127.0.0.1:9000/ http://i2pd:pw@127.0.0.1:7070/; do
+for u in http://127.0.0.1:7070/ "http://127.0.0.1:7685/abc/web/" http://127.0.0.1:9000/ http://127.0.0.1:9010/ http://i2pd:pw@127.0.0.1:7070/; do
   rm -f "$T/argv"; run "$u" && [ -s "$T/argv" ] && ok "accepted $u" || bad "refused $u"
 done
-for u in http://127.0.0.1:8080/ https://example.com/ http://127.0.0.1:7070.evil/ "http://127.0.0.1:9000/'x" "http://127.0.0.1:9000/\$(id)" file:///etc/passwd; do
+for u in http://127.0.0.1:8080/ http://127.0.0.1:9011/ https://example.com/ http://127.0.0.1:7070.evil/ "http://127.0.0.1:9000/'x" "http://127.0.0.1:9000/\$(id)" file:///etc/passwd; do
   rm -f "$T/argv"; run "$u" 2>/dev/null; rc=$?
   [ $rc = 2 ] && [ ! -e "$T/argv" ] && ok "refused $u" || bad "accepted $u (rc $rc)"
 done

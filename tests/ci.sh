@@ -51,7 +51,7 @@ if command -v systemd-analyze >/dev/null; then
     systemd-analyze security --offline=true --no-pager "$D/$1.service" 2>/dev/null | tail -n 1 | grep -o '[0-9]*\.[0-9]' \
       || unshare -rm sh -c 'mount -t tmpfs tmpfs /run && systemd-analyze security --offline=true --no-pager "$0"' "$D/$1.service" 2>/dev/null \
          | tail -n 1 | grep -o '[0-9]*\.[0-9]'; }
-  for f in "$D"/prestium-*.service "$D"/thelounge.service; do
+  for f in "$D"/prestium-*.service "$D"/thelounge.service "$D"/thelounge-tor.service; do
     u=$(basename "$f" .service); s=$(score "$u")
     if [ -z "$s" ]; then
       if [ "$(id -u)" = 0 ]; then echo "FAIL $u: could not be scored"; fail=1; else echo "SKIP $u: n/a (needs root or user namespaces)"; fi

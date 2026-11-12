@@ -25,6 +25,17 @@ AvoidDiskWrites 1
 ClientUseIPv6 0
 ClientPreferIPv6ORPort 0
 
+# 2.1: IRC (Tor), The Lounge's Tor instance. These names reach each network's own onion service, so
+# the server's TLS certificate (made for the name) checks out and nothing goes through an exit relay.
+# The mappings and onion addresses are the networks' own (libera.chat/guides/connect,
+# hackint.org/transport/tor, alphachat.net/tor.xhtml, pirateirc.net/servers.html). MapAddress applies
+# to every SOCKS client of this Tor (Tor Browser too): there these names also lead to the same
+# networks' official onion services, which is harmless.
+MapAddress palladium.libera.chat libera75jm6of4wxpxt4aynol3xjmbtxgfyjpu34ss4d7r7q2v5zrpyd.onion
+MapAddress guybrush.hackint.org dtlbunzs5b7s5sl775quwezleyeplxzicdoh3cnhm7feolxmkfd42nqd.onion
+MapAddress irc.alphachat.net rnjlael46gqqmfiuiqsswdeev6axrf47j7bq4dtuqdsv2qgqfumcy4yd.onion
+MapAddress roubaix-fr.pirateirc.net tll4bxf546kzf6iv4n2m4pbbjnifrfewe3kcritva2tuuuiowygx2cqd.onion
+
 # Pluggable transports: obfs4 (lyrebird), Snowflake and WebTunnel are set up by the Tor Connection
 # Assistant (menu: Network). Snowflake/meek/WebTunnel host names are resolved with DNS-over-HTTPS
 # through the I2P outproxy and pinned for the transports; Tor traffic itself never uses I2P.
