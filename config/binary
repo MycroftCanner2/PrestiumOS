@@ -34,7 +34,7 @@ LB_CHECKSUMS="sha256"
 LB_COMPRESSION="none"
 
 # Support dm-verity on rootfs
-LB_DM_VERITY=""
+LB_DM_VERITY="true"
 
 # Support FEC on dm-verity rootfs
 LB_DM_VERITY_FEC_ROOTS=""

@@ -1,0 +1,36 @@
+#!/bin/sh
+# Prestium 2.1: the dm-verity root hash of live/filesystem.squashfs (written by live-build's
+# binary_dm-verity stage, auto/config --dm-verity) goes on the kernel command line of every boot entry,
+# GRUB (UEFI and BIOS) and isolinux alike. The initramfs (9989-prestium-verity.sh, hook 0405) refuses to
+# boot without it, without the hash tree, or when the image does not match it. The hash tree is checked
+# against the root hash once here, so a failed or partial veritysetup run (live-build does not notice
+# one) stops the build instead of producing an image that can't boot.
+# Runs in binary/ on the build host, after 9000 and before the boot menu lock (9020).
+set -e
+SQ=live/filesystem.squashfs
+H=$(cat "$SQ.roothash" 2>/dev/null || true)
+echo "$H" | grep -qxE '[0-9a-f]{64}' || { echo "E: no dm-verity root hash in binary/$SQ.roothash (live-build --dm-verity, veritysetup on the build host)"; exit 1; }
+[ -s "$SQ.verity" ] || { echo "E: binary/$SQ.verity missing"; exit 1; }
+if [ -z "${PRESTIUM_VERITY_SKIP_VERIFY:-}" ]; then
+	veritysetup verify "$SQ" "$SQ.verity" "$H" || { echo "E: binary/$SQ does not match its dm-verity hash tree"; exit 1; }
+fi
+# live-boot would fall back to this file on the USB stick when no hash is given; Prestium never uses it
+# (hook 0405), and a copy outside the ISO is kept for the release files by build.sh
+cp -f "$SQ.roothash" ../prestium-roothash.tmp
+rm -f "$SQ.roothash"
+OPT="dm-verity-root-hash=filesystem.squashfs:$H dm-verity-oncorruption=panic"
+n=0
+for f in boot/grub/*.cfg isolinux/*.cfg; do
+	[ -f "$f" ] || continue
+	grep -q 'boot=live' "$f" || continue
+	grep -q 'dm-verity-root-hash=' "$f" && { echo "E: $f already has a dm-verity root hash"; exit 1; }
+	sed -i "s/boot=live /boot=live $OPT /g" "$f"
+	# every kernel line that boots the live system now carries the hash
+	if grep -E '(^|[[:space:]])(linux|append)[[:space:]].*boot=live' "$f" | grep -qv "dm-verity-root-hash=filesystem.squashfs:$H "; then
+		echo "E: $f: a boot entry without the dm-verity root hash"; exit 1
+	fi
+	n=$((n + 1))
+done
+[ "$n" -gt 0 ] || { echo "E: no boot menu with boot=live found"; exit 1; }
+echo "P: dm-verity root hash $H in $n boot menu files"
+exit 0

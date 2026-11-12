@@ -527,3 +527,5 @@
 0644 root root /usr/share/prestium/theme/gtk4.css
 0644 root root /usr/share/prestium/branding/prestium-logo.svg
 0644 root root /usr/share/prestium/branding/prestium-logo-256.png
+0644 root root /usr/lib/live/boot/9989-prestium-verity.sh
+0755 root root /etc/initramfs-tools/hooks/prestium-verity

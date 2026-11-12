@@ -43,6 +43,9 @@ modernization of the 2023 Prestium build, with tighter security and new features
   Tor circuits per network. Networks connect only when you choose Connect. Libera.Chat over Tor needs
   an account and client certificate (SASL EXTERNAL) set up beforehand without Tor; AlphaChat and
   Pirate IRC need SASL.
+- **Verified live image:** the root filesystem is mounted through dm-verity, and Prestium refuses to
+  boot when it doesn't match the root hash in the boot menu (the kernel, initramfs and boot menu
+  themselves are not covered yet; see the CHANGELOG's Known security limits).
 - **Fail-closed safety alerts** when the USB watchdog, MAC guard, Wayland broker, ptrace protection or
   shutdown memory wipe isn't working.
 - **Hardware:** current firmware, PipeWire audio, HiDPI scaling, laptop keys, touchpad settings and an
@@ -79,7 +82,7 @@ front, the WebTunnel bridge's host). In 2.0:
 
 Check a download before you write it to a USB stick.
 
-- **2.1** writes `SHA256SUMS` (the ISO, its manifest and its package list). When a release is signed
+- **2.1** writes `SHA256SUMS` (the ISO, its manifest, its dm-verity root hash and its package list). When a release is signed
   (`SHA256SUMS.asc` from `scripts/sign-release.sh`): import the Prestium release key, compare its full
   fingerprint with the one published with the release, then
 

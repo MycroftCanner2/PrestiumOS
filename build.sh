@@ -4,9 +4,9 @@
 #   sudo ./build.sh --resume   continue an interrupted build (keeps chroot and stage files)
 #   sudo ./build.sh --clean    lb clean --purge first
 # Host: Debian 13 (trixie) with live-build, debootstrap, squashfs-tools, xorriso, curl, gpg, gpgv,
-# git, unzip, npm. On a non-amd64 host also qemu-user-static with a binfmt_misc entry for x86-64
+# git, unzip, npm, cryptsetup-bin (veritysetup). On a non-amd64 host also qemu-user-static with a binfmt_misc entry for x86-64
 # (flag F), so the amd64 chroot runs emulated. Output: ./Prestium-2.1-amd64.iso and .sha256,
-# SHA256SUMS, the .manifest and the .packages list for a signed release (scripts/sign-release.sh).
+# SHA256SUMS, the .manifest, the .roothash (dm-verity) and the .packages list for a signed release (scripts/sign-release.sh).
 set -euo pipefail
 cd "$(dirname "$0")"
 TOP=$(pwd)
@@ -18,6 +18,10 @@ MODE=${1:-}
 # nothing else builds here, so hold an exclusive lock for the whole run (released on exit).
 exec 9>"$TOP/.prestium-build.lock"
 flock -n 9 || { echo "another build.sh is running in $TOP (lock $TOP/.prestium-build.lock)"; exit 1; }
+
+# 2.1: the image's dm-verity hash tree is made on the build host (live-build's binary_dm-verity stage runs
+# veritysetup outside the chroot, and hook 9010 checks the tree with it)
+command -v veritysetup >/dev/null || { echo "veritysetup missing on the build host (apt install cryptsetup-bin)"; exit 1; }
 
 if [ "$(dpkg --print-architecture)" != amd64 ]; then
 	[ -e /proc/sys/fs/binfmt_misc/qemu-x86_64 ] || { echo "non-amd64 host: register qemu-x86_64 in binfmt_misc (qemu-user-static)"; exit 1; }
@@ -117,6 +121,11 @@ cat "$OUT.sha256"
 #    writes SHA256SUMS.asc. The manifest records what went into the image.
 MAN=${OUT%.iso}.manifest
 PKGS=${OUT%.iso}.packages
+# 2.1: the dm-verity root hash of the live image (hook 9010 put it on every boot entry's command line).
+# It is in SHA256SUMS, so a signed release also signs the hash the boot menu must carry.
+ROOTHASH=${OUT%.iso}.roothash
+grep -qxE '[0-9a-f]{64}' prestium-roothash.tmp 2>/dev/null || { echo "no dm-verity root hash from hook 9010"; exit 1; }
+{ cat prestium-roothash.tmp; echo; } > "$ROOTHASH"   # rewritten by hook 9010 whenever the binary stage runs
 TP=config/includes.chroot/usr/src/prestium-thirdparty
 . thirdparty/versions.sh
 for f in live-image-amd64.packages chroot.packages.live; do [ -s "$f" ] && { cp -f "$f" "$PKGS"; break; }; done
@@ -127,6 +136,7 @@ for f in live-image-amd64.packages chroot.packages.live; do [ -s "$f" ] && { cp 
 	echo "image_bytes: $(stat -c %s "$OUT")"
 	echo "build_date_utc: $(date -u -d "@$(cat chroot/usr/share/prestium/build-date 2>/dev/null || date -u +%s)" '+%Y-%m-%dT%H:%M:%SZ')"
 	echo "source_commit: $(git rev-parse HEAD 2>/dev/null || echo unknown)$(git diff --quiet HEAD 2>/dev/null || echo ' (with local changes)')"
+	echo "dm_verity_root_hash: $(cat "$ROOTHASH") (live/filesystem.squashfs, sha256, 4096-byte blocks)"
 	echo "debian: trixie, $(grep -c . "$PKGS" 2>/dev/null || echo 0) packages (see $PKGS)"
 	echo "tor_browser: $(cat "$TP/tor-browser.version" 2>/dev/null || echo unknown) sha256 $(sha256sum "$TP/tor-browser.tar.xz" 2>/dev/null | cut -c1-64)"
 	echo "firefox_local: $FF_VERSION sha256 $FF_SHA256"
@@ -135,6 +145,6 @@ for f in live-image-amd64.packages chroot.packages.live; do [ -s "$f" ] && { cp 
 	echo "feather: $FEATHER_VERSION sha256 $FEATHER_SHA256"
 	echo "apt (installed at build time, signed repositories): tor $(chroot chroot dpkg-query -W -f '${Version}' tor 2>/dev/null), i2pd $(chroot chroot dpkg-query -W -f '${Version}' i2pd 2>/dev/null), librewolf $(chroot chroot dpkg-query -W -f '${Version}' librewolf 2>/dev/null)"
 } > "$MAN"
-sha256sum "$OUT" "$MAN" $( [ -s "$PKGS" ] && echo "$PKGS" ) > SHA256SUMS
+sha256sum "$OUT" "$MAN" "$ROOTHASH" $( [ -s "$PKGS" ] && echo "$PKGS" ) > SHA256SUMS
 rm -f SHA256SUMS.asc     # an old signature never covers a new build
-echo "release files: SHA256SUMS $MAN ${PKGS} (sign with: scripts/sign-release.sh KEYID)"
+echo "release files: SHA256SUMS $MAN $ROOTHASH ${PKGS} (sign with: scripts/sign-release.sh KEYID)"

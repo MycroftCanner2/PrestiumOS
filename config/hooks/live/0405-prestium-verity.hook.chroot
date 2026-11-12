@@ -1,0 +1,41 @@
+#!/bin/sh
+# Prestium 2.1: the live system is mounted only through dm-verity (auto/config --dm-verity: live-build
+# writes live/filesystem.squashfs.verity, hook 9010 puts the root hash on the kernel command line).
+# live-boot itself mounts an image without dm-verity when its hash tree is missing, takes the root hash
+# from a file next to the image when none is given, and carries on without dm-verity when the options
+# can't be used. Here every image must pass prestium_verity_check (9989-prestium-verity.sh) first, any
+# failure to set dm-verity up stops the boot, and the "plain root" mode (no image at all) is refused.
+# Each change must apply exactly once; a changed live-boot stops the build.
+set -e
+# PRESTIUM_HOOK_ROOT: only for tests/test_dm_verity.sh (a copy of live-boot's files); empty in the chroot
+R=${PRESTIUM_HOOK_ROOT:-}
+O=$R/usr/lib/live/boot/9990-overlay.sh
+[ -f "$O" ] && [ -f "$R/usr/lib/live/boot/9989-prestium-verity.sh" ] || { echo "E: live-boot or 9989-prestium-verity.sh missing"; exit 1; }
+python3 -I - "$O" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+M = "# prestium-verity"
+if M in s:
+    sys.exit(0)
+subs = [
+    ('\t\t\timagename=$(basename "${image}")\n',
+     '\t\t\timagename=$(basename "${image}")\n\t\t\tprestium_verity_check "${image}" ' + M + '\n'),
+    ('\t\t\t\t\tlog_end_msg "Finshed parsing dm-verity options for ${image}"\n',
+     '\t\t\t\t\t[ "${valid_config}" = "true" ] || prestium_verity_fail "dm-verity could not be set up for ${imagename}" ' + M + '\n'
+     '\t\t\t\t\tlog_end_msg "Finshed parsing dm-verity options for ${image}"\n'),
+    ('\t\t# we have a plain root system\n',
+     '\t\t# we have a plain root system\n\t\tprestium_verity_fail "plain root mode (no verified image)" ' + M + '\n'),
+]
+for a, b in subs:
+    assert s.count(a) == 1, "live-boot 9990-overlay.sh changed: " + a.strip()
+    s = s.replace(a, b)
+open(p, "w").write(s)
+PY
+grep -c 'prestium-verity' "$O" | grep -qx 3 || { echo "E: live-boot dm-verity patch incomplete"; exit 1; }
+sh -n "$O"
+sh -n "$R/usr/lib/live/boot/9989-prestium-verity.sh"
+# util-linux mount (used by live-boot for dm-verity) must have libcryptsetup support built in
+mount --version | grep -q verity || { echo "E: util-linux mount without dm-verity support"; exit 1; }
+[ -x "$R/etc/initramfs-tools/hooks/prestium-verity" ] || { echo "E: initramfs hook prestium-verity missing"; exit 1; }
+echo "P: live-boot requires dm-verity"

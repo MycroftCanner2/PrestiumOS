@@ -16,6 +16,8 @@ if [ -n "${PRESTIUM_SNAPSHOT:-}" ]; then
 	MIRROR_SEC=https://snapshot.debian.org/archive/debian-security/$PRESTIUM_SNAPSHOT/
 	APT_OPTS="--yes -o Acquire::Check-Valid-Until=false"   # snapshot Release files are past Valid-Until
 fi
+# 2.1: --dm-verity: live-build writes live/filesystem.squashfs.verity (the hash tree); hook 9010 puts the
+# root hash on the kernel command line and the initramfs (hook 0405) refuses to boot without a match.
 lb config noauto \
 	--mode debian \
 	--distribution trixie \
@@ -48,6 +50,7 @@ lb config noauto \
 	--zsync false \
 	--chroot-squashfs-compression-type zstd \
 	--chroot-squashfs-compression-level 6 \
+	--dm-verity \
 	--hdd-label PRESTIUM \
 	--iso-volume "PRESTIUM" \
 	--iso-application "Prestium" \

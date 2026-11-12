@@ -45,6 +45,17 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   committed private keys and tokens, checks `systemd-analyze security` scores, and runs the tests that
   don't need a live Wayland session.
 
+- **The live system is checked with dm-verity at boot.** The build makes a dm-verity hash tree for
+  `live/filesystem.squashfs` (`auto/config --dm-verity`, `veritysetup` on the build host) and puts its
+  root hash on the kernel command line of every GRUB and isolinux entry (hook 9010, which also checks the
+  tree once with `veritysetup verify`). The initramfs refuses to boot when the hash tree is missing, the
+  command line has no well-formed root hash for the image, an extra or non-squashfs image or "plain
+  root" mode turns up, or dm-verity can't be set up (hook 0405 patches live-boot, which otherwise falls
+  back to a plain mount or to a root hash file on the same stick). A changed block of the image is an
+  I/O error at mount time (the boot stops) or a kernel panic later (`dm-verity-oncorruption=panic`). The
+  root hash is in the release files (`Prestium-2.1-amd64.roothash`, the manifest, `SHA256SUMS`), so
+  a signed release signs it too. The kernel, initramfs and boot menu are not covered (see Known security limits).
+
 ### Base system
 - **Tor Browser 16.0.1** (or newer, as above) with Firefox security fixes and tor 0.4.9.16.
   **System Tor 0.4.9.16** comes from deb.torproject.org at build time. LibreWolf and the local Firefox
@@ -325,9 +336,17 @@ Not changed in 2.1, so you know where the edges are:
   Turning them off would mean a setuid bubblewrap instead.
 - **X11 programs share one Xwayland server**, so an X11-only program can read the keyboard input and
   windows of the other X11 programs (not of Wayland apps such as the browsers).
-- **The live system is not verified at boot** (no dm-verity, no signed root filesystem): someone who
-  can write to the USB stick can change Prestium for the next boot. Secure Boot checks only the
-  bootloader and kernel.
+- **dm-verity covers the root filesystem image only.** Secure Boot checks the bootloader (shim, GRUB)
+  and the kernel, but not the initramfs or the boot menu (`grub.cfg`, `isolinux/live.cfg`), and those
+  hold the check and the expected root hash. So someone who can write to the USB stick can still change
+  the next boot by replacing the initramfs or the boot menu together with the image. What dm-verity
+  does stop: a changed or swapped `filesystem.squashfs` on its own, an extra image or a missing hash
+  tree, and blocks of the image that change after the boot check (a faulty or malicious stick). To
+  check a stick against a signed release, compare it from another computer with `SHA256SUMS`
+  (`Prestium-2.1-amd64.roothash` is the hash the boot menu must carry). Closing the gap needs a signed
+  unified kernel image (kernel, initramfs and command line in one Secure Boot-signed file), which
+  Debian's shim and GRUB don't offer for a live image yet. The hash tree's salt is random, so two
+  builds of the same commit have different root hashes.
 - **The boot menu can be edited** (no GRUB password): anyone at the keyboard can change the kernel
   options, for example to boot without AppArmor.
 - **Programs running as the desktop user can still attach a disk image** (udisks loop-setup). The
