@@ -187,13 +187,10 @@ This is one combined list of everything that changed since the last release, 2.0
   directory across restarts.
 - **Apps no longer crash the session in a VM.** In a virtual machine, apps that hand the compositor
   GPU buffers (VLC, the QtQR webcam view and others) crashed labwc, which dropped back to the login
-  screen. On real hardware, as on a USB stick, this didn't happen. In a VM the session now uses
+  screen. On real hardware, as on a USB stick, this didn't happen. (This replaces an earlier
+  workaround that ran VLC and QtQR through Xwayland; they are native Wayland apps again.) In a VM the session now uses
   wlroots' software renderer (`WLR_RENDERER=pixman`, no hardware cursor). Apps then send plain
   shared-memory buffers. Nothing changes on real hardware.
-- **VLC and QtQR run through Xwayland.** In a VM, VLC's video and QtQR's webcam view, as native
-  Wayland clients, crashed the whole session. The menu entries and Debian's `vlc.desktop` and
-  `qtqr.desktop` (hook 0630) now start them with `QT_QPA_PLATFORM=xcb`. Their AppArmor profiles still
-  apply, and as X11 clients they can't reach Wayland windows.
 - **The Lounge ships the 10 Theme Factory themes, and Tech Innovation is the default.** Ocean Depths,
   Sunset Boulevard, Forest Canopy, Modern Minimalist, Golden Hour, Arctic Frost, Desert Rose, Tech
   Innovation, Botanical Garden and Midnight Galaxy are local packages. The old Prestium theme is
