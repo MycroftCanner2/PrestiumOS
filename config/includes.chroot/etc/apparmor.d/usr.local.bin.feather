@@ -1,4 +1,7 @@
 # Prestium 2.0 r9: Feather (Monero wallet, I2P-only settings), ENFORCED.
+# 2.1: network is I2P: settings.json "proxy": 2 (Feather's i2p mode) through i2pd's SOCKS proxy
+# 127.0.0.1:4447, the port in i2pd.conf [socksproxy]; the menu says I2P too. Feather starts no Tor of its
+# own in that mode and may execute nothing (no x rules). AppArmor can't limit ports; ferm limits "user".
 # Feather may use its own settings and wallet directories. No other files in $HOME, no sudo, no
 # Prestium helpers, no Tor control socket, no system bus. Not yet tested on a booted ISO.
 abi <abi/4.0>,
