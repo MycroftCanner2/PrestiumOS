@@ -188,6 +188,9 @@ This is one combined list of everything that changed since the last release, 2.0
   keyboard shortcuts, a highlighted default button and correct panel names and icons. PCManFM
   thumbnails are really off now (`[ui] show_thumbnail=0`), with Debian's other settings kept. Boot
   menu labels take the version from the image.
+- **One title bar per window, one desktop.** Every window gets labwc's title bar, and GTK and
+  libadwaita apps no longer draw a second close button in their header bar (`button-layout ':'`).
+  The desktop count is now 1 (four desktops had no indicator in the bar).
 - **I2P settings need confirmation (review N-2).** Apply in the I2P Connection Assistant now goes
   through the Wayland broker, which shows the change in a dialog only the person at the screen can
   answer, then logs it and sends a notification. sudo allows only reading the settings. The helper

@@ -9,3 +9,7 @@ cursor-theme='Adwaita'
 cursor-size=24
 color-scheme='prefer-dark'
 clock-format='24h'
+
+# 2.1: no window buttons in app header bars; labwc's title bar has minimise, maximise and close
+[org/gnome/desktop/wm/preferences]
+button-layout=':'

@@ -30,7 +30,8 @@
   <!-- 2.1: icons beside menu items (the item icon= attributes in menu.xml) -->
   <menu><showIcons>yes</showIcons></menu>
   <focus><followMouse>no</followMouse><raiseOnFocus>no</raiseOnFocus></focus>
-  <desktops number="4"><popupTime>875</popupTime></desktops>
+  <!-- 2.1: one desktop (with four and no indicator in the bar, windows got "lost") -->
+  <desktops number="1" />
   <windowSwitcher show="yes" preview="yes" outlines="yes" />
 
   <keyboard>
@@ -42,14 +43,6 @@
     <keybind key="A-Down"><action name="None" /></keybind>
     <keybind key="A-F3"><action name="None" /></keybind>
     <keybind key="W-Return"><action name="Execute" command="prestium-run foot" /></keybind>
-    <keybind key="C-A-Left"><action name="GoToDesktop" to="left" wrap="no" /></keybind>
-    <keybind key="C-A-Right"><action name="GoToDesktop" to="right" wrap="no" /></keybind>
-    <keybind key="S-A-Left"><action name="SendToDesktop" to="left" wrap="no" /></keybind>
-    <keybind key="S-A-Right"><action name="SendToDesktop" to="right" wrap="no" /></keybind>
-    <keybind key="W-F1"><action name="GoToDesktop" to="1" /></keybind>
-    <keybind key="W-F2"><action name="GoToDesktop" to="2" /></keybind>
-    <keybind key="W-F3"><action name="GoToDesktop" to="3" /></keybind>
-    <keybind key="W-F4"><action name="GoToDesktop" to="4" /></keybind>
     <keybind key="A-F4"><action name="Close" /></keybind>
     <keybind key="A-Escape"><action name="Lower" /></keybind>
     <keybind key="A-space"><action name="ShowMenu" menu="client-menu" /></keybind>
@@ -94,5 +87,8 @@
          is the one prestium-wl-broker registers ("org.prestium.apps"); the old "org.prestium.bwrap"
          matched nothing, so Firefox-based browsers drew their own title bar without buttons. -->
     <windowRule sandboxEngine="org.prestium.apps" serverDecoration="yes" />
+    <!-- 2.1: every window gets the same labwc title bar (the trusted tools on the full socket too);
+         GTK and libadwaita apps draw no buttons of their own (button-layout ':' in dconf) -->
+    <windowRule identifier="*" serverDecoration="yes" />
   </windowRules>
 </labwc_config>
