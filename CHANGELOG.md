@@ -173,6 +173,9 @@ This is one combined list of everything that changed since the last release, 2.0
   labwc theme, Prestium-Dark, has Adwaita colours, rounded corners, shadows and labwc's own buttons.
   The bar, notifications and menus match, and Cantarell is the UI font. Tor Browser keeps its own
   fonts.
+- **Desktop refinements.** A dark gradient wallpaper; the lock screen in the same colours with a blue
+  ring; icons beside menu items; a taller bar with rounded buttons, the date beside the time, and
+  "Volume" and "Battery" spelled out; notifications with app icons, grouped by app.
 
 ### Apps
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new

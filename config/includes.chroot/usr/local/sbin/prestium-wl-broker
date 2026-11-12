@@ -270,7 +270,8 @@ class Session:
     def panel(self):
         started = []
         for key, argv in (
-                ("swaybg", ["swaybg", "-c", "#303030"]),
+                # 2.1: dark wallpaper to match the Adwaita-dark desktop; the colour shows if the image is missing
+                ("swaybg", ["swaybg", "-c", "#1a1b1e", "-i", "/usr/share/backgrounds/prestium/dark.png", "-m", "fill"]),
                 ("waybar", ["waybar", "-c", ETC + "/waybar/config.jsonc", "-s", ETC + "/waybar/style.css"]),
                 ("mako", ["mako", "-c", ETC + "/mako/config"]),
                 ("swayidle", ["swayidle", "-w", "timeout", "600", "/usr/local/bin/prestium-lock-screen",

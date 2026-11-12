@@ -5,7 +5,7 @@
 {
   "layer": "top",
   "position": "bottom",
-  "height": 30,
+  "height": 34,
   "spacing": 6,
   "modules-left": ["custom/menu", "wlr/taskbar"],
   "modules-center": [],
@@ -32,7 +32,7 @@
   },
   "tray": { "icon-size": 18, "spacing": 8 },
   "pulseaudio": {
-    "format": "Vol {volume}%",
+    "format": "Volume {volume}%",
     "format-muted": "Muted",
     "scroll-step": 5,
     "max-volume": 150,
@@ -41,13 +41,13 @@
   },
   "battery": {
     "states": { "warning": 20, "critical": 10 },
-    "format": "Bat {capacity}%",
-    "format-charging": "Bat {capacity}% +",
-    "format-plugged": "AC {capacity}%",
+    "format": "Battery {capacity}%",
+    "format-charging": "Charging {capacity}%",
+    "format-plugged": "Plugged in {capacity}%",
     "tooltip-format": "{timeTo}"
   },
   "clock": {
-    "format": "{:%H:%M}",
+    "format": "{:%a %d %b  %H:%M}",
     "tooltip-format": "{:%A %Y-%m-%d}  (UTC; Prestium keeps the clock in UTC)",
     "timezone": "Etc/UTC"
   }

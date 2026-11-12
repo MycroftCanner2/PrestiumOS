@@ -25,6 +25,8 @@
     <font place="MenuItem"><name>Cantarell</name><size>10</size></font>
     <font place="OnScreenDisplay"><name>Cantarell</name><size>10</size><weight>bold</weight></font>
   </theme>
+  <!-- 2.1: icons beside menu items (the item icon= attributes in menu.xml) -->
+  <menu><showIcons>yes</showIcons></menu>
   <focus><followMouse>no</followMouse><raiseOnFocus>no</raiseOnFocus></focus>
   <desktops number="4"><popupTime>875</popupTime></desktops>
   <windowSwitcher show="yes" preview="yes" outlines="yes" />

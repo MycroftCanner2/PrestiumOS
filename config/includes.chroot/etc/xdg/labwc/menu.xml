@@ -3,167 +3,167 @@
      socket); the display settings, screen lock and on-screen keyboard need the full socket. -->
 <openbox_menu>
 <menu id="root-menu" label="Prestium">
-  <item label="I2P Browser">
+  <item label="I2P Browser" icon="librewolf">
     <action name="Execute" command="prestium-run librewolf-i2p" />
   </item>
-  <item label="Tor Browser">
+  <item label="Tor Browser" icon="/opt/tor-browser/Browser/browser/chrome/icons/default/default128.png">
     <action name="Execute" command="prestium-run tor-browser" />
   </item>
-  <item label="I2P Router Console">
+  <item label="I2P Router Console" icon="network-workgroup">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-console" />
   </item>
   <separator />
-  <item label="Text Editor">
+  <item label="Text Editor" icon="featherpad">
     <action name="Execute" command="prestium-run featherpad" />
   </item>
-  <item label="File Manager">
+  <item label="File Manager" icon="system-file-manager">
     <action name="Execute" command="prestium-run pcmanfm" />
   </item>
   <separator />
   <menu id="/Office" label="Office">
-    <item label="LibreOffice Writer">
-      <action name="Execute" command="prestium-run libreoffice --writer" />
+    <item label="LibreOffice Writer" icon="libreoffice-writer">
+    <action name="Execute" command="prestium-run libreoffice --writer" />
     </item>
-    <item label="LibreOffice Calc">
-      <action name="Execute" command="prestium-run libreoffice --calc" />
+    <item label="LibreOffice Calc" icon="libreoffice-calc">
+    <action name="Execute" command="prestium-run libreoffice --calc" />
     </item>
-    <item label="LibreOffice Math">
-      <action name="Execute" command="prestium-run libreoffice --math" />
+    <item label="LibreOffice Math" icon="libreoffice-math">
+    <action name="Execute" command="prestium-run libreoffice --math" />
     </item>
-    <item label="LibreOffice Impress">
-      <action name="Execute" command="prestium-run libreoffice --impress" />
+    <item label="LibreOffice Impress" icon="libreoffice-impress">
+    <action name="Execute" command="prestium-run libreoffice --impress" />
     </item>
-    <item label="LibreOffice Draw">
-      <action name="Execute" command="prestium-run libreoffice --draw" />
+    <item label="LibreOffice Draw" icon="libreoffice-draw">
+    <action name="Execute" command="prestium-run libreoffice --draw" />
     </item>
   </menu>
   <menu id="/Multimedia" label="Multimedia">
-    <item label="Volume Control">
-      <action name="Execute" command="prestium-run pavucontrol" />
+    <item label="Volume Control" icon="multimedia-volume-control">
+    <action name="Execute" command="prestium-run pavucontrol" />
     </item>
-    <item label="Audacity">
-      <action name="Execute" command="prestium-run audacity" />
+    <item label="Audacity" icon="audacity">
+    <action name="Execute" command="prestium-run audacity" />
     </item>
-    <item label="Gimp">
-      <action name="Execute" command="prestium-run gimp" />
+    <item label="Gimp" icon="gimp">
+    <action name="Execute" command="prestium-run gimp" />
     </item>
-    <item label="VLC Media player">
-      <action name="Execute" command="prestium-run vlc" />
+    <item label="VLC Media player" icon="vlc">
+    <action name="Execute" command="prestium-run vlc" />
     </item>
   </menu>
   <menu id="/Accessories" label="Accessories">
-    <item label="Feather Wallet (Monero)">
-      <action name="Execute" command="prestium-run feather" />
+    <item label="Feather Wallet (Monero)" icon="feather">
+    <action name="Execute" command="prestium-run feather" />
     </item>
-    <item label="Calculator">
-      <action name="Execute" command="prestium-run galculator" />
+    <item label="Calculator" icon="accessories-calculator">
+    <action name="Execute" command="prestium-run galculator" />
     </item>
-    <item label="Archive Manager">
-      <action name="Execute" command="prestium-run file-roller" />
+    <item label="Archive Manager" icon="org.gnome.FileRoller">
+    <action name="Execute" command="prestium-run file-roller" />
     </item>
-    <item label="Image Viewer">
-      <action name="Execute" command="prestium-run loupe" />
+    <item label="Image Viewer" icon="org.gnome.Loupe">
+    <action name="Execute" command="prestium-run loupe" />
     </item>
-    <item label="Metadata Cleaner">
-      <action name="Execute" command="prestium-run metadata-cleaner" />
+    <item label="Metadata Cleaner" icon="fr.romainvigier.MetadataCleaner">
+    <action name="Execute" command="prestium-run metadata-cleaner" />
     </item>
-    <item label="KeePassXC">
-      <action name="Execute" command="prestium-run keepassxc" />
+    <item label="KeePassXC" icon="keepassxc">
+    <action name="Execute" command="prestium-run keepassxc" />
     </item>
-    <item label="Unlock VeraCrypt Volume">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-veracrypt" />
+    <item label="Unlock VeraCrypt Volume" icon="drive-harddisk-encrypted">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-veracrypt" />
     </item>
-    <item label="Unlock Volume">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-volume" />
+    <item label="Unlock Volume" icon="drive-harddisk">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-volume" />
     </item>
-    <item label="Kleopatra (GnuPG)">
-      <action name="Execute" command="prestium-run kleopatra" />
+    <item label="Kleopatra (GnuPG)" icon="kleopatra">
+    <action name="Execute" command="prestium-run kleopatra" />
     </item>
-    <item label="QR Generator">
-      <action name="Execute" command="prestium-run qtqr" />
+    <item label="QR Generator" icon="qtqr">
+    <action name="Execute" command="prestium-run qtqr" />
     </item>
   </menu>
  <menu id="/Communication" label="Communication">
-    <item label="Gajim XMPP">
-      <action name="Execute" command="prestium-run gajim" />
+    <item label="Gajim XMPP" icon="org.gajim.Gajim">
+    <action name="Execute" command="prestium-run gajim" />
     </item>
-    <item label="I2P Torrents">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-torrents" />
+    <item label="I2P Torrents" icon="folder-download">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-torrents" />
     </item>
-    <item label="IRC (The Lounge)">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
+    <item label="IRC (The Lounge)" icon="internet-group-chat">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
     </item>
-    <item label="Pidgin">
-      <action name="Execute" command="prestium-run /usr/local/bin/pidgin-tor" />
+    <item label="Pidgin" icon="pidgin">
+    <action name="Execute" command="prestium-run /usr/local/bin/pidgin-tor" />
     </item>
-    <item label="OnionShare">
-      <action name="Execute" command="prestium-run onionshare" />
+    <item label="OnionShare" icon="org.onionshare.OnionShare">
+    <action name="Execute" command="prestium-run onionshare" />
     </item>
-    <item label="Mail (I2P)">
-      <action name="Execute" command="prestium-run claws-mail-i2p" />
+    <item label="Mail (I2P)" icon="claws-mail">
+    <action name="Execute" command="prestium-run claws-mail-i2p" />
     </item>
   </menu>
   <separator />
   <menu id="/Network" label="Network">
     <!-- 2.1: hops, restart and reseed are in the I2P Connection Assistant -->
-    <item label="I2P Connection Assistant">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-assistant" />
+    <item label="I2P Connection Assistant" icon="network-workgroup">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-assistant" />
     </item>
-    <item label="Tor Connection Assistant">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-tor-assistant" />
+    <item label="Tor Connection Assistant" icon="network-wired">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-tor-assistant" />
     </item>
-    <item label="Browser Updater">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-browser-updater" />
+    <item label="Browser Updater" icon="system-software-update">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-browser-updater" />
     </item>
-    <item label="Tor Monitor (Nyx)">
-      <action name="Execute" command="prestium-run foot prestium-nyx -s /run/onion-grater/control" />
+    <item label="Tor Monitor (Nyx)" icon="utilities-system-monitor">
+    <action name="Execute" command="prestium-run foot prestium-nyx -s /run/onion-grater/control" />
     </item>
   </menu>
   <separator />
   <menu id="/System" label="System">
-    <item label="Terminal">
-      <action name="Execute" command="prestium-run foot" />
+    <item label="Terminal" icon="utilities-terminal">
+    <action name="Execute" command="prestium-run foot" />
     </item>
-    <item label="Lock Screen">
-      <action name="Execute" command="/usr/local/bin/prestium-lock-screen" />
+    <item label="Lock Screen" icon="system-lock-screen">
+    <action name="Execute" command="/usr/local/bin/prestium-lock-screen" />
     </item>
-    <item label="Display Settings">
-      <action name="Execute" command="/usr/local/bin/prestium-wl display-settings" />
+    <item label="Display Settings" icon="video-display">
+    <action name="Execute" command="/usr/local/bin/prestium-wl display-settings" />
     </item>
-    <item label="Display Scale">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-display-scale" />
+    <item label="Display Scale" icon="preferences-desktop-display">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-display-scale" />
     </item>
-    <item label="Brightness">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-brightness" />
+    <item label="Brightness" icon="display-brightness-symbolic">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-brightness" />
     </item>
-    <item label="Touchpad">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-touchpad" />
+    <item label="Touchpad" icon="input-touchpad">
+    <action name="Execute" command="prestium-run /usr/local/bin/prestium-touchpad" />
     </item>
     <menu id="/System/Accessibility" label="Accessibility">
-      <item label="Screen Keyboard">
-        <action name="Execute" command="/usr/local/bin/prestium-osk" />
+      <item label="Screen Keyboard" icon="input-keyboard">
+    <action name="Execute" command="/usr/local/bin/prestium-osk" />
       </item>
     </menu>
     <separator />
     <menu id="/Desktop" label="Desktop">
-      <item label="Reload Desktop Settings"><action name="Reconfigure" /></item>
-      <item label="Log Out"><action name="Exit" /></item>
+      <item label="Reload Desktop Settings" icon="view-refresh"><action name="Reconfigure" /></item>
+      <item label="Log Out" icon="system-log-out"><action name="Exit" /></item>
     </menu>
   </menu>
   <separator />
-  <item label="Reboot">
+  <item label="Reboot" icon="system-reboot">
     <action name="Execute" command="/usr/local/bin/prestium-power reboot" />
   </item>
-  <item label="Shutdown">
+  <item label="Shutdown" icon="system-shutdown">
     <action name="Execute" command="/usr/local/bin/prestium-power poweroff" />
   </item>
 </menu>
 
 
 <menu id="client-menu">
-  <item label="Minimize"><action name="Iconify" /></item>
-  <item label="Maximize"><action name="ToggleMaximize" /></item>
-  <item label="Always on Top"><action name="ToggleAlwaysOnTop" /></item>
-  <item label="Close"><action name="Close" /></item>
+  <item label="Minimize" icon="window-minimize"><action name="Iconify" /></item>
+  <item label="Maximize" icon="window-maximize"><action name="ToggleMaximize" /></item>
+  <item label="Always on Top" icon="go-top"><action name="ToggleAlwaysOnTop" /></item>
+  <item label="Close" icon="window-close"><action name="Close" /></item>
 </menu>
 </openbox_menu>

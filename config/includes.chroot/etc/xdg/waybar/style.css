@@ -4,7 +4,8 @@ window#waybar { background: #242424; color: #ffffff; border-bottom: 1px solid #1
 #taskbar button { padding: 0 8px; margin: 3px 2px; min-width: 0; color: #c0c0c0; border-radius: 6px; border: none; }
 #taskbar button.active { background: #3a3a3a; color: #ffffff; box-shadow: inset 0 -2px #3584e4; }
 #taskbar button:hover { background: #333333; color: #ffffff; }
-#tray, #pulseaudio, #battery, #clock { padding: 0 10px; }
+#tray, #pulseaudio, #battery, #clock { padding: 0 10px; margin: 3px 0; border-radius: 6px; }
+#pulseaudio:hover, #clock:hover { background: #333333; }
 #clock { font-weight: bold; }
 #battery.warning:not(.charging) { color: #f8e45c; }
 #battery.critical:not(.charging) { color: #ff7b63; font-weight: bold; }
