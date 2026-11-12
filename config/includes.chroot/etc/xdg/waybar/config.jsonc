@@ -1,7 +1,7 @@
 // Prestium 2.0 r10: panel (replaces tint2): windows, tray, volume, battery, clock.
 // Menu: the "Menu" button at the left, right-click the desktop, or Super+Space.
 // The button asks the Wayland broker (prestium-wl menu) to press Super+Space, which labwc answers
-// with its root menu at the pointer; labwc has no command to open a menu directly.
+// with its root menu at the bottom-left, above this button; labwc has no command to open a menu directly.
 {
   "layer": "top",
   "position": "bottom",

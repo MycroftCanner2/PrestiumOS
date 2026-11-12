@@ -9,7 +9,18 @@ eng=$(sed -n 's/.*c.send(ctx, 1, wstring("\([^"]*\)")).*/\1/p' "$BR")
 [ -n "$eng" ]
 grep -q "<windowRule sandboxEngine=\"$eng\" serverDecoration=\"yes\" />" "$RC" || { echo "FAIL: rc.xml rule does not match broker engine $eng"; exit 1; }
 # Super+Space opens the root menu, and the panel button sends exactly that
-grep -q '<keybind key="W-space"><action name="ShowMenu" menu="root-menu" /></keybind>' "$RC"
+python3 - "$RC" <<'PY'
+import sys, xml.etree.ElementTree as ET
+ns = {"l": "http://openbox.org/3.4/rc"}
+root = ET.parse(sys.argv[1]).getroot()
+kb = [k for k in root.iter() if k.tag.endswith("keybind") and k.get("key") == "W-space"]
+assert len(kb) == 1, "one W-space keybind"
+a = [x for x in kb[0] if x.tag.endswith("action")][0]
+assert a.get("name") == "ShowMenu" and a.get("menu") == "root-menu"
+txt = {c.tag.split("}")[-1]: c for c in a.iter()}
+assert txt["atCursor"].text == "no"
+assert txt["x"].text == "0" and txt["y"].text == "-34", "menu fixed above the bar"
+PY
 W=$R/etc/xdg/waybar/config.jsonc
 sed 's#//.*##' "$W" | python3 -c '
 import json, sys
