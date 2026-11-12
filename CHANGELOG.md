@@ -185,6 +185,11 @@ This is one combined list of everything that changed since the last release, 2.0
   so Tor Browser never reached Tor again until it was restarted. The sandbox now binds the socket
   directories read-only (`/run/prestium-tbb`, `/run/onion-grater`), and onion-grater keeps its
   directory across restarts.
+- **Apps no longer crash the session in a VM.** In a virtual machine, apps that hand the compositor
+  GPU buffers (VLC, the QtQR webcam view and others) crashed labwc, which dropped back to the login
+  screen. On real hardware, as on a USB stick, this didn't happen. In a VM the session now uses
+  wlroots' software renderer (`WLR_RENDERER=pixman`, no hardware cursor). Apps then send plain
+  shared-memory buffers. Nothing changes on real hardware.
 - **VLC and QtQR run through Xwayland.** In a VM, VLC's video and QtQR's webcam view, as native
   Wayland clients, crashed the whole session. The menu entries and Debian's `vlc.desktop` and
   `qtqr.desktop` (hook 0630) now start them with `QT_QPA_PLATFORM=xcb`. Their AppArmor profiles still
