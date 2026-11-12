@@ -179,6 +179,10 @@ This is one combined list of everything that changed since the last release, 2.0
   If the browser proxy doesn't come back, the old settings are put back. Reseed (over Tor, or from a
   file) and *Reboot* are in the same window. The old *I2P Tunnel Hops*, *Restart I2P* and reseed menu
   items are gone. `prestium-tunnel-hops` still works from a terminal.
+  The window fits the screen: on small screens its content scrolls, and it can be resized.
+- **VLC runs through Xwayland.** In a VM, VLC as a native Wayland client crashed the whole session.
+  The menu entry and Debian's `vlc.desktop` (hook 0630) now start it with `QT_QPA_PLATFORM=xcb`.
+  Its AppArmor profile still applies, and as an X11 client it can't reach Wayland windows.
 - **The Lounge ships the 10 Theme Factory themes, and Tech Innovation is the default.** Ocean Depths,
   Sunset Boulevard, Forest Canopy, Modern Minimalist, Golden Hour, Arctic Frost, Desert Rose, Tech
   Innovation, Botanical Garden and Midnight Galaxy are local packages. The old Prestium theme is

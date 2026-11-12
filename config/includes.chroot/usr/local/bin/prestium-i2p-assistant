@@ -59,11 +59,16 @@ class Assistant(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="I2P Connection Assistant")
         self.set_icon_name("network-workgroup")
-        self.set_default_size(460, -1); self.set_resizable(False)
         self.set_position(Gtk.WindowPosition.CENTER)
         self.current = None; self.busy = False
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=16)
-        self.add(box)
+        # 2.1: always fits the screen. The content scrolls when the work area (screen minus the
+        # bar) is shorter than the window, and the window can be resized.
+        sw = Gtk.ScrolledWindow(hscrollbar_policy=Gtk.PolicyType.NEVER,
+                                vscrollbar_policy=Gtk.PolicyType.AUTOMATIC)
+        sw.set_propagate_natural_width(True); sw.set_propagate_natural_height(True)
+        sw.set_max_content_height(self.fit_height())
+        sw.add(box); self.add(sw)
 
         self.status = Gtk.Label(xalign=0); box.pack_start(self.status, False, False, 0)
         row = Gtk.Box(spacing=8)
@@ -128,6 +133,18 @@ class Assistant(Gtk.ApplicationWindow):
         self.run(lambda: helper("status"), self.loaded)
 
     # helpers
+    @staticmethod
+    def fit_height():
+        """Tallest the content may be: the monitor's work area less room for the title bar and
+        the bar (Wayland reports the whole monitor as its work area, so keep a margin)."""
+        try:
+            d = Gdk.Display.get_default()
+            m = d.get_primary_monitor() or d.get_monitor(0)
+            h = m.get_workarea().height
+        except Exception:
+            h = 600
+        return max(240, h - 140)
+
     def run(self, work, done):
         threading.Thread(target=lambda: (lambda r: GLib.idle_add(done, r))(work()), daemon=True).start()
 

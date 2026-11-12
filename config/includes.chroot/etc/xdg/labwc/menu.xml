@@ -48,7 +48,7 @@
       <action name="Execute" command="prestium-run gimp" />
     </item>
     <item label="VLC Media player">
-      <action name="Execute" command="prestium-run vlc" />
+      <action name="Execute" command="prestium-run env QT_QPA_PLATFORM=xcb vlc" />
     </item>
   </menu>
   <menu id="/Accessories" label="Accessories">
