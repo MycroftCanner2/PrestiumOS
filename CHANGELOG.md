@@ -168,6 +168,29 @@ This is one combined list of everything that changed since the last release, 2.0
   is read-only and disappears once both connect.
 
 ### Desktop
+- **Prestium look (Tech Innovation palette).** One palette everywhere: dark grey surfaces, Electric
+  Blue `#0066ff` accent, Neon Cyan `#00ffff` links and highlights, the colours of The Lounge's Tech
+  Innovation theme. GTK 3 and 4 (libadwaita) get it from `gtk.css` (colours only), with dconf
+  `accent-color='blue'` as the nearest named accent. Qt 5 and 6 use Kvantum with a "Prestium" theme
+  (KvGnomeDark shapes, recoloured at build time; `QT_STYLE_OVERRIDE=kvantum`, replacing adwaita-qt).
+  KDE apps use a new `Prestium` colour scheme, and **Kleopatra picks it by default** (`/etc/xdg/kleopatrarc`)
+  instead of KDE's automatic Breeze Dark. The labwc theme, lock screen and notifications match.
+  The broker's dialogs read the same colours from a root-owned directory; accessibility stays off for
+  them (`DIALOG_ENV` is still applied last). Browser Updater keeps stock GTK 3, as its plan asks.
+- **Papirus-Dark icons.** The Prestium icon theme holds the new logo mark ("P." in blue to cyan) and
+  inherits Papirus-Dark first; Adwaita, AdwaitaLegacy and gnome are fallbacks only. mako looks up icons
+  in the same order.
+- **Floating bar.** waybar floats with rounded corners and margins, uses Font Awesome symbols, and its
+  status area is icons only (network, volume, battery) with a two-line clock (time over date, UTC, no
+  tooltip). Tor and I2P pills show connecting (amber), ready (cyan) or failed (red); a click opens the
+  matching Connection Assistant. The state comes from `prestium-netstatus.service` (own user, journal
+  group, read-only, writes only `/run/prestium/netstatus`, never copies log text).
+- **Notifications.** One look per urgency (low: grey edge, 5 s; normal: blue edge, 8 s; critical: red
+  edge, stays). The volume and brightness display is compact, at the top centre. Optional quiet sounds,
+  off by default (System, Notification Sounds (On/Off)). labwc and mako have no open or close
+  animations, so there are no fades or slide-ins; the bar has colour transitions on hover.
+- **Wallpapers.** Three Prestium wallpapers (Horizon, Circuit, Mark), picked in System, Wallpaper. The
+  broker takes only one of those names from the user's setting, never a path.
 - **One dark look across the desktop.** GTK 3 and 4 apps use Adwaita's dark variant (prefer-dark);
   GTK 2 (Pidgin) uses Adwaita-dark from `gnome-themes-extra`. Qt 5 and 6 apps use adwaita-qt's
   Adwaita-Dark, and KDE apps (Kleopatra) get matching colours from `/etc/xdg/kdeglobals`. Audacity,

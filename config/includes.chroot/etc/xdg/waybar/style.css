@@ -1,17 +1,40 @@
-/* Prestium 2.1: dark Adwaita colours, like the window titlebars (labwc theme Prestium-Dark) */
-* { font-family: Cantarell, sans-serif; font-size: 13px; min-height: 0; }
-window#waybar { background: #242424; color: #ffffff; border-top: 1px solid #3a3a3a; }
-#taskbar button { padding: 0 8px; margin: 3px 2px; min-width: 0; color: #c0c0c0; border-radius: 6px; border: none; }
-#taskbar button.active { background: #3a3a3a; color: #ffffff; box-shadow: inset 0 -2px #3584e4; }
-#taskbar button:hover { background: #333333; color: #ffffff; }
-#tray, #pulseaudio, #battery, #clock { padding: 0 10px; margin: 3px 0; border-radius: 6px; }
-#pulseaudio:hover, #clock:hover { background: #333333; }
-#clock { font-weight: bold; }
-#battery.warning:not(.charging) { color: #f8e45c; }
-#battery.critical:not(.charging) { color: #ff7b63; font-weight: bold; }
-#pulseaudio.muted { color: #9a9a9a; }
-/* 2.0 r19: menu button */
-#custom-menu { padding: 0 12px; margin: 3px 4px; background: #1c71d8; color: #ffffff; border-radius: 6px; font-weight: bold; }
-#custom-menu:hover { background: #1a5fb4; }
-tooltip { background: #383838; border: 1px solid #1e1e1e; border-radius: 8px; }
-tooltip label { color: #ffffff; }
+/* Prestium 2.1 (design batch): floating, rounded bar in the Tech Innovation colours (dark grey,
+   Electric Blue #0066ff, Neon Cyan #00ffff), the same palette as the window titlebars (labwc theme
+   Prestium-Dark), GTK, Qt and mako. Symbols come from Font Awesome 4.7 (fonts-font-awesome).
+   Only colour transitions on hover: labwc and waybar have no window animations. */
+* { font-family: Cantarell, FontAwesome, sans-serif; font-size: 13px; min-height: 0; }
+window#waybar { background: rgba(22, 22, 22, 0.94); color: #ffffff; border: 1px solid #333333; border-radius: 14px; }
+tooltip { background: #262626; border: 1px solid #333333; border-radius: 10px; }
+tooltip label { color: #ffffff; padding: 2px 4px; }
+
+/* menu button */
+#custom-menu { padding: 0 14px; margin: 4px 4px 4px 5px; background: #0066ff; color: #ffffff; border-radius: 10px; font-weight: bold;
+  transition: background-color 150ms ease-in-out; }
+#custom-menu:hover { background: #1a75ff; }
+
+/* windows */
+#taskbar button { padding: 0 8px; margin: 4px 2px; min-width: 0; color: #a8a8a8; border-radius: 8px; border: none;
+  transition: background-color 150ms ease-in-out, box-shadow 150ms ease-in-out; }
+#taskbar button:hover { background: #262626; color: #ffffff; }
+#taskbar button.active { background: #262626; color: #ffffff; box-shadow: inset 0 -2px #00ffff; }
+
+/* status area */
+/* icons only, evenly spaced, like a system tray; the clock is two small lines, time over date */
+#network, #pulseaudio, #battery { font-size: 15px; }
+#tray, #network, #pulseaudio, #battery, #clock { padding: 0 9px; margin: 4px 0; border-radius: 8px;
+  transition: background-color 150ms ease-in-out; }
+#network:hover, #pulseaudio:hover, #battery:hover { background: #262626; }
+#clock { font-size: 11px; font-weight: normal; margin-right: 6px; padding: 0 10px 0 6px; }
+#network.disconnected { color: #ff7a7a; }
+#pulseaudio.muted { color: #a8a8a8; }
+#battery.warning:not(.charging) { color: #ffd166; }
+#battery.critical:not(.charging) { color: #ff7a7a; font-weight: bold; }
+
+/* Tor and I2P pills: connecting (amber), ready (cyan), failed (red) */
+#custom-tor, #custom-i2p { padding: 0 11px; margin: 6px 2px; border-radius: 999px; font-size: 12px; font-weight: bold;
+  background: #262626; color: #a8a8a8; border: 1px solid #333333;
+  transition: background-color 300ms ease-in-out, color 300ms ease-in-out, border-color 300ms ease-in-out; }
+#custom-tor.connecting, #custom-i2p.connecting { color: #ffd166; border-color: #5c4a1a; background: #2a2416; }
+#custom-tor.ready, #custom-i2p.ready { color: #00ffff; border-color: #0a4f5c; background: #10262b; }
+#custom-tor.failed, #custom-i2p.failed { color: #ff7a7a; border-color: #5c2424; background: #2b1616; }
+#custom-tor:hover, #custom-i2p:hover { border-color: #0066ff; }

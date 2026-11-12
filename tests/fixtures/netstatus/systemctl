@@ -1,0 +1,6 @@
+#!/bin/sh
+# test fixture for prestium-netstatus
+case "$*" in
+  "is-active tor@default.service"|"is-active i2pd.service") echo active ;;
+  *"InvocationID"*) echo 0123456789abcdef0123456789abcdef ;;
+esac

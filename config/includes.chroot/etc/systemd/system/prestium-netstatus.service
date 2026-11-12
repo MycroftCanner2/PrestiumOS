@@ -1,0 +1,45 @@
+# Prestium 2.1 (design batch): Tor and I2P state for the panel pills (waybar reads /run/prestium/netstatus).
+# Read-only: service state, Tor bootstrap percentage, i2pd peer count. Never changes Tor, i2pd or the network.
+[Unit]
+Description=Prestium panel network status (Tor and I2P)
+After=network.target tor.service i2pd.service systemd-tmpfiles-setup.service
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=10
+ExecStart=/usr/local/sbin/prestium-netstatus
+# not root. Reading the system journal needs only the systemd-journal group;
+# ss (sock_diag) and ip route work unprivileged.
+User=prestium-netstatus
+Group=prestium-netstatus
+SupplementaryGroups=systemd-journal
+# read-only checks (systemctl, journal, socket list); writes only /run/prestium/netstatus
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/prestium/netstatus
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+CapabilityBoundingSet=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+ProtectProc=invisible
+IPAddressDeny=any
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

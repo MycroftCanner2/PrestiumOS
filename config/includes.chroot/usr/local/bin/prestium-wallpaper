@@ -1,0 +1,8 @@
+#!/bin/sh
+# Prestium 2.1 (design batch): pick the desktop wallpaper (System, Wallpaper).
+#   prestium-wallpaper horizon|circuit|mark
+# Saves the name in ~/.config/prestium/wallpaper and asks the Wayland broker to show it.
+case "$1" in horizon|circuit|mark) ;; *) echo "usage: prestium-wallpaper horizon|circuit|mark" >&2; exit 2 ;; esac
+d="${HOME:?}/.config/prestium"
+mkdir -p "$d" && printf '%s\n' "$1" > "$d/wallpaper" || exit 1
+exec /usr/local/bin/prestium-wl wallpaper >/dev/null

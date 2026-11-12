@@ -1,0 +1,5 @@
+# Prestium 2.1 (design batch): Kleopatra uses the Prestium colour scheme by default. Off KDE Plasma, KDE's
+# "Default" entry means Breeze or Breeze Dark; this picks Prestium instead. A choice made in Settings,
+# Color Scheme is saved in ~/.config/kleopatrarc and wins over this.
+[UiSettings]
+ColorScheme=Prestium

@@ -1,9 +1,9 @@
 #!/usr/bin/python3 -I
 """Prestium 2.0 r11: ask the Wayland broker (root) for something that needs the compositor's full
-socket: start | panel | menu | lock | set-password | osk | display-settings | scale | screenshot | screenshot-area |
+socket: start | panel | menu | lock | set-password | osk | display-settings | scale | wallpaper | screenshot | screenshot-area |
 status | i2p-apply JSON. The caller never gets that socket; see /usr/local/sbin/prestium-wl-broker."""
 import os, socket, sys
-OK = ("start", "panel", "menu", "lock", "set-password", "osk", "display-settings", "scale", "screenshot", "screenshot-area", "status")
+OK = ("start", "panel", "menu", "lock", "set-password", "osk", "display-settings", "scale", "wallpaper", "screenshot", "screenshot-area", "status")
 # 2.1 (review N-2): i2p-apply takes one argument, the I2P Connection Assistant's JSON request (one line)
 if len(sys.argv) == 3 and sys.argv[1] == "i2p-apply" and "\n" not in sys.argv[2] and len(sys.argv[2]) <= 900:
     req = "i2p-apply " + sys.argv[2]

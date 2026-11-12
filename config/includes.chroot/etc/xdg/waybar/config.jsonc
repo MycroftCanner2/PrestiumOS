@@ -3,15 +3,20 @@
 // The button asks the Wayland broker (prestium-wl menu) to press Super+Space, which labwc answers
 // with its root menu at the bottom-left, above this button; labwc has no command to open a menu directly.
 {
+  // 2.1 (design batch): a floating, rounded bar (margins; style.css draws the rounded body), symbol icons
+  // (Font Awesome 4.7), and Tor and I2P status pills fed by prestium-netstatus (connecting, ready, failed).
   "layer": "top",
   "position": "bottom",
-  "height": 34,
-  "spacing": 6,
+  "height": 36,
+  "margin-bottom": 8,
+  "margin-left": 10,
+  "margin-right": 10,
+  "spacing": 4,
   "modules-left": ["custom/menu", "wlr/taskbar"],
   "modules-center": [],
-  "modules-right": ["tray", "pulseaudio", "battery", "clock"],
+  "modules-right": ["custom/tor", "custom/i2p", "tray", "network", "pulseaudio", "battery", "clock"],
   "custom/menu": {
-    "format": "\u2630  Menu",
+    "format": "\uf0c9  Menu",
     "tooltip-format": "Applications and settings (Super+Space)",
     // 2.0 r20: waybar's children only get the restricted Wayland socket, where labwc offers no
     // virtual keyboard, so wtype run from here did nothing. The broker presses Super+Space on a
@@ -30,10 +35,39 @@
     "on-click-middle": "close",
     "ignore-list": ["wvkbd"]
   },
+  // 2.1 (design batch): Tor and I2P pills. Root-free and read-only: prestium-netstatus.service writes the
+  // state every 5 seconds; a click opens the matching Connection Assistant (Network menu).
+  "custom/tor": {
+    "exec": "cat /run/prestium/netstatus/tor.json",
+    "return-type": "json",
+    "interval": 5,
+    "format": "\uf111  {}",
+    "on-click": "prestium-run /usr/local/bin/prestium-tor-assistant"
+  },
+  "custom/i2p": {
+    "exec": "cat /run/prestium/netstatus/i2p.json",
+    "return-type": "json",
+    "interval": 5,
+    "format": "\uf111  {}",
+    "on-click": "prestium-run /usr/local/bin/prestium-i2p-assistant"
+  },
   "tray": { "icon-size": 18, "spacing": 8 },
+  "network": {
+    "format-wifi": "\uf1eb",
+    "format-ethernet": "\uf0e8",
+    "format-linked": "\uf0e8",
+    "format-disconnected": "\uf127",
+    "tooltip-format-wifi": "Wi-Fi {essid} ({signalStrength} %)",
+    "tooltip-format-ethernet": "Wired: {ifname}",
+    "tooltip-format-disconnected": "No network",
+    "interval": 10
+  },
   "pulseaudio": {
-    "format": "Volume {volume}%",
-    "format-muted": "Muted",
+    // 2.1 (design batch): icon only, like a system tray; the level shows on hover
+    "format": "{icon}",
+    "format-muted": "\uf026",
+    "format-icons": { "default": ["\uf026", "\uf027", "\uf028"] },
+    "tooltip-format": "Volume {volume} % (click: mixer, right-click: mute)",
     "scroll-step": 5,
     "max-volume": 100,
     "on-click": "prestium-run pavucontrol",
@@ -41,14 +75,17 @@
   },
   "battery": {
     "states": { "warning": 20, "critical": 10 },
-    "format": "Battery {capacity}%",
-    "format-charging": "Charging {capacity}%",
-    "format-plugged": "Plugged in {capacity}%",
-    "tooltip-format": "{timeTo}"
+    "format": "{icon}",
+    "format-charging": "\uf0e7 {icon}",
+    "format-plugged": "\uf1e6",
+    "format-icons": ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"],
+    "tooltip-format": "Battery {capacity} %. {timeTo}"
   },
   "clock": {
-    "format": "{:%a %d %b  %H:%M} UTC",
-    "tooltip-format": "{:%A %Y-%m-%d}  (UTC; Prestium keeps the clock in UTC)",
+    // 2.1 (design batch): time over date, right-aligned, no tooltip (Prestium keeps the clock in UTC)
+    "format": "{:%H:%M UTC\n%Y-%m-%d}",
+    "justify": "right",
+    "tooltip": false,
     "timezone": "Etc/UTC"
   }
 }

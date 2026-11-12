@@ -1,0 +1,38 @@
+#!/bin/sh
+# Prestium 2.1 (design batch): a Kvantum theme "Prestium" for Qt 5 and Qt 6 apps (QT_STYLE_OVERRIDE=kvantum,
+# set in prestium-session; the user's ~/.config/Kvantum/kvantum.kvconfig picks it). It is KvGnomeDark's
+# shapes (they match GTK's Adwaita-dark) with the Tech Innovation colours: dark grey, Electric Blue
+# selection, Neon Cyan links.
+set -e
+S=/usr/share/Kvantum/KvGnomeDark; D=/usr/share/Kvantum/Prestium
+[ -f "$S/KvGnomeDark.svg" ] && [ -f "$S/KvGnomeDark.kvconfig" ] || { echo "E: KvGnomeDark missing (qt-style-kvantum-themes)"; exit 1; }
+rm -rf "$D"; mkdir -p "$D"
+install -m 644 "$S/KvGnomeDark.svg" "$D/Prestium.svg"
+install -m 644 "$S/KvGnomeDark.kvconfig" "$D/Prestium.kvconfig"
+set_color() { # key value
+	grep -q "^$1=" "$D/Prestium.kvconfig" || { echo "E: Kvantum key $1 not in KvGnomeDark.kvconfig"; exit 1; }
+	sed -i "s|^$1=.*|$1=$2|" "$D/Prestium.kvconfig"
+}
+set_color window.color '#1e1e1e'
+set_color inactive.window.color '#1e1e1e'
+set_color base.color '#161616'
+set_color inactive.base.color '#161616'
+set_color alt.base.color '#262626'
+set_color inactive.alt.base.color '#262626'
+set_color button.color '#262626'
+set_color light.color '#4a4a4a'
+set_color mid.light.color '#3a3a3a'
+set_color dark.color '#0f0f0f'
+set_color mid.color '#333333'
+set_color highlight.color '#0066ff'
+set_color inactive.highlight.color '#0052cc'
+set_color text.color '#ffffff'
+set_color window.text.color '#ffffff'
+set_color button.text.color '#ffffff'
+set_color disabled.text.color '#a8a8a8'
+set_color tooltip.text.color '#ffffff'
+set_color highlight.text.color '#ffffff'
+set_color link.color '#00ffff'
+set_color link.visited.color '#7575fd'
+chmod 755 "$D"
+echo "P: Kvantum theme Prestium (KvGnomeDark shapes, Tech Innovation colours)"

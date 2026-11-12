@@ -15,6 +15,9 @@ import os, sys, threading, time
 
 sys.dont_write_bytecode = True      # no __pycache__ next to the shipped library
 sys.pycache_prefix = "/nonexistent/prestium-pycache"   # and never read one from there
+# 2.1 (design batch): stock GTK 3 look, as its plan asks: the Prestium colours in ~/.config/gtk-3.0/gtk.css
+# don't apply here (GTK reads the user stylesheet from XDG_CONFIG_HOME, and this tool keeps no settings).
+os.environ["XDG_CONFIG_HOME"] = "/nonexistent/prestium-stock-gtk"
 import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, Gdk, GLib, Gio, Pango

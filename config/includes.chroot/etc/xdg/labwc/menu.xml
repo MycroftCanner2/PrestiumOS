@@ -143,6 +143,12 @@
         <action name="Execute" command="/usr/local/bin/prestium-osk" />
       </item>
     </menu>
+    <menu id="/System/Wallpaper" label="Wallpaper" icon="preferences-desktop-wallpaper">
+      <item label="Horizon"><action name="Execute" command="/usr/local/bin/prestium-wallpaper horizon" /></item>
+      <item label="Circuit"><action name="Execute" command="/usr/local/bin/prestium-wallpaper circuit" /></item>
+      <item label="Mark"><action name="Execute" command="/usr/local/bin/prestium-wallpaper mark" /></item>
+    </menu>
+    <item label="Notification Sounds (On/Off)" icon="audio-volume-low"><action name="Execute" command="/usr/local/bin/prestium-notify-sound toggle" /></item>
     <item label="Reload Desktop Settings" icon="view-refresh"><action name="Reconfigure" /></item>
   </menu>
   <separator />

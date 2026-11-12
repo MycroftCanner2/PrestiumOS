@@ -1,0 +1,64 @@
+#!/bin/bash
+# Prestium 2.1 (design batch): Tor and I2P state for the panel's two pills.
+# Started at boot by prestium-netstatus.service (not root; journal group only). Every 5 seconds it writes,
+# in $OUT (world-readable), tor.json and i2p.json for waybar's custom modules:
+#   {"text": "...", "class": "connecting|ready|failed", "tooltip": "..."}
+# Read-only checks: the service state (systemctl), Tor's bootstrap progress in this run of tor@default
+# (journal), i2pd's established peer connections (ss). It never changes Tor, i2pd or the network, and
+# never copies log text: only a percentage and fixed words go into the files.
+set -u
+OUT=${PRESTIUM_NETSTATUS_OUT:-/run/prestium/netstatus}
+EVERY=${PRESTIUM_NETSTATUS_EVERY:-5}
+I2PD_UID=${PRESTIUM_NETSTATUS_I2PD_UID:-2000}
+I2P_READY_PEERS=${PRESTIUM_NETSTATUS_I2P_PEERS:-3}
+ONCE=${PRESTIUM_NETSTATUS_ONCE:-}
+
+put() {   # name: stdin to $OUT/name, atomically, 0644
+  local t; t=$(mktemp "$OUT/.$1.XXXXXX") || return 1
+  cat > "$t" && chmod 0644 "$t" && mv -f "$t" "$OUT/$1"
+}
+json() {  # text class tooltip (fixed words and numbers only, so no escaping is needed)
+  printf '{"text": "%s", "class": "%s", "tooltip": "%s"}\n' "$1" "$2" "$3"
+}
+
+tor_state() {
+  local st inv pct
+  st=$(systemctl is-active tor@default.service 2>/dev/null)
+  case "$st" in
+    active) ;;
+    activating|reloading) json "Tor" connecting "Tor: starting"; return ;;
+    *) json "Tor" failed "Tor: not running (Network, Tor Connection Assistant)"; return ;;
+  esac
+  inv=$(systemctl show -p InvocationID --value tor@default.service 2>/dev/null)
+  case "$inv" in ''|*[!0-9a-f]*) json "Tor" connecting "Tor: connecting"; return ;; esac
+  pct=$(journalctl -o cat --no-pager "_SYSTEMD_INVOCATION_ID=$inv" 2>/dev/null \
+        | sed -n 's/.*Bootstrapped \([0-9]\{1,3\}\)%.*/\1/p' | tail -n 1)
+  case "$pct" in ''|*[!0-9]*) pct=0 ;; esac
+  if [ "$pct" -ge 100 ]; then json "Tor" ready "Tor: connected"
+  else json "Tor $pct%" connecting "Tor: connecting ($pct %)"; fi
+}
+
+i2p_peers() {  # established TCP (NTCP2) connections of i2pd to other computers
+  ss -Htne state established 2>/dev/null \
+    | awk -v u="uid:$I2PD_UID" '$4 !~ /^127\./ && $4 !~ /^\[::1\]/ { for (i = 5; i <= NF; i++) if ($i == u) { n++; break } }
+        END { print n+0 }'
+}
+i2p_state() {
+  local st n
+  st=$(systemctl is-active i2pd.service 2>/dev/null)
+  case "$st" in
+    active) ;;
+    activating|reloading) json "I2P" connecting "I2P: starting"; return ;;
+    *) json "I2P" failed "I2P: not running (Network, I2P Connection Assistant)"; return ;;
+  esac
+  n=$(i2p_peers); case "$n" in ''|*[!0-9]*) n=0 ;; esac
+  if [ "$n" -ge "$I2P_READY_PEERS" ]; then json "I2P" ready "I2P: connected to $n routers"
+  else json "I2P" connecting "I2P: connecting ($n routers)"; fi
+}
+
+while :; do
+  tor_state | put tor.json
+  i2p_state | put i2p.json
+  [ -n "$ONCE" ] && exit 0
+  sleep "$EVERY"
+done

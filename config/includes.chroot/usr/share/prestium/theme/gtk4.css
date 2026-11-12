@@ -1,0 +1,26 @@
+/* Prestium 2.1 (design batch): GTK 4 and libadwaita apps in the Tech Innovation colours.
+   libadwaita's own accent setting offers only named colours (dconf accent-color is set to the nearest,
+   'blue'), so the exact Electric Blue comes from here. Colours only, nothing about sizes or behaviour. */
+@define-color accent_bg_color #0066ff;
+@define-color accent_fg_color #ffffff;
+@define-color accent_color #3d8bff;
+@define-color window_bg_color #1e1e1e;
+@define-color window_fg_color #ffffff;
+@define-color view_bg_color #161616;
+@define-color view_fg_color #ffffff;
+@define-color headerbar_bg_color #262626;
+@define-color headerbar_fg_color #ffffff;
+@define-color headerbar_backdrop_color #1e1e1e;
+@define-color sidebar_bg_color #1e1e1e;
+@define-color card_bg_color #262626;
+@define-color dialog_bg_color #262626;
+@define-color popover_bg_color #262626;
+@define-color theme_selected_bg_color #0066ff;
+:root {
+  --accent-bg-color: #0066ff; --accent-fg-color: #ffffff; --accent-color: #3d8bff;
+  --window-bg-color: #1e1e1e; --view-bg-color: #161616;
+  --headerbar-bg-color: #262626; --headerbar-backdrop-color: #1e1e1e;
+  --sidebar-bg-color: #1e1e1e; --card-bg-color: #262626; --dialog-bg-color: #262626; --popover-bg-color: #262626;
+}
+link, label link, .link, button.link { color: #00ffff; }
+selection { background-color: alpha(#0066ff, 0.5); }

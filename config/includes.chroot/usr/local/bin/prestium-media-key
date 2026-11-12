@@ -3,6 +3,7 @@
 # notification. Volume through PipeWire (wpctl; pactl as fallback), brightness with brightnessctl
 # (user is in group "video"; the udev rule makes the backlight writable for that group).
 #   prestium-media-key volume-up|volume-down|mute|mic-mute|brightness-up|brightness-down
+# 2.1 (design batch): category prestium.osd, so mako draws these as a compact on-screen display
 ID_FILE="${XDG_RUNTIME_DIR:-/tmp}/prestium-osd.id"
 SINK=@DEFAULT_AUDIO_SINK@; SOURCE=@DEFAULT_AUDIO_SOURCE@
 
@@ -11,7 +12,7 @@ osd() { # icon text percent
 	id=$(cat "$ID_FILE" 2>/dev/null); case "$id" in ''|*[!0-9]*) id=0;; esac
 	n=$(( ${3:-0} / 10 )); bar=""; i=0
 	while [ $i -lt 10 ]; do if [ $i -lt $n ]; then bar="$bar▮"; else bar="$bar▯"; fi; i=$((i+1)); done
-	new=$(notify-send -a Prestium -i "$1" -t 1500 -h string:x-canonical-private-synchronous:prestium-osd \
+	new=$(notify-send -a Prestium -c prestium.osd -i "$1" -t 1500 -h string:x-canonical-private-synchronous:prestium-osd \
 		-h "int:value:${3:-0}" -r "$id" -p "$2" "$bar" 2>/dev/null) && echo "$new" > "$ID_FILE"
 }
 

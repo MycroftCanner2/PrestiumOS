@@ -1,0 +1,2 @@
+#!/bin/sh
+printf 'Bootstrapped 45%% (loading_descriptors): Loading relay descriptors\nBootstrapped 100%% (done): Done\n'

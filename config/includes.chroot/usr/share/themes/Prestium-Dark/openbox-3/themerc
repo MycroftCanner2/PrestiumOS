@@ -1,5 +1,6 @@
-# Prestium 2.1: labwc window theme in GNOME's dark Adwaita colours, to match GTK (Adwaita-dark),
-# Qt (adwaita-qt, Adwaita-Dark), waybar and mako. No button images: labwc draws its own.
+# Prestium 2.1: labwc window theme. Design batch: Tech Innovation colours (dark grey, Electric Blue #0066ff,
+# Neon Cyan #00ffff), the same palette as GTK (gtk.css), Qt (Kvantum "Prestium"), KDE, waybar and mako.
+# No button images: labwc draws its own. Rounded corners and drop shadows are on in rc.xml.
 border.width: 1
 # keys as labwc 0.8.3 reads them (titlebar about 32 px with Cantarell 10 bold)
 window.titlebar.padding.width: 8
@@ -9,32 +10,32 @@ window.button.height: 26
 window.button.spacing: 4
 window.button.hover.bg.corner-radius: 6
 window.label.text.justify: center
-window.active.title.bg.color: #303030
-window.inactive.title.bg.color: #242424
+window.active.title.bg.color: #262626
+window.inactive.title.bg.color: #1e1e1e
 window.active.label.text.color: #ffffff
-window.inactive.label.text.color: #9a9a9a
-window.active.border.color: #3584e4
-window.inactive.border.color: #3a3a3a
+window.inactive.label.text.color: #a8a8a8
+window.active.border.color: #0066ff
+window.inactive.border.color: #333333
 window.active.button.unpressed.image.color: #ffffff
-window.inactive.button.unpressed.image.color: #9a9a9a
-window.active.shadow.size: 14
+window.inactive.button.unpressed.image.color: #a8a8a8
+window.active.shadow.size: 18
 window.inactive.shadow.size: 8
-window.active.shadow.color: #00000080
+window.active.shadow.color: #00000099
 window.inactive.shadow.color: #00000050
 menu.overlap.x: 0
 menu.width.min: 200
 menu.items.padding.x: 12
 menu.items.padding.y: 6
-menu.items.bg.color: #383838
+menu.items.bg.color: #262626
 menu.items.text.color: #ffffff
-menu.items.active.bg.color: #1c71d8
+menu.items.active.bg.color: #0066ff
 menu.items.active.text.color: #ffffff
-menu.separator.color: #5e5e5e
+menu.separator.color: #3a3a3a
 menu.separator.padding.height: 4
 menu.border.width: 1
-menu.border.color: #1e1e1e
-osd.bg.color: #303030
-osd.border.color: #3584e4
+menu.border.color: #333333
+osd.bg.color: #262626
+osd.border.color: #0066ff
 osd.border.width: 1
 osd.label.text.color: #ffffff
-osd.window-switcher.preview.border.color: #3584e4
+osd.window-switcher.preview.border.color: #00ffff

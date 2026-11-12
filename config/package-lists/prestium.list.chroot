@@ -2,12 +2,18 @@
 7zip
 adduser
 adwaita-icon-theme
-# 2.1: Qt 5 and 6 apps in the same dark Adwaita look (QT_STYLE_OVERRIDE=Adwaita-Dark)
-adwaita-qt
-adwaita-qt6
 # 2.1: dark GTK 2 theme (Pidgin) and full-colour icons the Prestium icon theme inherits (menu icons)
 gnome-themes-extra
 adwaita-icon-theme-legacy
+# 2.1 (design batch): one complete icon theme (Papirus-Dark; the Prestium theme inherits it first),
+# Kvantum for Qt 5 and 6 (the Prestium Kvantum theme, Tech Innovation colours), Font Awesome for the
+# bar's symbols, librsvg's pixbuf loader for SVG icons in the bar and notifications
+papirus-icon-theme
+qt-style-kvantum
+qt6-style-kvantum
+qt-style-kvantum-themes
+fonts-font-awesome
+librsvg2-common
 alsa-topology-conf
 alsa-ucm-conf
 apparmor

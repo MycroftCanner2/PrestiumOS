@@ -1,0 +1,23 @@
+#!/bin/sh
+# Prestium 2.1 (design batch): optional quiet notification sounds. Off by default.
+#   prestium-notify-sound normal|critical   mako's on-notify: a short, quiet sound if sounds are on
+#   prestium-notify-sound toggle            System menu, Notification Sounds: turn them on or off
+# The setting is one flag file in the user's home; nothing else is kept.
+FLAG="${HOME:-/nonexistent}/.config/prestium/notify-sounds"
+S=/usr/share/sounds/freedesktop/stereo
+case "$1" in
+normal|critical)
+	[ -f "$FLAG" ] || exit 0
+	command -v pw-play >/dev/null || exit 0
+	f=$S/message.oga; [ "$1" = critical ] && f=$S/dialog-warning.oga
+	[ -f "$f" ] || exit 0
+	exec pw-play --volume 0.35 "$f" >/dev/null 2>&1 ;;
+toggle)
+	if [ -f "$FLAG" ]; then
+		rm -f "$FLAG"; notify-send -a Prestium -i audio-volume-muted "Notification sounds off" "Notifications are silent." 2>/dev/null
+	else
+		mkdir -p "${FLAG%/*}" && : > "$FLAG"
+		notify-send -a Prestium -i audio-volume-low "Notification sounds on" "Notifications play a quiet sound." 2>/dev/null
+	fi ;;
+*) echo "usage: prestium-notify-sound normal|critical|toggle" >&2; exit 2 ;;
+esac

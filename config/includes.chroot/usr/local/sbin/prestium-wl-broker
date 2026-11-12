@@ -27,6 +27,7 @@ start in turn is restricted again. Requests (one line on /run/prestium-wl/broker
   osk                toggle the on-screen keyboard (wvkbd)
   display-settings   output settings (wdisplays)
   scale              apply ~/.config/prestium/scale to every output (wlr-randr)
+  wallpaper          show the wallpaper named in ~/.config/prestium/wallpaper (one of WALLPAPERS; 2.1 design batch)
   screenshot         screenshot of the screen the user then clicks (slurp -o, grim)
   screenshot-area    screenshot of an area the user then drags (slurp, grim)
   status             "session <uid> <apps socket>" or "none"
@@ -120,6 +121,13 @@ class WlConn:
 # socket (dialogs, waybar, wdisplays, ...). GTK 4 reads GTK_A11Y, GTK 3's atk-bridge reads NO_AT_BRIDGE.
 # With it on, any program of the user could press buttons in these windows through the AT-SPI bus.
 DIALOG_ENV = {"GTK_A11Y": "none", "NO_AT_BRIDGE": "1"}
+# 2.1 (design batch): the broker's dialogs read the Prestium GTK colours from a root-owned directory
+# (gtk-3.0/gtk.css and gtk-4.0/gtk.css, colours only), never from the user's ~/.config. Only the look
+# changes: DIALOG_ENV is still applied last in env(), so accessibility stays off.
+# 2.1 (design batch): the wallpapers the user can pick (System, Wallpaper); anything else means the default
+WALLPAPERS = ("horizon", "circuit", "mark")
+WALLPAPER_DIR = "/usr/share/backgrounds/prestium"
+DIALOG_STYLE = {"XDG_CONFIG_HOME": "/usr/share/prestium/broker-style"}
 INTERPRETER_RE = re.compile(r"\A(python[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node|(ba|da|z|k)?sh)\Z")
 
 # characters Python counts as printable that still show as blank (verification of e574474, N-6)
@@ -318,7 +326,7 @@ class Session:
         """2.1 (review V-1): confirmation and password dialogs run with accessibility off. With it on,
         any process of the user could find the dialog on the AT-SPI bus and press Apply or type into the
         password fields (GTK 4 exposes a click action and SetTextContents), which would undo N-2 and L-2."""
-        return self.spawn(argv, wait=True, capture=capture, timeout=timeout, extra_env=DIALOG_ENV)
+        return self.spawn(argv, wait=True, capture=capture, timeout=timeout, extra_env=dict(DIALOG_STYLE, **DIALOG_ENV))
 
     def spawn(self, argv, wait=False, capture=False, timeout=None, key=None, extra_env=None):
         """Run argv as the user with one full-socket connection as WAYLAND_SOCKET."""
@@ -358,8 +366,8 @@ class Session:
     def panel(self):
         started = []
         for key, argv in (
-                # 2.1: dark wallpaper to match the Adwaita-dark desktop; the colour shows if the image is missing
-                ("swaybg", ["swaybg", "-c", "#1a1b1e", "-i", "/usr/share/backgrounds/prestium/dark.png", "-m", "fill"]),
+                # 2.1 (design batch): the chosen Prestium wallpaper; the colour shows if the image is missing
+                ("swaybg", self.swaybg_argv()),
                 ("waybar", ["waybar", "-c", ETC + "/waybar/config.jsonc", "-s", ETC + "/waybar/style.css"]),
                 ("mako", ["mako", "-c", ETC + "/mako/config"]),
                 ("swayidle", ["swayidle", "-w", "timeout", "600", "/usr/local/bin/prestium-lock-screen --auto",
@@ -508,6 +516,27 @@ class Session:
             self.spawn(["wlr-randr", "--output", name, "--scale", "%.2f" % (pct / 100.0)], wait=True, timeout=15)
         return "ok %s" % setting
 
+    def wallpaper_name(self):
+        """The user's choice in ~/.config/prestium/wallpaper, read as the user (like the scale setting);
+        only a name from WALLPAPERS is used, never a path."""
+        rc, val = self.as_user(["head", "-c", "32", "--", os.path.join(self.home, ".config/prestium/wallpaper")])
+        val = val.strip() if rc == 0 else ""
+        return val if val in WALLPAPERS else WALLPAPERS[0]
+
+    def swaybg_argv(self):
+        return ["swaybg", "-c", "#161616", "-i", os.path.join(WALLPAPER_DIR, self.wallpaper_name() + ".png"), "-m", "fill"]
+
+    def wallpaper(self):
+        p = self.kids.get("swaybg")
+        if p is not None and p.poll() is None:
+            p.terminate()
+            try:
+                p.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                p.kill()
+        self.spawn(self.swaybg_argv(), key="swaybg")
+        return "ok " + self.wallpaper_name()
+
     def screenshot(self, area):
         if self.running("slurp"):
             return "error a screenshot is already being taken"
@@ -571,6 +600,8 @@ def dispatch(uid, cmd, pid=0):
             return s.display_settings()
         if cmd == "menu":
             return s.menu()
+        if cmd == "wallpaper":
+            return s.wallpaper()
     if cmd == "lock":
         return s.lock_screen()
     if cmd == "set-password":

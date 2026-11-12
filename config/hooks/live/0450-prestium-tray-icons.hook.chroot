@@ -1,42 +1,31 @@
 #!/bin/sh
-# Prestium 2.0: trixie's Adwaita (48) ships the audio-volume-* / audio-card icons only as
-# dark "-symbolic" SVGs, so pasystray's tray icon (AppIndicator -> GtkStatusIcon fallback) was
-# drawn dark grey on tint2's black panel, i.e. invisible. GTK searches the whole current theme
-# (with its symbolic fallbacks) before inherited themes, so copies in hicolor are not enough:
-# add a small "Prestium" icon theme that holds GNOME's full-colour audio icons and inherits
-# Adwaita for everything else, and make it the GTK 3 default icon theme.
+# Prestium 2.1 (design batch): the "Prestium" icon theme. It holds Prestium's own logo mark and inherits
+# Papirus-Dark first, so apps, menus, the tray and notifications draw from one complete, modern set
+# (Papirus-Dark's panel icons are light, so tray icons stay visible on the dark bar). Adwaita,
+# AdwaitaLegacy and gnome follow only for names Papirus lacks.
+# (2.0 to 2.1 r1: this theme held GNOME's full-colour audio icons, since Adwaita's were dark symbolic only.)
+# Papirus folders are blue by default, which matches the Tech Innovation accent; nothing is recoloured.
 set -e
-G=/usr/share/icons/gnome; P=/usr/share/icons/Prestium
-rm -rf "$P"; mkdir -p "$P"
-dirs=""; sect=""; n=0
-for d in "$G"/*x*/status "$G"/*x*/devices; do
-	[ -d "$d" ] || continue
-	ctx=${d##*/}; size=${d%/*}; size=${size##*/}; px=${size%%x*}
-	found=0
-	for f in "$d"/audio-volume-high.png "$d"/audio-volume-medium.png "$d"/audio-volume-low.png \
-	         "$d"/audio-volume-muted.png "$d"/audio-card.png "$d"/audio-input-microphone.png; do
-		[ -f "$f" ] || continue
-		install -D -m 644 "$f" "$P/$size/$ctx/${f##*/}"; n=$((n+1)); found=1
-	done
-	[ $found = 1 ] || continue
-	case $ctx in status) C=Status ;; *) C=Devices ;; esac
-	dirs="$dirs${dirs:+,}$size/$ctx"
-	sect="$sect
-[$size/$ctx]
-Size=$px
-Context=$C
-Type=Threshold
-"
-done
-[ "$n" -gt 0 ] || { echo "E: no GNOME audio icons found (gnome-icon-theme missing?)"; exit 1; }
-cat > "$P/index.theme" <<EOF
+P=/usr/share/icons/Prestium
+L=/usr/share/prestium/branding/prestium-logo.svg
+[ -f /usr/share/icons/Papirus-Dark/index.theme ] || { echo "E: Papirus-Dark missing (papirus-icon-theme)"; exit 1; }
+[ -f "$L" ] || { echo "E: $L missing"; exit 1; }
+rm -rf "$P"; mkdir -p "$P/scalable/apps"
+install -m 644 "$L" "$P/scalable/apps/prestium.svg"
+cat > "$P/index.theme" <<EOT
 [Icon Theme]
 Name=Prestium
-Comment=Adwaita with full-colour audio icons for the panel tray
-Inherits=Adwaita,AdwaitaLegacy,gnome,hicolor
-Directories=$dirs
-$sect
-EOF
+Comment=Prestium's logo, then Papirus-Dark for everything else
+Inherits=Papirus-Dark,Papirus,Adwaita,AdwaitaLegacy,gnome,hicolor
+Directories=scalable/apps
+
+[scalable/apps]
+Size=64
+MinSize=16
+MaxSize=512
+Context=Applications
+Type=Scalable
+EOT
 gtk-update-icon-cache -f -q "$P"
 mkdir -p /etc/gtk-3.0
 if [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^gtk-icon-theme-name' /etc/gtk-3.0/settings.ini; then
@@ -46,4 +35,4 @@ elif [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^\[Settings\]' /etc/gtk-3.0/se
 else
 	printf '[Settings]\ngtk-icon-theme-name=Prestium\n' >> /etc/gtk-3.0/settings.ini
 fi
-echo "P: Prestium icon theme with $n full-colour audio icons; GTK 3 default icon theme set"
+echo "P: Prestium icon theme (logo, inherits Papirus-Dark); GTK 3 default icon theme set"

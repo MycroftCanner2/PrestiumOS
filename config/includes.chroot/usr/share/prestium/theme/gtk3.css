@@ -1,0 +1,47 @@
+/* Prestium 2.1 (design batch): GTK 3 apps in the Tech Innovation colours on top of Adwaita-dark:
+   dark grey surfaces, Electric Blue (#0066ff) accent, Neon Cyan (#00ffff) links.
+   Colours only: no sizes, fonts or hidden widgets, so layouts and accessibility stay as Adwaita has them. */
+@define-color theme_bg_color #1e1e1e;
+@define-color theme_base_color #161616;
+@define-color theme_fg_color #ffffff;
+@define-color theme_text_color #ffffff;
+@define-color theme_selected_bg_color #0066ff;
+@define-color theme_selected_fg_color #ffffff;
+@define-color insensitive_bg_color #1e1e1e;
+@define-color borders #333333;
+@define-color unfocused_borders #333333;
+@define-color accent_color #3d8bff;
+@define-color accent_bg_color #0066ff;
+
+window, .background { background-color: @theme_bg_color; }
+headerbar, .titlebar, menubar, toolbar, .toolbar, .inline-toolbar, actionbar, searchbar > revealer > box {
+  background-color: #262626; background-image: none; border-color: #333333; }
+headerbar:backdrop, .titlebar:backdrop { background-color: #1e1e1e; }
+.view, textview text, iconview, treeview.view, list, row { background-color: @theme_base_color; }
+treeview.view:hover:not(:selected), row.activatable:hover:not(:selected) { background-color: #262626; }
+
+selection, *:selected, .view:selected, treeview.view:selected, row:selected,
+textview text selection, entry selection, label selection, flowboxchild:selected {
+  background-color: #0066ff; color: #ffffff; }
+.view:selected:backdrop, row:selected:backdrop, treeview.view:selected:backdrop { background-color: #0052cc; }
+
+entry:focus, spinbutton:focus:not(.vertical), textview:focus { border-color: #0066ff; box-shadow: inset 0 0 0 1px #0066ff; }
+
+button.suggested-action, button.default:not(.flat) {
+  background-image: none; background-color: #0066ff; border-color: #0052cc; color: #ffffff; text-shadow: none; }
+button.suggested-action:hover { background-color: #1a75ff; }
+button.suggested-action:active, button.suggested-action:checked { background-color: #0052cc; }
+button.suggested-action:disabled { background-color: #24324d; color: #a8a8a8; }
+
+check:checked, radio:checked, check:indeterminate, radio:indeterminate {
+  background-image: none; background-color: #0066ff; border-color: #0052cc; color: #ffffff; }
+switch:checked { background-color: #0066ff; border-color: #0052cc; }
+progressbar progress, levelbar block.filled, scale highlight { background-image: none; background-color: #0066ff; border-color: #0052cc; }
+notebook > header > tabs > tab:checked { box-shadow: inset 0 -3px #0066ff; }
+stacksidebar row:selected, placessidebar row:selected { background-color: #0066ff; }
+
+*:link, button:link, button:visited, link { color: #00ffff; }
+*:link:hover { color: #80ffff; }
+*:visited { color: #7fb2ff; }
+
+tooltip.background { background-color: #262626; border: 1px solid #333333; color: #ffffff; }
