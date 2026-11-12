@@ -116,23 +116,41 @@ class WlConn:
         self.roundtrip(ev)
         return reg, found
 
-# 2.1 (review V-1): environment for broker dialogs. GTK 4 reads GTK_A11Y, GTK 3's atk-bridge reads NO_AT_BRIDGE.
+# 2.1 (review V-1, verification R-1): accessibility off for everything the broker starts on the full
+# socket (dialogs, waybar, wdisplays, ...). GTK 4 reads GTK_A11Y, GTK 3's atk-bridge reads NO_AT_BRIDGE.
+# With it on, any program of the user could press buttons in these windows through the AT-SPI bus.
 DIALOG_ENV = {"GTK_A11Y": "none", "NO_AT_BRIDGE": "1"}
+INTERPRETER_RE = re.compile(r"\A(python[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node|(ba|da|z|k)?sh)\Z")
+
+def printable(text, limit=200):
+    """2.1 (verification N-1): a path may hold newlines or bidi controls; never let it forge dialog lines."""
+    return "".join(c if c.isprintable() else "?" for c in text)[:limit]
+
+def describe(pid):
+    exe = os.readlink("/proc/%d/exe" % pid)
+    what = printable(exe)
+    if INTERPRETER_RE.match(os.path.basename(exe)):
+        with open("/proc/%d/cmdline" % pid, "rb") as f:
+            argv = f.read(4096).split(b"\0")[1:]
+        script = next((a for a in argv if a and not a.startswith(b"-")), b"")
+        if script:
+            what += " running %s (self-reported)" % printable(script.decode(errors="replace"))
+    return "%s (pid %d)" % (what, pid)
 
 def requester(pid):
     """The program that sent the request and its parent, from /proc (shown in the I2P dialog; a hint for
-    the person at the screen, not a security check)."""
+    the person at the screen, not a security check: a script's path is what it says it is)."""
     names = []
     for _ in range(2):
         if pid <= 1:
             break
         try:
-            names.append("%s (pid %d)" % (os.readlink("/proc/%d/exe" % pid), pid))
+            names.append(describe(pid))
             with open("/proc/%d/stat" % pid) as f:
                 pid = int(f.read().rsplit(")", 1)[1].split()[1])
         except (OSError, ValueError, IndexError):
             break
-    return ", started by ".join(names) or "unknown"
+    return printable(", started by ".join(names), 500) or "unknown"
 
 def peer_pid(sock):
     return struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
@@ -260,6 +278,7 @@ class Session:
              "XDG_CONFIG_DIRS": "/etc/xdg", "XDG_DATA_DIRS": "/usr/local/share:/usr/share"}
         if extra:
             e.update(extra)
+        e.update(DIALOG_ENV)   # last: nothing turns accessibility back on
         return e
 
     def dialog(self, argv, capture=False, timeout=300):

@@ -42,6 +42,23 @@ class T(unittest.TestCase):
         self.fwd("tor-browser", "ONION_CLIENT_AUTH_REMOVE " + ADDR)
         self.fwd("tor-browser", "ONION_CLIENT_AUTH_VIEW")
 
+    def test_tor_browser_auth_arguments_checked(self):
+        # 2.1 (verification of 9d289eb): only well-formed arguments reach Tor
+        self.fwd("tor-browser", "ONION_CLIENT_AUTH_ADD %s.onion x25519:%s ClientName=Bob_1" % (ADDR, "A" * 43 + "="))
+        self.fwd("tor-browser", "ONION_CLIENT_AUTH_VIEW " + ADDR)
+        for l in ["ONION_CLIENT_AUTH_ADD %s" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= ClientName=x\x00y" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= ClientName=" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= ClientName=a b" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= SETCONF ControlPort=1" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s ed25519:abc=" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:abc=" % ("1" * 56),
+                  "ONION_CLIENT_AUTH_ADD %s x25519:abc=" % ADDR[:55],
+                  "ONION_CLIENT_AUTH_REMOVE",
+                  "ONION_CLIENT_AUTH_REMOVE %s extra" % ADDR,
+                  "ONION_CLIENT_AUTH_VIEW %s %s" % (ADDR, ADDR)]:
+            self.assertIsNone(g.check("tor-browser", l)[0], l)
+
     def test_torrc_extended_errors(self):
         t = open(os.path.join(ROOT, "etc/tor/torrc")).read()
         line = [l for l in t.splitlines() if l.startswith("SocksPort unix:/run/prestium-tbb/socks")]

@@ -159,8 +159,8 @@
 
 
 <menu id="client-menu">
-  <item label="Minimize" icon="window-minimize"><action name="Iconify" /></item>
-  <item label="Maximize" icon="window-maximize"><action name="ToggleMaximize" /></item>
+  <item label="Minimize" icon="go-down"><action name="Iconify" /></item>
+  <item label="Maximize" icon="view-fullscreen"><action name="ToggleMaximize" /></item>
   <item label="Always on Top" icon="go-top"><action name="ToggleAlwaysOnTop" /></item>
   <item label="Close" icon="window-close"><action name="Close" /></item>
 </menu>

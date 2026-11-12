@@ -211,6 +211,9 @@ def split_args(rest):
 # and target port 1) is OnionShare's probe for client-auth support, which it removes at once.
 PORT_RE = re.compile(r"^Port=(80,(127\.0\.0\.1:)?(176[0-4][0-9]|17650)|1|1,(127\.0\.0\.1:)?1)$", re.I | re.A)
 KEY_RE = re.compile(r"^(NEW:(BEST|ED25519-V3)|ED25519-V3:[A-Za-z0-9+/=]+)$")
+ONION_ADDR_RE = re.compile(r"^[a-z2-7]{56}(\.onion)?$", re.A)
+X25519_RE = re.compile(r"^x25519:[A-Za-z0-9+/]{1,64}={0,2}$", re.I | re.A)
+CLIENT_NAME_RE = re.compile(r"^ClientName=[A-Za-z0-9._-]{1,64}$", re.I | re.A)
 FLAG_RE = re.compile(r"^Flags=((DiscardPK|Detach|V3Auth|MaxStreamsCloseCircuit|NonAnonymous)(,(DiscardPK|Detach|V3Auth|MaxStreamsCloseCircuit))*)$", re.I)
 
 def check(profile, line):
@@ -266,6 +269,17 @@ def check(profile, line):
         # nothing is written to disk (Tor has no ClientOnionAuthDir here anyway).
         args = [a for a in split_args(rest) if not re.match(r"^Flags=Permanent$", a, re.I)]
         if any(a.lower().startswith("flags=") for a in args):
+            return None, "510 Command filtered\r\n"
+        # 2.1 (verification of 9d289eb): only well-formed arguments reach Tor. ADD: address, key,
+        # optional ClientName; REMOVE: address; VIEW: optional address.
+        if cmd == "ONION_CLIENT_AUTH_ADD":
+            ok = (2 <= len(args) <= 3 and ONION_ADDR_RE.match(args[0]) and X25519_RE.match(args[1])
+                  and (len(args) == 2 or CLIENT_NAME_RE.match(args[2])))
+        elif cmd == "ONION_CLIENT_AUTH_REMOVE":
+            ok = len(args) == 1 and ONION_ADDR_RE.match(args[0])
+        else:
+            ok = not args or (len(args) == 1 and ONION_ADDR_RE.match(args[0]))
+        if not ok:
             return None, "510 Command filtered\r\n"
         return " ".join([cmd] + args), None
     if cmd == "ADD_ONION" and p["add_onion"]:

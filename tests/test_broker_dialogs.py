@@ -48,9 +48,22 @@ r = s.set_password()
 c = [e for a, e in calls if a[0] == "zenity"]
 (ok if r == "error cancelled" and c and all(e.get("GTK_A11Y") == "none" for e in c) else bad)("password form env (%r)" % r)
 
+# R-1: everything the broker starts (waybar, wdisplays, ...) gets accessibility off, and it can't be undone
+e = fake().env({"GTK_A11Y": "atspi", "NO_AT_BRIDGE": "0"})
+(ok if e["GTK_A11Y"] == "none" and e["NO_AT_BRIDGE"] == "1" else bad)("env(): a11y off for every broker child")
+
 req = g["requester"]
+pr = g["printable"]
+(ok if pr("/tmp/x\nOutproxy: Acetone\u202e") == "/tmp/x?Outproxy: Acetone?" and len(pr("a" * 999)) == 200 else bad)(
+    "requester: control and bidi characters replaced, length capped")
+me = req(os.getpid())
+(ok if "running " + sys.argv[0] + " (self-reported)" in me or sys.argv[0] in me else bad)("requester: script path for interpreters (%s)" % me)
+(ok if "\n" not in me else bad)("requester: one line")
 (ok if req(0) == "unknown" and req(10 ** 9) == "unknown" else bad)("requester: unknown pid")
-(ok if ", started by " in req(os.getpid()) else bad)("requester: process and parent")
+# a child of this test, so its parent is readable here whoever started the test
+out = subprocess.run([sys.executable, "-c", "import runpy, os, sys; print(runpy.run_path(sys.argv[1], "
+                      "run_name='t')['requester'](os.getpid()))", SRC], capture_output=True, text=True).stdout
+(ok if ", started by " in out and "test_broker_dialogs.py (self-reported)" in out else bad)("requester: process and parent (%s)" % out.strip())
 
 # V-2: a dialog that times out is killed, not left on screen
 del S.spawn
