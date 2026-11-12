@@ -163,6 +163,15 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   and the MAC guard read `PRESTIUM_*` variables only when run from the source tree.
 
 ### Network, firewall and privileges
+- **Network → Network Logs shows the Tor, I2P and control-port filter logs** of this boot, read-only.
+  The desktop user can't read the journal, so the hints that said `journalctl` led nowhere; Nyx and the
+  Tor Connection Assistant now point here. A small service, `prestium-logs` (its own user, journal group,
+  no network, read-only system), copies the last 400 entries of exactly `tor@default`, `i2pd` and
+  `prestium-onion-grater` to `/run/prestium/logs` every 10 seconds. It keeps only entries the journal
+  attributes to those units, and it replaces control, bidi and other invisible characters. The files
+  can be read only by the desktop user (group `user`, setgid directory), not by the confined apps
+  (AppArmor). There's no sudo rule, the user isn't in `systemd-journal` or `adm`, and nothing the user
+  sends can choose another unit.
 - **Time over Tor onion services, on Kicksecure's design.** `prestium-timesync` is now a daemon built on
   sdwdate's design (written for Prestium, not Kicksecure's code). Each round it asks one source from each
   of three pools of onion web servers run by unrelated operators (Kicksecure's own list, kept under its

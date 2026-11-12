@@ -77,7 +77,7 @@ for _try in range(3):
     if r.startswith("FilterRefused"):
         break
 (ok if r.startswith("FilterRefused") else bad)("assistant: 510 recognised when the filter closes at once (%s)" % r)
-(ok if "journalctl -u prestium-onion-grater" in g["REFUSED_TEXT"] else bad)("assistant: the message names the journal")
+(ok if "Network Logs" in g["REFUSED_TEXT"] and "journalctl" not in g["REFUSED_TEXT"] else bad)("assistant: the message points to Network Logs (readable by the user)")
 (ok if "except FilterRefused:" in src and "REFUSED_TEXT" in src[src.index("def run(self)"):] else bad)(
     "assistant: run() shows the refusal text")
 stop.set()

@@ -121,6 +121,9 @@
     <item label="Tor Monitor (Nyx)" icon="utilities-system-monitor">
       <action name="Execute" command="prestium-run foot --title='Tor Monitor (Nyx)' --app-id=prestium-nyx prestium-nyx -s /run/onion-grater/control" />
     </item>
+    <item label="Network Logs…" icon="utilities-log-viewer">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-logs-view" />
+    </item>
   </menu>
   <menu id="/System" label="System" icon="preferences-system">
     <item label="Terminal" icon="utilities-terminal">

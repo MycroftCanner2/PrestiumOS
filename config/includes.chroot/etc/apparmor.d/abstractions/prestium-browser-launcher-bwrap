@@ -38,6 +38,7 @@
   /newroot/{,**} r,
   owner /newroot/{,**} rw,
   /** r,
+  deny /run/prestium/logs/** rw,   # 2.1: the desktop user's Tor/I2P logs
   # the new root (a tmpfs on /tmp before pivot_root) and the sandbox's own /run
   /dev/** rw,
   /proc/** rw,

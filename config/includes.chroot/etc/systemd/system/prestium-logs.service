@@ -1,0 +1,50 @@
+# Prestium 2.1: the Tor, i2pd and onion-grater logs for the desktop user (prestium-logs-view), without a
+# sudo rule and without putting the user in the journal group. Not root; reads only those three units'
+# entries (fixed in /usr/local/sbin/prestium-logs) and writes only /run/prestium/logs.
+[Unit]
+Description=Prestium readable logs (Tor, I2P, control-port filter)
+After=systemd-journald.service systemd-tmpfiles-setup.service
+
+[Service]
+Type=simple
+Restart=on-failure
+RestartSec=10
+ExecStart=/usr/local/sbin/prestium-logs
+User=prestium-logs
+Group=prestium-logs
+SupplementaryGroups=systemd-journal
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/run/prestium/logs
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+PrivateIPC=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RemoveIPC=yes
+ProtectProc=invisible
+ProcSubset=pid
+IPAddressDeny=any
+DevicePolicy=closed
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

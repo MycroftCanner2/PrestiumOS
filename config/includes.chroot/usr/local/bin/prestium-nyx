@@ -10,7 +10,7 @@ rc=$?
 if [ "$rc" -ne 0 ]; then
 	printf '\nNyx stopped (exit status %s).\n' "$rc"
 	printf 'If it could not connect, the reason is in the control-port filter'"'"'s log:\n'
-	printf '  journalctl -u prestium-onion-grater -b\n\nPress Enter to close this window. '
+	printf '  Network > Network Logs > Control-port filter (or: prestium-logs-view onion-grater)\n\nPress Enter to close this window. '
 	read -r _ || true
 fi
 exit "$rc"

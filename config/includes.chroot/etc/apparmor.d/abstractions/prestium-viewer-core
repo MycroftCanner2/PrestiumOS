@@ -9,6 +9,7 @@
   include <abstractions/prestium-app-common>
   include <abstractions/prestium-app-secrets>
   deny @{HOME}/.gnupg/** rw,
+  deny /run/prestium/logs/** rw,   # 2.1: the desktop user's Tor/I2P logs
   deny @{HOME}/**.kdbx rw,
   deny @{HOME}/**.{key,keyx} rw,
   # base and gnome allow writes and ix there (ecryptfs, ~/tmp); not for a file viewer

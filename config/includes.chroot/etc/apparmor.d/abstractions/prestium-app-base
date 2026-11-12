@@ -6,5 +6,7 @@
   include <abstractions/prestium-app-secrets>
   # and, for every app built on this: no OpenPGP keys, no KeePassXC databases, no Tor Browser downloads
   deny @{HOME}/.gnupg/** rw,
+  # 2.1: the logs for the desktop user (prestium-logs-view) are not for the confined apps
+  deny /run/prestium/logs/** rw,
   deny @{HOME}/Tor\ Browser/** rw,
   deny @{HOME}/**.kdbx rw,

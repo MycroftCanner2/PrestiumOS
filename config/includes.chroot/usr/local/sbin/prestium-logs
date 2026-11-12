@@ -1,0 +1,148 @@
+#!/usr/bin/python3 -I
+"""Prestium 2.1: the Tor, i2pd and onion-grater logs the desktop user may read, without a sudo rule and
+without the systemd-journal or adm group for the user.
+
+Started at boot by prestium-logs.service (not root: user prestium-logs, journal group only, no network,
+read-only system). Every 10 seconds it reads this boot's last entries of exactly three units from the
+journal and writes them, cleaned, to /run/prestium/logs/{tor,i2p,onion-grater}.log (0640, group user
+through the setgid directory). Nothing it does depends on input from the user: the unit list is fixed
+here, and it takes no arguments. The desktop opens the files with prestium-logs-view (read-only).
+
+Cleaning: an entry is kept only if the journal says it came from the unit itself (_SYSTEMD_UNIT, a
+field only journald sets) or from systemd (PID 1) about that unit. Every control, format (bidi,
+zero-width), private-use, unassigned, surrogate and line/paragraph separator character in it is
+replaced with "?", tabs become spaces, and each line is cut at 1000 characters, so a log line can't
+move the cursor, colour the terminal, reorder text or pretend to be several lines.
+"""
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import time
+import unicodedata
+
+
+def _test_env(name, default, _installed="/usr/local/sbin/prestium-logs"):
+    """The PRESTIUM_* overrides are for the test suite (run from the source tree); the installed copy
+    ignores them."""
+    if os.path.realpath(__file__) == _installed:
+        return default
+    return os.environ.get(name, default)
+
+
+OUT = _test_env("PRESTIUM_LOGS_OUT", "/run/prestium/logs")
+JOURNALCTL = _test_env("PRESTIUM_LOGS_JOURNALCTL", "/usr/bin/journalctl")
+EVERY = 10
+LINES = 400
+MAXLEN = 1000
+# file name -> systemd unit. Only these, ever.
+UNITS = {
+    "tor": "tor@default.service",
+    "i2p": "i2pd.service",
+    "onion-grater": "prestium-onion-grater.service",
+}
+BAD_CATEGORIES = {"Cc", "Cf", "Co", "Cn", "Cs", "Zl", "Zp"}
+
+
+def clean(text):
+    out = []
+    for ch in text:
+        if ch == "\t":
+            out.append(" ")
+        elif unicodedata.category(ch) in BAD_CATEGORIES:
+            out.append("?")
+        else:
+            out.append(ch)
+    s = "".join(out)
+    return s if len(s) <= MAXLEN else s[:MAXLEN - 1] + "\u2026"
+
+
+def field(entry, name):
+    v = entry.get(name)
+    if isinstance(v, list):   # journalctl -o json: a byte array for binary or non-UTF-8 data
+        if v and all(isinstance(x, int) for x in v):
+            v = bytes(b & 0xFF for b in v).decode("utf-8", "replace")
+        else:
+            return ""
+    return v if isinstance(v, str) else ""
+
+
+def belongs(entry, unit):
+    if field(entry, "_SYSTEMD_UNIT") == unit:
+        return True
+    return field(entry, "_PID") == "1" and field(entry, "UNIT") == unit
+
+
+def render(unit, json_lines):
+    rows = []
+    for raw in json_lines:
+        try:
+            e = json.loads(raw)
+        except ValueError:
+            continue
+        if not isinstance(e, dict) or not belongs(e, unit):
+            continue
+        try:
+            t = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime(int(field(e, "__REALTIME_TIMESTAMP")) / 1e6))
+        except ValueError:
+            t = "????-??-?? ??:??:??"
+        who = field(e, "SYSLOG_IDENTIFIER") or ("systemd" if field(e, "_PID") == "1" else "?")
+        # only "\n" starts a new (prefixed) line; CR, VT, FF, NEL and U+2028/2029 are replaced in clean()
+        for line in field(e, "MESSAGE").rstrip("\n").split("\n"):
+            rows.append(clean("%s UTC %s: %s" % (t, who, line)))
+    head = "# %s, this boot, last %d entries (UTC), refreshed every %d s by prestium-logs\n" % (unit, LINES, EVERY)
+    return head + "".join(r + "\n" for r in rows)
+
+
+def read(unit):
+    r = subprocess.run([JOURNALCTL, "-b", "-u", unit, "-n", str(LINES), "-o", "json", "--no-pager", "-q"],
+                       stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                       timeout=30, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C.UTF-8", "SYSTEMD_PAGER": ""})
+    return r.stdout.decode("utf-8", "replace").splitlines()
+
+
+def put(name, text):
+    path = os.path.join(OUT, name + ".log")
+    try:
+        with open(path, encoding="utf-8") as f:
+            if f.read() == text:
+                return
+    except OSError:
+        pass
+    fd, tmp = tempfile.mkstemp(dir=OUT, prefix="." + name + ".")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.chmod(tmp, 0o640)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
+def once():
+    for name, unit in UNITS.items():
+        try:
+            put(name, render(unit, read(unit)))
+        except (OSError, subprocess.SubprocessError) as e:
+            print("prestium-logs: %s: %s" % (unit, e), file=sys.stderr)
+
+
+def main(argv):
+    if argv[1:]:
+        print("prestium-logs takes no arguments", file=sys.stderr)
+        return 2
+    os.umask(0o027)
+    while True:
+        once()
+        if _test_env("PRESTIUM_LOGS_ONCE", ""):
+            return 0
+        time.sleep(EVERY)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

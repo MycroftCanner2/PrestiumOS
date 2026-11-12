@@ -1,0 +1,29 @@
+#!/bin/sh
+# Prestium 2.1: Network -> Network Logs. Shows the Tor, I2P (i2pd) or control-port filter (onion-grater)
+# log of this boot, read-only, from /run/prestium/logs (written by prestium-logs.service, already
+# cleaned of control characters). Refresh reloads it. No sudo, no journal access for the user.
+#   prestium-logs-view [tor|i2p|onion-grater]
+D=/run/prestium/logs
+pick() {
+	zenity --list --title="Network Logs" --text="Which log of this boot?" --width=420 --height=260 \
+		--column=log --column=Program --hide-column=1 --print-column=1 \
+		tor "Tor" i2p "I2P (i2pd)" onion-grater "Control-port filter (onion-grater)" 2>/dev/null
+}
+name=${1:-}
+[ -n "$name" ] || name=$(pick) || exit 0
+case "$name" in
+	tor) title="Tor log" ;;
+	i2p) title="I2P log (i2pd)" ;;
+	onion-grater) title="Control-port filter log (onion-grater)" ;;
+	*) echo "usage: prestium-logs-view [tor|i2p|onion-grater]" >&2; exit 2 ;;
+esac
+f=$D/$name.log
+while :; do
+	if [ ! -r "$f" ]; then
+		zenity --info --no-markup --title="$title" --text="The log is not available yet (prestium-logs.service writes it within 10 seconds of starting)." 2>/dev/null
+		exit 0
+	fi
+	# --text-info is read-only unless --editable is given; no markup, no links
+	zenity --text-info --title="$title" --filename="$f" --font=monospace --width=980 --height=620 \
+		--ok-label=Refresh --cancel-label=Close 2>/dev/null || exit 0
+done

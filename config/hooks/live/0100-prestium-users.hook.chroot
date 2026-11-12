@@ -36,6 +36,7 @@ sysuser prestium-htp /nonexistent ""
 sysuser prestium-ptdns /nonexistent "Prestium DoH lookups for Tor bridges (via I2P)"
 sysuser prestium-vmcheck /nonexistent "Prestium VM network check"   # 2.1 (security audit): not root
 sysuser prestium-netstatus /nonexistent "Prestium panel network status"   # 2.1 (design batch): not root
+sysuser prestium-logs /nonexistent "Prestium readable logs (Tor, I2P, onion-grater)"   # 2.1: not root
 grp autologin; grp i2ptorrents; grp prestium-localweb
 grp prestium-tbb   # 2.0 r9: may use Tor's SOCKS socket for the Tor Browser sandbox
 

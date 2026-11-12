@@ -127,7 +127,7 @@ class FilterRefused(ConnectionError):
     """onion-grater (Prestium's control-port filter) answered 510: it did not accept this program."""
 
 REFUSED_TEXT = ("Prestium's control-port filter (onion-grater) refused the assistant; Tor itself is not "
-                "affected. Reason: journalctl -u prestium-onion-grater -b")
+                "affected. The reason is in Network > Network Logs > Control-port filter.")
 
 class ControlMonitor(threading.Thread):
     """One persistent connection to the onion-grater filter: GETINFO every second, async events."""

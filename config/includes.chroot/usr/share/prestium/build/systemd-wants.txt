@@ -12,6 +12,7 @@
 /etc/systemd/system/multi-user.target.wants/prestium-usb-watchdog.service /etc/systemd/system/prestium-usb-watchdog.service
 /etc/systemd/system/multi-user.target.wants/prestium-vm-netcheck.service /etc/systemd/system/prestium-vm-netcheck.service
 /etc/systemd/system/multi-user.target.wants/prestium-netstatus.service /etc/systemd/system/prestium-netstatus.service
+/etc/systemd/system/multi-user.target.wants/prestium-logs.service /etc/systemd/system/prestium-logs.service
 /etc/systemd/system/multi-user.target.wants/remote-fs.target /usr/lib/systemd/system/remote-fs.target
 /etc/systemd/system/multi-user.target.wants/thelounge.service /etc/systemd/system/thelounge.service
 /etc/systemd/system/multi-user.target.wants/thelounge-tor.service /etc/systemd/system/thelounge-tor.service

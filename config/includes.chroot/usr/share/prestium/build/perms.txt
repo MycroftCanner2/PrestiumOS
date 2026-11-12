@@ -518,6 +518,9 @@
 # 2.1 (design batch): theme, branding, panel network status, wallpaper and notification sound tools
 0644 root root /etc/systemd/system/prestium-netstatus.service
 0755 root root /usr/local/sbin/prestium-netstatus
+0644 root root /etc/systemd/system/prestium-logs.service
+0755 root root /usr/local/sbin/prestium-logs
+0755 root root /usr/local/bin/prestium-logs-view
 0755 root root /usr/local/bin/prestium-notify-sound
 0755 root root /usr/local/bin/prestium-wallpaper
 0644 root root /etc/xdg/kleopatrarc
