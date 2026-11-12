@@ -259,9 +259,15 @@ def check(profile, line):
             return "SIGNAL " + sig, None
         return None, "510 Command filtered\r\n"
     if cmd in ("ONION_CLIENT_AUTH_ADD", "ONION_CLIENT_AUTH_REMOVE", "ONION_CLIENT_AUTH_VIEW"):
-        if p["onion_auth"] and "Flags=Permanent" not in rest:
-            return line, None
-        return None, "510 Command filtered\r\n"
+        if not p["onion_auth"]:
+            return None, "510 Command filtered\r\n"
+        # 2.1: Tor Browser's key prompt sends Flags=Permanent when "Remember this key" is ticked, and
+        # refusing it made the prompt fail. Drop the flag instead: the key lasts until Tor restarts,
+        # nothing is written to disk (Tor has no ClientOnionAuthDir here anyway).
+        args = [a for a in split_args(rest) if not re.match(r"^Flags=Permanent$", a, re.I)]
+        if any(a.lower().startswith("flags=") for a in args):
+            return None, "510 Command filtered\r\n"
+        return " ".join([cmd] + args), None
     if cmd == "ADD_ONION" and p["add_onion"]:
         args = split_args(rest)
         if not args or not KEY_RE.match(args[0]):

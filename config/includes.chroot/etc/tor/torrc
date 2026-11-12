@@ -8,13 +8,16 @@ SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort IsolateSOCKSAuth
 # 2.0 r9: Tor Browser runs in a sandbox with no network at all (its own empty network namespace,
 # like Tails' "tbb" namespace but without even a veth); this Unix socket, bound into the sandbox, is
 # its only way out. Only members of prestium-tbb (the desktop user) can use it, the same users the
-# firewall lets reach 9050. No isolation flags: Tor Browser isolates by SOCKS username itself.
+# firewall lets reach 9050. Tor Browser isolates by SOCKS username itself (IsolateSOCKSAuth is Tor's default).
 # 2.0 r17: WorldWritable, not GroupWritable. With GroupWritable, Tor requires the directory's group
 # to be its own (debian-tor) or root and silently skipped this socket because /run/prestium-tbb is
 # group prestium-tbb (seen on the r16 ISO: 9050 open, no socket). Access is enforced by the
 # directory instead: /run/prestium-tbb is 2750 debian-tor:prestium-tbb (tmpfiles.d), so only Tor and
 # members of prestium-tbb can reach the socket, the same as Debian's /run/tor/socks model.
-SocksPort unix:/run/prestium-tbb/socks WorldWritable
+# 2.1: ExtendedErrors (as Tor Browser's own launcher sets): Tor tells the browser *why* an onion
+# failed (F4 = needs a client key). Without it Tor Browser never showed its key prompt, so private
+# OnionShare addresses (the default) failed with "Unable to connect". KeepAliveIsolateSOCKSAuth as well.
+SocksPort unix:/run/prestium-tbb/socks WorldWritable ExtendedErrors KeepAliveIsolateSOCKSAuth
 # no DNSPort/TransPort: nothing on Prestium resolves names outside Tor/I2P
 AvoidDiskWrites 1
 # Sandbox 1 removed: Tor refuses managed proxies (ClientTransportPlugin: obfs4/snowflake/webtunnel) in Sandbox mode, so tor@default failed. Tails does not use Sandbox either.

@@ -82,7 +82,9 @@ class TestTransports(Base):
         self.assertEqual(len(lines), 1)
         self.assertIn("IsolateSOCKSAuth", lines[0].split())
         self.assertNotIn("NoIsolateSOCKSAuth", lines[0])
-        self.assertIn("SocksPort unix:/run/prestium-tbb/socks WorldWritable", torrc)
+        tbb = [l for l in torrc if l.startswith("SocksPort unix:/run/prestium-tbb/socks ")]
+        self.assertEqual(len(tbb), 1)
+        self.assertIn("WorldWritable", tbb[0].split())
 
     @unittest.skipUnless(T.have("curl"), "curl missing")
     def test_real_curl_sends_socks_username(self):

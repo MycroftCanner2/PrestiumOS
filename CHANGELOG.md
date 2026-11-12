@@ -188,6 +188,10 @@ This is one combined list of everything that changed since the last release, 2.0
   keyboard shortcuts, a highlighted default button and correct panel names and icons. PCManFM
   thumbnails are really off now (`[ui] show_thumbnail=0`), with Debian's other settings kept. Boot
   menu labels take the version from the image.
+- **Private OnionShare addresses open in Tor Browser.** Tor Browser's Tor socket now has `ExtendedErrors`
+  (as Tor Browser's own launcher sets), so Tor Browser asks for the private key instead of
+  failing with "Unable to connect". Ticking "Remember this key" no longer makes the prompt fail: onion-grater
+  drops `Flags=Permanent`, so the key lasts until Tor restarts.
 - **The menu opens in one place.** The Menu button and Super+Space always open it at the bottom-left,
   just above the button, wherever the pointer moves. Right-clicking the desktop still opens it at the pointer.
 - **One title bar per window, one desktop.** Every window gets labwc's title bar, and GTK and
