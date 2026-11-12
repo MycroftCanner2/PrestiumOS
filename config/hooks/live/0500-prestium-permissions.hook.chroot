@@ -23,6 +23,10 @@ find "$TP" -type d -exec chmod 0750 {} +; find "$TP" -type f -exec chmod 0640 {}
 # directories created by includes that the manifest does not list keep root:root 0755
 chmod 0440 /etc/sudoers.d/*
 visudo -c >/dev/null
+# 2.1 (L-5): each confined app's own download or output folder (its AppArmor profile lets it write only
+# there); ~/Downloads itself holds what you put there for apps to read. Torrents is made by i2pd's helper.
+for d in "I2P Browser" "Local Firefox" Mail Gajim Pidgin; do install -d -m 0700 "/home/user/Downloads/$d"; done
+for d in LibreOffice GIMP FeatherPad "File Roller" Xarchiver Audacity Kleopatra "Metadata Cleaner"; do install -d -m 0700 "/home/user/Documents/$d"; done
 chown -R user:user /home/user
 # 2.1 (review of db6601c, L-2): passwd is not setuid. The live user starts with no password, and passwd
 # asks a user with an empty password for no old one, so any program of the user could choose the first

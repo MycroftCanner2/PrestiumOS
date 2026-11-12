@@ -13,6 +13,9 @@ profile kleopatra /usr/bin/{kleopatra,kwatchgnupg} {
   deny @{HOME}/.Private/** wx,
   deny @{HOME}/tmp/** wx,
   include <abstractions/prestium-viewer-write>
+  # 2.1 (L-5): the only folder in the home it may write: its own output folder
+  owner "@{HOME}/Documents/Kleopatra/" rw,
+  owner "@{HOME}/Documents/Kleopatra/**" rwkl,
   include <abstractions/nameservice-strict>
   deny @{HOME}/**.kdbx rw,
   network unix stream,

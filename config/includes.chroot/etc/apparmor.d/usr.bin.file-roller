@@ -8,6 +8,9 @@ include <tunables/global>
 profile file-roller /usr/bin/file-roller {
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-write>
+  # 2.1 (L-5): the only folder in the home it may write: its own output folder
+  owner "@{HOME}/Documents/File Roller/" rw,
+  owner "@{HOME}/Documents/File Roller/**" rwkl,
   /usr/bin/file-roller mr,
   /usr/libexec/file-roller/* mrix,
   /usr/bin/{tar,gzip,gunzip,zcat,bzip2,bunzip2,xz,unxz,lzma,unlzma,zstd,unzstd,lz4,lzip,lzop,brotli,cpio,ar,bsdtar,7z,7za,7zr,7zz,unzip,zip,zipinfo,unrar,rar,unar,lsar,cabextract,isoinfo,dpkg-deb,rpm2cpio,unsquashfs,arj,unarj,lha,unace,unalz,uudecode,file} mrix,

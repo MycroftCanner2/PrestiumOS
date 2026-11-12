@@ -38,3 +38,8 @@ user_pref("browser.newtabpage.activity-stream.asrouter.userprefs.cfr.features", 
 user_pref("browser.messaging-system.whatsNewPanel.enabled", false);
 // Prestium 2.0 r19: no tabs in the title bar; the compositor draws the frame (minimise, maximise, close)
 user_pref("browser.tabs.inTitlebar", 0);
+// 2.1 (L-5): its own download folder, the only one in the home it may write (AppArmor)
+user_pref("browser.download.dir", "/home/user/Downloads/Local Firefox");
+user_pref("browser.download.lastDir", "/home/user/Downloads/Local Firefox");
+user_pref("browser.download.folderList", 2);
+user_pref("browser.download.useDownloadDir", true);

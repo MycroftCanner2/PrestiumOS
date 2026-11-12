@@ -28,6 +28,10 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Enforced AppArmor profiles** for the browsers, Claws Mail, Gajim, Pidgin, OnionShare, Feather,
   LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra and the programs that open
   downloaded files.
+- **Separate folders per app:** each confined app saves only in its own folder (`~/Downloads/<App>`
+  for the browsers, mail and chat, `~/Documents/<App>` for the editors, `~/Tor Browser` for Tor
+  Browser), so one compromised app can't change files another app opens. To upload or attach a file,
+  put it in that app's folder (mail and chat can also take files directly from `~/Downloads`).
 - **Network privacy:** MAC address spoofing with a guard against leaks of the real address,
   default-deny firewall that stays closed when stopped, no system DNS, IPv6 off, no LAN access.
   In the terminal, `http_proxy` and `https_proxy` point to i2pd (127.0.0.1:4450), so command-line

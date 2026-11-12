@@ -7,6 +7,9 @@ include <tunables/global>
 profile xarchiver /usr/bin/xarchiver {
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-write>
+  # 2.1 (L-5): the only folder in the home it may write: its own output folder
+  owner "@{HOME}/Documents/Xarchiver/" rw,
+  owner "@{HOME}/Documents/Xarchiver/**" rwkl,
   /usr/bin/xarchiver mr,
   /usr/libexec/xarchiver/* mrix,
   /usr/bin/{tar,gzip,gunzip,zcat,bzip2,bunzip2,xz,unxz,lzma,unlzma,zstd,unzstd,lz4,lzip,lzop,brotli,cpio,ar,bsdtar,7z,7za,7zr,7zz,unzip,zip,zipinfo,unrar,rar,unar,lsar,cabextract,isoinfo,dpkg-deb,rpm2cpio,unsquashfs,arj,unarj,lha,unace,unalz,uudecode,file} mrix,

@@ -100,6 +100,18 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   press Reset to shipped copy.
 
 ### App confinement and sandboxes
+- **Each confined app has its own download or output folder, and writes files nowhere else (L-5).** A
+  compromised app can no longer change a file another app wrote or will open. Network apps save in
+  `~/Downloads/<App>`: I2P Browser, Local Firefox, Mail (Claws attachments), Gajim and Pidgin (Tor
+  Browser keeps `~/Tor Browser`, I2P Torrents `~/Downloads/Torrents`). Editors save in
+  `~/Documents/<App>`: LibreOffice, GIMP, FeatherPad, File Roller, Xarchiver, Audacity, Kleopatra and
+  Metadata Cleaner (which cleans files in place, so copy a file there first). mat2 ("Remove metadata")
+  writes only its `name.cleaned.ext` copy next to the original. Viewers and editors still open files from
+  every folder, but read-only. A document opened elsewhere opens read-only in LibreOffice; use Save As.
+  The browsers see only their own folder, so to upload a file, put it there first, as with Tor Browser.
+  Mail and chat can also read files you put directly in `~/Downloads`, for attachments, but not another
+  app's folder. Unlocked volumes under `/media` stay writable for the editors. Hook 0500 creates the
+  folders, the apps' settings point at them, and the file chooser has bookmarks for the download folders.
 - **The file manager makes no thumbnails and mounts no drives by itself.** PCManFM isn't confined, so it no
   longer decodes downloaded pictures for previews (`/etc/xdg/libfm/libfm.conf`). USB drives are mounted with
   a click, not on insert or at start-up.
@@ -108,12 +120,12 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **Programs that open downloaded files are confined:** Loupe, Ristretto, VLC, File Roller, Xarchiver,
   FeatherPad, mat2, Metadata Cleaner, GIMP and Audacity run under enforced AppArmor profiles (no
   network, no camera, no admin tools, no other app's mail/chat/browser data, no OpenPGP keys or
-  KeePassXC databases). They may use the file folders (Desktop, Documents, Downloads and the others)
-  and their own settings. Files outside those folders need to be moved into Documents first. VLC plays
+  KeePassXC databases). They may read the file folders (Desktop, Documents, Downloads and the others),
+  save only in their own folder (see above) and use their own settings. Files outside those folders need to be moved into Documents first. VLC plays
   local files only (no network streams). Loupe's image decoders and mat2's helpers keep their own
   bubblewrap sandbox, in a child profile with the same limits.
 - **KeePassXC and Kleopatra are confined too.** KeePassXC has no network and no browser integration.
-  Kleopatra and the GnuPG tools it starts may use `~/.gnupg` and the file folders; only dirmngr opens
+  Kleopatra and the GnuPG tools it starts may use `~/.gnupg`, read the file folders and save in `~/Documents/Kleopatra`; only dirmngr opens
   TCP (through Tor), and passphrase prompts use a confined pinentry. Kleopatra may not write the GnuPG
   configuration files (those can name helper programs). The pinentry profile also applies when the
   session's own gpg-agent starts a prompt.
@@ -362,8 +374,11 @@ Not changed in 2.1, so you know where the edges are:
   boot menus and other boot media are outside Prestium's control; a firmware password helps there.
 - **Programs running as the desktop user can still attach a disk image** (udisks loop-setup). The
   confined apps can't reach udisks, and rarely used filesystem drivers can't be loaded.
-- **Most confined apps share ~/Downloads**, so a compromised one could change a file another app later
-  opens. Separate folders per app would change where your files end up; not done in 2.1.
+- **Per-app folders limit writes, not reads.** A compromised viewer or editor can still read every
+  file folder (it has no network, so it would need another app to send anything out), and mail and
+  chat can read the files you put directly in `~/Downloads`. The file manager and other unconfined
+  programs of the desktop user can still write everywhere. Unlocked volumes under `/media` are shared
+  by the editors.
 - **The i2pd console's per-boot password is readable by the desktop user's programs**, because the
   local-only Firefox's launcher runs as the user and needs it.
 - **The bubblewrap children of Loupe, mat2 and Metadata Cleaner keep bubblewrap's mount rights**, so a

@@ -1,4 +1,5 @@
-# Prestium 2.1 (audit of 96468c5, M-1): Metadata Cleaner (the GUI for mat2), ENFORCED. The same rules as mat2.
+# Prestium 2.1 (audit of 96468c5, M-1): Metadata Cleaner (the GUI for mat2), ENFORCED. The same rules as mat2,
+# except where it writes (its own folder, L-5).
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
@@ -20,8 +21,12 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
   /usr/share/perl/** r,
   /usr/lib/@{multiarch}/perl*/** mr,
   /usr/bin/bwrap mrCx -> bwrap,
-  # the cleaned copy goes next to the original: "<name>.cleaned.<ext>", the Tor Browser's folder included
-  owner "@{HOME}/Tor Browser/**.cleaned.*" rw,
+  # 2.1 (L-5): Metadata Cleaner replaces the files it cleans, so it may write only its own folder,
+  # ~/Documents/Metadata Cleaner: copy a file there to clean it in place. (For a file anywhere else,
+  # "Remove metadata" in the file manager runs mat2, which writes a cleaned copy next to it.) It still
+  # reads every file folder, but can't change a file another app wrote or will open.
+  owner "@{HOME}/Documents/Metadata Cleaner/" rw,
+  owner "@{HOME}/Documents/Metadata Cleaner/**" rwk,
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>

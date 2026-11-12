@@ -8,6 +8,9 @@ include <tunables/global>
 profile featherpad /usr/bin/{featherpad,fpad} {
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-write>
+  # 2.1 (L-5): the only folder in the home it may write: its own output folder
+  owner "@{HOME}/Documents/FeatherPad/" rw,
+  owner "@{HOME}/Documents/FeatherPad/**" rwkl,
   /usr/bin/{featherpad,fpad} mr,
   owner @{HOME}/.config/featherpad/ rw,
   owner @{HOME}/.config/featherpad/** rwk,

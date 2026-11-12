@@ -57,7 +57,9 @@ allow kleopatra $S/S.gpg-agent rw
 allow kleopatra $S/S.keyboxd rw
 allow kleopatra $S/S.dirmngr rw
 allow kleopatra $S/S.uiserver rw
-allow kleopatra $H/Documents/letter.txt.gpg rw
+allow kleopatra $H/Documents/Kleopatra/letter.txt.gpg rw
+deny kleopatra $H/Documents/letter.txt.gpg w
+deny kleopatra $H/Downloads/Mail/letter.txt.gpg w
 allow kleopatra $H/Downloads/key.asc r
 deny kleopatra $G/gpg.conf w
 deny kleopatra $G/gpg-agent.conf w
@@ -135,6 +137,9 @@ run usr.bin.mat2 <<EOT
 allow mat2 /usr/bin/bwrap x:C
 allow mat2 /tmp/tmpab12cd/ w
 allow mat2 $H/Downloads/clip.cleaned.mp4 w
+allow mat2 $H/Downloads/Mail/clip.cleaned.mp4 w
+deny mat2 $H/Downloads/Mail/clip.mp4 w
+deny mat2 $H/Downloads/clip.mp4 w
 $(bw mat2//bwrap)
 allow mat2//bwrap /usr/bin/ffmpeg x:i
 allow mat2//bwrap /usr/bin/exiftool x:i
@@ -157,7 +162,10 @@ $(bw metadata-cleaner//bwrap)
 allow metadata-cleaner//bwrap /tmp/0123abcd.mp4 w
 deny metadata-cleaner//bwrap $H/Downloads/clip.cleaned.mp4 w
 allow metadata-cleaner /tmp/0123abcd.mp4 rw
-allow metadata-cleaner $H/Downloads/clip.mp4 rw
+allow metadata-cleaner "$H/Documents/Metadata Cleaner/clip.mp4" rw
+allow metadata-cleaner $H/Downloads/clip.mp4 r
+deny metadata-cleaner $H/Downloads/clip.mp4 w
+deny metadata-cleaner $H/Downloads/Mail/clip.mp4 w
 EOT
 
 echo "== GIMP (system configuration, plug-ins)"
@@ -187,7 +195,9 @@ allow audacity /dev/snd/pcmC0D0c rw
 allow audacity /run/user/1000/pulse/native rw
 allow audacity $H/.local/share/audacity/x rw
 allow audacity $H/.config/audacity/audacity.cfg rw
-allow audacity $H/Music/take1.aup3 rw
+allow audacity $H/Documents/Audacity/take1.aup3 rw
+allow audacity $H/Music/take1.aup3 r
+deny audacity $H/Music/take1.aup3 w
 deny audacity $G/pubring.kbx r
 deny audacity /dev/video0 rw
 deny audacity /usr/bin/bwrap x

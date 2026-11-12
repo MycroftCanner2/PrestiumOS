@@ -1,6 +1,6 @@
 # Prestium 2.0 r9: LibreOffice, ENFORCED, with no network at all (documents are a common exploit
 # vector, and an office suite doesn't need to go online here). It may open and save documents in
-# the usual user folders and its own profile. No sudo, no Prestium helpers, no system bus.
+# the usual user folders, saves only in ~/Documents/LibreOffice (2.1, L-5), and uses its own profile. No sudo, no Prestium helpers, no system bus.
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
@@ -27,7 +27,11 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   owner @{HOME}/.config/libreoffice/** rwk,
   owner @{HOME}/.cache/libreoffice/** rwk,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/ r,
-  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/** rwk,
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/** r,
+  # 2.1 (L-5): it saves only in its own folder, so a crafted document can't change a file another app
+  # wrote or will open (a document opened elsewhere opens read-only; save it with "Save As")
+  owner @{HOME}/Documents/LibreOffice/ rw,
+  owner @{HOME}/Documents/LibreOffice/** rwk,
   # unlocked VeraCrypt/LUKS volumes
   /media/** rwk,
 

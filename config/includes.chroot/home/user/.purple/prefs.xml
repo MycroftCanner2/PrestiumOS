@@ -16,6 +16,11 @@
 		</pref>
 	</pref>
 	<pref name='pidgin'>
+		<pref name='filelocations'>
+			<pref name='last_save_folder' type='path' value='/home/user/Downloads/Pidgin'/>
+			<pref name='last_receive_folder' type='path' value='/home/user/Downloads/Pidgin'/>
+			<pref name='last_open_folder' type='path' value='/home/user/Downloads/Pidgin'/>
+		</pref>
 		<pref name='plugins'>
 			<pref name='loaded' type='pathlist'>
 				<item value='/usr/lib/pidgin/pidgin-otr.so'/>

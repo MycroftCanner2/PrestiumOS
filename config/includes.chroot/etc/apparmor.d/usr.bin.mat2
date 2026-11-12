@@ -1,5 +1,5 @@
 # Prestium 2.1 (audit of 96468c5, M-1): mat2, the metadata cleaner (command line), ENFORCED. No network, no other app's data, no keys;
-# reads the file folders and writes the cleaned copy next to the original.
+# reads the file folders and writes the cleaned copy next to the original (2.1, L-5: nothing else).
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
@@ -18,7 +18,9 @@ profile mat2 /usr/bin/mat2 {
   /usr/share/perl/** r,
   /usr/lib/@{multiarch}/perl*/** mr,
   /usr/bin/bwrap mrCx -> bwrap,
-  # the cleaned copy goes next to the original: "<name>.cleaned.<ext>", the Tor Browser's folder included
+  # the cleaned copy goes next to the original: "<name>.cleaned.<ext>", in any file folder (2.1, L-5: the
+  # only write it has there; it never changes an original or any other file)
+  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/**.cleaned.* rw,
   owner "@{HOME}/Tor Browser/**.cleaned.*" rw,
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
