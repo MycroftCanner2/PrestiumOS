@@ -1,0 +1,14 @@
+[Desktop Entry]
+# Prestium 2.1: Debian's org.gnome.Zenity.desktop has no Icon, so every zenity window (Unlock VeraCrypt
+# Volume, the session password, Mail's account form, ...) had no icon in the panel. Same entry, plus
+# zenity's own icon. (/usr/local/share comes before /usr/share in XDG_DATA_DIRS.)
+Name=Zenity
+Comment=Display dialog boxes from the command line
+Exec=zenity
+Icon=zenity
+Terminal=false
+Type=Application
+NoDisplay=true
+StartupNotify=true
+DBusActivatable=true
+X-GNOME-UsesNotifications=true

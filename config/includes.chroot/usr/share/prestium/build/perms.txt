@@ -502,3 +502,4 @@
 0755 root root /usr/local/sbin/prestium-gnupg-check
 0644 root root /usr/share/applications/prestium-audacity.desktop
 0644 root root /etc/gnupg/gpg-agent.conf
+0644 root root /usr/local/share/applications/org.gnome.Zenity.desktop
