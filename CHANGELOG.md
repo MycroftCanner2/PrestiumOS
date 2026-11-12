@@ -168,6 +168,17 @@ This is one combined list of everything that changed since the last release, 2.0
   is read-only and disappears once both connect.
 
 ### Apps
+- **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
+  at every start, and sets:
+  - tunnel hops, 1 to 7 (default 3);
+  - share level: Low 30 % at 32 KB/s (default), Medium 50 % at 64 KB/s, High 80 % at 128 KB/s;
+  - outproxy: Acetone (default), StormyCloud, or a custom I2P address.
+  StormyCloud also takes the SOCKS outproxy. A custom outproxy is HTTP only, so SOCKS stays on Acetone.
+  Local port 4500 never changes. *Apply* writes the settings through a root helper
+  (`prestium-i2p-mode`: sudo, a checked JSON request, no free-form arguments) and restarts i2pd.
+  If the browser proxy doesn't come back, the old settings are put back. Reseed (over Tor, or from a
+  file) and *Reboot* are in the same window. The old *I2P Tunnel Hops*, *Restart I2P* and reseed menu
+  items are gone. `prestium-tunnel-hops` still works from a terminal.
 - **The Lounge ships the 10 Theme Factory themes, and Tech Innovation is the default.** Ocean Depths,
   Sunset Boulevard, Forest Canopy, Modern Minimalist, Golden Hour, Arctic Frost, Desert Rose, Tech
   Innovation, Botanical Garden and Midnight Galaxy are local packages. The old Prestium theme is

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=I2P Connection Assistant
+Comment=Show I2P's port and choose tunnel hops, share level and outproxy; reseed; reboot
+Exec=/usr/local/bin/prestium-i2p-assistant
+Icon=network-workgroup
+Terminal=false
+StartupNotify=true
+Categories=Network;

@@ -105,37 +105,9 @@
   </menu>
   <separator />
   <menu id="/Network" label="Network">
-    <menu id="/Network/Hops" label="I2P Tunnel Hops">
-      <item label="1 hop">
-        <action name="Execute" command="prestium-run prestium-tunnel-hops 1" />
-      </item>
-      <item label="2 hops">
-        <action name="Execute" command="prestium-run prestium-tunnel-hops 2" />
-      </item>
-      <item label="3 hops (default)">
-        <action name="Execute" command="prestium-run prestium-tunnel-hops 3" />
-      </item>
-      <item label="4 hops">
-        <action name="Execute" command="prestium-run prestium-tunnel-hops 4" />
-      </item>
-      <item label="5 hops">
-        <action name="Execute" command="prestium-run prestium-tunnel-hops 5" />
-      </item>
-      <item label="6 hops">
-        <action name="Execute" command="prestium-run prestium-tunnel-hops 6" />
-      </item>
-      <item label="7 hops">
-        <action name="Execute" command="prestium-run prestium-tunnel-hops 7" />
-      </item>
-    </menu>
-    <item label="Restart I2P (i2pd)">
-      <action name="Execute" command="prestium-run sh -c &quot;systemctl restart i2pd || sudo -n systemctl restart i2pd&quot;" />
-    </item>
-    <item label="Refresh I2P reseed (via Tor)">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-reseed-gui" />
-    </item>
-    <item label="Manual reseed file">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-reseed-gui --manual" />
+    <!-- 2.1: hops, restart and reseed are in the I2P Connection Assistant -->
+    <item label="I2P Connection Assistant">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-assistant" />
     </item>
     <item label="Tor Connection Assistant">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-tor-assistant" />

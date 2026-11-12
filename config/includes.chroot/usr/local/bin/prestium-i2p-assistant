@@ -1,0 +1,221 @@
+#!/usr/bin/python3
+# Prestium 2.1: I2P Connection Assistant. One window for i2pd's settings, in place of the old
+# "I2P Tunnel Hops", "Restart I2P" and reseed menu items:
+#   - the router's port (random, new at every i2pd start; read-only)
+#   - tunnel hops (1-7, default 3)
+#   - share level: Low 30 % at 32 KB/s (default), Medium 50 % at 64 KB/s, High 80 % at 128 KB/s
+#   - outproxy: Acetone (default), StormyCloud, or a custom I2P address (HTTP only; the SOCKS
+#     outproxy on 127.0.0.1:4500 then stays on Acetone)
+#   - reseed from StormyCloud over Tor, or from a .su3 file (prestium-i2p-reseed-gui)
+#   - Apply writes the settings and restarts i2pd; Reboot is at the bottom.
+# All changes go through the root helper /usr/local/sbin/prestium-i2p-mode (sudo, a JSON request
+# on stdin that the helper checks again). The live settings are always read back from i2pd's files.
+# Opening the assistant changes nothing.
+import json, re, subprocess, threading
+import gi
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, Gdk, GLib, Gio
+
+APP_ID = "org.prestium.I2PConnectionAssistant"   # matches its .desktop file (panel icon)
+HELPER = ["/usr/bin/sudo", "-n", "/usr/local/sbin/prestium-i2p-mode"]
+RESEED = "/usr/local/bin/prestium-i2p-reseed-gui"
+REBOOT = ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+SHARES = [("low", "Low: 30 % of 32 KB/s (default)"), ("medium", "Medium: 50 % of 64 KB/s"),
+          ("high", "High: 80 % of 128 KB/s")]
+OUTPROXIES = [("acetone", "Acetone (default)"), ("stormycloud", "StormyCloud"), ("custom", "Custom")]
+# same rule as the helper (it checks again)
+CUSTOM = re.compile(r"\Ahttp://(?:[a-z2-7]{52}\.b32|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*)\.i2p"
+                    r"(?::([1-9][0-9]{0,4}))?\Z")
+
+def custom_ok(url):
+    m = CUSTOM.match(url)
+    return bool(m) and (m.group(1) is None or int(m.group(1)) <= 65535) and len(url) <= 300
+
+def helper(cmd, request=None):
+    try:
+        r = subprocess.run(HELPER + [cmd], input=json.dumps(request) if request else "",
+                           capture_output=True, text=True, timeout=180)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "error": str(e)}
+    for line in reversed(r.stdout.splitlines()):
+        try:
+            return json.loads(line)
+        except ValueError:
+            continue
+    return {"ok": False, "error": (r.stderr.strip() or "the helper gave no answer")[-300:]}
+
+def heading(text):
+    l = Gtk.Label(xalign=0)
+    l.set_markup("<b>%s</b>" % GLib.markup_escape_text(text))
+    return l
+
+def hint(text):
+    l = Gtk.Label(label=text, xalign=0)
+    l.set_line_wrap(True); l.set_max_width_chars(52)
+    l.get_style_context().add_class("dim-label")
+    return l
+
+class Assistant(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="I2P Connection Assistant")
+        self.set_icon_name("network-workgroup")
+        self.set_default_size(460, -1); self.set_resizable(False)
+        self.set_position(Gtk.WindowPosition.CENTER)
+        self.current = None; self.busy = False
+        box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=16)
+        self.add(box)
+
+        self.status = Gtk.Label(xalign=0); box.pack_start(self.status, False, False, 0)
+        row = Gtk.Box(spacing=8)
+        self.port = Gtk.Label(xalign=0, selectable=True)
+        copy = Gtk.Button(label="Copy"); copy.connect("clicked", self.copy_port)
+        row.pack_start(self.port, True, True, 0); row.pack_end(copy, False, False, 0)
+        box.pack_start(row, False, False, 0)
+        box.pack_start(hint("The port is chosen at random every time i2pd starts."), False, False, 0)
+        box.pack_start(Gtk.Separator(), False, False, 4)
+
+        box.pack_start(heading("Tunnel hops"), False, False, 0)
+        self.hops = Gtk.SpinButton.new_with_range(1, 7, 1); self.hops.set_value(3)
+        self.hops.connect("value-changed", self.changed)
+        hb = Gtk.Box(spacing=8); hb.pack_start(self.hops, False, False, 0)
+        hb.pack_start(hint("More hops: more anonymity, less speed. Default 3."), True, True, 0)
+        box.pack_start(hb, False, False, 0)
+
+        box.pack_start(heading("Share level"), False, False, 0)
+        box.pack_start(hint("How much of your bandwidth i2pd may use to relay other people's traffic."), False, False, 0)
+        self.share = {}; grp = None
+        for key, label in SHARES:
+            b = Gtk.RadioButton.new_with_label_from_widget(grp, label); grp = grp or b
+            b.connect("toggled", self.changed); self.share[key] = b; box.pack_start(b, False, False, 0)
+
+        box.pack_start(heading("Outproxy"), False, False, 0)
+        box.pack_start(hint("Clearnet sites you open in the I2P Browser go through this outproxy, which sees every one of them."), False, False, 0)
+        self.outproxy = {}; grp = None
+        for key, label in OUTPROXIES:
+            b = Gtk.RadioButton.new_with_label_from_widget(grp, label); grp = grp or b
+            b.connect("toggled", self.changed); self.outproxy[key] = b; box.pack_start(b, False, False, 0)
+        self.custom = Gtk.Entry(placeholder_text="http://name.i2p:3128 or http://….b32.i2p:3128")
+        self.custom.connect("changed", self.changed)
+        box.pack_start(self.custom, False, False, 0)
+        self.custom_hint = hint(""); box.pack_start(self.custom_hint, False, False, 0)
+
+        bb = Gtk.Box(spacing=8)
+        self.revert = Gtk.Button(label="Revert"); self.revert.connect("clicked", lambda *_: self.show(self.current))
+        self.apply = Gtk.Button(label="Apply and restart I2P"); self.apply.connect("clicked", self.do_apply)
+        self.apply.get_style_context().add_class("suggested-action")
+        bb.pack_end(self.apply, False, False, 0); bb.pack_end(self.revert, False, False, 0)
+        box.pack_start(bb, False, False, 4)
+        pb = Gtk.Box(spacing=8)
+        self.spinner = Gtk.Spinner(); self.progress = Gtk.Label(xalign=0); self.progress.set_line_wrap(True)
+        pb.pack_start(self.spinner, False, False, 0); pb.pack_start(self.progress, True, True, 0)
+        box.pack_start(pb, False, False, 0)
+        box.pack_start(Gtk.Separator(), False, False, 4)
+
+        box.pack_start(heading("Reseed"), False, False, 0)
+        box.pack_start(hint("Get a fresh list of I2P routers if i2pd can't find peers."), False, False, 0)
+        rb = Gtk.Box(spacing=8)
+        r1 = Gtk.Button(label="Refresh reseed (via Tor)"); r1.connect("clicked", lambda *_: self.spawn([RESEED]))
+        r2 = Gtk.Button(label="Reseed from file…"); r2.connect("clicked", lambda *_: self.spawn([RESEED, "--manual"]))
+        rb.pack_start(r1, False, False, 0); rb.pack_start(r2, False, False, 0)
+        box.pack_start(rb, False, False, 0)
+        box.pack_start(Gtk.Separator(), False, False, 4)
+
+        rbt = Gtk.Box(); reboot = Gtk.Button(label="Reboot…"); reboot.connect("clicked", self.do_reboot)
+        reboot.get_style_context().add_class("destructive-action")
+        rbt.pack_end(reboot, False, False, 0); box.pack_end(rbt, False, False, 0)
+
+        self.set_busy(True, "Reading I2P's settings…")
+        self.run(lambda: helper("status"), self.loaded)
+
+    # helpers
+    def run(self, work, done):
+        threading.Thread(target=lambda: (lambda r: GLib.idle_add(done, r))(work()), daemon=True).start()
+
+    def spawn(self, argv):
+        try: subprocess.Popen(argv, start_new_session=True)
+        except OSError as e: self.progress.set_text("Couldn't start the reseed tool: %s" % e)
+
+    def set_busy(self, busy, text=""):
+        self.busy = busy
+        (self.spinner.start if busy else self.spinner.stop)()
+        self.progress.set_text(text)
+        for w in [self.hops, self.custom, self.revert, self.apply] + list(self.share.values()) + list(self.outproxy.values()):
+            w.set_sensitive(not busy)
+        if not busy: self.changed()
+
+    def wanted(self):
+        out = next(k for k, b in self.outproxy.items() if b.get_active())
+        return {"hops": int(self.hops.get_value()),
+                "share": next(k for k, b in self.share.items() if b.get_active()),
+                "outproxy": out, "custom": self.custom.get_text().strip() if out == "custom" else ""}
+
+    def show(self, st):
+        if not st: return
+        self.status.set_markup("<b>i2pd is %s</b>" % ("running" if st.get("running") else "not running"))
+        self.port.set_text("Router port: %s (TCP and UDP)" % (st.get("port") or "unknown"))
+        self.hops.set_value(st.get("hops") or 3)
+        self.share.get(st.get("share") or "low", self.share["low"]).set_active(True)
+        self.outproxy[st.get("outproxy", "acetone")].set_active(True)
+        self.custom.set_text(st.get("custom") or "")
+        self.changed()
+
+    # callbacks
+    def loaded(self, st):
+        self.set_busy(False)
+        if not st.get("ok"):
+            self.progress.set_text("Couldn't read I2P's settings: %s" % st.get("error")); return
+        self.current = st; self.show(st)
+
+    def changed(self, *_):
+        if self.busy: return
+        w = self.wanted(); custom = w["outproxy"] == "custom"
+        self.custom.set_visible(custom); self.custom_hint.set_visible(custom)
+        good = not custom or custom_ok(w["custom"])
+        self.custom_hint.set_markup("" if good else
+            "<span foreground='#e01b24'>Enter an I2P address, such as http://name.i2p:3128</span>")
+        c = self.current or {}
+        same = c and w == {"hops": c.get("hops"), "share": c.get("share"), "outproxy": c.get("outproxy"),
+                           "custom": c.get("custom") if c.get("outproxy") == "custom" else ""}
+        self.apply.set_sensitive(bool(c) and good and not same)
+        self.revert.set_sensitive(bool(c) and not same)
+
+    def do_apply(self, *_):
+        req = self.wanted()
+        self.set_busy(True, "Writing settings, restarting i2pd and waiting for the browser proxy…")
+        self.run(lambda: helper("apply", req), self.applied)
+
+    def applied(self, st):
+        if st.get("ok"):
+            self.current = st; self.show(st); self.set_busy(False)
+            self.progress.set_text("Applied. i2pd is back; tunnels take a minute or two to build.")
+        else:
+            self.set_busy(False)
+            self.progress.set_text("Not applied: %s" % st.get("error"))
+            self.run(lambda: helper("status"), self.loaded_quiet)
+
+    def loaded_quiet(self, st):
+        if st.get("ok"): self.current = st; self.show(st)
+
+    def copy_port(self, *_):
+        p = (self.current or {}).get("port")
+        if p: Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD).set_text(str(p), -1)
+
+    def do_reboot(self, *_):
+        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
+                              buttons=Gtk.ButtonsType.NONE, text="Reboot now?")
+        d.format_secondary_text("Open windows will close.")
+        d.add_button("_Cancel", Gtk.ResponseType.CANCEL); d.add_button("_Reboot", Gtk.ResponseType.OK)
+        r = d.run(); d.destroy()
+        if r == Gtk.ResponseType.OK:
+            subprocess.Popen(REBOOT, start_new_session=True)
+
+class App(Gtk.Application):
+    def __init__(self):
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.FLAGS_NONE)
+    def do_activate(self):
+        w = self.get_active_window() or Assistant(self)
+        w.show_all(); w.changed(); w.present()
+
+if __name__ == "__main__":
+    GLib.set_prgname(APP_ID)
+    App().run(None)

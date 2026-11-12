@@ -7,3 +7,5 @@ Icon=view-refresh
 Terminal=false
 StartupNotify=true
 Categories=Network;
+# 2.1: in the I2P Connection Assistant now
+NoDisplay=true

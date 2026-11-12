@@ -12,6 +12,7 @@
   deny /usr/local/lib/prestium/** mrwx,
   deny /usr/local/bin/prestium-tunnel-hops mrwx,
   deny /usr/local/bin/prestium-tor-assistant mrwx,
+  deny /usr/local/bin/prestium-i2p-assistant mrwx,
   deny /etc/sudoers r,
   deny /etc/sudoers.d/** r,
   deny /run/sudo/** rw,

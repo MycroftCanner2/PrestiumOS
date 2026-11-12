@@ -1,115 +1,26 @@
 #!/bin/bash
 # prestium-tunnel-hops: set the number of hops for Prestium's i2pd tunnels.
-# Usage: prestium-tunnel-hops [1-7]   (no argument: pick in a dialog)
-#
-# Changes inbound.length/outbound.length in every active tunnel of
-# /var/lib/i2pd/tunnels.conf, in [exploratory] and [socksproxy] of i2pd.conf,
-# then restarts i2pd. The new files are checked the way i2pd reads them
-# (no duplicate sections or keys) before they replace the old ones, and the old
-# files are restored if i2pd does not bring the browser proxy (4444) back up.
-# 2.0 r4 (security audit): /var/lib/i2pd belongs to i2pd, so both files are read and replaced only
-# through /usr/local/lib/prestium/safefile (a symlink or special file is refused; the new file is
-# created by root in the same directory and renamed over the name, also for the rollback).
+# Usage: prestium-tunnel-hops [1-7]   (no argument: ask)
+# 2.1: a command-line front end for the I2P Connection Assistant's root helper
+# (/usr/local/sbin/prestium-i2p-mode). It keeps the current share level and outproxy and changes
+# only the hops; the helper writes i2pd's files, restarts i2pd and rolls back if the browser proxy
+# (4444) doesn't come back. The menu entry is now Network > I2P Connection Assistant.
 set -e
-D=/var/lib/i2pd
-CONF=$D/tunnels.conf
-MAIN=$D/i2pd.conf
-SAFE=/usr/local/lib/prestium/safefile
 N="$1"
-if [ -z "$N" ]; then
-  if command -v zenity >/dev/null && [ -n "$DISPLAY" ]; then
-    N=$(zenity --list --title="Tunnel hops" --text="Hops per I2P tunnel.\nMore hops = more anonymity, less speed. Default: 3" \
-      --column=Hops 1 2 3 4 5 6 7 --height=330) || exit 0
-  else
-    read -rp "Hops per tunnel (1-7, default 3): " N; N=${N:-3}
-  fi
-fi
+if [ -z "$N" ]; then read -rp "Hops per tunnel (1-7, default 3): " N; N=${N:-3}; fi
 [[ "$N" =~ ^[1-7]$ ]] || { echo "Hops must be 1-7" >&2; exit 1; }
-[ "$(id -u)" -eq 0 ] || exec sudo -n /usr/local/bin/prestium-tunnel-hops "$N"
-
-# sudo keeps the caller's working directory: never run (Python) code from it as root
-cd / || exit 1
-exec 9>/run/prestium-hops.lock
-flock -n 9 || { echo "another tunnel-hops change is already running" >&2; exit 1; }
-
-say() {
-  echo "$2"
-  command -v notify-send >/dev/null || return 0
-  sudo -u "${SUDO_USER:-user}" DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u "${SUDO_USER:-user}")/bus" \
-    notify-send ${1:+-u "$1"} "I2P tunnel hops" "$2" 2>/dev/null || true
-}
-
-T=$(mktemp -d /run/prestium-hops.XXXXXX)
-trap 'rm -rf "$T"' EXIT
-$SAFE read $D tunnels.conf > "$T/tunnels.conf.bak" || { say critical "$CONF is not a regular file; nothing changed."; exit 1; }
-$SAFE read $D i2pd.conf > "$T/i2pd.conf.bak" || { say critical "$MAIN is not a regular file; nothing changed."; exit 1; }
-cp "$T/tunnels.conf.bak" "$T/tunnels.conf.new"; cp "$T/i2pd.conf.bak" "$T/i2pd.conf.new"
-put() { $SAFE write $D "$1" 2000 2000 0644 < "$2"; }
-
-python3 -I - "$T/tunnels.conf.new" "$T/i2pd.conf.new" "$N" <<'PY'
-import re, sys
-tun, main, n = sys.argv[1], sys.argv[2], sys.argv[3]
-SEC = re.compile(r"^\s*\[([^\]]+)\]\s*$")
-KEY = re.compile(r"^\s*([^#;=\s][^=]*?)\s*=")
-LEN = re.compile(r"^\s*(inbound|outbound)\.length\s*=")
-
-def sections(lines):
-    """Split into (name, [lines]); name None = before the first section."""
-    out = [[None, []]]
-    for l in lines:
-        m = SEC.match(l)
-        if m: out.append([m.group(1).strip(), [l]])
-        else: out[-1][1].append(l)
-    return out
-
-def keys(body):
-    return [KEY.match(l).group(1) for l in body if KEY.match(l)]
-
-def setlen(body):
-    body = [l for l in body if not LEN.match(l)]
-    i = len(body)
-    while i > 1 and body[i-1].strip() == "": i -= 1   # insert before trailing blanks
-    return body[:i] + [f"inbound.length = {n}", f"outbound.length = {n}"] + body[i:]
-
-def check(lines, path):
-    seen = set()
-    for name, body in sections(lines):
-        if name is None: continue
-        if name in seen: sys.exit(f"{path}: duplicate section [{name}]")
-        seen.add(name)
-        k = keys(body)
-        d = {x for x in k if k.count(x) > 1}
-        if d: sys.exit(f"{path}: duplicate keys {sorted(d)} in [{name}]")
-
-# tunnels.conf: only real tunnels (sections that have a "type" key)
-secs = sections(open(tun).read().splitlines())
-res = []
-for name, body in secs:
-    if name is not None and "type" in keys(body) and not name.startswith("socks-outproxy"): body = setlen(body)   # outproxy tunnels keep their 1-hop setting
-    res += body
-check(res, tun)
-open(tun, "w").write("\n".join(res) + "\n")
-
-# i2pd.conf: exploratory tunnels and the SOCKS proxy (4447, Feather)
-secs = sections(open(main).read().splitlines())
-res = []
-for name, body in secs:
-    if name in ("exploratory", "socksproxy"): body = setlen(body)
-    res += body
-check(res, main)
-open(main, "w").write("\n".join(res) + "\n")
-PY
-
-put tunnels.conf "$T/tunnels.conf.new"; put i2pd.conf "$T/i2pd.conf.new"
-
-# :4444 listening = proxy up (limited readiness), not that exploratory/client tunnels exist yet.
-up() { for i in $(seq 1 45); do ss -ltn 2>/dev/null | grep -q '127.0.0.1:4444 ' && return 0; sleep 1; done; return 1; }
-systemctl restart i2pd
-if up; then
-  say "" "Hop count set to $N; i2pd restarted and the HTTP proxy (:4444) is listening. That is not proof tunnels are built yet — wait a minute or two before browsing."
-else
-  put tunnels.conf "$T/tunnels.conf.bak"; put i2pd.conf "$T/i2pd.conf.bak"
-  systemctl restart i2pd
-  say critical "i2pd did not come back with $N hops, so the previous settings were restored."
-  exit 1
-fi
+H=(/usr/bin/sudo -n /usr/local/sbin/prestium-i2p-mode)
+[ "$(id -u)" -eq 0 ] && H=(/usr/local/sbin/prestium-i2p-mode)
+cur=$("${H[@]}" status)
+req=$(python3 -I -c '
+import json, sys
+s = json.loads(sys.argv[1])
+if not s.get("ok"): sys.exit("cannot read the current settings: %s" % s.get("error"))
+print(json.dumps({"hops": int(sys.argv[2]), "share": s.get("share") or "low",
+                  "outproxy": s.get("outproxy") or "acetone", "custom": s.get("custom") or ""}))' "$cur" "$N")
+out=$(printf '%s' "$req" | "${H[@]}" apply) && rc=0 || rc=$?
+python3 -I -c '
+import json, sys
+s = json.loads(sys.argv[1].splitlines()[-1])
+print("Hop count set to %d; i2pd restarted." % s["hops"] if s.get("ok") else "Not applied: %s" % s.get("error"))' "$out" || true
+exit "$rc"

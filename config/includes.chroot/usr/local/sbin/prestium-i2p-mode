@@ -1,0 +1,220 @@
+#!/usr/bin/python3 -I
+# Prestium 2.1: root helper of the I2P Connection Assistant (run through sudo by "user" only).
+#   prestium-i2p-mode status   print the current settings as one JSON line
+#   prestium-i2p-mode apply    read one JSON request on stdin, check it, write i2pd's config,
+#                              restart i2pd and wait for the browser proxy (127.0.0.1:4444).
+#                              If i2pd doesn't come back, both files are put back and i2pd is
+#                              restarted again (exit 1). Prints the new state as one JSON line.
+# Request: {"hops": 1-7, "share": "low"|"medium"|"high",
+#           "outproxy": "acetone"|"stormycloud"|"custom", "custom": "http://NAME.i2p:PORT"}
+# What changes:
+#   tunnels.conf  inbound/outbound.length of every tunnel except socks-outproxy-* (those stay at 1)
+#                 [Web Browser HTTP Proxy] outproxy (the 4444 browser proxy)
+#                 socks-outproxy-tcp/udp destination (local port 4500 never changes; a custom
+#                 outproxy is HTTP only, so the SOCKS outproxy then stays on Acetone)
+#   i2pd.conf     share and bandwidth; [exploratory] and [socksproxy] lengths
+# Never touched: the firewall (its i2pd rule follows /run/prestium/i2pd.port, which i2pd's
+# ExecStartPre writes again on every start), Tor, the console password.
+# /var/lib/i2pd belongs to i2pd, so both files are read and replaced only through safefile
+# (a symlink or special file is refused; new file created by root, then renamed over the name).
+import fcntl, json, os, re, socket, subprocess, sys, time
+
+INSTALLED = os.path.abspath(sys.argv[0]).startswith("/usr/local/")
+def _test_env(name, default):
+    """Test-only overrides; ignored when run from the installed path."""
+    return default if INSTALLED else os.environ.get(name, default)
+
+D = _test_env("PRESTIUM_I2P_DIR", "/var/lib/i2pd")
+SAFE = _test_env("PRESTIUM_SAFEFILE", "/usr/local/lib/prestium/safefile")
+SYSTEMCTL = _test_env("PRESTIUM_SYSTEMCTL", "/usr/bin/systemctl")
+PORTFILE = _test_env("PRESTIUM_I2PD_PORTFILE", "/run/prestium/i2pd.port")
+LOCK = _test_env("PRESTIUM_I2P_LOCK", "/run/prestium-hops.lock")   # shared with prestium-tunnel-hops
+PROXY_PORT = int(_test_env("PRESTIUM_I2P_PROXY_PORT", "4444"))
+WAIT = int(_test_env("PRESTIUM_I2P_WAIT", "60"))
+
+ACETONE = "proxy4uwdijqxac2bvdx4fuhem6njmiwukuk2gelejv2nzxka2xq.b32.i2p"
+STORMY = "5d4s7pcvfdpftfk7npc7hllyujhufsdprtrf4o53i44rgsa2xbwa.b32.i2p"   # exit.stormycloud.i2p
+PRESETS = {   # name: (HTTP outproxy URL, SOCKS outproxy destination, its port)
+    "acetone": ("http://%s:3128" % ACETONE, ACETONE, "1080"),
+    "stormycloud": ("http://%s" % STORMY, STORMY, "1080"),
+}
+SHARE = {"low": ("30", "L"), "medium": ("50", "64"), "high": ("80", "128")}   # share %, bandwidth (KB/s)
+CUSTOM = re.compile(r"\Ahttp://(?:[a-z2-7]{52}\.b32|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*)\.i2p"
+                    r"(?::([1-9][0-9]{0,4}))?\Z")
+
+SEC = re.compile(r"^\s*\[([^\]]+)\]\s*$")
+KEY = re.compile(r"^\s*([^#;=\s][^=]*?)\s*=\s*(.*?)\s*$")
+HTTP_TUNNEL = "Web Browser HTTP Proxy"
+
+def die(msg, code=1):
+    print(json.dumps({"ok": False, "error": msg}))
+    sys.exit(code)
+
+def custom_ok(url):
+    m = CUSTOM.match(url or "")
+    return bool(m) and (m.group(1) is None or 1 <= int(m.group(1)) <= 65535) and len(url) <= 300
+
+def sections(lines):
+    out = [[None, []]]
+    for l in lines:
+        m = SEC.match(l)
+        if m: out.append([m.group(1).strip(), [l]])
+        else: out[-1][1].append(l)
+    return out
+
+def get(body, key):
+    for l in body:
+        m = KEY.match(l)
+        if m and m.group(1) == key:
+            return m.group(2)
+    return None
+
+def put(body, key, value):
+    """Set key = value in a section body (replace the first, drop the rest, or append)."""
+    out, done = [], False
+    for l in body:
+        m = KEY.match(l)
+        if m and m.group(1) == key:
+            if not done:
+                out.append("%s = %s" % (key, value)); done = True
+            continue
+        out.append(l)
+    if not done:
+        i = len(out)
+        while i > 1 and out[i-1].strip() == "": i -= 1
+        out[i:i] = ["%s = %s" % (key, value)]
+    return out
+
+def check(lines, path):
+    seen = set()
+    for name, body in sections(lines):
+        if name is None: continue
+        if name in seen: die("%s: duplicate section [%s]" % (path, name))
+        seen.add(name)
+        k = [KEY.match(l).group(1) for l in body if KEY.match(l)]
+        d = sorted({x for x in k if k.count(x) > 1})
+        if d: die("%s: duplicate keys %s in [%s]" % (path, d, name))
+
+def safe_read(name):
+    r = subprocess.run([SAFE, "read", D, name], capture_output=True, text=True)
+    if r.returncode: die("%s/%s is not a regular file; nothing changed" % (D, name))
+    return r.stdout
+
+def safe_write(name, text):
+    r = subprocess.run([SAFE, "write", D, name, "2000", "2000", "0644"], input=text, text=True,
+                       capture_output=True)
+    if r.returncode: raise OSError("cannot write %s/%s: %s" % (D, name, r.stderr.strip()))
+
+def state(tun, main):
+    """Current settings, read from i2pd's own files."""
+    st = {"hops": None, "share": None, "outproxy": "custom", "custom": "", "port": None,
+          "running": subprocess.run([SYSTEMCTL, "is-active", "--quiet", "i2pd"]).returncode == 0}
+    tsecs = dict((n, b) for n, b in sections(tun.splitlines()) if n)
+    msecs = sections(main.splitlines())
+    b = tsecs.get(HTTP_TUNNEL, [])
+    url = get(b, "outproxy") or ""
+    st["custom"] = url
+    for name, (u, _d, _p) in PRESETS.items():
+        if url == u: st["outproxy"], st["custom"] = name, ""
+    try: st["hops"] = int(get(b, "outbound.length") or "3")
+    except ValueError: pass
+    top = msecs[0][1]
+    share, bw = get(top, "share"), get(top, "bandwidth")
+    for name, (s, w) in SHARE.items():
+        if (share, bw) == (s, w): st["share"] = name
+    st["share_raw"], st["bandwidth_raw"] = share, bw
+    try:
+        with open(PORTFILE) as f:
+            p = f.read().strip()
+        st["port"] = int(p) if p.isdigit() else None
+    except OSError:
+        pass
+    return st
+
+def edit(tun, main, req):
+    n = str(req["hops"])
+    http, sdest, sport = PRESETS.get(req["outproxy"], PRESETS["acetone"])
+    if req["outproxy"] == "custom":
+        http = req["custom"]   # HTTP only; the SOCKS outproxy keeps Acetone
+    res = []
+    for name, body in sections(tun.splitlines()):
+        if name is not None and get(body, "type") is not None:
+            if name.startswith("socks-outproxy"):
+                body = put(put(body, "destination", sdest), "destinationport", sport)
+            else:
+                body = put(put(body, "inbound.length", n), "outbound.length", n)
+            if name == HTTP_TUNNEL:
+                body = put(body, "outproxy", http)
+        res += body
+    check(res, "tunnels.conf")
+    tun2 = "\n".join(res) + "\n"
+    share, bw = SHARE[req["share"]]
+    res = []
+    for name, body in sections(main.splitlines()):
+        if name is None:
+            body = put(put(body, "bandwidth", bw), "share", share)
+        elif name in ("exploratory", "socksproxy"):
+            body = put(put(body, "inbound.length", n), "outbound.length", n)
+        res += body
+    check(res, "i2pd.conf")
+    return tun2, "\n".join(res) + "\n"
+
+def proxy_up():
+    end = time.monotonic() + WAIT
+    while time.monotonic() < end:
+        try:
+            socket.create_connection(("127.0.0.1", PROXY_PORT), timeout=2).close()
+            return True
+        except OSError:
+            time.sleep(1)
+    return False
+
+def parse(raw):
+    try:
+        req = json.loads(raw)
+    except ValueError:
+        die("request is not JSON")
+    if not isinstance(req, dict) or set(req) - {"hops", "share", "outproxy", "custom"}:
+        die("unknown request fields")
+    if type(req.get("hops")) is not int or not 1 <= req["hops"] <= 7: die("hops must be 1-7")
+    if req.get("share") not in SHARE: die("share must be low, medium or high")
+    if req.get("outproxy") not in ("acetone", "stormycloud", "custom"): die("unknown outproxy")
+    if req["outproxy"] == "custom":
+        if not isinstance(req.get("custom"), str) or not custom_ok(req["custom"]):
+            die("a custom outproxy must be an I2P address such as http://name.i2p:3128")
+    else:
+        req["custom"] = ""
+    return req
+
+def main():
+    if len(sys.argv) != 2 or sys.argv[1] not in ("status", "apply"):
+        print("usage: prestium-i2p-mode status|apply", file=sys.stderr); return 2
+    os.chdir("/")
+    if sys.argv[1] == "status":
+        print(json.dumps(dict(state(safe_read("tunnels.conf"), safe_read("i2pd.conf")), ok=True)))
+        return 0
+    req = parse(sys.stdin.read(4096))
+    lk = open(LOCK, "w")
+    try:
+        fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        die("another I2P settings change is already running")
+    tun, main_ = safe_read("tunnels.conf"), safe_read("i2pd.conf")
+    tun2, main2 = edit(tun, main_, req)
+    try:
+        safe_write("tunnels.conf", tun2); safe_write("i2pd.conf", main2)
+    except OSError as e:
+        for name, text in (("tunnels.conf", tun), ("i2pd.conf", main_)):
+            try: safe_write(name, text)
+            except OSError: pass
+        die("%s; previous settings restored" % e)
+    subprocess.run([SYSTEMCTL, "restart", "i2pd"])
+    if proxy_up():
+        print(json.dumps(dict(state(tun2, main2), ok=True)))
+        return 0
+    safe_write("tunnels.conf", tun); safe_write("i2pd.conf", main_)
+    subprocess.run([SYSTEMCTL, "restart", "i2pd"])
+    die("i2pd did not come back with the new settings, so the previous settings were restored")
+
+if __name__ == "__main__":
+    sys.exit(main())

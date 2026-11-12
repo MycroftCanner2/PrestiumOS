@@ -1,2 +1,2 @@
-# 2.0 r4 (audit hardening): prestium-tunnel-hops only with a hop count 1-7
-user ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff, /usr/bin/systemctl reboot, /usr/sbin/poweroff, /usr/sbin/reboot, /usr/bin/systemctl restart i2pd, /usr/local/bin/prestium-tunnel-hops ^[1-7]$
+# 2.1: prestium-tunnel-hops now goes through prestium-i2p-mode (sudoers.d/prestium-i2p-mode)
+user ALL=(root) NOPASSWD: /usr/bin/systemctl poweroff, /usr/bin/systemctl reboot, /usr/sbin/poweroff, /usr/sbin/reboot, /usr/bin/systemctl restart i2pd

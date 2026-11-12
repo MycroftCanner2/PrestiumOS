@@ -1,0 +1,2 @@
+# Prestium 2.1: I2P Connection Assistant (validated JSON on stdin; no free-form arguments)
+user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-i2p-mode status, /usr/local/sbin/prestium-i2p-mode apply
