@@ -277,6 +277,9 @@ purple-xmpp-carbons
 qrencode
 qt5-gtk-platformtheme
 qtqr
+# 2.1: QtQR's webcam view is Qt Multimedia (QCamera); its GStreamer camera service is a Recommends
+# (libqt5multimedia5-plugins), which --apt-recommends false left out, so "Decode from webcam" found no camera.
+libqt5multimedia5-plugins
 qttranslations5-l10n
 qtwayland5
 readline-common
