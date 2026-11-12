@@ -80,7 +80,7 @@
       <action name="Execute" command="prestium-run kleopatra" />
     </item>
     <item label="QR Generator">
-      <action name="Execute" command="prestium-run qtqr" />
+      <action name="Execute" command="prestium-run env QT_QPA_PLATFORM=xcb qtqr" />
     </item>
   </menu>
  <menu id="/Communication" label="Communication">

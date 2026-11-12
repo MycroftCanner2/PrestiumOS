@@ -1,0 +1,18 @@
+#!/bin/sh
+# Prestium 2.1: VLC and QtQR run through Xwayland (Qt "xcb"), not as native Wayland clients.
+# Both show live video in Qt (VLC's video window; QtQR's webcam view through Qt Multimedia and
+# GStreamer), and in a VM that brought the whole labwc session down. Under Xwayland they keep
+# their normal video windows, and as X11 clients they still can't see or reach Wayland windows.
+# Debian's desktop files (menus, "Open with") get QT_QPA_PLATFORM=xcb on their Exec lines; the
+# AppArmor profiles still attach to the programs. The Prestium menu sets the same
+# (etc/xdg/labwc/menu.xml). Safe to run again.
+set -e
+fix() {   # fix DESKTOP-FILE PROGRAM-PATTERN
+	[ -f "$1" ] || { echo "E: $1 is missing"; exit 1; }
+	sed -i -E "s#^Exec=(env QT_QPA_PLATFORM=xcb )?($2)( |\$)#Exec=env QT_QPA_PLATFORM=xcb \\2\\3#" "$1"
+	grep '^Exec=' "$1" | grep -qvE "^Exec=env QT_QPA_PLATFORM=xcb ($2)( |\$)" \
+		&& { echo "E: $1 starts its program another way: update hook 0630"; grep '^Exec=' "$1"; exit 1; }
+	echo "P: $1 starts through Xwayland"
+}
+fix /usr/share/applications/vlc.desktop '/usr/bin/vlc|vlc'
+fix /usr/share/applications/qtqr.desktop '/usr/bin/qtqr|qtqr'
