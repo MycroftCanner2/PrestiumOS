@@ -17,6 +17,8 @@
   <placement><policy>center</policy></placement>
   <theme>
     <name>Prestium-Dark</name>
+    <!-- 2.1: icon theme for menu and titlebar icons (unset, labwc would look for a "Prestium-Dark" icon theme) -->
+    <icon>Prestium</icon>
     <titlebar><layout>icon:iconify,max,close</layout></titlebar>
     <cornerRadius>8</cornerRadius>
     <dropShadows>yes</dropShadows>
@@ -33,6 +35,13 @@
 
   <keyboard>
     <default />
+    <!-- 2.1: give Alt+arrows back to the browsers (Back/Forward), drop default binds to programs Prestium lacks -->
+    <keybind key="A-Left"><action name="None" /></keybind>
+    <keybind key="A-Right"><action name="None" /></keybind>
+    <keybind key="A-Up"><action name="None" /></keybind>
+    <keybind key="A-Down"><action name="None" /></keybind>
+    <keybind key="A-F3"><action name="None" /></keybind>
+    <keybind key="W-Return"><action name="Execute" command="prestium-run foot" /></keybind>
     <keybind key="C-A-Left"><action name="GoToDesktop" to="left" wrap="no" /></keybind>
     <keybind key="C-A-Right"><action name="GoToDesktop" to="right" wrap="no" /></keybind>
     <keybind key="S-A-Left"><action name="SendToDesktop" to="left" wrap="no" /></keybind>
@@ -77,7 +86,7 @@
 
   <windowRules>
     <!-- zenity 4 draws title-less dialogs; give them a frame and open them centred -->
-    <windowRule identifier="zenity" serverDecoration="yes">
+    <windowRule identifier="*zenity*" serverDecoration="yes">
       <action name="AutoPlace" policy="center" />
     </windowRule>
     <!-- apps on the restricted socket (browsers included): always keep the frame (title bar with

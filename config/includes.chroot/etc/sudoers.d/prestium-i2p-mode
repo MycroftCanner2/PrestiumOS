@@ -1,2 +1,3 @@
-# Prestium 2.1: I2P Connection Assistant (validated JSON on stdin; no free-form arguments)
-user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-i2p-mode status, /usr/local/sbin/prestium-i2p-mode apply
+# Prestium 2.1: I2P Connection Assistant reads the settings (no arguments). Changes go through the Wayland
+# broker (prestium-wl i2p-apply), which asks the person at the screen first (review N-2).
+user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-i2p-mode status

@@ -168,14 +168,31 @@ This is one combined list of everything that changed since the last release, 2.0
   is read-only and disappears once both connect.
 
 ### Desktop
-- **One dark look across the desktop.** GTK 3 and 4 apps use Adwaita-dark. Qt 5 and 6 apps use the
-  same dark Adwaita style (`adwaita-qt`, `adwaita-qt6`, `QT_STYLE_OVERRIDE=Adwaita-Dark`). A new
-  labwc theme, Prestium-Dark, has Adwaita colours, rounded corners, shadows and labwc's own buttons.
-  The bar, notifications and menus match, and Cantarell is the UI font. Tor Browser keeps its own
-  fonts.
-- **Desktop refinements.** A dark gradient wallpaper; the lock screen in the same colours with a blue
-  ring; icons beside menu items; a taller bar with rounded buttons, the date beside the time, and
-  "Volume" and "Battery" spelled out; notifications with app icons, grouped by app.
+- **One dark look across the desktop.** GTK 3 and 4 apps use Adwaita's dark variant (prefer-dark);
+  GTK 2 (Pidgin) uses Adwaita-dark from `gnome-themes-extra`. Qt 5 and 6 apps use adwaita-qt's
+  Adwaita-Dark, and KDE apps (Kleopatra) get matching colours from `/etc/xdg/kdeglobals`. Audacity,
+  KeePassXC and the foot terminal (11 pt) are dark too. A new labwc theme, Prestium-Dark, has Adwaita
+  colours, rounded corners and shadows. The bar, notifications, menus and lock screen match, and
+  Cantarell is the UI font. Tor Browser keeps its own fonts. `dconf-cli` is installed and the build
+  fails if the system dconf database isn't compiled.
+- **Desktop refinements.** A dark gradient wallpaper (2560×1440); a lock screen in the same colours
+  with a caps-lock indicator; icons beside menu items and submenus (icon theme Prestium, with
+  `adwaita-icon-theme-legacy`); a taller bar with rounded buttons, the date beside the time and "UTC"
+  after it, volume capped at 100 %; notifications with app icons, where only identical repeats are
+  grouped and critical alerts always show. White text sits on the darker blue `#1c71d8`.
+- **Desktop fixes (UI review of 96db20b).** Alt+arrows go to the browsers again (Back/Forward), not
+  labwc; Super+Return opens the terminal. nm-applet and lxpolkit no longer hold up the VM, image-age
+  and safety notices at login. The zenity window rule matches zenity 4. Log Out asks first; Restart and
+  Shut Down have named buttons. One "Unlock Encrypted Volume" entry. Long dialog texts wrap instead of
+  running off small screens, and file names in dialogs are shown as text. The Prestium tools have
+  keyboard shortcuts, a highlighted default button and correct panel names and icons. PCManFM
+  thumbnails are really off now (`[ui] show_thumbnail=0`), with Debian's other settings kept. Boot
+  menu labels take the version from the image.
+- **I2P settings need confirmation (review N-2).** Apply in the I2P Connection Assistant now goes
+  through the Wayland broker, which shows the change in a dialog only the person at the screen can
+  answer, then logs it and sends a notification. sudo allows only reading the settings. The helper
+  also checks that the restarted listener on 4444 belongs to i2pd and reports a failed rollback.
+  onion-grater refuses to start without AppArmor.
 
 ### Apps
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new

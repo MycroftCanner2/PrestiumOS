@@ -20,7 +20,7 @@ def status():
         return ""
 
 def notify(msg):
-    subprocess.run(["zenity", "--title", "I2P Torrents", "--warning", "--no-wrap", "--text", msg])
+    subprocess.run(["zenity", "--title", "I2P Torrents", "--warning", "--no-markup", "--width", "460", "--text", msg])
 
 def add(b, item):
     args = {"filename": item} if item.startswith("magnet:") else \

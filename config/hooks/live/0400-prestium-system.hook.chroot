@@ -65,7 +65,9 @@ update-alternatives --set pinentry-x11 /usr/bin/pinentry-gnome3 >/dev/null 2>&1 
 update-ca-certificates --fresh >/dev/null 2>&1 || update-ca-certificates >/dev/null
 
 ## dconf system db (Diodon settings + locks), plymouth theme, locale
-dconf update 2>/dev/null || true
+# 2.1: fail the build if the db isn't compiled (the desktop look and dark mode depend on it)
+dconf update
+[ -f /etc/dconf/db/local ] || { echo "E: dconf db not compiled"; exit 1; }
 plymouth-set-default-theme connect 2>/dev/null || true
 grep -q '^en_US.UTF-8 UTF-8' /etc/locale.gen 2>/dev/null || echo 'en_US.UTF-8 UTF-8' >> /etc/locale.gen
 locale-gen >/dev/null 2>&1 || true

@@ -3,6 +3,8 @@
 Description=Prestium Tor control port filter (onion-grater)
 After=tor@default.service
 Wants=tor@default.service
+# review of 8f5b9ce (I-7): systemd ignores AppArmorProfile= when AppArmor is off (apparmor=0); refuse to start then
+AssertSecurity=apparmor
 
 [Service]
 Type=simple

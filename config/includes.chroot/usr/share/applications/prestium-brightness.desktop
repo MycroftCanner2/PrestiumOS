@@ -1,0 +1,8 @@
+[Desktop Entry]
+# 2.1: panel name and icon for this window (app_id prestium-brightness)
+Type=Application
+Name=Brightness
+Exec=/usr/local/bin/prestium-brightness
+Icon=display-brightness
+NoDisplay=true
+StartupWMClass=prestium-brightness

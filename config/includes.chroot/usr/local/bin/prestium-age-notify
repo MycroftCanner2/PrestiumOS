@@ -12,6 +12,6 @@ now=$(date -u +%s)
 days=$(( (now - build) / 86400 ))
 [ "$days" -ge "$OLD" ] || exit 0
 when=$(date -u -d "@$build" '+%Y-%m-%d')
-notify-send -u normal -t 0 "This Prestium image is $days days old" \
+notify-send -a "Prestium Updates" -i software-update-urgent -u normal -t 0 "This Prestium image is $days days old" \
   "It was built on $when. Security fixes released since then (Debian, Tor, i2pd) are not in it, and Prestium does not update itself during a session. Download the newest release when you can." 2>/dev/null
 exit 0

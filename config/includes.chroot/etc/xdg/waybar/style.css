@@ -1,6 +1,6 @@
 /* Prestium 2.1: dark Adwaita colours, like the window titlebars (labwc theme Prestium-Dark) */
 * { font-family: Cantarell, sans-serif; font-size: 13px; min-height: 0; }
-window#waybar { background: #242424; color: #ffffff; border-bottom: 1px solid #1e1e1e; }
+window#waybar { background: #242424; color: #ffffff; border-top: 1px solid #3a3a3a; }
 #taskbar button { padding: 0 8px; margin: 3px 2px; min-width: 0; color: #c0c0c0; border-radius: 6px; border: none; }
 #taskbar button.active { background: #3a3a3a; color: #ffffff; box-shadow: inset 0 -2px #3584e4; }
 #taskbar button:hover { background: #333333; color: #ffffff; }
@@ -11,7 +11,7 @@ window#waybar { background: #242424; color: #ffffff; border-bottom: 1px solid #1
 #battery.critical:not(.charging) { color: #ff7b63; font-weight: bold; }
 #pulseaudio.muted { color: #9a9a9a; }
 /* 2.0 r19: menu button */
-#custom-menu { padding: 0 12px; margin: 3px 4px; background: #3584e4; color: #ffffff; border-radius: 6px; font-weight: bold; }
-#custom-menu:hover { background: #4a90e8; }
+#custom-menu { padding: 0 12px; margin: 3px 4px; background: #1c71d8; color: #ffffff; border-radius: 6px; font-weight: bold; }
+#custom-menu:hover { background: #1a5fb4; }
 tooltip { background: #383838; border: 1px solid #1e1e1e; border-radius: 8px; }
 tooltip label { color: #ffffff; }

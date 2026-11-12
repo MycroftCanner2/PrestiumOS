@@ -9,7 +9,7 @@
   <item label="Tor Browser" icon="/opt/tor-browser/Browser/browser/chrome/icons/default/default128.png">
     <action name="Execute" command="prestium-run tor-browser" />
   </item>
-  <item label="I2P Router Console" icon="network-workgroup">
+  <item label="I2P Router Console" icon="applications-internet">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-console" />
   </item>
   <separator />
@@ -20,7 +20,7 @@
     <action name="Execute" command="prestium-run pcmanfm" />
   </item>
   <separator />
-  <menu id="/Office" label="Office">
+  <menu id="/Office" label="Office" icon="applications-office">
     <item label="LibreOffice Writer" icon="libreoffice-writer">
     <action name="Execute" command="prestium-run libreoffice --writer" />
     </item>
@@ -37,22 +37,22 @@
     <action name="Execute" command="prestium-run libreoffice --draw" />
     </item>
   </menu>
-  <menu id="/Multimedia" label="Multimedia">
+  <menu id="/Multimedia" label="Multimedia" icon="applications-multimedia">
     <item label="Volume Control" icon="multimedia-volume-control">
     <action name="Execute" command="prestium-run pavucontrol" />
     </item>
     <item label="Audacity" icon="audacity">
     <action name="Execute" command="prestium-run audacity" />
     </item>
-    <item label="Gimp" icon="gimp">
+    <item label="GIMP" icon="gimp">
     <action name="Execute" command="prestium-run gimp" />
     </item>
-    <item label="VLC Media player" icon="vlc">
+    <item label="VLC Media Player" icon="vlc">
     <action name="Execute" command="prestium-run vlc" />
     </item>
   </menu>
-  <menu id="/Accessories" label="Accessories">
-    <item label="Feather Wallet (Monero)" icon="feather">
+  <menu id="/Accessories" label="Accessories" icon="applications-accessories">
+    <item label="Feather Wallet (Monero)" icon="emblem-money">
     <action name="Execute" command="prestium-run feather" />
     </item>
     <item label="Calculator" icon="accessories-calculator">
@@ -70,10 +70,8 @@
     <item label="KeePassXC" icon="keepassxc">
     <action name="Execute" command="prestium-run keepassxc" />
     </item>
-    <item label="Unlock VeraCrypt Volume" icon="drive-harddisk-encrypted">
-    <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-veracrypt" />
-    </item>
-    <item label="Unlock Volume" icon="drive-harddisk">
+    <!-- 2.1: one entry for LUKS, BitLocker, VeraCrypt and TrueCrypt (prestium-unlock-veracrypt stays as a command) -->
+    <item label="Unlock Encrypted Volume" icon="drive-harddisk">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-volume" />
     </item>
     <item label="Kleopatra (GnuPG)" icon="kleopatra">
@@ -83,14 +81,14 @@
     <action name="Execute" command="prestium-run qtqr" />
     </item>
   </menu>
- <menu id="/Communication" label="Communication">
+  <menu id="/Communication" label="Communication" icon="internet-mail">
     <item label="Gajim XMPP" icon="org.gajim.Gajim">
     <action name="Execute" command="prestium-run gajim" />
     </item>
     <item label="I2P Torrents" icon="folder-download">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-torrents" />
     </item>
-    <item label="IRC (The Lounge)" icon="internet-group-chat">
+    <item label="IRC (The Lounge)" icon="internet-chat">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
     </item>
     <item label="Pidgin" icon="pidgin">
@@ -104,7 +102,7 @@
     </item>
   </menu>
   <separator />
-  <menu id="/Network" label="Network">
+  <menu id="/Network" label="Network" icon="network-workgroup">
     <!-- 2.1: hops, restart and reseed are in the I2P Connection Assistant -->
     <item label="I2P Connection Assistant" icon="network-workgroup">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-assistant" />
@@ -116,11 +114,11 @@
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-browser-updater" />
     </item>
     <item label="Tor Monitor (Nyx)" icon="utilities-system-monitor">
-    <action name="Execute" command="prestium-run foot prestium-nyx -s /run/onion-grater/control" />
+    <action name="Execute" command="prestium-run foot --title='Tor Monitor (Nyx)' --app-id=prestium-nyx prestium-nyx -s /run/onion-grater/control" />
     </item>
   </menu>
   <separator />
-  <menu id="/System" label="System">
+  <menu id="/System" label="System" icon="preferences-system">
     <item label="Terminal" icon="utilities-terminal">
     <action name="Execute" command="prestium-run foot" />
     </item>
@@ -133,28 +131,28 @@
     <item label="Display Scale" icon="preferences-desktop-display">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-display-scale" />
     </item>
-    <item label="Brightness" icon="display-brightness-symbolic">
+    <item label="Brightness" icon="display-brightness">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-brightness" />
     </item>
     <item label="Touchpad" icon="input-touchpad">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-touchpad" />
     </item>
-    <menu id="/System/Accessibility" label="Accessibility">
+    <menu id="/System/Accessibility" label="Accessibility" icon="preferences-desktop-accessibility">
       <item label="Screen Keyboard" icon="input-keyboard">
     <action name="Execute" command="/usr/local/bin/prestium-osk" />
       </item>
     </menu>
     <separator />
-    <menu id="/Desktop" label="Desktop">
+    <menu id="/Desktop" label="Desktop" icon="preferences-desktop">
       <item label="Reload Desktop Settings" icon="view-refresh"><action name="Reconfigure" /></item>
-      <item label="Log Out" icon="system-log-out"><action name="Exit" /></item>
+      <item label="Log Out…" icon="system-log-out"><action name="Execute" command="/usr/local/bin/prestium-power logout" /></item>
     </menu>
   </menu>
   <separator />
-  <item label="Reboot" icon="system-reboot">
+  <item label="Restart…" icon="system-reboot">
     <action name="Execute" command="/usr/local/bin/prestium-power reboot" />
   </item>
-  <item label="Shutdown" icon="system-shutdown">
+  <item label="Shut Down…" icon="system-shutdown">
     <action name="Execute" command="/usr/local/bin/prestium-power poweroff" />
   </item>
 </menu>

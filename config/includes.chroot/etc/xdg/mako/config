@@ -15,7 +15,8 @@ max-visible=5
 icons=1
 max-icon-size=40
 icon-location=left
-group-by=app-name
+# 2.1: only identical repeats collapse (same app and summary); critical alerts are never hidden
+group-by=app-name,summary
 format=<b>%s</b>\n%b
 [urgency=critical]
 default-timeout=0
@@ -23,3 +24,6 @@ border-color=#ff7b63
 border-size=2
 [grouped]
 format=(%g) <b>%s</b>\n%b
+# after [grouped]: a critical alert stays visible even inside a group
+[urgency=critical]
+invisible=0

@@ -27,7 +27,7 @@ NS=/usr/local/lib/prestium/audacity-ns
 PY=/usr/bin/python3
 
 fail() {
-	/usr/bin/notify-send -u critical "Audacity" "$1" 2>/dev/null
+	/usr/bin/notify-send -a Audacity -i dialog-error -u critical "Audacity" "$1" 2>/dev/null
 	echo "Audacity: $1" >&2
 	exit 1
 }

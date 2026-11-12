@@ -107,7 +107,11 @@ if command -v apparmor_parser >/dev/null; then
 else echo "SKIP apparmor_parser missing (compile, expanded checks)"; fi
 # 2.1 (audit of a5fd1fb, L-7): the unconfined file manager makes no thumbnails and mounts nothing by itself
 L="$R/config/includes.chroot/etc/xdg/libfm/libfm.conf" P="$R/config/includes.chroot/etc/xdg/pcmanfm/default/pcmanfm.conf"
-grep -qx 'show_thumbnail=0' "$L" 2>/dev/null && ok "libfm: thumbnails off" || bad "libfm: thumbnails not off"
+# review N-1: libfm reads show_thumbnail from [ui] only; [config] keeps the local-only, size-capped defaults
+ini() { python3 -c 'import configparser,sys; c=configparser.ConfigParser(interpolation=None); c.read(sys.argv[1]); print(c.get(sys.argv[2],sys.argv[3],fallback=""))' "$L" "$1" "$2"; }
+[ "$(ini ui show_thumbnail)" = 0 ] && ok "libfm: [ui] show_thumbnail=0" || bad "libfm: thumbnails not off in [ui]"
+[ "$(ini config thumbnail_local)" = 1 ] && [ "$(ini config thumbnail_max)" = 2048 ] && ok "libfm: thumbnails local-only and capped" || bad "libfm: thumbnail_local/thumbnail_max widened"
+[ -n "$(ini config terminal)" ] && ok "libfm: terminal set" || bad "libfm: no terminal"
 grep -qx 'mount_removable=0' "$P" && grep -qx 'mount_on_startup=0' "$P" && ok "pcmanfm: no automount" || bad "pcmanfm automounts"
 for f in "$A"/usr.bin.{loupe,ristretto,file-roller,xarchiver,featherpad,mat2,metadata-cleaner,gimp,keepassxc,kleopatra}; do
   grep -q 'abstractions/audio' "$f" && bad "$(basename "$f"): sound access" || ok "$(basename "$f"): no sound access"; done

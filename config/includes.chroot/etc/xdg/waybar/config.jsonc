@@ -35,7 +35,7 @@
     "format": "Volume {volume}%",
     "format-muted": "Muted",
     "scroll-step": 5,
-    "max-volume": 150,
+    "max-volume": 100,
     "on-click": "prestium-run pavucontrol",
     "on-click-right": "/usr/local/bin/prestium-media-key mute"
   },
@@ -47,7 +47,7 @@
     "tooltip-format": "{timeTo}"
   },
   "clock": {
-    "format": "{:%a %d %b  %H:%M}",
+    "format": "{:%a %d %b  %H:%M} UTC",
     "tooltip-format": "{:%A %Y-%m-%d}  (UTC; Prestium keeps the clock in UTC)",
     "timezone": "Etc/UTC"
   }

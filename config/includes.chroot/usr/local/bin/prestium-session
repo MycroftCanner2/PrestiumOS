@@ -8,6 +8,8 @@ export MOZ_ENABLE_WAYLAND=1 GDK_BACKEND=wayland,x11 QT_QPA_PLATFORM='wayland;xcb
        ELECTRON_OZONE_PLATFORM_HINT=wayland QT_WAYLAND_DISABLE_WINDOWDECORATION=1
 # 2.1: one dark look: Qt 5 and 6 apps use adwaita-qt's dark style, like GTK's Adwaita-dark
 export QT_STYLE_OVERRIDE=Adwaita-Dark
+# 2.1: one cursor theme and size for labwc, Qt and GTK
+export XCURSOR_THEME=Adwaita XCURSOR_SIZE=24
 unset DISPLAY
 # 2.1: in a virtual machine labwc draws with wlroots' software renderer (pixman) instead of
 # OpenGL ES. VM graphics (virtio-gpu, QXL, VMware SVGA, VirtualBox) are emulated or software GL

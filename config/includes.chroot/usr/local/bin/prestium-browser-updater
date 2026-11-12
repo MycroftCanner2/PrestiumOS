@@ -2,7 +2,7 @@
 # Prestium 2.1: Browser Updater (Network menu, after the Tor Connection Assistant).
 # Installs the latest publisher-signed Tor Browser or I2P Browser (LibreWolf) in place of the copy on
 # the USB image, for this session. The user picks the transport per update: "Update using Tor" (Tor's
-# SOCKS port, a fresh SOCKS username per update, so its own circuits) or "Update using I2P OutProxy"
+# SOCKS port, a fresh SOCKS username per update, so its own circuits) or "Update using I2P outproxy"
 # (i2pd's HTTP proxy 127.0.0.1:4444 and its outproxy, which sees the host names). Nothing is fetched
 # when the window opens. The download and the first signature check run as the user
 # (/usr/local/lib/prestium/browser_update.py); the root helper /usr/local/sbin/prestium-browser-install
@@ -29,7 +29,7 @@ INTRO = ("This installs the latest publisher-signed build of a browser in place 
          "persistence, an update lasts only for this session and stays in RAM until Reset or reboot. "
          "Reset to shipped copy brings back the original from the USB image. If a browser does not "
          "start after an update, press Reset to shipped copy.")
-I2P_HELP = ("I2P OutProxy: the download goes through I2P's configured outproxy, which can see which site "
+I2P_HELP = ("I2P outproxy: the download goes through I2P's configured outproxy, which can see which site "
             "is contacted. Update using Tor does not use the outproxy.")
 
 
@@ -93,7 +93,7 @@ class Section:
         self.ram.set_text(bu.ram_note(name))
         bb = Gtk.Box(spacing=6)
         self.tor_btn = Gtk.Button(label="Update using Tor")
-        self.i2p_btn = Gtk.Button(label="Update using I2P OutProxy")
+        self.i2p_btn = Gtk.Button(label="Update using I2P outproxy")
         self.tor_btn.connect("clicked", lambda *_: win.start_update(name, "tor"))
         self.i2p_btn.connect("clicked", lambda *_: win.start_update(name, "i2p"))
         bb.pack_start(self.tor_btn, False, False, 0)
@@ -105,6 +105,10 @@ class Section:
         self.reset_btn.connect("clicked", lambda *_: win.start_reset(name))
         self.cancel_btn = Gtk.Button(label="Cancel")
         self.cancel_btn.connect("clicked", lambda *_: win.cancel_job())
+        # 2.1: keyboard mnemonics (Alt+T, Alt+I, Alt+R, Alt+C)
+        for b_, t_ in ((self.tor_btn, "Update using _Tor"), (self.i2p_btn, "Update using _I2P outproxy"),
+                       (self.reset_btn, "_Reset to shipped copy"), (self.cancel_btn, "_Cancel")):
+            b_.set_label(t_); b_.set_use_underline(True)
         rb.pack_start(self.reset_btn, False, False, 0)
         rb.pack_end(self.cancel_btn, False, False, 0)
         self.progress = Gtk.ProgressBar(show_text=True)
@@ -150,6 +154,7 @@ class Section:
 class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Browser Updater")
+        self.set_icon_name("system-software-update")
         ww, wh = workarea()
         self.set_default_size(min(640, ww - 16), min(700, wh - 40))
         self.connect("realize", lambda *_: self.fit_screen())
@@ -203,7 +208,7 @@ class Window(Gtk.ApplicationWindow):
         box.pack_start(self.details, False, False, 0)
 
         bb = Gtk.Box(spacing=6)
-        close = Gtk.Button(label="Close"); close.connect("clicked", lambda *_: self.close())
+        close = Gtk.Button(label="C_lose", use_underline=True); close.connect("clicked", lambda *_: self.close())
         bb.pack_end(close, False, False, 0)
         outer.pack_start(bb, False, False, 0)
         self.connect("delete-event", self.on_delete)

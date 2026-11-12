@@ -5,6 +5,9 @@ adwaita-icon-theme
 # 2.1: Qt 5 and 6 apps in the same dark Adwaita look (QT_STYLE_OVERRIDE=Adwaita-Dark)
 adwaita-qt
 adwaita-qt6
+# 2.1: dark GTK 2 theme (Pidgin) and full-colour icons the Prestium icon theme inherits (menu icons)
+gnome-themes-extra
+adwaita-icon-theme-legacy
 alsa-topology-conf
 alsa-ucm-conf
 apparmor
@@ -47,6 +50,8 @@ dbus-system-bus-common
 dbus-user-session
 dconf-gsettings-backend
 dconf-service
+# 2.1: dconf update compiles the system db (desktop look, dark mode)
+dconf-cli
 deb.torproject.org-keyring
 debconf
 debian-archive-keyring

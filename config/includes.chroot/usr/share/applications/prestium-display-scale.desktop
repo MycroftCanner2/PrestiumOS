@@ -1,0 +1,8 @@
+[Desktop Entry]
+# 2.1: panel name and icon for this window (app_id prestium-display-scale)
+Type=Application
+Name=Display Scale
+Exec=/usr/local/bin/prestium-display-scale
+Icon=preferences-desktop-display
+NoDisplay=true
+StartupWMClass=prestium-display-scale

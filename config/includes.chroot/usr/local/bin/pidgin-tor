@@ -1,7 +1,7 @@
 #!/bin/sh
 # Prestium: start Pidgin only when Tor SOCKS is up; global proxy is SOCKS5 127.0.0.1:9050 (prefs.xml)
 if ! systemctl is-active -q tor@default 2>/dev/null && ! systemctl is-active -q tor 2>/dev/null; then
-  notify-send "Pidgin" "Tor is not running - Pidgin not started." 2>/dev/null; exit 1
+  notify-send -a Pidgin -i dialog-error "Pidgin" "Tor is not running - Pidgin not started." 2>/dev/null; exit 1
 fi
 unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY
 exec /usr/bin/pidgin "$@"

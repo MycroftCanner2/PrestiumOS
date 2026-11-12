@@ -1,0 +1,8 @@
+[Desktop Entry]
+# Prestium 2.1: panel name and icon for the Tor Monitor window (foot --app-id=prestium-nyx)
+Type=Application
+Name=Tor Monitor (Nyx)
+Exec=foot --title="Tor Monitor (Nyx)" --app-id=prestium-nyx prestium-nyx -s /run/onion-grater/control
+Icon=utilities-system-monitor
+NoDisplay=true
+StartupWMClass=prestium-nyx

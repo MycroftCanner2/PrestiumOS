@@ -14,7 +14,7 @@ while [ ! -s "$D/virt" ]; do
   sleep 5; n=$((n + 5))
 done
 virt=$(head -c 40 "$D/virt" | tr -cd 'a-z0-9_-')
-notify-send -u normal -t 0 "Prestium is running in a virtual machine${virt:+ ($virt)}" \
+notify-send -a "Prestium VM" -i dialog-warning -u normal -t 0 "Prestium is running in a virtual machine${virt:+ ($virt)}" \
   "The host operating system and the virtualization software can see and record everything you do in Prestium: what you type, what is on screen, and the network traffic before it is encrypted. Use a virtual machine only on a computer you trust. Nothing you do here is hidden from the host." 2>/dev/null
 last=
 t=0
@@ -23,11 +23,11 @@ while [ "$t" -lt "$LIFE" ]; do
     cur=$(head -c 1500 "$D/network" | esc)
     if [ "$cur" != "$last" ]; then
       last=$cur
-      notify-send -u critical -t 0 "Prestium: network problem in the virtual machine" "$cur" 2>/dev/null
+      notify-send -a "Prestium VM" -i network-error -u critical -t 0 "Prestium: network problem in the virtual machine" "$cur" 2>/dev/null
     fi
   elif [ -n "$last" ]; then
     last=
-    notify-send -u normal "Prestium: network OK" "Tor and I2P are connected." 2>/dev/null
+    notify-send -a "Prestium VM" -i network-transmit-receive -u normal "Prestium: network OK" "Tor and I2P are connected." 2>/dev/null
   fi
   sleep "$POLL"; t=$((t + POLL))
 done

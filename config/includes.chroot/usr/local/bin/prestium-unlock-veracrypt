@@ -12,7 +12,7 @@
 #   prestium-unlock-veracrypt --lock     unmount and lock every unlocked volume
 #   prestium-unlock-veracrypt --cli ...  no dialogs (for testing):
 #        --cli FILE_OR_DEVICE  (password on stdin)  [--pim N] [--hidden] [--system] [--keyfile F]...
-import os, subprocess, sys
+import html, os, subprocess, sys
 import gi
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib
@@ -58,14 +58,14 @@ def info(msg):
     if CLI:
         print(msg)
     else:
-        subprocess.run(["zenity", "--title", TITLE, "--info", "--no-wrap", "--text", msg])
+        subprocess.run(["zenity", "--title", TITLE, "--info", "--no-markup", "--width", "460", "--text", msg])
 
 
 def fail(msg):
     if CLI:
         print("ERROR: " + msg, file=sys.stderr)
     else:
-        subprocess.run(["zenity", "--title", TITLE, "--error", "--no-wrap", "--text", msg])
+        subprocess.run(["zenity", "--title", TITLE, "--error", "--no-markup", "--width", "460", "--text", msg])
     sys.exit(1)
 
 
@@ -187,7 +187,7 @@ def main():
         what = zen("--list", "--radiolist", "--width", "460", "--height", "260",
                    "--text", "What do you want to unlock?", "--column", "", "--column", "Volume",
                    "TRUE", "A VeraCrypt file container", "FALSE", "A VeraCrypt partition or drive",
-                   "FALSE", "Lock all unlocked volumes")
+                   "FALSE", "Lock unlocked volumes")
         if what.startswith("Lock"):
             return lock_all()
         if what.startswith("A VeraCrypt file"):
@@ -200,7 +200,7 @@ def main():
                          "Choose the partition:", "--column", "Device", "--column", "Size", *rows)
         if not target:
             return
-    form = zen("--forms", "--width", "420", "--text", os.path.basename(target),
+    form = zen("--forms", "--width", "420", "--text", html.escape(os.path.basename(target), quote=False),
                "--add-password", "Password", "--add-entry", "PIM (leave empty if none)",
                "--add-combo", "Volume type", "--combo-values", "Standard|Hidden|Windows system",
                "--add-combo", "Keyfiles", "--combo-values", "No|Yes", "--separator", "\x1f")
@@ -214,7 +214,7 @@ def main():
     m = unlock(target, pw, int(pim or 0), vt == "Hidden", vt == "Windows system", keyfiles)
     if m:
         subprocess.Popen(["pcmanfm", m], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        info("Unlocked and opened at %s.\nUse \"Lock all unlocked volumes\" when you're done." % m)
+        info("Unlocked and opened at %s.\nUse \"Lock unlocked volumes\" in Unlock Encrypted Volume when you're done." % m)
 
 
 main()

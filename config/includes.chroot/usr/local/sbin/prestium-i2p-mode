@@ -32,6 +32,7 @@ PORTFILE = _test_env("PRESTIUM_I2PD_PORTFILE", "/run/prestium/i2pd.port")
 LOCK = _test_env("PRESTIUM_I2P_LOCK", "/run/prestium-hops.lock")   # shared with prestium-tunnel-hops
 PROXY_PORT = int(_test_env("PRESTIUM_I2P_PROXY_PORT", "4444"))
 WAIT = int(_test_env("PRESTIUM_I2P_WAIT", "60"))
+I2PD_UID = int(_test_env("PRESTIUM_I2PD_UID", "2000"))   # i2pd's fixed uid (hook 0100)
 
 ACETONE = "proxy4uwdijqxac2bvdx4fuhem6njmiwukuk2gelejv2nzxka2xq.b32.i2p"
 STORMY = "5d4s7pcvfdpftfk7npc7hllyujhufsdprtrf4o53i44rgsa2xbwa.b32.i2p"   # exit.stormycloud.i2p
@@ -168,7 +169,10 @@ def listening():
     try:
         with open("/proc/net/tcp") as f:
             next(f)
-            return any(l.split()[1] == want and l.split()[3] == "0A" for l in f)
+            # review of 8f5b9ce (N-3): the listener must be i2pd's (uid field), so another process
+            # binding 4444 while i2pd restarts can't make a bad configuration look good
+            return any(l.split()[1] == want and l.split()[3] == "0A" and l.split()[7] == str(I2PD_UID)
+                       for l in f)
     except (OSError, StopIteration, IndexError):
         return False
 
@@ -219,13 +223,18 @@ def main():
             try: safe_write(name, text)
             except OSError: pass
         die("%s; previous settings restored" % e)
-    subprocess.run([SYSTEMCTL, "restart", "i2pd"])
-    if proxy_up():
+    # review of 8f5b9ce (N-4): the restart's result counts, and a failed rollback is reported, not a traceback
+    r = subprocess.run([SYSTEMCTL, "restart", "i2pd"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    if r.returncode == 0 and proxy_up():
         print(json.dumps(dict(state(tun2, main2), ok=True)))
         return 0
-    safe_write("tunnels.conf", tun); safe_write("i2pd.conf", main_)
-    subprocess.run([SYSTEMCTL, "restart", "i2pd"])
-    die("i2pd did not come back with the new settings, so the previous settings were restored")
+    why = "i2pd did not restart" if r.returncode else "i2pd did not come back with the new settings"
+    try:
+        safe_write("tunnels.conf", tun); safe_write("i2pd.conf", main_)
+    except OSError as e:
+        die("%s, and restoring the previous settings failed (%s); restart Prestium" % (why, e))
+    subprocess.run([SYSTEMCTL, "restart", "i2pd"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    die("%s, so the previous settings were restored" % why)
 
 if __name__ == "__main__":
     sys.exit(main())

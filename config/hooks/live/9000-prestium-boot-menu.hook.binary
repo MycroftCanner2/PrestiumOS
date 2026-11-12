@@ -1,9 +1,15 @@
 #!/bin/sh
-# Prestium 2.1: boot menu labels ("Prestium 2.1" instead of live-build's "Live system (amd64)")
+# Prestium 2.1: boot menu labels ("Prestium 2.1" instead of live-build's "Live system (amd64)").
+# The version comes from the image's os-release (hook 0400 writes VERSION_ID), so a bump can't leave stale
+# labels; the bootloader templates say @PRESTIUM_VERSION@.
+V=$(. ../chroot/etc/os-release 2>/dev/null && printf %s "$VERSION_ID")
+[ -n "$V" ] || V=$(sed -n 's/^VERSION=//p' ../config/hooks/live/0400-prestium-system.hook.chroot 2>/dev/null | head -1)
+[ -n "$V" ] || { echo "E: Prestium version not found for the boot menu"; exit 1; }
 for f in boot/grub/*.cfg isolinux/*.cfg; do
 	[ -f "$f" ] || continue
-	sed -i -e 's/Live system (amd64 fail-safe mode)/Prestium 2.1 (nomodeset)/g' \
-	       -e 's/Live system (amd64)/Prestium 2.1/g' -e 's/Live system (autodetect)/Prestium 2.1/g' "$f"
+	sed -i -e "s/Live system (amd64 fail-safe mode)/Prestium $V (nomodeset)/g" \
+	       -e "s/Live system (amd64)/Prestium $V/g" -e "s/Live system (autodetect)/Prestium $V/g" \
+	       -e "s/@PRESTIUM_VERSION@/$V/g" "$f"
 done
 # boot the default entry after 3 seconds, as earlier releases did (live-build leaves both menus waiting forever)
 [ -f isolinux/isolinux.cfg ] && sed -i -e 's/^timeout 0$/timeout 30/' isolinux/isolinux.cfg

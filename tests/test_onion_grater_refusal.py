@@ -78,7 +78,7 @@ stop.set()
 
 # Nyx: the menu runs the launcher; the launcher waits for Enter only when Nyx fails
 menu = open(os.path.join(I, "etc/xdg/labwc/menu.xml")).read()
-(ok if 'command="prestium-run foot prestium-nyx -s /run/onion-grater/control"' in menu else bad)(
+(ok if re.search(r'command="prestium-run foot [^"]*prestium-nyx -s /run/onion-grater/control"', menu) else bad)(
     "menu: Tor Monitor (Nyx) runs prestium-nyx in foot")
 L = os.path.join(I, "usr/local/bin/prestium-nyx")
 (ok if os.access(L, os.X_OK) else bad)("prestium-nyx is executable")

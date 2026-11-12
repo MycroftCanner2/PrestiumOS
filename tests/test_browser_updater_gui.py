@@ -174,7 +174,7 @@ class TestWindow(unittest.TestCase):
         self.assertEqual(list(self.w.sections), ["tor-browser", "librewolf"])
         s = self.w.sections["tor-browser"]
         self.assertEqual(s.tor_btn._label, "Update using Tor")
-        self.assertEqual(s.i2p_btn._label, "Update using I2P OutProxy")
+        self.assertEqual(s.i2p_btn._label, "Update using I2P outproxy")
         self.assertEqual(s.reset_btn._label, "Reset to shipped copy")
         self.assertIn("RAM", s.ram.get_text())
         self.assertIn("outproxy", s.help.get_text())

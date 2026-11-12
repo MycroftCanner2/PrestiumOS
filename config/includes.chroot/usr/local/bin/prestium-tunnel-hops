@@ -16,11 +16,17 @@ req=$(python3 -I -c '
 import json, sys
 s = json.loads(sys.argv[1])
 if not s.get("ok"): sys.exit("cannot read the current settings: %s" % s.get("error"))
-print(json.dumps({"hops": int(sys.argv[2]), "share": s.get("share") or "low",
+# review of 8f5b9ce (N-5): keep the current settings or refuse; never reset them silently
+if not s.get("share"): sys.exit("the share level was set by hand; set it in the I2P Connection Assistant first")
+if s.get("outproxy") == "custom" and not s.get("custom"): sys.exit("the outproxy was set by hand; set it in the I2P Connection Assistant first")
+print(json.dumps({"hops": int(sys.argv[2]), "share": s["share"],
                   "outproxy": s.get("outproxy") or "acetone", "custom": s.get("custom") or ""}))' "$cur" "$N")
-out=$(printf '%s' "$req" | "${H[@]}" apply) && rc=0 || rc=$?
+# 2.1 (review N-2): as the user, the change goes through the broker's confirmation dialog
+if [ "$(id -u)" -eq 0 ]; then out=$(printf '%s' "$req" | "${H[@]}" apply) && rc=0 || rc=$?
+else out=$(/usr/local/bin/prestium-wl i2p-apply "$req") && rc=0 || rc=$?; out=${out#ok }; fi
 python3 -I -c '
 import json, sys
-s = json.loads(sys.argv[1].splitlines()[-1])
+try: s = json.loads(sys.argv[1].splitlines()[-1])
+except (ValueError, IndexError): s = {"ok": False, "error": sys.argv[1].strip()[6:] or "no answer"}
 print("Hop count set to %d; i2pd restarted." % s["hops"] if s.get("ok") else "Not applied: %s" % s.get("error"))' "$out" || true
 exit "$rc"

@@ -12,10 +12,10 @@ Note: mat2 can't remove information inside the content itself (e.g. faces, text,
 	[ -n "$out" ] && msg="$msg
 
 $out"
-	zenity --info --no-markup --title="Remove metadata" --text="$msg" 2>/dev/null || notify-send "Remove metadata" "Done: cleaned copies written."
+	zenity --info --no-markup --title="Remove metadata" --text="$msg" 2>/dev/null || notify-send -a "Metadata Cleaner" -i edit-clear "Remove metadata" "Done: cleaned copies written."
 else
 	zenity --error --no-markup --title="Remove metadata" --text="mat2 could not clean every file:
 
-$(printf '%s' "$out" | tail -n 15)" 2>/dev/null || notify-send "Remove metadata" "mat2 failed"
+$(printf '%s' "$out" | tail -n 15)" 2>/dev/null || notify-send -a "Metadata Cleaner" -i dialog-error "Remove metadata" "mat2 failed"
 fi
 exit $rc

@@ -33,7 +33,7 @@ cat > "$P/index.theme" <<EOF
 [Icon Theme]
 Name=Prestium
 Comment=Adwaita with full-colour audio icons for the panel tray
-Inherits=Adwaita,AdwaitaLegacy,hicolor
+Inherits=Adwaita,AdwaitaLegacy,gnome,hicolor
 Directories=$dirs
 $sect
 EOF

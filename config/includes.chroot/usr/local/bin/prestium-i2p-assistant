@@ -7,7 +7,7 @@
 #   - outproxy: Acetone (default), StormyCloud, or a custom I2P address (HTTP only; the SOCKS
 #     outproxy on 127.0.0.1:4500 then stays on Acetone)
 #   - reseed from StormyCloud over Tor, or from a .su3 file (prestium-i2p-reseed-gui)
-#   - Apply writes the settings and restarts i2pd; Reboot is at the bottom.
+#   - Apply writes the settings and restarts i2pd; Restart (the computer) is at the bottom.
 # All changes go through the root helper /usr/local/sbin/prestium-i2p-mode (sudo, a JSON request
 # on stdin that the helper checks again). The live settings are always read back from i2pd's files.
 # Opening the assistant changes nothing.
@@ -20,6 +20,9 @@ APP_ID = "org.prestium.I2PConnectionAssistant"   # matches its .desktop file (pa
 HELPER = ["/usr/bin/sudo", "-n", "/usr/local/sbin/prestium-i2p-mode"]
 RESEED = "/usr/local/bin/prestium-i2p-reseed-gui"
 REBOOT = ["/usr/bin/sudo", "-n", "/usr/bin/systemctl", "reboot"]
+# 2.1 (review N-2): Apply goes through the Wayland broker, which shows the change in a dialog only the
+# person at the screen can answer, then runs the helper as root
+BROKER_APPLY = ["/usr/local/bin/prestium-wl", "i2p-apply"]
 SHARES = [("low", "Low: 30 % of 32 KB/s (default)"), ("medium", "Medium: 50 % of 64 KB/s"),
           ("high", "High: 80 % of 128 KB/s")]
 OUTPROXIES = [("acetone", "Acetone (default)"), ("stormycloud", "StormyCloud"), ("custom", "Custom")]
@@ -33,8 +36,19 @@ def custom_ok(url):
 
 def helper(cmd, request=None):
     try:
-        r = subprocess.run(HELPER + [cmd], input=json.dumps(request) if request else "",
-                           capture_output=True, text=True, timeout=180)
+        if cmd == "apply":
+            r = subprocess.run(BROKER_APPLY + [json.dumps(request)], capture_output=True, text=True, timeout=700)
+            out = r.stdout.strip()
+            if out.startswith("ok "):
+                try:
+                    return json.loads(out[3:])
+                except ValueError:
+                    pass
+            if out == "error cancelled":
+                return {"ok": False, "error": "cancelled in the confirmation dialog"}
+            return {"ok": False, "error": (out[6:] if out.startswith("error ") else r.stderr.strip()
+                                          or "the broker gave no answer")[-300:]}
+        r = subprocess.run(HELPER + [cmd], input="", capture_output=True, text=True, timeout=60)
     except (OSError, subprocess.TimeoutExpired) as e:
         return {"ok": False, "error": str(e)}
     for line in reversed(r.stdout.splitlines()):
@@ -73,7 +87,7 @@ class Assistant(Gtk.ApplicationWindow):
         self.status = Gtk.Label(xalign=0); box.pack_start(self.status, False, False, 0)
         row = Gtk.Box(spacing=8)
         self.port = Gtk.Label(xalign=0, selectable=True)
-        copy = Gtk.Button(label="Copy"); copy.connect("clicked", self.copy_port)
+        copy = Gtk.Button(label='C_opy', use_underline=True); copy.connect("clicked", self.copy_port)
         row.pack_start(self.port, True, True, 0); row.pack_end(copy, False, False, 0)
         box.pack_start(row, False, False, 0)
         box.pack_start(hint("The port is chosen at random every time i2pd starts."), False, False, 0)
@@ -105,9 +119,11 @@ class Assistant(Gtk.ApplicationWindow):
         self.custom_hint = hint(""); box.pack_start(self.custom_hint, False, False, 0)
 
         bb = Gtk.Box(spacing=8)
-        self.revert = Gtk.Button(label="Revert"); self.revert.connect("clicked", lambda *_: self.show(self.current))
-        self.apply = Gtk.Button(label="Apply and restart I2P"); self.apply.connect("clicked", self.do_apply)
+        self.revert = Gtk.Button(label='Re_vert', use_underline=True); self.revert.connect("clicked", lambda *_: self.show(self.current))
+        self.apply = Gtk.Button(label='_Apply and restart I2P', use_underline=True); self.apply.connect("clicked", self.do_apply)
         self.apply.get_style_context().add_class("suggested-action")
+        # 2.1: Enter applies (default button; Enter in the custom address field too)
+        self.apply.set_can_default(True); self.set_default(self.apply); self.custom.set_activates_default(True)
         bb.pack_end(self.apply, False, False, 0); bb.pack_end(self.revert, False, False, 0)
         box.pack_start(bb, False, False, 4)
         pb = Gtk.Box(spacing=8)
@@ -119,13 +135,13 @@ class Assistant(Gtk.ApplicationWindow):
         box.pack_start(heading("Reseed"), False, False, 0)
         box.pack_start(hint("Get a fresh list of I2P routers if i2pd can't find peers."), False, False, 0)
         rb = Gtk.Box(spacing=8)
-        r1 = Gtk.Button(label="Refresh reseed (via Tor)"); r1.connect("clicked", lambda *_: self.spawn([RESEED]))
-        r2 = Gtk.Button(label="Reseed from file…"); r2.connect("clicked", lambda *_: self.spawn([RESEED, "--manual"]))
+        r1 = Gtk.Button(label='Refresh reseed (via _Tor)', use_underline=True); r1.connect("clicked", lambda *_: self.spawn([RESEED]))
+        r2 = Gtk.Button(label='Reseed from _file…', use_underline=True); r2.connect("clicked", lambda *_: self.spawn([RESEED, "--manual"]))
         rb.pack_start(r1, False, False, 0); rb.pack_start(r2, False, False, 0)
         box.pack_start(rb, False, False, 0)
         box.pack_start(Gtk.Separator(), False, False, 4)
 
-        rbt = Gtk.Box(); reboot = Gtk.Button(label="Reboot…"); reboot.connect("clicked", self.do_reboot)
+        rbt = Gtk.Box(); reboot = Gtk.Button(label='_Restart…', use_underline=True); reboot.connect("clicked", self.do_reboot)
         reboot.get_style_context().add_class("destructive-action")
         rbt.pack_end(reboot, False, False, 0); box.pack_end(rbt, False, False, 0)
 
@@ -198,7 +214,7 @@ class Assistant(Gtk.ApplicationWindow):
 
     def do_apply(self, *_):
         req = self.wanted()
-        self.set_busy(True, "Writing settings, restarting i2pd and waiting for the browser proxy…")
+        self.set_busy(True, "Confirm the change in the dialog. Then i2pd restarts and the browser proxy comes back…")
         self.run(lambda: helper("apply", req), self.applied)
 
     def applied(self, st):
@@ -219,9 +235,9 @@ class Assistant(Gtk.ApplicationWindow):
 
     def do_reboot(self, *_):
         d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION,
-                              buttons=Gtk.ButtonsType.NONE, text="Reboot now?")
+                              buttons=Gtk.ButtonsType.NONE, text="Restart the computer now?")
         d.format_secondary_text("Open windows will close.")
-        d.add_button("_Cancel", Gtk.ResponseType.CANCEL); d.add_button("_Reboot", Gtk.ResponseType.OK)
+        d.add_button("_Cancel", Gtk.ResponseType.CANCEL); d.add_button("_Restart", Gtk.ResponseType.OK)
         r = d.run(); d.destroy()
         if r == Gtk.ResponseType.OK:
             subprocess.Popen(REBOOT, start_new_session=True)

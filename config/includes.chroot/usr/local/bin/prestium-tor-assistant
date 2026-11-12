@@ -230,6 +230,7 @@ class ControlMonitor(threading.Thread):
 class Assistant(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Tor Connection Assistant")
+        self.set_icon_name("network-wired")
         # never larger than the screen minus the taskbar and the title bar (fits 1024x768 and 1366x768);
         # content that does not fit scrolls instead of growing the window
         ww, wh = workarea()
@@ -314,11 +315,13 @@ class Assistant(Gtk.ApplicationWindow):
         box.pack_start(self.details, False, False, 0)
 
         bb = Gtk.Box(spacing=6)
-        self.apply_btn = Gtk.Button(label="Apply and connect"); self.apply_btn.connect("clicked", self.on_apply)
-        self.cancel_btn = Gtk.Button(label="Cancel"); self.cancel_btn.connect("clicked", self.on_cancel)
-        self.reconnect_btn = Gtk.Button(label="Reconnect"); self.reconnect_btn.connect("clicked", self.on_reconnect)
+        self.apply_btn = Gtk.Button(label='_Apply and connect', use_underline=True); self.apply_btn.connect("clicked", self.on_apply)
+        # 2.1: the primary button is highlighted and is the default (Enter)
+        self.apply_btn.get_style_context().add_class("suggested-action"); self.apply_btn.set_can_default(True); self.set_default(self.apply_btn)
+        self.cancel_btn = Gtk.Button(label='_Cancel', use_underline=True); self.cancel_btn.connect("clicked", self.on_cancel)
+        self.reconnect_btn = Gtk.Button(label='_Reconnect', use_underline=True); self.reconnect_btn.connect("clicked", self.on_reconnect)
         self.reconnect_btn.set_tooltip_text("Restart Tor with the current settings (new connections)")
-        close = Gtk.Button(label="Close"); close.connect("clicked", lambda *_: self.close())
+        close = Gtk.Button(label='C_lose', use_underline=True); close.connect("clicked", lambda *_: self.close())
         bb.pack_start(self.apply_btn, False, False, 0)
         bb.pack_start(self.cancel_btn, False, False, 0)
         bb.pack_start(self.reconnect_btn, False, False, 0)

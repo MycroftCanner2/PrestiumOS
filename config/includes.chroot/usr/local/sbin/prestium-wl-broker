@@ -22,6 +22,8 @@ start in turn is restricted again. Requests (one line on /run/prestium-wl/broker
   panel              start the panel, notifications, wallpaper and idle lock (once per session)
   lock               lock the screen (swaylock); answers when the lock is in place
   set-password       the first session password, asked in a dialog on the full socket (2.1, audit L-2)
+  i2p-apply JSON     I2P hops, share level and outproxy: the person confirms in a dialog on the full
+                     socket, then the broker runs prestium-i2p-mode apply as root (2.1, review N-2)
   osk                toggle the on-screen keyboard (wvkbd)
   display-settings   output settings (wdisplays)
   scale              apply ~/.config/prestium/scale to every output (wlr-randr)
@@ -55,6 +57,10 @@ SESSION_PASSWORD = "/usr/local/sbin/prestium-session-password"
 PW_TEXT = ("Set a password to lock the screen.\nYou'll need it to unlock the screen and for administration "
            "prompts.\nUse at least 8 characters; a few unrelated words are best.\nIt lasts until you shut down.")
 UID_MIN, UID_MAX = 1000, 60000      # login users (login.defs UID_MIN..UID_MAX)
+I2P_MODE = _test_env("PRESTIUM_WL_I2P_MODE", "/usr/local/sbin/prestium-i2p-mode")
+I2P_SHARE = {"low": "Low", "medium": "Medium", "high": "High"}
+I2P_OUTPROXY = {"acetone": "Acetone", "stormycloud": "StormyCloud", "custom": "Custom"}
+I2P_CUSTOM_CHARS = re.compile(r"\A[A-Za-z0-9.:/-]{1,300}\Z")
 ETC = _test_env("PRESTIUM_WL_ETC", "/etc/xdg")          # override: tests only
 
 def log(msg, crit=False):
@@ -142,6 +148,7 @@ class Session:
         self.labwc = None; self.labwc_start = None
         self.ctx_conn = None; self.close_w = None
         self.kids = {}; self.lock = threading.Lock(); self.pw_busy = threading.Lock()
+        self.i2p_busy = threading.Lock()
 
     def alive(self):
         return self.labwc is not None and proc_start(self.labwc) == self.labwc_start
@@ -320,6 +327,64 @@ class Session:
             p1 = p2 = out = None
             self.pw_busy.release()
 
+    def i2p_apply(self, raw):
+        """2.1 (review N-2): I2P settings change only after the person at the screen confirms them. The
+        dialog runs on the compositor's full socket, so no application can draw over it or click it.
+        Before, any process of the user could run "sudo prestium-i2p-mode apply" and silently point the
+        browser's outproxy somewhere else. The helper validates the request again in full; every change
+        is logged and announced."""
+        try:
+            req = json.loads(raw)
+        except ValueError:
+            return "error request is not JSON"
+        if (not isinstance(req, dict) or set(req) - {"hops", "share", "outproxy", "custom"}
+                or type(req.get("hops")) is not int or not 1 <= req["hops"] <= 7
+                or req.get("share") not in I2P_SHARE or req.get("outproxy") not in I2P_OUTPROXY):
+            return "error invalid request"
+        custom = req.get("custom") or ""
+        if req["outproxy"] == "custom" and not (isinstance(custom, str) and I2P_CUSTOM_CHARS.match(custom)):
+            return "error invalid custom outproxy"
+        what = I2P_OUTPROXY[req["outproxy"]] + (": " + custom if req["outproxy"] == "custom" else "")
+        summary = "%d hops, share %s, outproxy %s" % (req["hops"], I2P_SHARE[req["share"]], what)
+        text = ("Apply these I2P settings?\n\nHops per tunnel: %d\nShare level: %s\nOutproxy: %s\n\n"
+                "i2pd restarts, and I2P connections drop for a minute or two."
+                % (req["hops"], I2P_SHARE[req["share"]], what))
+        if req["outproxy"] == "custom":
+            text += "\n\nThis outproxy sees every clearnet site you visit."
+        text += "\n\nIf you didn't just press Apply in the I2P Connection Assistant, choose Cancel."
+        if not self.i2p_busy.acquire(blocking=False):
+            return "error an I2P settings dialog is already open"
+        try:
+            rc, _ = self.spawn(["zenity", "--question", "--no-markup", "--width", "460",
+                                "--title", "I2P Connection Assistant", "--icon", "network-workgroup",
+                                "--ok-label", "Apply", "--cancel-label", "Cancel", "--text", text],
+                               wait=True, timeout=300)
+            if rc != 0:
+                log("uid %d: I2P settings change cancelled at the dialog (%s)" % (self.uid, summary))
+                return "error cancelled"
+            r = subprocess.run([I2P_MODE, "apply"], input=json.dumps(req), capture_output=True,
+                               text=True, timeout=330)
+            st = None
+            for line in reversed(r.stdout.splitlines()):
+                try:
+                    st = json.loads(line); break
+                except ValueError:
+                    continue
+            if not isinstance(st, dict):
+                st = {"ok": False, "error": (r.stderr.strip() or "the helper gave no answer")[-300:]}
+            if st.get("ok"):
+                log("uid %d: I2P settings applied: %s" % (self.uid, summary))
+                try:
+                    self.as_user(["notify-send", "-a", "Prestium", "-i", "network-workgroup",
+                                  "I2P settings changed", summary])
+                except (OSError, subprocess.SubprocessError):
+                    pass
+                return "ok " + json.dumps(st)
+            log("uid %d: I2P settings not applied (%s): %s" % (self.uid, summary, st.get("error")), crit=True)
+            return "error " + str(st.get("error") or "not applied").replace("\n", " ")[:300]
+        finally:
+            self.i2p_busy.release()
+
     def lock_screen(self):
         rc, _ = self.spawn(["swaylock", "-f", "-C", SWAYLOCK_CONF], wait=True, timeout=30)
         return "ok locked" if rc == 0 else "error swaylock exit %d" % rc
@@ -392,7 +457,7 @@ class Handler(socketserver.StreamRequestHandler):
     def handle(self):
         try:
             _pid, uid, _gid = peer_pid(self.request)
-            line = self.rfile.readline(200).decode(errors="replace").strip()
+            line = self.rfile.readline(1024).decode(errors="replace").strip()
             if uid == 0:
                 reply = "error refusing root"
             elif not UID_MIN <= uid <= UID_MAX:
@@ -429,6 +494,8 @@ def dispatch(uid, cmd):
         return s.lock_screen()
     if cmd == "set-password":
         return s.set_password()
+    if cmd.startswith("i2p-apply "):
+        return s.i2p_apply(cmd[len("i2p-apply "):])
     if cmd == "scale":
         return s.scale()
     if cmd in ("screenshot", "screenshot-area"):
@@ -464,7 +531,8 @@ def main():
         os.unlink(BROKER)
     except FileNotFoundError:
         pass
-    old = os.umask(0o111)
+    # review of 8f5b9ce: no moment with the socket open to everyone (0660 before the chown below)
+    old = os.umask(0o117)
     srv = Server(BROKER, Handler)
     os.umask(old)
     # 2.1 (audit of a5fd1fb, L-4): only group "user" (the session and its apps) may connect; system

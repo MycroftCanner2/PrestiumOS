@@ -1,8 +1,9 @@
 [Desktop Entry]
+# 2.1: one entry for every encrypted volume (the file name stays for existing links)
 Type=Application
-Name=Unlock VeraCrypt Volume
-Comment=Open VeraCrypt containers and drives without root
-Exec=/usr/local/bin/prestium-unlock-veracrypt
-Icon=drive-harddisk-encrypted
+Name=Unlock Encrypted Volume
+Comment=Open LUKS, BitLocker, VeraCrypt and TrueCrypt volumes without root
+Exec=/usr/local/bin/prestium-unlock-volume
+Icon=drive-harddisk
 Categories=Utility;Security;
 Terminal=false

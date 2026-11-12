@@ -1,6 +1,18 @@
 #!/bin/sh
-# Prestium 2.0 r10: Reboot/Shut down from the menu, with a confirmation (labwc has no prompt).
-case "$1" in reboot) t="Restart the computer?" ;; poweroff) t="Shut down the computer?" ;;
-  *) echo "usage: prestium-power reboot|poweroff" >&2; exit 2 ;; esac
-prestium-run zenity --question --title Prestium --text "$t" 2>/dev/null || exit 0
-systemctl "$1" || sudo -n systemctl "$1"
+# Prestium 2.0 r10: Restart/Shut Down/Log Out from the menu, with a confirmation (labwc has no prompt).
+# 2.1: named buttons, and the live-system warning
+w="Open windows will close. Prestium is a live system: anything not saved outside it is lost."
+case "$1" in
+  reboot)   ti=Restart;   q="Restart the computer?";  ok=Restart;   ic=system-reboot ;;
+  poweroff) ti="Shut Down"; q="Shut down the computer?"; ok="Shut Down"; ic=system-shutdown ;;
+  logout)   ti="Log Out";  q="Log out?";               ok="Log Out";  ic=system-log-out ;;
+  *) echo "usage: prestium-power reboot|poweroff|logout" >&2; exit 2 ;;
+esac
+prestium-run zenity --question --no-markup --width=420 --title "$ti" --icon "$ic" \
+  --ok-label "$ok" --cancel-label Cancel --text "$q
+
+$w" 2>/dev/null || exit 0
+case "$1" in
+  logout) exec labwc --exit ;;
+  *) systemctl "$1" || sudo -n systemctl "$1" ;;
+esac

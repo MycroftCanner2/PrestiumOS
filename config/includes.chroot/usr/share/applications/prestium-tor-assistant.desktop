@@ -6,4 +6,6 @@ Exec=/usr/local/bin/prestium-tor-assistant
 Icon=network-wired
 Terminal=false
 StartupNotify=true
+# 2.1: the window's app_id, so the panel finds this file's name and icon
+StartupWMClass=org.prestium.TorConnectionAssistant
 Categories=Network;

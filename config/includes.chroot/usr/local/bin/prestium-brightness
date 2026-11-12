@@ -39,7 +39,7 @@ class Win(Gtk.Window):
             box.pack_start(row, False, False, 0)
             box.pack_start(Gtk.Label(label="Device: %s  (keys: brightness up/down)" % self.dev, xalign=0), False, False, 0)
         self.pending = None
-        close = Gtk.Button(label="Close"); close.connect("clicked", lambda *_: self.destroy())
+        close = Gtk.Button(label='C_lose', use_underline=True); close.connect("clicked", lambda *_: self.destroy())
         bb = Gtk.Box(); bb.pack_end(close, False, False, 0); box.pack_start(bb, False, False, 0)
 
     def on_change(self, s):

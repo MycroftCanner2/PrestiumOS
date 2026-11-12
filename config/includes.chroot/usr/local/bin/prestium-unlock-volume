@@ -18,7 +18,7 @@
 #   prestium-unlock-volume --lock-all      lock every unlocked volume
 #   prestium-unlock-volume --cli TARGET [--type auto|luks|bitlocker|veracrypt|truecrypt]
 #        [--pim N] [--hidden] [--system] [--keyfile F]...   (passphrase on stdin; no dialogs)
-import os, subprocess, sys
+import html, os, subprocess, sys
 import gi
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib
@@ -70,14 +70,14 @@ def info(msg):
     if CLI:
         print(msg)
     else:
-        subprocess.run(["zenity", "--title", TITLE, "--info", "--no-wrap", "--text", msg])
+        subprocess.run(["zenity", "--title", TITLE, "--info", "--no-markup", "--width", "460", "--text", msg])
 
 
 def fail(msg):
     if CLI:
         print("ERROR: " + msg, file=sys.stderr)
     else:
-        subprocess.run(["zenity", "--title", TITLE, "--error", "--no-wrap", "--text", msg])
+        subprocess.run(["zenity", "--title", TITLE, "--error", "--no-markup", "--width", "460", "--text", msg])
     sys.exit(1)
 
 
@@ -267,7 +267,7 @@ def candidates():
 
 
 def ask(target):
-    form = zen("--forms", "--width", "460", "--text", os.path.basename(target),
+    form = zen("--forms", "--width", "460", "--text", html.escape(os.path.basename(target), quote=False),
                "--add-password", "Passphrase (or BitLocker recovery key)",
                "--add-combo", "Volume type", "--combo-values", "|".join(TYPES),
                "--add-entry", "VeraCrypt PIM (empty if none)",
@@ -335,7 +335,7 @@ def main():
     m = unlock(target, pw, vt, pim, hidden, system, keyfiles)
     if m:
         subprocess.Popen(["pcmanfm", m], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        info("Unlocked and opened at %s.\nUse \"Lock unlocked volumes\" in Unlock Volume when you're done." % m)
+        info("Unlocked and opened at %s.\nUse \"Lock unlocked volumes\" in Unlock Encrypted Volume when you're done." % m)
 
 
 main()

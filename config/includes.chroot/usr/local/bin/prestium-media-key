@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.0: laptop/multimedia keys (bound in /etc/xdg/openbox/rc.xml) with an on-screen
+# Prestium 2.0: laptop/multimedia keys (bound in /etc/xdg/labwc/rc.xml) with an on-screen
 # notification. Volume through PipeWire (wpctl; pactl as fallback), brightness with brightnessctl
 # (user is in group "video"; the udev rule makes the backlight writable for that group).
 #   prestium-media-key volume-up|volume-down|mute|mic-mute|brightness-up|brightness-down

@@ -19,7 +19,7 @@ SBX_WL_BASE=/run/prestium-wl
 SBX_BWRAP=/usr/bin/bwrap
 
 sbx_fail() {   # $1 title, $2 message
-  notify-send -u critical "$1" "$2" 2>/dev/null
+  notify-send -a Prestium -i dialog-error -u critical "$1" "$2" 2>/dev/null
   echo "$1: $2" >&2
   exit 1
 }

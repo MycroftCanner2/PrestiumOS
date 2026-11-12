@@ -27,14 +27,15 @@ open(os.path.join(T, "port"), "w").write("21437\n")
 def free_port():
     s = socket.socket(); s.bind(("127.0.0.1", 0)); p = s.getsockname()[1]; s.close(); return p
 
-def run(cmd, req=None, listen=True):
+def run(cmd, req=None, listen=True, uid=None):
+    uid = os.getuid() if uid is None else uid
     port = free_port(); srv = None
     if listen:
         srv = socket.socket(); srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind(("127.0.0.1", port)); srv.listen(8)
     env = dict(os.environ, PRESTIUM_I2P_DIR=D, PRESTIUM_SAFEFILE=SAFE, PRESTIUM_SYSTEMCTL=SYSTEMCTL,
                PRESTIUM_I2PD_PORTFILE=os.path.join(T, "port"), PRESTIUM_I2P_LOCK=os.path.join(T, "lock"),
-               PRESTIUM_I2P_PROXY_PORT=str(port), PRESTIUM_I2P_WAIT="3")
+               PRESTIUM_I2P_PROXY_PORT=str(port), PRESTIUM_I2P_WAIT="3", PRESTIUM_I2PD_UID=str(uid))
     r = subprocess.run([sys.executable, "-I", HELPER, cmd], input=req if isinstance(req, str) else json.dumps(req or {}),
                        capture_output=True, text=True, env=env, timeout=60)
     if srv: srv.close()
@@ -106,6 +107,10 @@ rc, out = run("apply", dict(hops=2, share="low", outproxy="acetone"), listen=Fal
 check(rc != 0 and "restored" in (out.get("error") or ""), "proxy not back: refused and restored (%s)" % out.get("error"))
 check(all(open(os.path.join(D, f)).read() == before[f] for f in before), "rollback restored both files exactly")
 
+before = {f: open(os.path.join(D, f)).read() for f in ("tunnels.conf", "i2pd.conf")}
+rc, out = run("apply", dict(hops=4, share="low", outproxy="acetone"), uid=os.getuid() + 1)
+check(rc != 0 and all(open(os.path.join(D, f)).read() == before[f] for f in before),
+      "a listener of another uid on 4444 doesn't count: rolled back (review N-3)")
 rc, st = run("apply", dict(hops=3, share="low", outproxy="acetone"))
 check(rc == 0 and st["share"] == "low" and st["outproxy"] == "acetone" and re.search(r"^bandwidth = L$", open(main).read(), re.M),
       "back to defaults: low (L), Acetone")
@@ -115,8 +120,8 @@ check('INSTALLED = os.path.abspath(sys.argv[0]).startswith("/usr/local/")' in h,
 check("create_connection" not in h and "/proc/net/tcp" in h,
       "readiness from /proc/net/tcp, never a connection (the firewall refuses root on 4444)")
 sud = open(os.path.join(I, "etc/sudoers.d/prestium-i2p-mode")).read()
-check("NOPASSWD: /usr/local/sbin/prestium-i2p-mode status, /usr/local/sbin/prestium-i2p-mode apply\n" in sud,
-      "sudoers: fixed arguments only")
+check("NOPASSWD: /usr/local/sbin/prestium-i2p-mode status\n" in sud and "mode apply" not in sud,
+      "sudoers: status only; apply goes through the broker's confirmation (review N-2)")
 check("tunnel-hops" not in open(os.path.join(I, "etc/sudoers.d/prestium-power")).read().split("\n", 1)[1],
       "sudoers: old tunnel-hops grant removed")
 if shutil.which("visudo"):

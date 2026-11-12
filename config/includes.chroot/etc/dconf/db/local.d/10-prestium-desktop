@@ -1,6 +1,6 @@
 # Prestium 2.0 r10: desktop look under Wayland (GTK reads these; under Openbox xfsettingsd set them)
 [org/gnome/desktop/interface]
-gtk-theme='Adwaita-dark'
+gtk-theme='Adwaita'
 icon-theme='Prestium'
 font-name='Cantarell 10'
 font-antialiasing='grayscale'

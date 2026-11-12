@@ -1,0 +1,4 @@
+# Prestium 2.1: GTK 2 apps (Pidgin) in the dark Adwaita theme from gnome-themes-extra
+gtk-theme-name="Adwaita-dark"
+gtk-icon-theme-name="Prestium"
+gtk-font-name="Cantarell 10"
