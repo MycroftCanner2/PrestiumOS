@@ -126,27 +126,16 @@ INTERPRETER_RE = re.compile(r"\A(python[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node|(ba|
 INVISIBLE = {"\u115f", "\u1160", "\u3164", "\uffa0", "\u2800", "\u180e"}
 
 def printable(text, limit=200):
-    """2.1 (verification N-1): a path may hold newlines, bidi or zero-width characters, or blank fillers;
+    """2.1 (verification N-1): a path may hold newlines, bidi or zero-width characters, combining marks
+    (CGJ, variation selectors) or blank fillers;
     never let it forge dialog lines or hide part of the text."""
-    return "".join(c if c.isprintable() and c not in INVISIBLE and unicodedata.category(c) != "Cf"
+    return "".join(c if c.isprintable() and c not in INVISIBLE and unicodedata.category(c) not in ("Cf", "Mn", "Me")
                    else "?" for c in text)[:limit]
 
-def script_of(exe, argv):
-    """The script an interpreter says it runs: the first argument that isn't an option or an option's value."""
-    py = os.path.basename(exe).startswith("python")
-    i = 0
-    while i < len(argv):
-        a = argv[i]
-        if py and a in (b"-c", b"-m"):
-            return a.decode() if a == b"-c" else "-m " + (argv[i + 1].decode(errors="replace") if i + 1 < len(argv) else "")
-        if not py and a in (b"-c", b"-e"):
-            return a.decode()          # inline code (sh -c, perl -e, node -e): no script file
-        if a.startswith(b"-"):
-            takes = (a in (b"-W", b"-X")) if py else (a in (b"-I", b"-r"))
-            i += 2 if takes else 1
-            continue
-        return a.decode(errors="replace") if a else ""
-    return ""
+def args_of(argv, n=3):
+    """2.1 (verification of 0cdf03c, N-5): an interpreter's first few arguments, cleaned, instead of
+    guessing which one is the script (combined flags like -Ic or -lc defeat any guess)."""
+    return " ".join(printable(a.decode(errors="replace"), 60) for a in [a for a in argv if a][:n])
 
 def describe(pid):
     exe = os.readlink("/proc/%d/exe" % pid)
@@ -154,9 +143,9 @@ def describe(pid):
     if INTERPRETER_RE.match(os.path.basename(exe)):
         with open("/proc/%d/cmdline" % pid, "rb") as f:
             argv = f.read(4096).split(b"\0")[1:]
-        script = script_of(exe, argv)
-        if script:
-            what += " running %s (self-reported)" % printable(script)
+        args = args_of(argv)
+        if args:
+            what += " running %s (self-reported)" % args
     return "%s (pid %d)" % (what, pid)
 
 def requester(pid):
