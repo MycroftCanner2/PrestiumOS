@@ -38,7 +38,7 @@ with an empty, root-owned XDG_CONFIG_HOME/XDG_DATA_HOME and fixed config files, 
 apps can write can't change what they do.
 """
 import array, grp, json, os, pwd, re, signal, socket, socketserver, stat, struct, subprocess
-import sys, syslog, threading, time, unicodedata
+import shlex, sys, syslog, threading, time, unicodedata
 
 def _test_env(name, default, _installed="/usr/local/sbin/prestium-wl-broker"):
     """2.1 (audit I-1): the PRESTIUM_* overrides are for the test suite, which runs this file from the
@@ -125,17 +125,39 @@ INTERPRETER_RE = re.compile(r"\A(python[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node|(ba|
 # characters Python counts as printable that still show as blank (verification of e574474, N-6)
 INVISIBLE = {"\u115f", "\u1160", "\u3164", "\uffa0", "\u2800", "\u180e"}
 
+# never shown, even after a letter: CGJ and the variation selectors
+ALWAYS_HIDDEN = re.compile("[\u034f\ufe00-\ufe0f\U000e0100-\U000e01ef]")
+
 def printable(text, limit=200):
-    """2.1 (verification N-1): a path may hold newlines, bidi or zero-width characters, combining marks
-    (CGJ, variation selectors) or blank fillers;
-    never let it forge dialog lines or hide part of the text."""
-    return "".join(c if c.isprintable() and c not in INVISIBLE and unicodedata.category(c) not in ("Cf", "Mn", "Me")
-                   else "?" for c in text)[:limit]
+    """2.1 (verification N-1, N-6, N-8): a path may hold newlines, bidi or zero-width characters, combining
+    marks or blank fillers; never let it forge dialog lines or hide part of the text. Text is NFC first,
+    so Amélie or Zürich from macOS stays readable, and at most two combining marks may follow a letter or
+    digit (Hindi, Thai, Arabic and Hebrew vowel marks). CGJ, variation selectors, enclosing marks and
+    format characters (emoji joiners) are always replaced. Cut text ends in "…"."""
+    out, marks = [], -1          # marks: combining marks since the last letter/digit, -1 if none allowed
+    for c in unicodedata.normalize("NFC", text):
+        cat = unicodedata.category(c)
+        if cat == "Mn" and 0 <= marks < 2 and not ALWAYS_HIDDEN.match(c):
+            out.append(c); marks += 1
+            continue
+        if not c.isprintable() or c in INVISIBLE or cat in ("Cf", "Mn", "Me") or ALWAYS_HIDDEN.match(c):
+            out.append("?"); marks = -1
+            continue
+        out.append(c)
+        if cat[0] in "LN":
+            marks = 0
+        elif cat != "Mc":        # a spacing vowel sign (Hindi ि) keeps the letter's cluster going
+            marks = -1
+    s = "".join(out)
+    return s if len(s) <= limit else s[:limit - 1] + "…"
 
 def args_of(argv, n=3):
-    """2.1 (verification of 0cdf03c, N-5): an interpreter's first few arguments, cleaned, instead of
-    guessing which one is the script (combined flags like -Ic or -lc defeat any guess)."""
-    return " ".join(printable(a.decode(errors="replace"), 60) for a in [a for a in argv if a][:n])
+    """2.1 (verification of 0cdf03c, N-5, N-9): an interpreter's first few arguments, cleaned and quoted
+    as a shell would show them, instead of guessing which one is the script (combined flags like -Ic or
+    -lc defeat any guess)."""
+    args = [a for a in argv if a]
+    shown = " ".join(shlex.quote(printable(a.decode(errors="replace"), 60)) for a in args[:n])
+    return shown + (" …" if len(args) > n else "")
 
 def describe(pid):
     exe = os.readlink("/proc/%d/exe" % pid)

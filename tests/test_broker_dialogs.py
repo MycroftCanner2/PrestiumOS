@@ -3,7 +3,7 @@
 so no process of the user can press Apply or fill in the password form through AT-SPI; a dialog that
 times out is closed; the I2P dialog names the program that asked. Runs the broker's code with stubs
 (no compositor, no root)."""
-import os, re, runpy, socket, subprocess, sys, threading
+import os, re, runpy, socket, subprocess, sys, threading, unicodedata
 
 H = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SRC = os.path.join(H, "config/includes.chroot/usr/local/sbin/prestium-wl-broker")
@@ -60,14 +60,24 @@ me = req(os.getpid())
 (ok if "running " + sys.argv[0] + " (self-reported)" in me or sys.argv[0] in me else bad)("requester: script path for interpreters (%s)" % me)
 (ok if "\n" not in me else bad)("requester: one line")
 ao = g["args_of"]
-cases = [([b"-I", b"-W", b"ignore", b"x.py", b"more"], "-I -W ignore"),
+cases = [([b"-I", b"-W", b"ignore", b"x.py", b"more"], "-I -W ignore …"),
          ([b"-Ic", b"code", b"x"], "-Ic code x"),
-         ([b"-lc", b"exec x\nfake", b""], "-lc exec x?fake"),
-         ([b"/usr/local/bin/prestium-wl", b"i2p-apply", b"{}", b"x"], "/usr/local/bin/prestium-wl i2p-apply {}"),
-         ([b"a" * 99], "a" * 60)]
+         ([b"-lc", b"exec x\nfake", b""], "-lc 'exec x?fake'"),
+         ([b"one arg with spaces"], "'one arg with spaces'"),
+         ([b"/usr/local/bin/prestium-wl", b"i2p-apply", b"{}"], "/usr/local/bin/prestium-wl i2p-apply '{}'"),
+         ([b"a" * 99], "'" + "a" * 59 + "…'")]
 for argv, want in cases:
     (ok if ao(argv) == want else bad)("args_of %r -> %r (%r)" % (argv, want, ao(argv)))
-(ok if pr("a\u034fb\ufe0fc\u0301d\u20dde") == "a?b?c?d?e" else bad)("printable: CGJ, variation selectors, combining marks replaced")
+(ok if pr("a\u034fb\ufe0fc\u0301d\u20dde") == "a?b?\u0107d?e" else bad)("printable: CGJ, variation selectors, enclosing marks replaced; c+acute composed")
+# N-8: NFC and up to two marks after a letter keep ordinary names readable
+for raw, want in [("Ame\u0301lie/Zu\u0308rich", "Am\u00e9lie/Z\u00fcrich"),
+                  ("\u0939\u093f\u0902\u0926\u0940", "\u0939\u093f\u0902\u0926\u0940"),   # Hindi
+                  ("\u0e01\u0e34\u0e48", "\u0e01\u0e34\u0e48"),                    # Thai, two marks
+                  ("x\u0301\u0302\u0303\u0304", "x\u0301\u0302??"),   # no precomposed x: two marks kept, the rest replaced
+                  (" \u0301", " ?"),
+                  ("a\u200db", "a?b")]:
+    (ok if pr(raw) == want else bad)("printable %r -> %r (%r)" % (raw, want, pr(raw)))
+(ok if pr("a" * 600, 500) == "a" * 499 + "\u2026" else bad)("printable: a cut line ends in an ellipsis")
 (ok if pr("a\u3164b\u200bc\u2800d\u115f") == "a?b?c?d?" else bad)("printable: fillers and zero-width replaced")
 (ok if req(0) == "unknown" and req(10 ** 9) == "unknown" else bad)("requester: unknown pid")
 # a child of this test, so its parent is readable here whoever started the test
