@@ -193,7 +193,7 @@ This is one combined list of everything that changed since the last release, 2.0
   failing with "Unable to connect". Ticking "Remember this key" no longer makes the prompt fail: onion-grater
   drops `Flags=Permanent`, so the key lasts until Tor restarts.
 - **The menu opens in one place.** The Menu button and Super+Space always open it at the bottom-left,
-  just above the button, wherever the pointer moves. Right-clicking the desktop still opens it at the pointer.
+  its bottom edge on the bar above the button, wherever the pointer moves. Right-clicking the desktop still opens it at the pointer.
 - **One title bar per window, one desktop.** Every window gets labwc's title bar, and GTK and
   libadwaita apps no longer draw a second close button in their header bar (`button-layout ':'`).
   The desktop count is now 1 (four desktops had no indicator in the bar).
@@ -202,6 +202,15 @@ This is one combined list of everything that changed since the last release, 2.0
   answer, then logs it and sends a notification. sudo allows only reading the settings. The helper
   also checks that the restarted listener on 4444 belongs to i2pd and reports a failed rollback.
   onion-grater refuses to start without AppArmor.
+- **Broker dialogs can't be answered by other programs (verification V-1, V-2).** The I2P
+  confirmation and the lock-screen password form run with accessibility off (`GTK_A11Y=none`,
+  `NO_AT_BRIDGE=1`). Before, any program of the user could press Apply or fill in the password through
+  the accessibility bus. The I2P dialog also names the program that asked. A dialog that times out now
+  closes instead of staying on screen and doing nothing.
+- **Smaller desktop fixes (verification of 2cb8ec4).** The menu's bottom edge sits on the bar (it
+  opened 34 px above it). With Caps Lock on, keypresses show on the lock screen ring again. Brightness,
+  Feather, IRC, Communication and Restart have menu icons that Debian actually ships. The terminal's
+  red and blue are easier to read on its dark background.
 
 ### Apps
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new

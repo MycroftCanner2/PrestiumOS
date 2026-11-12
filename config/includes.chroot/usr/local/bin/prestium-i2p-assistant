@@ -8,8 +8,10 @@
 #     outproxy on 127.0.0.1:4500 then stays on Acetone)
 #   - reseed from StormyCloud over Tor, or from a .su3 file (prestium-i2p-reseed-gui)
 #   - Apply writes the settings and restarts i2pd; Restart (the computer) is at the bottom.
-# All changes go through the root helper /usr/local/sbin/prestium-i2p-mode (sudo, a JSON request
-# on stdin that the helper checks again). The live settings are always read back from i2pd's files.
+# Apply goes through the Wayland broker (prestium-wl i2p-apply): it shows the values in a
+# confirmation dialog and only then runs the root helper /usr/local/sbin/prestium-i2p-mode, which
+# checks the request again. sudo allows only "prestium-i2p-mode status" (read-only). The live
+# settings are always read back from i2pd's files.
 # Opening the assistant changes nothing.
 import json, re, subprocess, threading
 import gi

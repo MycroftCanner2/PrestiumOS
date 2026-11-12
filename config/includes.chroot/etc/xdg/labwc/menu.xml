@@ -52,7 +52,7 @@
     </item>
   </menu>
   <menu id="/Accessories" label="Accessories" icon="applications-accessories">
-    <item label="Feather Wallet (Monero)" icon="emblem-money">
+    <item label="Feather Wallet (Monero)" icon="security-high">
     <action name="Execute" command="prestium-run feather" />
     </item>
     <item label="Calculator" icon="accessories-calculator">
@@ -81,14 +81,14 @@
     <action name="Execute" command="prestium-run qtqr" />
     </item>
   </menu>
-  <menu id="/Communication" label="Communication" icon="internet-mail">
+  <menu id="/Communication" label="Communication" icon="mail-unread">
     <item label="Gajim XMPP" icon="org.gajim.Gajim">
     <action name="Execute" command="prestium-run gajim" />
     </item>
     <item label="I2P Torrents" icon="folder-download">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-torrents" />
     </item>
-    <item label="IRC (The Lounge)" icon="internet-chat">
+    <item label="IRC (The Lounge)" icon="user-available">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
     </item>
     <item label="Pidgin" icon="pidgin">
@@ -131,7 +131,7 @@
     <item label="Display Scale" icon="preferences-desktop-display">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-display-scale" />
     </item>
-    <item label="Brightness" icon="display-brightness">
+    <item label="Brightness" icon="weather-clear">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-brightness" />
     </item>
     <item label="Touchpad" icon="input-touchpad">
@@ -149,7 +149,7 @@
     </menu>
   </menu>
   <separator />
-  <item label="Restart…" icon="system-reboot">
+  <item label="Restart…" icon="media-playlist-repeat">
     <action name="Execute" command="/usr/local/bin/prestium-power reboot" />
   </item>
   <item label="Shut Down…" icon="system-shutdown">

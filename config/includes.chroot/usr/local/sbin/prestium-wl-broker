@@ -116,6 +116,24 @@ class WlConn:
         self.roundtrip(ev)
         return reg, found
 
+# 2.1 (review V-1): environment for broker dialogs. GTK 4 reads GTK_A11Y, GTK 3's atk-bridge reads NO_AT_BRIDGE.
+DIALOG_ENV = {"GTK_A11Y": "none", "NO_AT_BRIDGE": "1"}
+
+def requester(pid):
+    """The program that sent the request and its parent, from /proc (shown in the I2P dialog; a hint for
+    the person at the screen, not a security check)."""
+    names = []
+    for _ in range(2):
+        if pid <= 1:
+            break
+        try:
+            names.append("%s (pid %d)" % (os.readlink("/proc/%d/exe" % pid), pid))
+            with open("/proc/%d/stat" % pid) as f:
+                pid = int(f.read().rsplit(")", 1)[1].split()[1])
+        except (OSError, ValueError, IndexError):
+            break
+    return ", started by ".join(names) or "unknown"
+
 def peer_pid(sock):
     return struct.unpack("3i", sock.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))
 
@@ -244,6 +262,12 @@ class Session:
             e.update(extra)
         return e
 
+    def dialog(self, argv, capture=False, timeout=300):
+        """2.1 (review V-1): confirmation and password dialogs run with accessibility off. With it on,
+        any process of the user could find the dialog on the AT-SPI bus and press Apply or type into the
+        password fields (GTK 4 exposes a click action and SetTextContents), which would undo N-2 and L-2."""
+        return self.spawn(argv, wait=True, capture=capture, timeout=timeout, extra_env=DIALOG_ENV)
+
     def spawn(self, argv, wait=False, capture=False, timeout=None, key=None, extra_env=None):
         """Run argv as the user with one full-socket connection as WAYLAND_SOCKET."""
         s, _pid = self.connect_full()
@@ -260,7 +284,12 @@ class Session:
         if key:
             self.kids[key] = p
         if wait or capture:
-            out, _ = p.communicate(timeout=timeout)
+            try:
+                out, _ = p.communicate(timeout=timeout)
+            except subprocess.TimeoutExpired:
+                # 2.1 (review V-2): don't leave a dialog on screen that no longer does anything
+                p.kill(); p.communicate()
+                raise
             return p.returncode, (out.decode(errors="replace") if capture else "")
         return p
 
@@ -300,9 +329,9 @@ class Session:
             st = subprocess.run([SESSION_PASSWORD, "status"], capture_output=True, timeout=10)
             if st.stdout.decode(errors="replace").strip() == "set":
                 return "ok already set"
-            rc, out = self.spawn(["zenity", "--forms", "--title", "Lock Screen", "--text", PW_TEXT,
-                                  "--add-password", "Password", "--add-password", "Confirm password",
-                                  "--separator", "\n"], capture=True, timeout=900)
+            rc, out = self.dialog(["zenity", "--forms", "--title", "Lock Screen", "--text", PW_TEXT,
+                                   "--add-password", "Password", "--add-password", "Confirm password",
+                                   "--separator", "\n"], capture=True, timeout=900)
             if rc != 0:
                 return "error cancelled"
             lines = out.split("\n")
@@ -321,13 +350,13 @@ class Session:
                     log("uid %d: session password set from the lock dialog" % self.uid)
                     return "ok set"
                 err = "Could not set the password. The screen was not locked."
-            self.spawn(["zenity", "--error", "--title", "Lock Screen", "--text", err], wait=True, timeout=300)
+            self.dialog(["zenity", "--error", "--no-markup", "--title", "Lock Screen", "--text", err])
             return "error " + err
         finally:
             p1 = p2 = out = None
             self.pw_busy.release()
 
-    def i2p_apply(self, raw):
+    def i2p_apply(self, raw, pid=0):
         """2.1 (review N-2): I2P settings change only after the person at the screen confirms them. The
         dialog runs on the compositor's full socket, so no application can draw over it or click it.
         Before, any process of the user could run "sudo prestium-i2p-mode apply" and silently point the
@@ -351,14 +380,14 @@ class Session:
                 % (req["hops"], I2P_SHARE[req["share"]], what))
         if req["outproxy"] == "custom":
             text += "\n\nThis outproxy sees every clearnet site you visit."
+        text += "\n\nAsked for by: " + requester(pid)
         text += "\n\nIf you didn't just press Apply in the I2P Connection Assistant, choose Cancel."
         if not self.i2p_busy.acquire(blocking=False):
             return "error an I2P settings dialog is already open"
         try:
-            rc, _ = self.spawn(["zenity", "--question", "--no-markup", "--width", "460",
-                                "--title", "I2P Connection Assistant", "--icon", "network-workgroup",
-                                "--ok-label", "Apply", "--cancel-label", "Cancel", "--text", text],
-                               wait=True, timeout=300)
+            rc, _ = self.dialog(["zenity", "--question", "--no-markup", "--width", "460",
+                                 "--title", "I2P Connection Assistant", "--icon", "network-workgroup",
+                                 "--ok-label", "Apply", "--cancel-label", "Cancel", "--text", text])
             if rc != 0:
                 log("uid %d: I2P settings change cancelled at the dialog (%s)" % (self.uid, summary))
                 return "error cancelled"
@@ -456,7 +485,7 @@ def session_for(uid, create=False):
 class Handler(socketserver.StreamRequestHandler):
     def handle(self):
         try:
-            _pid, uid, _gid = peer_pid(self.request)
+            pid, uid, _gid = peer_pid(self.request)
             line = self.rfile.readline(1024).decode(errors="replace").strip()
             if uid == 0:
                 reply = "error refusing root"
@@ -464,7 +493,7 @@ class Handler(socketserver.StreamRequestHandler):
                 # 2.1 (audit L-4): system accounts (services, nobody) get nothing from the broker
                 reply = "error refusing system uid %d" % uid
             else:
-                reply = dispatch(uid, line)
+                reply = dispatch(uid, line, pid)
         except Exception as e:
             reply = "error " + str(e).replace("\n", " ")[:300]
             log("request failed: %s" % reply, crit=True)
@@ -473,7 +502,7 @@ class Handler(socketserver.StreamRequestHandler):
         except OSError:
             pass
 
-def dispatch(uid, cmd):
+def dispatch(uid, cmd, pid=0):
     if cmd == "start":
         return session_for(uid, create=True).start()
     s = session_for(uid)
@@ -495,7 +524,7 @@ def dispatch(uid, cmd):
     if cmd == "set-password":
         return s.set_password()
     if cmd.startswith("i2p-apply "):
-        return s.i2p_apply(cmd[len("i2p-apply "):])
+        return s.i2p_apply(cmd[len("i2p-apply "):], pid)
     if cmd == "scale":
         return s.scale()
     if cmd in ("screenshot", "screenshot-area"):

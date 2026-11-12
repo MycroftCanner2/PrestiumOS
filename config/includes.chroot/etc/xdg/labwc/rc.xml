@@ -46,13 +46,14 @@
     <keybind key="A-F4"><action name="Close" /></keybind>
     <keybind key="A-Escape"><action name="Lower" /></keybind>
     <keybind key="A-space"><action name="ShowMenu" menu="client-menu" /></keybind>
-    <!-- 2.1: the root menu always opens at the bottom-left, just above the 34 px bar and the Menu
+    <!-- 2.1: the root menu always opens at the bottom-left, its bottom edge on the bar, above the Menu
          button, wherever the pointer is (the panel button presses Super+Space after a short wait,
-         so "at the pointer" moved with the mouse). Right-click on the desktop still opens it at the pointer. -->
+         so "at the pointer" moved with the mouse). Right-click on the desktop still opens it at the pointer.
+         Positions count inside the usable area, which already ends at the bar, so y=-1 is the bar top. -->
     <keybind key="W-space">
       <action name="ShowMenu" menu="root-menu">
         <atCursor>no</atCursor>
-        <position><x>0</x><y>-34</y></position>
+        <position><x>0</x><y>-1</y></position>
       </action>
     </keybind>
     <keybind key="A-Tab"><action name="NextWindow" /></keybind>

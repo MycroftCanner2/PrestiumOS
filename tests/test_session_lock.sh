@@ -18,10 +18,10 @@ grep -q 'prestium-session-password status$' "$S" && ok "sudoers: status allowed"
 grep -v '^\s*#' "$L" | grep -q 'session-password set' && bad "lock screen still uses sudo set" || ok "lock screen: no sudo set"
 grep -q 'prestium-wl set-password' "$L" && grep -q '"set-password"' "$I/usr/local/bin/prestium-wl" && ok "lock screen asks the broker" || bad "lock screen -> broker"
 grep -q 'if cmd == "set-password":' "$B" && grep -q '\[SESSION_PASSWORD, "set"\]' "$B" && ok "broker sets it as root" || bad "broker set-password"
-python3 - "$B" <<'PY' && ok "broker: password dialog on the full socket (spawn), not prestium-run" || bad "broker dialog"
+python3 - "$B" <<'PY' && ok "broker: password dialog on the full socket (dialog(), a11y off), not prestium-run" || bad "broker dialog"
 import re,sys
 s=open(sys.argv[1]).read(); f=s[s.index("def set_password"):s.index("def lock_screen")]
-sys.exit(0 if 'self.spawn(["zenity", "--forms"' in f and "prestium-run" not in f else 1)
+sys.exit(0 if 'self.dialog(["zenity", "--forms"' in f and "prestium-run" not in f else 1)
 PY
 # 2.1 (review of db6601c): plain passwd isn't setuid (an empty password asks for no old one), and no
 # confined app may run passwd or its relatives

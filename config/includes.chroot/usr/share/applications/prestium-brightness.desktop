@@ -3,6 +3,6 @@
 Type=Application
 Name=Brightness
 Exec=/usr/local/bin/prestium-brightness
-Icon=display-brightness
+Icon=weather-clear
 NoDisplay=true
 StartupWMClass=prestium-brightness

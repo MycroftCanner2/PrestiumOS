@@ -59,7 +59,7 @@ brightness-up|brightness-down)
 	command -v brightnessctl >/dev/null || exit 0
 	if [ "$1" = brightness-up ]; then brightnessctl -q set 5%+; else brightnessctl -q --min-value=1 set 5%-; fi
 	p=$(brightnessctl -m 2>/dev/null | head -1 | cut -d, -f4 | tr -d %)
-	[ -n "$p" ] && osd display-brightness "Brightness $p %" "$p" ;;
+	[ -n "$p" ] && osd weather-clear "Brightness $p %" "$p" ;;
 *)
 	echo "usage: $0 volume-up|volume-down|mute|mic-mute|brightness-up|brightness-down" >&2; exit 2 ;;
 esac

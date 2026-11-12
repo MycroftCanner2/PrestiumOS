@@ -19,7 +19,7 @@ a = [x for x in kb[0] if x.tag.endswith("action")][0]
 assert a.get("name") == "ShowMenu" and a.get("menu") == "root-menu"
 txt = {c.tag.split("}")[-1]: c for c in a.iter()}
 assert txt["atCursor"].text == "no"
-assert txt["x"].text == "0" and txt["y"].text == "-34", "menu fixed above the bar"
+assert txt["x"].text == "0" and txt["y"].text == "-1", "menu bottom edge on the bar (the usable area already ends at the bar)"
 PY
 W=$R/etc/xdg/waybar/config.jsonc
 sed 's#//.*##' "$W" | python3 -c '
