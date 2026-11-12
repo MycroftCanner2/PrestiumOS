@@ -2,7 +2,8 @@
 # Prestium 2.1: root helper of the I2P Connection Assistant (run through sudo by "user" only).
 #   prestium-i2p-mode status   print the current settings as one JSON line
 #   prestium-i2p-mode apply    read one JSON request on stdin, check it, write i2pd's config,
-#                              restart i2pd and wait for the browser proxy (127.0.0.1:4444).
+#                              restart i2pd and wait until the browser proxy (127.0.0.1:4444)
+#                              is listening (checked in /proc/net/tcp, not by connecting).
 #                              If i2pd doesn't come back, both files are put back and i2pd is
 #                              restarted again (exit 1). Prints the new state as one JSON line.
 # Request: {"hops": 1-7, "share": "low"|"medium"|"high",
@@ -17,7 +18,7 @@
 # ExecStartPre writes again on every start), Tor, the console password.
 # /var/lib/i2pd belongs to i2pd, so both files are read and replaced only through safefile
 # (a symlink or special file is refused; new file created by root, then renamed over the name).
-import fcntl, json, os, re, socket, subprocess, sys, time
+import fcntl, json, os, re, subprocess, sys, time
 
 INSTALLED = os.path.abspath(sys.argv[0]).startswith("/usr/local/")
 def _test_env(name, default):
@@ -159,14 +160,24 @@ def edit(tun, main, req):
     check(res, "i2pd.conf")
     return tun2, "\n".join(res) + "\n"
 
+def listening():
+    """Is something listening on 127.0.0.1:PROXY_PORT? Read from /proc/net/tcp, never by
+    connecting: the firewall lets only the desktop user (and the DoH resolver) reach 4444, so a
+    connection from root is refused (2.1 fix: that made every Apply time out and roll back)."""
+    want = "0100007F:%04X" % PROXY_PORT
+    try:
+        with open("/proc/net/tcp") as f:
+            next(f)
+            return any(l.split()[1] == want and l.split()[3] == "0A" for l in f)
+    except (OSError, StopIteration, IndexError):
+        return False
+
 def proxy_up():
     end = time.monotonic() + WAIT
     while time.monotonic() < end:
-        try:
-            socket.create_connection(("127.0.0.1", PROXY_PORT), timeout=2).close()
+        if listening():
             return True
-        except OSError:
-            time.sleep(1)
+        time.sleep(1)
     return False
 
 def parse(raw):

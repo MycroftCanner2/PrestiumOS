@@ -112,6 +112,8 @@ check(rc == 0 and st["share"] == "low" and st["outproxy"] == "acetone" and re.se
 
 h = open(HELPER).read()
 check('INSTALLED = os.path.abspath(sys.argv[0]).startswith("/usr/local/")' in h, "test overrides ignored when installed")
+check("create_connection" not in h and "/proc/net/tcp" in h,
+      "readiness from /proc/net/tcp, never a connection (the firewall refuses root on 4444)")
 sud = open(os.path.join(I, "etc/sudoers.d/prestium-i2p-mode")).read()
 check("NOPASSWD: /usr/local/sbin/prestium-i2p-mode status, /usr/local/sbin/prestium-i2p-mode apply\n" in sud,
       "sudoers: fixed arguments only")
