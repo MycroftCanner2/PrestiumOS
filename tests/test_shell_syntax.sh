@@ -8,7 +8,6 @@ for f in \
   "$root/config/includes.chroot/usr/local/sbin/prestium-i2pd-torrents" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-i2p-reseed" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-clockfix" \
-  "$root/config/includes.chroot/usr/local/sbin/prestium-timesync" \
   "$root/config/includes.chroot/usr/local/bin/claws-mail-i2p" \
   "$root/config/includes.chroot/usr/local/bin/prestium-irc" \
   "$root/config/includes.chroot/usr/local/bin/prestium-i2p-console" \
@@ -32,7 +31,9 @@ for f in \
   "$root/config/includes.chroot/usr/local/lib/prestium/safefile" \
   "$root/config/includes.chroot/usr/local/lib/prestium/browser_update.py" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-browser-install" \
-  "$root/config/includes.chroot/usr/local/bin/prestium-browser-updater"
+  "$root/config/includes.chroot/usr/local/bin/prestium-browser-updater" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-timesync" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-bootclock"
 do
   # bytecode goes to a throw-away prefix, never into config/includes.chroot (live-build would ship it)
   if ! PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/prestium-pycache.$$" python3 -m py_compile "$f"; then

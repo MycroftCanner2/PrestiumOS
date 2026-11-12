@@ -130,6 +130,20 @@ This is one combined list of everything that changed since the last release, 2.0
   and the MAC guard read `PRESTIUM_*` variables only when run from the source tree.
 
 ### Network, firewall and privileges
+- **Time over Tor onion services, on Kicksecure's design.** `prestium-timesync` is now a daemon built on
+  sdwdate's design (written for Prestium, not Kicksecure's code). Each round it asks one source from each
+  of three pools of onion web servers run by unrelated operators (Kicksecure's own list, kept under its
+  AGPL-3+ licence in `/usr/share/prestium/timesync/pools.conf`), each on its own Tor circuit as the
+  firewalled `prestium-htp` user, and uses the median. A pool with more than a third of its members
+  failing aborts the round. An answer outside the current Tor consensus window is rejected. The clock is
+  never set earlier than the build date, the last time it set this boot, or `/etc/minimum-unixtime`
+  (time replay protection). Up to one second of random nanoseconds is added. The first sync steps the
+  clock; later differences under 3 minutes are slewed a few milliseconds at a time. It re-syncs at random
+  60 to 180 minute intervals instead of once per boot. Clearnet sites are no longer used for time.
+- **Boot clock randomization.** `prestium-bootclock.service` moves the clock a random 0 to 180 seconds
+  into the past or future, with random nanoseconds, before Tor, i2pd and the time sync start.
+- **Clock-sync symbol in the bar.** An amber clock symbol shows until the time is set over Tor, and a red
+  one if the sync refused a time it could not trust. It disappears once the clock is synced.
 - **The control-port filter checks Python clients more strictly.** Nyx, OnionShare and the Tor Connection
   Assistant must start with `PYTHONNOUSERSITE=1` (`prestium-run` and `prestium-nyx` set it), because Python
   runs `.pth` files from the user's site-packages before `sitecustomize` can switch them off. The filter's

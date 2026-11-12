@@ -43,3 +43,4 @@
 /etc/systemd/user/default.target.wants/pipewire-pulse.service /usr/lib/systemd/user/pipewire-pulse.service
 /etc/systemd/system/graphical.target.wants/prestium-wl-broker.service /etc/systemd/system/prestium-wl-broker.service
 /etc/systemd/system/timers.target.wants/prestium-gnupg-check.timer /etc/systemd/system/prestium-gnupg-check.timer
+/etc/systemd/system/sysinit.target.wants/prestium-bootclock.service /etc/systemd/system/prestium-bootclock.service

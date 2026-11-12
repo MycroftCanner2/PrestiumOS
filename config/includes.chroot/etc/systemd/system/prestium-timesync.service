@@ -1,14 +1,20 @@
-# Prestium 1.8: clock sync over Tor (Tails-style htpdate), no clearnet NTP.
+# Prestium 1.8: clock sync over Tor, no clearnet NTP.
 # 2.0 r6: After prestium-clockfix so a pre-bootstrap consensus fix finishes first.
+# 2.1: a daemon on Kicksecure's sdwdate design: three pools of onion sources, median, Tor consensus
+# check, time replay protection, randomized nanoseconds, re-sync at random 60 to 180 minute intervals.
 [Unit]
-Description=Prestium time sync over Tor
-After=tor.service network-online.target prestium-clockfix.service
+Description=Prestium time sync over Tor onion services
+After=tor.service network-online.target prestium-bootclock.service prestium-clockfix.service
 Wants=tor.service
 
 [Service]
-Type=oneshot
+Type=simple
 ExecStart=/usr/local/sbin/prestium-timesync
-TimeoutStartSec=20min
+Restart=on-failure
+RestartSec=60
+# the last time set this boot (time replay protection); on the live system it lives in RAM
+StateDirectory=prestium-timesync
+StateDirectoryMode=0700
 # 2.1 (audit L-3): set the clock (sys_time), run curl as prestium-htp (setuid, setgid; audit_write for
 # runuser's PAM), create the safety flag. No ProtectClock, which would forbid the very job. The flag
 # directory is made before the sandbox starts ("+": that one command runs unsandboxed).
@@ -17,7 +23,7 @@ NoNewPrivileges=yes
 SystemCallFilter=@system-service @clock
 SystemCallErrorNumber=EPERM
 RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
-ExecStartPre=+/usr/bin/install -d -o root -g root -m 0755 /run/prestium /run/prestium/safety
+ExecStartPre=+/usr/bin/install -d -o root -g root -m 0755 /run/prestium /run/prestium/safety /run/prestium/timesync
 ReadWritePaths=/run/prestium
 ProtectKernelModules=yes
 ProtectKernelTunables=yes

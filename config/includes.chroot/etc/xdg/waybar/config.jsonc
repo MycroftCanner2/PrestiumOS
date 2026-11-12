@@ -14,7 +14,7 @@
   "spacing": 4,
   "modules-left": ["custom/menu", "wlr/taskbar"],
   "modules-center": [],
-  "modules-right": ["custom/tor", "custom/i2p", "tray", "network", "pulseaudio", "battery", "clock"],
+  "modules-right": ["custom/tor", "custom/i2p", "custom/timesync", "tray", "network", "pulseaudio", "battery", "clock"],
   "custom/menu": {
     "format": "\uf0c9  Menu",
     "tooltip-format": "Applications and settings (Super+Space)",
@@ -50,6 +50,14 @@
     "interval": 5,
     "format": "\uf111  {}",
     "on-click": "prestium-run /usr/local/bin/prestium-i2p-assistant"
+  },
+  // 2.1: clock sync over Tor (prestium-timesync). Hidden once the time is set; a clock symbol in amber
+  // while it waits or syncs, red when it refused a time it could not trust.
+  "custom/timesync": {
+    "exec": "cat /run/prestium/timesync/waybar.json",
+    "return-type": "json",
+    "interval": 10,
+    "format": "{}"
   },
   "tray": { "icon-size": 18, "spacing": 8 },
   "network": {

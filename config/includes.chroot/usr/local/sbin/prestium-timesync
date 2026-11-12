@@ -1,54 +1,267 @@
-#!/bin/sh
-# Prestium 1.8: set the clock over Tor, never over clearnet (no NTP leak).
-# Like Tails' htpdate: once Tor has bootstrapped, read the HTTPS "Date" header
-# from three random well-known sites through Tor and use the median.
-# The requests run as the unprivileged "prestium-htp" user, which the firewall
-# only lets reach Tor's SOCKS port, on their own isolated Tor circuits.
-# The system time zone stays UTC, so every Prestium looks the same.
-PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
-BUILD_FILE=/usr/share/prestium/build-date
-FLAG=/usr/local/lib/prestium/safety-flag
-POOL="www.torproject.org www.debian.org www.eff.org www.wikipedia.org www.kernel.org duckduckgo.com tails.net www.mozilla.org"
-PROXY="socks5h://prestium-htp:$$@127.0.0.1:9050"
+#!/usr/bin/python3
+# Prestium 2.1: secure distributed time over Tor onion services, modelled on Kicksecure's sdwdate
+# (https://www.kicksecure.com/wiki/Sdwdate). Written for Prestium; it reuses only sdwdate's source list
+# (/usr/share/prestium/timesync/pools.conf, AGPL-3+, a separate data file). No NTP, no clearnet.
+#
+# Each round, once Tor has bootstrapped:
+#  - one source from each of three pools of onion web servers, run by unrelated operators (a group of
+#    onions from one operator counts as one member), asked for its HTTP Date header, each on its own Tor
+#    circuit (a fresh SOCKS username), as the unprivileged prestium-htp user (the firewall lets that uid
+#    reach Tor's SOCKS port and nothing else);
+#  - a pool whose failures pass a third of its members aborts the round (the pool may be under attack);
+#  - an answer outside the validity window of Tor's current consensus is a failure (consensus check);
+#  - the median of the three differences is used, never the mean, so one liar cannot pull the clock;
+#  - up to one second of random nanoseconds is added, so a source cannot tag a user by the exact
+#    time it sent (sdwdate's clock randomization);
+#  - never earlier than the image's build date (one day of slack), the last time this boot set, or
+#    /etc/minimum-unixtime; never more than 10 years after the build (time replay protection);
+#  - the first sync of a boot, or a difference over 3 minutes, steps the clock; smaller ones are slewed
+#    in steps of a few milliseconds, so the clock never jumps visibly to a watching web page.
+# Then it sleeps a random 60 to 180 minutes (a failed round: 1 to 5 minutes) and starts again.
+# State for the panel goes to /run/prestium/timesync/waybar.json; the log keeps "skew Ns" lines,
+# which prestium-vm-netcheck reads.
+import json, os, random, re, secrets, statistics, subprocess, sys, threading, time
+from email.utils import parsedate_to_datetime
 
-fetch() {
-  runuser -u prestium-htp -- curl -sI --max-time 60 --proxy "$PROXY" "https://$1/" 2>/dev/null \
-    | tr -d '\r' | sed -n 's/^[Dd]ate: //p' | head -n1
-}
+POOLS = "/usr/share/prestium/timesync/pools.conf"
+BUILD_FILE = "/usr/share/prestium/build-date"
+FLAG = "/usr/local/lib/prestium/safety-flag"
+STATE = os.environ.get("STATE_DIRECTORY", "/var/lib/prestium-timesync") + "/time-replay-protection"
+RUN = "/run/prestium/timesync"
+MIN_FILES = ("/etc/minimum-unixtime", "/usr/local/etc/minimum-unixtime")
+CONSENSUS = ("/var/lib/tor/cached-microdesc-consensus", "/var/lib/tor/cached-consensus")
+SOCKS = "127.0.0.1:9050"
+HTP_USER = "prestium-htp"
+MAX_FAILURE_RATIO = 0.34
+STEP_LIMIT = 180                    # seconds; larger differences are stepped, smaller ones slewed
+TEN_YEARS = 315576000
+ONION = re.compile(r"^https?://([a-z0-9-]+\.)*[a-z2-7]{56}\.onion(:[0-9]{1,5})?$")
+NS = 1_000_000_000
+TEST = os.environ.get("PRESTIUM_TIMESYNC_TEST") == "1"   # tests/test_timesync.py: no real clock or network
 
-# wait up to 15 minutes for Tor
-i=0
-until runuser -u prestium-htp -- curl -s -o /dev/null --max-time 30 --proxy "$PROXY" https://www.torproject.org/ 2>/dev/null; do
-  i=$((i+1)); [ $i -ge 30 ] && { echo "Tor not ready, clock left as is"; exit 0; }
-  sleep 30
-done
 
-times=""
-for h in $(printf '%s\n' $POOL | shuf -n 3); do
-  d=$(fetch "$h"); [ -n "$d" ] || continue
-  t=$(date -u -d "$d" +%s 2>/dev/null) || continue
-  times="$times $t"
-done
-n=$(printf '%s\n' $times | grep -c .)
-[ "$n" -ge 2 ] || { echo "not enough answers ($n), clock left as is"; exit 0; }
-med=$(printf '%s\n' $times | sort -n | sed -n "$(( (n+1)/2 ))p")
-now=$(date -u +%s); skew=$((med-now)); abs=${skew#-}
-echo "median of $n sources, skew ${skew}s"
-# 2.1 (audit L-3): the same bounds as prestium-set-clock. Never before this image was built (one day
-# of slack) or more than 10 years after it: the clock decides whether Tor's consensus, TLS certificates
-# and the Browser Updater's publisher keys are valid, and the sites' answers come over the network.
-build=$(head -c 32 "$BUILD_FILE" 2>/dev/null | tr -cd 0-9)
-[ -n "$build" ] || { echo "no build date ($BUILD_FILE), clock left as is"; exit 0; }
-if [ "$med" -lt $((build - 86400)) ] || [ "$med" -gt $((build + 315576000)) ]; then
-  echo "answer $(date -u -d "@$med" '+%F %T') UTC is outside the image's bounds, clock left as is"
-  "$FLAG" set clock-sync "The clock sync over Tor got a time ($(date -u -d "@$med" '+%Y-%m-%d %H:%M') UTC) before this image was built or more than 10 years after it, and ignored it. Check the clock before trusting Tor or TLS warnings." 2>/dev/null
-  exit 0
-fi
-if [ "$abs" -gt 10 ]; then
-  date -u -s "@$med" >/dev/null && echo "clock set"
-  # a jump of more than a day is unusual after prestium-clockfix: show it, so it isn't silent
-  [ "$abs" -gt 86400 ] && "$FLAG" set clock-sync "The clock sync over Tor moved the clock by $((abs / 3600)) hours, to $(date -u -d "@$med" '+%Y-%m-%d %H:%M') UTC. If that is wrong, the time sources may have been tampered with." 2>/dev/null
-  # i2pd needs a correct clock; restart it after a big jump
-  [ "$abs" -gt 60 ] && systemctl try-restart i2pd.service
-fi
-exit 0
+def log(msg):
+    print(msg, flush=True)
+
+
+def load_pools(path=POOLS):
+    """{name: [[url, ...] per member]}; a group is one member with several urls."""
+    pools, cur, group = {}, None, None
+    with open(path, encoding="ascii") as f:
+        for raw in f:
+            line = raw.split("#", 1)[0].strip()
+            if not line:
+                continue
+            m = re.fullmatch(r"\[pool ([a-z0-9_-]+)\]", line)
+            if m:
+                cur = pools.setdefault(m.group(1), []); group = None; continue
+            if line == "group":
+                group = []; continue
+            if line == "end":
+                if group:
+                    cur.append(group)
+                group = None; continue
+            if cur is None or not ONION.match(line):
+                raise ValueError("bad line in %s: %r" % (path, raw.strip()))
+            if group is not None:
+                group.append(line)
+            else:
+                cur.append([line])
+    if len(pools) != 3 or any(len(p) < 3 for p in pools.values()):
+        raise ValueError("%s: need 3 pools of at least 3 members" % path)
+    return pools
+
+
+def read_int(path):
+    try:
+        with open(path, "rb") as f:
+            v = re.sub(rb"[^0-9]", b"", f.read(32))
+        return int(v) if v else None
+    except OSError:
+        return None
+
+
+def bounds():
+    build = read_int(BUILD_FILE)
+    if build is None:
+        return None, None
+    floor = build - 86400
+    for p in (STATE,) + MIN_FILES:
+        v = read_int(p)
+        if v is not None:
+            floor = max(floor, v)
+    return floor, build + TEN_YEARS
+
+
+def consensus_window():
+    for c in CONSENSUS:
+        try:
+            with open(c, encoding="ascii", errors="replace") as f:
+                head = f.read(4096)
+        except OSError:
+            continue
+        va = re.search(r"^valid-after (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)$", head, re.M)
+        vu = re.search(r"^valid-until (\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)$", head, re.M)
+        if va and vu:
+            conv = lambda s: int(time.mktime(time.strptime(s, "%Y-%m-%d %H:%M:%S")) - time.timezone)
+            return conv(va.group(1)), conv(vu.group(1))
+    return None
+
+
+def tor_ready():
+    r = subprocess.run(["journalctl", "-b", "-u", "tor@default", "-o", "cat", "--no-pager"],
+                       capture_output=True, text=True)
+    return "Bootstrapped 100" in r.stdout
+
+
+def fetch(url):
+    """(remote unix time, local unix time in ns at the middle of the request) or None."""
+    user = secrets.token_hex(8)                      # own circuit per request (IsolateSOCKSAuth)
+    cmd = ["runuser", "-u", HTP_USER, "--", "curl", "-sI", "--max-time", "120", "--proto", "=http,https",
+           "--proxy", "socks5h://%s:x@%s" % (user, SOCKS), url]
+    t0 = time.clock_gettime_ns(time.CLOCK_REALTIME)
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=150).stdout
+    except subprocess.TimeoutExpired:
+        return None
+    t1 = time.clock_gettime_ns(time.CLOCK_REALTIME)
+    m = re.search(r"^date:\s*(.+?)\r?$", out, re.I | re.M)
+    if not m:
+        return None
+    try:
+        remote = int(parsedate_to_datetime(m.group(1)).timestamp())
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return remote, (t0 + t1) // 2
+
+
+def ask_pool(name, members, window, result):
+    order = list(members); random.SystemRandom().shuffle(order)
+    allowed = max(1, int(len(members) * MAX_FAILURE_RATIO))
+    fails = 0
+    for member in order:
+        url = secrets.choice(member)
+        got = fetch(url)
+        if got is None:
+            log("pool %s: %s did not answer" % (name, url)); fails += 1
+        elif window and not (window[0] <= got[0] <= window[1]):
+            log("pool %s: %s answered %s UTC, outside Tor's consensus window, ignored"
+                % (name, url, time.strftime("%F %T", time.gmtime(got[0]))))
+            fails += 1
+        else:
+            diff = got[0] * NS - got[1]
+            log("pool %s: %s difference %+.3fs" % (name, url, diff / NS))
+            result[name] = diff; return
+        if fails > allowed:
+            log("pool %s: %d failures, more than %d allowed, round aborted" % (name, fails, allowed))
+            return
+
+
+def flag(msg):
+    if TEST:
+        log("FLAG " + msg); return
+    subprocess.run([FLAG, "set", "clock-sync", msg], stderr=subprocess.DEVNULL)
+
+
+def write_status(cls, tooltip):
+    # the panel's clock-sync dot: nothing shown once synced, amber while syncing, red after a refusal
+    text = "" if cls == "synced" else "\uf017"
+    data = json.dumps({"text": text, "class": cls, "tooltip": tooltip})
+    try:
+        os.makedirs(RUN, exist_ok=True)
+        tmp = RUN + "/.waybar.json"
+        with open(tmp, "w") as f:
+            f.write(data + "\n")
+        os.chmod(tmp, 0o644); os.replace(tmp, RUN + "/waybar.json")
+    except OSError:
+        pass
+
+
+def set_clock(target_ns, now_ns, step):
+    if TEST:
+        log("SET %d %s" % (target_ns // NS, "step" if step else "slew")); return
+    if step:
+        time.clock_settime_ns(time.CLOCK_REALTIME, target_ns + (time.clock_gettime_ns(time.CLOCK_REALTIME) - now_ns))
+        return
+    # slew: move a few random milliseconds every tenth of a second until the difference is gone
+    left = target_ns - now_ns
+    while left:
+        d = min(abs(left), random.randint(4, 9) * 1_000_000) * (1 if left > 0 else -1)
+        time.clock_settime_ns(time.CLOCK_REALTIME, time.clock_gettime_ns(time.CLOCK_REALTIME) + d)
+        left -= d
+        time.sleep(0.1)
+
+
+def one_round(pools, first):
+    window = consensus_window()
+    if window is None:
+        log("no Tor consensus to check answers against, round skipped"); return False
+    result, threads = {}, []
+    for name, members in pools.items():
+        t = threading.Thread(target=ask_pool, args=(name, members, window, result)); t.start(); threads.append(t)
+    for t in threads:
+        t.join()
+    if len(result) != len(pools):
+        return False
+    diffs = sorted(result.values())
+    med = int(statistics.median(diffs))
+    rnd = secrets.randbelow(2 * NS + 1) - NS
+    now = time.clock_gettime_ns(time.CLOCK_REALTIME)
+    target = now + med + rnd
+    log("pool differences, sorted: [%s]" % ", ".join("%+.3f" % (d / NS) for d in diffs))
+    log("median of 3 sources, skew %ds; randomized by %+.9fs" % (round(med / NS), rnd / NS))
+    floor, ceiling = bounds()
+    if floor is None:
+        log("no build date (%s), clock left as is" % BUILD_FILE); return False
+    when = time.strftime("%Y-%m-%d %H:%M", time.gmtime(target // NS))
+    if not (floor <= target // NS <= ceiling):
+        log("answer %s UTC is outside the allowed bounds, clock left as is" % when)
+        flag("The clock sync over Tor got a time (%s UTC) before this image was built, earlier than the "
+             "time it already set, or more than 10 years after the build, and ignored it. Check the clock "
+             "before trusting Tor or TLS warnings." % when)
+        write_status("failed", "Clock sync refused a time it could not trust")
+        return None
+    jump = abs(target - now) // NS
+    set_clock(target, now, first or jump > STEP_LIMIT)
+    log("clock %s by %+.3fs" % ("set" if first or jump > STEP_LIMIT else "slewed", (target - now) / NS))
+    if jump > 86400:
+        flag("The clock sync over Tor moved the clock by %d hours, to %s UTC. If that is wrong, the "
+             "time sources may have been tampered with." % (jump // 3600, when))
+    if jump > 60 and not TEST:
+        subprocess.run(["systemctl", "try-restart", "i2pd.service"])
+    try:
+        tmp = STATE + ".new"
+        with open(tmp, "w") as f:
+            f.write("%d\n" % (target // NS))
+        os.replace(tmp, STATE)
+    except OSError as e:
+        log("could not save the replay-protection time: %s" % e)
+    write_status("synced", "")
+    return True
+
+
+def main():
+    pools = load_pools()
+    if "--check" in sys.argv:
+        print("pools: " + ", ".join("%s=%d" % (k, len(v)) for k, v in pools.items())); return 0
+    write_status("syncing", "Clock: waiting for Tor")
+    while not tor_ready():
+        time.sleep(10)
+    first = True
+    while True:
+        write_status("syncing", "Clock: syncing over Tor")
+        ok = one_round(pools, first)
+        if ok:
+            first = False
+            wait = random.SystemRandom().randint(3600, 10800)
+        else:
+            if ok is False:
+                write_status("syncing", "Clock: no answer yet, retrying")
+            wait = random.SystemRandom().randint(60, 300)
+        if TEST:
+            return 0 if ok else 1
+        time.sleep(wait)
+
+
+if __name__ == "__main__":
+    sys.exit(main())
