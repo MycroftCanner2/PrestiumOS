@@ -33,12 +33,12 @@ class T(unittest.TestCase):
             self.assertIsNone(g.check("onionshare", l)[0], l)
 
     def test_tor_browser_key_prompt(self):
-        self.assertEqual(self.fwd("tor-browser", "ONION_CLIENT_AUTH_ADD %s x25519:abc=" % ADDR),
-                         "ONION_CLIENT_AUTH_ADD %s x25519:abc=" % ADDR)
+        self.assertEqual(self.fwd("tor-browser", "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ=" % ADDR),
+                         "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ=" % ADDR)
         # "Remember this key": the flag is dropped, never forwarded
-        self.assertEqual(self.fwd("tor-browser", "ONION_CLIENT_AUTH_ADD %s x25519:abc= Flags=Permanent" % ADDR),
-                         "ONION_CLIENT_AUTH_ADD %s x25519:abc=" % ADDR)
-        self.assertIsNone(g.check("tor-browser", "ONION_CLIENT_AUTH_ADD %s x25519:abc= Flags=Other" % ADDR)[0])
+        self.assertEqual(self.fwd("tor-browser", "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ= Flags=Permanent" % ADDR),
+                         "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ=" % ADDR)
+        self.assertIsNone(g.check("tor-browser", "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ= Flags=Other" % ADDR)[0])
         self.fwd("tor-browser", "ONION_CLIENT_AUTH_REMOVE " + ADDR)
         self.fwd("tor-browser", "ONION_CLIENT_AUTH_VIEW")
 
@@ -46,14 +46,17 @@ class T(unittest.TestCase):
         # 2.1 (verification of 9d289eb): only well-formed arguments reach Tor
         self.fwd("tor-browser", "ONION_CLIENT_AUTH_ADD %s.onion x25519:%s ClientName=Bob_1" % (ADDR, "A" * 43 + "="))
         self.fwd("tor-browser", "ONION_CLIENT_AUTH_VIEW " + ADDR)
+        self.fwd("tor-browser", "ONION_CLIENT_AUTH_ADD %s x25519:%s" % (ADDR, "Q" * 43))   # no padding
         for l in ["ONION_CLIENT_AUTH_ADD %s" % ADDR,
-                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= ClientName=x\x00y" % ADDR,
-                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= ClientName=" % ADDR,
-                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= ClientName=a b" % ADDR,
-                  "ONION_CLIENT_AUTH_ADD %s x25519:abc= SETCONF ControlPort=1" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ= ClientName=x\x00y" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ= ClientName=" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ= ClientName=a b" % ADDR,
+                  "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ= SETCONF ControlPort=1" % ADDR,
                   "ONION_CLIENT_AUTH_ADD %s ed25519:abc=" % ADDR,
-                  "ONION_CLIENT_AUTH_ADD %s x25519:abc=" % ("1" * 56),
-                  "ONION_CLIENT_AUTH_ADD %s x25519:abc=" % ADDR[:55],
+                  "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ=" % ("1" * 56),
+                  "ONION_CLIENT_AUTH_ADD %s x25519:QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ=" % ADDR[:55],
+                  "ONION_CLIENT_AUTH_ADD %s x25519:%s=" % (ADDR, "Q" * 42),
+                  "ONION_CLIENT_AUTH_ADD %s x25519:%s=" % (ADDR, "Q" * 44),
                   "ONION_CLIENT_AUTH_REMOVE",
                   "ONION_CLIENT_AUTH_REMOVE %s extra" % ADDR,
                   "ONION_CLIENT_AUTH_VIEW %s %s" % (ADDR, ADDR)]:

@@ -59,6 +59,16 @@ pr = g["printable"]
 me = req(os.getpid())
 (ok if "running " + sys.argv[0] + " (self-reported)" in me or sys.argv[0] in me else bad)("requester: script path for interpreters (%s)" % me)
 (ok if "\n" not in me else bad)("requester: one line")
+so = g["script_of"]
+cases = [("/usr/bin/python3.13", [b"-I", b"-W", b"ignore", b"x.py"], "x.py"),
+         ("/usr/bin/python3.13", [b"-X", b"utf8", b"-I", b"/usr/local/bin/prestium-wl", b"i2p-apply"], "/usr/local/bin/prestium-wl"),
+         ("/usr/bin/python3.13", [b"-c", b"print(1)"], "-c"),
+         ("/usr/bin/python3.13", [b"-m", b"http.server"], "-m http.server"),
+         ("/usr/bin/bash", [b"-c", b"exec x", b"name"], "-c"),
+         ("/usr/bin/perl", [b"-w", b"s.pl"], "s.pl")]
+for exe, argv, want in cases:
+    (ok if so(exe, argv) == want else bad)("script_of %s %r -> %r (%r)" % (exe, argv, want, so(exe, argv)))
+(ok if pr("a\u3164b\u200bc\u2800d\u115f") == "a?b?c?d?" else bad)("printable: fillers and zero-width replaced")
 (ok if req(0) == "unknown" and req(10 ** 9) == "unknown" else bad)("requester: unknown pid")
 # a child of this test, so its parent is readable here whoever started the test
 out = subprocess.run([sys.executable, "-c", "import runpy, os, sys; print(runpy.run_path(sys.argv[1], "

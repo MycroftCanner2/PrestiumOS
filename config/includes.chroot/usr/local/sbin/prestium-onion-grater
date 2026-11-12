@@ -212,7 +212,7 @@ def split_args(rest):
 PORT_RE = re.compile(r"^Port=(80,(127\.0\.0\.1:)?(176[0-4][0-9]|17650)|1|1,(127\.0\.0\.1:)?1)$", re.I | re.A)
 KEY_RE = re.compile(r"^(NEW:(BEST|ED25519-V3)|ED25519-V3:[A-Za-z0-9+/=]+)$")
 ONION_ADDR_RE = re.compile(r"^[a-z2-7]{56}(\.onion)?$", re.A)
-X25519_RE = re.compile(r"^x25519:[A-Za-z0-9+/]{1,64}={0,2}$", re.I | re.A)
+X25519_RE = re.compile(r"^x25519:[A-Za-z0-9+/]{43}=?$", re.I | re.A)   # a 32-byte key in base64
 CLIENT_NAME_RE = re.compile(r"^ClientName=[A-Za-z0-9._-]{1,64}$", re.I | re.A)
 FLAG_RE = re.compile(r"^Flags=((DiscardPK|Detach|V3Auth|MaxStreamsCloseCircuit|NonAnonymous)(,(DiscardPK|Detach|V3Auth|MaxStreamsCloseCircuit))*)$", re.I)
 
