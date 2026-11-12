@@ -180,6 +180,11 @@ This is one combined list of everything that changed since the last release, 2.0
   file) and *Reboot* are in the same window. The old *I2P Tunnel Hops*, *Restart I2P* and reseed menu
   items are gone. `prestium-tunnel-hops` still works from a terminal.
   The window fits the screen: on small screens its content scrolls, and it can be resized.
+- **Tor Browser reconnects after Tor restarts.** Changing the method in the Tor Connection Assistant
+  restarts Tor, which makes a new SOCKS socket. The browser's sandbox had bound the old socket file,
+  so Tor Browser never reached Tor again until it was restarted. The sandbox now binds the socket
+  directories read-only (`/run/prestium-tbb`, `/run/onion-grater`), and onion-grater keeps its
+  directory across restarts.
 - **VLC and QtQR run through Xwayland.** In a VM, VLC's video and QtQR's webcam view, as native
   Wayland clients, crashed the whole session. The menu entries and Debian's `vlc.desktop` and
   `qtqr.desktop` (hook 0630) now start them with `QT_QPA_PLATFORM=xcb`. Their AppArmor profiles still

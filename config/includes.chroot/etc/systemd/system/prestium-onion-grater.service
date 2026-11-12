@@ -12,6 +12,8 @@ Group=onion-grater
 SupplementaryGroups=debian-tor prestium-tbb
 RuntimeDirectory=onion-grater
 RuntimeDirectoryMode=0755
+# 2.1: keep the directory across restarts; Tor Browser's sandbox binds it (not the socket file)
+RuntimeDirectoryPreserve=yes
 # read /proc/<pid>/exe of the connecting app (another uid)
 # 2.1 (ISO test after ba6ff54): CAP_DAC_READ_SEARCH too. /proc/<pid>/environ is mode 0400, owned by
 # the client's uid: CAP_SYS_PTRACE passes the ptrace check, but the open is a plain file permission

@@ -47,14 +47,18 @@ sed "s#@DOWNLOADS@#$D#g" /usr/local/share/prestium-tor-browser/user.js > "$P/use
 # a Flatpak sandbox); 2.0 r10: Wayland only, in its own security context. The sandbox is described
 # in /usr/local/lib/prestium/browser-sandbox.sh. Its only ways out are Tor's SOCKS Unix socket and
 # the onion-grater control filter.
+# 2.1: the directories are bound, not the socket files. Tor makes a new SOCKS socket every time it
+# starts (the Tor Connection Assistant restarts it when the connection method changes), and a bound
+# socket file would stay the old, dead one inside the sandbox, so the browser could never reconnect.
+# Read-only: a socket on a read-only mount still accepts connections. /run/prestium-tbb holds only
+# Tor's socket; /run/onion-grater only the filter's (kept across restarts: RuntimeDirectoryPreserve).
 SOCKS=/run/prestium-tbb/socks
 CTL=/run/onion-grater/control
 . "$SBX_LIB" || { echo "browser sandbox library missing" >&2; exit 1; }
 [ -S "$SOCKS" ] || sbx_fail "Tor Browser" "Tor is not running (no SOCKS socket). Tor Browser was not started."
 sbx_init "Tor Browser"
 B+=(--ro-bind "$TB" "$TB"
-    --dir /run/prestium-tbb --bind "$SOCKS" "$SOCKS"
-    --dir /run/onion-grater --bind-try "$CTL" "$CTL"
+    --ro-bind "${SOCKS%/*}" "${SOCKS%/*}" --ro-bind-try "${CTL%/*}" "${CTL%/*}"
     --bind "$HOME/.tor-browser" "$HOME/.tor-browser" --bind "$D" "$D"
     --setenv TOR_SKIP_LAUNCH 1 --setenv TOR_SOCKS_IPC_PATH "$SOCKS" --setenv TOR_CONTROL_IPC_PATH "$CTL"
     --setenv TOR_CONTROL_PASSWD '"prestium"' --setenv TOR_HIDE_UPDATE_CHECK_UI 1
