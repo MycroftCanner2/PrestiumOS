@@ -2,11 +2,12 @@
 
 ## 2.1: changes since Prestium 2.0
 
-Prestium 2.1 is a security and features release on top of Prestium 2.0. It adds a Browser Updater,
-tighter confinement and firewall rules, signed release files, and fixes for apps that broke or were
-too open in 2.0. It is still built with live-build on Debian 13 "trixie".
+Prestium 2.1 is a security and features release on top of Prestium 2.0. It adds a Browser Updater, an
+I2P Connection Assistant, Tor onion time sync on Kicksecure's design, a new desktop look, tighter
+confinement and firewall rules, signed release files, and fixes for apps that broke or were too open
+in 2.0. It is still built with live-build on Debian 13 "trixie".
 
-This is one combined list of everything that changed since the last release, 2.0.
+This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
 
 ### Build system and supply chain
 - **Tor Browser is the newest signed release at every build.** `scripts/tb-latest.sh` asks the Tor
@@ -139,11 +140,12 @@ This is one combined list of everything that changed since the last release, 2.0
   never set earlier than the build date, the last time it set this boot, or `/etc/minimum-unixtime`
   (time replay protection). Up to one second of random nanoseconds is added. The first sync steps the
   clock; later differences under 3 minutes are slewed a few milliseconds at a time. It re-syncs at random
-  60 to 180 minute intervals instead of once per boot. Clearnet sites are no longer used for time.
+  60 to 180 minute intervals instead of once per boot.
 - **Boot clock randomization.** `prestium-bootclock.service` moves the clock a random 0 to 180 seconds
   into the past or future, with random nanoseconds, before Tor, i2pd and the time sync start.
 - **Clock-sync symbol in the bar.** An amber clock symbol shows until the time is set over Tor, and a red
-  one if the sync refused a time it could not trust. It disappears once the clock is synced.
+  one if the sync refused a time it could not trust. It disappears once the clock is synced. The
+  previous one-shot sync from clearnet HTTPS sites is gone.
 - **The control-port filter checks Python clients more strictly.** Nyx, OnionShare and the Tor Connection
   Assistant must start with `PYTHONNOUSERSITE=1` (`prestium-run` and `prestium-nyx` set it), because Python
   runs `.pth` files from the user's site-packages before `sitecustomize` can switch them off. The filter's
@@ -159,8 +161,8 @@ This is one combined list of everything that changed since the last release, 2.0
   can't be set.
 - **The MAC guard keeps its egress filter current**, re-installing the rule that drops frames with a
   card's real address on every device event.
-- **The Wayland broker and the MAC guard keep only the root powers they use.** timesync, clockfix and
-  the USB watchdog run in a systemd sandbox. The VM network check runs as its own user, not as root,
+- **The Wayland broker and the MAC guard keep only the root powers they use.** The time sync, bootclock,
+  clockfix and the USB watchdog run in a systemd sandbox. The VM network check runs as its own user, not as root,
   and never copies Tor's log text.
 - **Setting the clock has bounds.** `sudo date -s` is replaced by `sudo prestium-set-clock`. timesync,
   clockfix and set-clock all refuse a time before the image was built (one day of slack) or more than
@@ -182,90 +184,69 @@ This is one combined list of everything that changed since the last release, 2.0
   is read-only and disappears once both connect.
 
 ### Desktop
-- **Prestium look (Tech Innovation palette).** One palette everywhere: dark grey surfaces, Electric
-  Blue `#0066ff` accent, Neon Cyan `#00ffff` links and highlights, the colours of The Lounge's Tech
-  Innovation theme. GTK 3 and 4 (libadwaita) get it from `gtk.css` (colours only), with dconf
-  `accent-color='blue'` as the nearest named accent. Qt 5 and 6 use Kvantum with a "Prestium" theme
-  (KvGnomeDark shapes, recoloured at build time; `QT_STYLE_OVERRIDE=kvantum`, replacing adwaita-qt).
-  KDE apps use a new `Prestium` colour scheme, and **Kleopatra picks it by default** (`/etc/xdg/kleopatrarc`)
-  instead of KDE's automatic Breeze Dark. The labwc theme, lock screen and notifications match.
-  The broker's dialogs read the same colours from a root-owned directory; accessibility stays off for
-  them (`DIALOG_ENV` is still applied last). Browser Updater keeps stock GTK 3, as its plan asks.
-- **Papirus-Dark icons.** The Prestium icon theme holds the new logo mark ("P." in blue to cyan) and
-  inherits Papirus-Dark first; Adwaita, AdwaitaLegacy and gnome are fallbacks only. mako looks up icons
-  in the same order.
-- **Floating bar.** waybar floats with rounded corners and margins, uses Font Awesome symbols, and its
-  status area is icons only (network, volume, battery) with a two-line clock (time over date, UTC, no
-  tooltip). Tor and I2P pills show connecting (amber), ready (cyan) or failed (red); a click opens the
-  matching Connection Assistant. The state comes from `prestium-netstatus.service` (own user, journal
-  group, read-only, writes only `/run/prestium/netstatus`, never copies log text).
+- **A new Prestium look.** One palette everywhere: dark grey surfaces, an Electric Blue `#0066ff` accent
+  and Neon Cyan `#00ffff` highlights (the colours of The Lounge's Tech Innovation theme), with Cantarell
+  as the UI font. GTK 3 and 4 (libadwaita) apps are dark (prefer-dark, dconf `accent-color='blue'`) and
+  take the palette from a colour-only `gtk.css`; GTK 2 (Pidgin) uses Adwaita-dark. Qt 5 and 6 apps use
+  Kvantum with a "Prestium" theme (`QT_STYLE_OVERRIDE=kvantum`; adwaita-qt is gone). KDE apps use a
+  `Prestium` colour scheme, and Kleopatra picks it by default (`/etc/xdg/kleopatrarc`) instead of
+  Breeze Dark. Audacity, KeePassXC and the foot terminal (11 pt, readable red, blue, magenta and grey)
+  are dark too. Tor Browser keeps its own fonts. The build fails if the system dconf database isn't
+  compiled.
+- **Windows.** The labwc theme uses the same palette, with 8 px rounded corners and drop shadows. Every
+  window gets one labwc title bar; GTK and libadwaita apps no longer draw a second close button
+  (`button-layout ':'`). There is one desktop. Minimize and Maximize have icons in the window menu.
+- **Papirus-Dark icons.** The Prestium icon theme holds the new logo mark (a blue-to-cyan "P.") and
+  inherits Papirus-Dark first; Adwaita, AdwaitaLegacy and gnome are fallbacks. Menus, notifications and
+  the bar use it.
+- **A floating bar.** waybar floats with rounded corners and margins and uses Font Awesome symbols. Its
+  status area is icons only (network, volume capped at 100 %, battery) with a two-line clock: time over
+  date, in UTC, no tooltip. Tor and I2P pills show connecting (amber), ready (cyan) or failed (red), and
+  a click opens the matching Connection Assistant. The state comes from `prestium-netstatus.service`
+  (its own user, read-only, writes only `/run/prestium/netstatus`, never copies log text). A clock symbol
+  shows until the time is set over Tor (see Network). Hover colours fade in; labwc and mako have no open
+  or close animations.
+- **The menu opens in one place, grouped by task.** The Menu button and Super+Space open it at the
+  bottom-left, its bottom edge on the bar; right-clicking the desktop opens it at the pointer. The top
+  level has I2P Browser, Tor Browser, I2P Router Console, Text Editor and File Manager, then Office,
+  Multimedia, Accessories, Security (KeePassXC, Kleopatra, Metadata Cleaner, Unlock Encrypted Volume,
+  Feather), Communication, Sharing (OnionShare, Torrents), Network and System, then Log Out…, Restart…
+  and Shut Down…. Networked apps name their network ("Gajim (XMPP, Tor)", "The Lounge (IRC, I2P)",
+  "Claws Mail (Email, I2P)"). Every entry has an icon Debian ships, and wording, ellipses and title case
+  are the same everywhere.
 - **Notifications.** One look per urgency (low: grey edge, 5 s; normal: blue edge, 8 s; critical: red
-  edge, stays). The volume and brightness display is compact, at the top centre. Optional quiet sounds,
-  off by default (System, Notification Sounds (On/Off)). labwc and mako have no open or close
-  animations, so there are no fades or slide-ins; the bar has colour transitions on hover.
-- **Wallpapers.** Three Prestium wallpapers (Horizon, Circuit, Mark), picked in System, Wallpaper. The
-  broker takes only one of those names from the user's setting, never a path.
-- **One dark look across the desktop.** GTK 3 and 4 apps use Adwaita's dark variant (prefer-dark);
-  GTK 2 (Pidgin) uses Adwaita-dark from `gnome-themes-extra`. Qt 5 and 6 apps use adwaita-qt's
-  Adwaita-Dark, and KDE apps (Kleopatra) get matching colours from `/etc/xdg/kdeglobals`. Audacity,
-  KeePassXC and the foot terminal (11 pt) are dark too. A new labwc theme, Prestium-Dark, has Adwaita
-  colours, rounded corners and shadows. The bar, notifications, menus and lock screen match, and
-  Cantarell is the UI font. Tor Browser keeps its own fonts. `dconf-cli` is installed and the build
-  fails if the system dconf database isn't compiled.
-- **Desktop refinements.** A dark gradient wallpaper (2560×1440); a lock screen in the same colours
-  with a caps-lock indicator; icons beside menu items and submenus (icon theme Prestium, with
-  `adwaita-icon-theme-legacy`); a taller bar with rounded buttons, the date beside the time and "UTC"
-  after it, volume capped at 100 %; notifications with app icons, where only identical repeats are
-  grouped and critical alerts always show. White text sits on the darker blue `#1c71d8`.
-- **Desktop fixes (UI review of 96db20b).** Alt+arrows go to the browsers again (Back/Forward), not
-  labwc; Super+Return opens the terminal. nm-applet and lxpolkit no longer hold up the VM, image-age
-  and safety notices at login. The zenity window rule matches zenity 4. Log Out asks first; Restart and
-  Shut Down have named buttons. One "Unlock Encrypted Volume" entry. Long dialog texts wrap instead of
-  running off small screens, and file names in dialogs are shown as text. The Prestium tools have
-  keyboard shortcuts, a highlighted default button and correct panel names and icons. PCManFM
-  thumbnails are really off now (`[ui] show_thumbnail=0`), with Debian's other settings kept. Boot
-  menu labels take the version from the image.
-- **Private OnionShare addresses open in Tor Browser.** Tor Browser's Tor socket now has `ExtendedErrors`
-  (as Tor Browser's own launcher sets), so Tor Browser asks for the private key instead of
-  failing with "Unable to connect". Ticking "Remember this key" no longer makes the prompt fail: onion-grater
-  drops `Flags=Permanent`, so the key lasts until Tor restarts. That means "Remember this key" only
-  remembers it until Tor restarts or Prestium shuts down; nothing is written to disk. The key prompt's
-  other arguments (onion address, x25519 key, optional ClientName) are checked before they reach Tor.
-- **The menu opens in one place.** The Menu button and Super+Space always open it at the bottom-left,
-  its bottom edge on the bar above the button, wherever the pointer moves. Right-clicking the desktop still opens it at the pointer.
-- **One title bar per window, one desktop.** Every window gets labwc's title bar, and GTK and
-  libadwaita apps no longer draw a second close button in their header bar (`button-layout ':'`).
-  The desktop count is now 1 (four desktops had no indicator in the bar).
-- **I2P settings need confirmation (review N-2).** Apply in the I2P Connection Assistant now goes
-  through the Wayland broker, which shows the change in a dialog only the person at the screen can
-  answer, then logs it and sends a notification. sudo allows only reading the settings. The helper
-  also checks that the restarted listener on 4444 belongs to i2pd and reports a failed rollback.
-  onion-grater refuses to start without AppArmor.
-- **Broker dialogs can't be answered by other programs (verification V-1, V-2).** The I2P
-  confirmation and the lock-screen password form run with accessibility off (`GTK_A11Y=none`,
-  `NO_AT_BRIDGE=1`). Before, any program of the user could press Apply or fill in the password through
-  the accessibility bus. The I2P dialog also names the program that asked. A dialog that times out now
-  closes instead of staying on screen and doing nothing. The bar and display settings (waybar,
-  wdisplays) run with accessibility off too, so other programs can't press their buttons. The "Asked
-  for by" line replaces control characters, has a length limit, and shows a script's path, marked as
-  self-reported.
-- **Smaller desktop fixes (verification of 2cb8ec4).** The menu's bottom edge sits on the bar (it
-  opened 34 px above it). With Caps Lock on, keypresses show on the lock screen ring again. Brightness,
-  Feather, IRC, Communication and Restart have menu icons that Debian actually ships. The terminal's
-  red, blue, magenta and grey are easier to read on its dark background. Notifications show their icons
-  (mako's `icon-path` lists the installed themes), and Minimize and Maximize have icons in the window menu.
-
-- **One menu, grouped by task, that names each app's network.** New Security (KeePassXC, Kleopatra,
-  Metadata Cleaner, Unlock Encrypted Volume, Feather) and Sharing (OnionShare, Torrents) submenus.
-  Networked apps say which network they use: "Gajim (XMPP, Tor)", "The Lounge (IRC, I2P)",
-  "Claws Mail (Email, I2P)". Log Out… sits beside Restart… and Shut Down…. The Tor Connection
-  Assistant has Tor's onion icon. Ellipses, title case and notification senders ("Prestium") are the same everywhere.
-- **The lock-screen password dialog no longer promises admin prompts it doesn't serve.** No prompt in
-  Prestium asks for it, so lxpolkit is no longer started. **When the screen is due to lock automatically
-  and no password is set, a notification says it is not locked** instead of opening a dialog nobody sees.
-- Restart… in the I2P Connection Assistant uses the same confirmation as the menu (with the live-system
-  warning). The image-age notice mentions the Browser Updater. The README says command-line tools use
-  the I2P outproxy (`http_proxy`), not Tor. The reseed and torrent messages point to steps that exist.
+  edge, stays and always shows), with app icons; only identical repeats are grouped. The volume and
+  brightness display is compact, at the top centre. Optional quiet sounds, off by default (System,
+  Notification Sounds (On/Off)). The VM, image-age and safety notices are no longer held up at login.
+- **Wallpapers and lock screen.** Three Prestium wallpapers (Horizon, Circuit, Mark) are picked in
+  System, Wallpaper; the broker takes only one of those names, never a path. The lock screen uses the
+  palette and shows Caps Lock and keypresses on its ring.
+- **Keys and dialogs.** Alt+arrows go to the browsers (Back/Forward), not labwc; Super+Return opens the
+  terminal. Log Out asks first; Restart and Shut Down have named buttons, and Restart… in the I2P
+  Connection Assistant uses the same confirmation. Long dialog texts wrap on small screens, file names
+  are shown as text, and the Prestium tools have keyboard shortcuts and a highlighted default button.
+  PCManFM makes no thumbnails (`[ui] show_thumbnail=0`). Boot menu labels take the version from the
+  image.
+- **Broker dialogs can't be answered by other programs.** The I2P settings confirmation and the
+  lock-screen password form run on the compositor's full socket with accessibility off (`GTK_A11Y=none`,
+  `NO_AT_BRIDGE=1`), and so do waybar and wdisplays, so other programs can't press their buttons or fill
+  in the password. They use the Prestium colours from a root-owned directory. A dialog that times out
+  closes. The I2P dialog names the program that asked; that line is self-reported, normalised (NFC),
+  stripped of control and invisible characters, length-limited, and shows up to three quoted arguments.
+- **Locking.** lxpolkit is no longer started (no prompt in Prestium used it), so the password dialog
+  says only that it unlocks the screen. When the screen is due to lock automatically and no password
+  is set, a notification says it is not locked instead of opening a dialog nobody sees. Lock Screen
+  from the menu still asks for a password first.
+- **Private OnionShare addresses open in Tor Browser.** Tor Browser's Tor socket has `ExtendedErrors`,
+  so Tor Browser asks for the private key instead of failing with "Unable to connect". onion-grater
+  drops `Flags=Permanent`, so "Remember this key" keeps the key until Tor restarts or Prestium shuts
+  down; nothing is written to disk. The key prompt's arguments are checked before they reach Tor.
+- **I2P settings need confirmation.** Apply in the I2P Connection Assistant goes through the Wayland
+  broker, which shows the change in a dialog only the person at the screen can answer, then logs it and
+  sends a notification. sudo allows only reading the settings. The helper checks that the restarted
+  listener on 4444 belongs to i2pd and reports a failed rollback.
+- The image-age notice mentions the Browser Updater. The README says command-line tools use the I2P
+  outproxy (`http_proxy`), not Tor. The reseed and torrent messages point to steps that exist.
 
 ### Apps
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
@@ -358,8 +339,9 @@ Not changed in 2.1, so you know where the edges are:
 A booted 2.1 ISO should still be used to confirm: Audacity (start, microphone, second-file handoff, no
 reach to Tor or I2P proxies); the Tor Connection Assistant and Nyx through onion-grater, including
 NEWNYM and the circuit display; Browser Updater on the live overlay (download through Tor or I2P,
-bind-mount install and Reset, onion-grater's mount namespace, RAM freed after the last Reset); and
-bridges after the tighter loopback firewall rules.
+bind-mount install and Reset, onion-grater's mount namespace, RAM freed after the last Reset); bridges
+after the tighter loopback firewall rules; the onion time sync and boot clock randomization; and the
+new look (Kvantum, libadwaita accent, Kleopatra's colours, the bar's pills and Papirus-Dark tray icons).
 
 ## 2.0: changes since Prestium 1.9.1.3
 
