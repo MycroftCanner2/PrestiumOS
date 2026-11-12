@@ -32,6 +32,11 @@ profile prestium_pinentry /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11} 
   /dev/tty rw,
   /dev/pts/* rw,
   network unix stream,
+  # 2.1: every app (prestium-run) gets WAYLAND_DISPLAY=/run/prestium-wl/<uid>/apps, and gpg passes it to
+  # the agent's pinentry. Without this the prompt could not open its window, and the program waiting
+  # on it (Claws Mail signing or encrypting) hung with no prompt on screen. Never the broker's socket.
+  @{run}/prestium-wl/[0-9]*/apps rw,
+  deny @{run}/prestium-wl/broker rw,
   # (nameservice-strict, not nameservice: no inet or netlink rules come in through an abstraction)
   deny network inet,
   deny network inet6,

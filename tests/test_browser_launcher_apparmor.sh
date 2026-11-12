@@ -39,8 +39,8 @@ grep -q 'deny /usr/local/sbin/\*\* mrwx' "$LA" && grep -q 'deny /run/tor/\*\* rw
 grep -q '/usr/bin/bwrap mrCx -> bwrap,' "$LA" && ok "bubblewrap in a child profile" || bad "bwrap transition"
 grep -q 'firefox.real Px -> torbrowser_firefox' <<<"$t" && grep -q 'librewolf{,-bin} Px -> librewolf' <<<"$l" && ok "browsers keep their own profiles inside" || bad "browser transitions"
 # pinentry: no writes except the terminal, no exec, no network but unix
-pw=$(grep -v '^\s*#\|deny' "$PE" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '^\s*/dev/(tty|pts/\*) rw,')
-[ -z "$pw" ] && ok "pinentry: writes only its terminal" || bad "pinentry writes: $pw"
+pw=$(grep -v '^\s*#\|deny' "$PE" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '^\s*(/dev/(tty|pts/\*)|@\{run\}/prestium-wl/\[0-9\]\*/apps) rw,')
+[ -z "$pw" ] && ok "pinentry: writes only its terminal and the apps Wayland socket" || bad "pinentry writes: $pw"
 grep -Eq '\s[a-zA-Z]*[iPpCcUu]x[a-zA-Z]*(\s*->\s*\S+)?,\s*$' <<<"$(grep -v '^\s*#' "$PE")" && bad "pinentry may run programs" || ok "pinentry: runs nothing"
 grep -v '^\s*#' "$PE" | grep -v deny | grep -q 'network inet' && bad "pinentry has network" || ok "pinentry: no network rule of its own"
 grep -q 'abstractions/nameservice>' "$PE" && bad "pinentry includes nameservice (inet rules)" || ok "pinentry: nameservice-strict"

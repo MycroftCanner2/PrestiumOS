@@ -49,4 +49,7 @@ conf "pinentry-program /home/user/.x/evil"; run2; flagged && ok "re-flagged afte
 grep -q '/usr/local/\*) P=/proc; FLAG=/usr/local/lib/prestium/safety-flag' "$S" && ok "installed copy ignores PRESTIUM_* overrides" || bad "overrides"
 grep -q '^profile prestium_pinentry /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11} {' "$I/etc/apparmor.d/prestium.pinentry" && ok "pinentry profile attached" || bad "pinentry attachment"
 grep -q 'timers.target.wants/prestium-gnupg-check.timer' "$I/usr/share/prestium/build/systemd-wants.txt" && ok "timer enabled" || bad "timer not enabled"
+grep -q '^  @{run}/prestium-wl/\[0-9\]\*/apps rw,' "$I/etc/apparmor.d/prestium.pinentry" && grep -q 'deny @{run}/prestium-wl/broker rw,' "$I/etc/apparmor.d/prestium.pinentry" \
+  && ok "pinentry: apps' Wayland socket, not the broker's" || bad "pinentry Wayland socket"
+grep -qx 'pinentry-timeout 120' "$I/etc/gnupg/gpg-agent.conf" && ok "gpg-agent: prompt times out" || bad "pinentry-timeout"
 exit $f
