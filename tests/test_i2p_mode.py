@@ -34,7 +34,7 @@ def run(cmd, req=None, listen=True, uid=None):
         srv = socket.socket(); srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         srv.bind(("127.0.0.1", port)); srv.listen(8)
     env = dict(os.environ, PRESTIUM_I2P_DIR=D, PRESTIUM_SAFEFILE=SAFE, PRESTIUM_SYSTEMCTL=SYSTEMCTL,
-               PRESTIUM_I2PD_PORTFILE=os.path.join(T, "port"), PRESTIUM_I2P_LOCK=os.path.join(T, "lock"),
+               PRESTIUM_I2PD_PORTFILE=os.path.join(T, "port"), PRESTIUM_I2P_LOCK=os.path.join(T, "lock"), PRESTIUM_I2P_APPLY_LOCK=os.path.join(T, "apply.lock"),
                PRESTIUM_I2P_PROXY_PORT=str(port), PRESTIUM_I2P_WAIT="3", PRESTIUM_I2PD_UID=str(uid))
     r = subprocess.run([sys.executable, "-I", HELPER, cmd], input=req if isinstance(req, str) else json.dumps(req or {}),
                        capture_output=True, text=True, env=env, timeout=60)

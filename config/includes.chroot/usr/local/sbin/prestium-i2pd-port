@@ -11,8 +11,20 @@
 # 2.0 r6: if ferm reload fails after the conf/port file are written, restore the previous conf,
 # remove the run file (fail closed: no inbound rule) and exit non-zero so i2pd does not start
 # listening on a firewalled port. Also set a per-boot web-console password (auth=true).
+# 2.1 (shared config lock): i2pd.conf is read, edited and written under /run/prestium-hops.lock, the
+# lock the I2P Connection Assistant (prestium-i2p-mode apply) holds while it edits i2pd's files. The
+# assistant releases it before it restarts i2pd (which runs this script), so there is no deadlock; neither
+# side can lose the other's edit. Wait at most 10 s, then fail loudly: i2pd doesn't start, nothing changed.
 set -e
 SAFE=/usr/local/lib/prestium/safefile
+LOCK=/run/prestium-hops.lock
+exec 9>>"$LOCK"
+if ! flock -w 10 9; then
+  msg="i2pd's configuration stayed locked for 10 s (I2P Connection Assistant?); nothing changed, i2pd not started"
+  echo "prestium-i2pd-port: $msg" >&2
+  logger -p daemon.err -t prestium-i2pd-port "$msg" 2>/dev/null || :
+  exit 1
+fi
 PORT=$(shuf -i 10000-30000 -n 1)
 # console password: URL-safe, no ':' (basic-auth URL embedding)
 CPASS=$(head -c 18 /dev/urandom | base64 | tr -d '+/=' | tr -d '\n' | head -c 24)

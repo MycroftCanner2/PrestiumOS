@@ -163,6 +163,18 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   and the MAC guard read `PRESTIUM_*` variables only when run from the source tree.
 
 ### Network, firewall and privileges
+- **i2pd's port script and the I2P Connection Assistant no longer overwrite each other.**
+  `prestium-i2pd-port` (run before every i2pd start) now takes the same lock as the assistant's root
+  helper (`/run/prestium-hops.lock`) before it reads `i2pd.conf`. It waits at most 10 seconds; after
+  that it logs the reason to the journal and exits, so i2pd doesn't start and nothing changes. Apply
+  holds the lock only while it edits and writes the files (each written to a new file, then renamed),
+  and releases it before it restarts i2pd, because that restart runs the port script. Holding it
+  through the restart would deadlock. A separate lock (`/run/prestium-i2p-apply.lock`) still allows one
+  Apply at a time through the whole restart. Apply waits at most 30 seconds for the config lock, then
+  stops with nothing changed. A rollback takes the lock again and puts back the previous settings,
+  but keeps the port and console password the port script wrote in the meantime.
+  `test_i2pd_config_lock.py` runs both scripts at the same time with a stubbed systemctl and checks
+  for hangs and lost edits.
 - **Feather says I2P everywhere.** The menu and `settings.json` already used I2P (Feather's i2p mode
   through i2pd's SOCKS proxy 127.0.0.1:4447), but the firewall's comment still listed Feather on Tor's
   9050. It now lists Feather on 4447. Port 9050 stays open to the desktop user for Tor Browser, Gajim and

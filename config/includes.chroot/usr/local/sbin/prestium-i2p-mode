@@ -18,7 +18,17 @@
 # ExecStartPre writes again on every start), Tor, the console password.
 # /var/lib/i2pd belongs to i2pd, so both files are read and replaced only through safefile
 # (a symlink or special file is refused; new file created by root, then renamed over the name).
-import fcntl, json, os, re, subprocess, sys, time
+# 2.1 (shared config lock): two locks.
+#   /run/prestium-i2p-apply.lock  one Apply at a time; held for the whole Apply, restart included.
+#   /run/prestium-hops.lock       i2pd's config lock, shared with prestium-i2pd-port (i2pd's
+#                                 ExecStartPre, which rewrites the port and console password). Held only
+#                                 while the files are read, edited and written, and released BEFORE
+#                                 i2pd is restarted: the restart runs prestium-i2pd-port, which waits
+#                                 for this lock, so holding it across the restart would deadlock.
+#   Both sides wait a bounded time (here PRESTIUM_I2P_LOCK_WAIT, 30 s; the port script 10 s) and fail
+#   loudly (stderr and syslog) with nothing changed. A rollback takes the lock again, puts back the
+#   previous settings but keeps the port and console password the port script wrote meanwhile.
+import fcntl, json, os, re, subprocess, sys, syslog, time
 
 INSTALLED = os.path.abspath(sys.argv[0]).startswith("/usr/local/")
 def _test_env(name, default):
@@ -29,7 +39,9 @@ D = _test_env("PRESTIUM_I2P_DIR", "/var/lib/i2pd")
 SAFE = _test_env("PRESTIUM_SAFEFILE", "/usr/local/lib/prestium/safefile")
 SYSTEMCTL = _test_env("PRESTIUM_SYSTEMCTL", "/usr/bin/systemctl")
 PORTFILE = _test_env("PRESTIUM_I2PD_PORTFILE", "/run/prestium/i2pd.port")
-LOCK = _test_env("PRESTIUM_I2P_LOCK", "/run/prestium-hops.lock")   # shared with prestium-tunnel-hops
+LOCK = _test_env("PRESTIUM_I2P_LOCK", "/run/prestium-hops.lock")   # i2pd config lock, shared with prestium-i2pd-port
+APPLY_LOCK = _test_env("PRESTIUM_I2P_APPLY_LOCK", "/run/prestium-i2p-apply.lock")   # one Apply at a time
+LOCK_WAIT = float(_test_env("PRESTIUM_I2P_LOCK_WAIT", "30"))
 PROXY_PORT = int(_test_env("PRESTIUM_I2P_PROXY_PORT", "4444"))
 WAIT = int(_test_env("PRESTIUM_I2P_WAIT", "60"))
 I2PD_UID = int(_test_env("PRESTIUM_I2PD_UID", "2000"))   # i2pd's fixed uid (hook 0100)
@@ -161,6 +173,44 @@ def edit(tun, main, req):
     check(res, "i2pd.conf")
     return tun2, "\n".join(res) + "\n"
 
+def conf_lock():
+    """Take i2pd's config lock (shared with prestium-i2pd-port), waiting at most LOCK_WAIT seconds."""
+    lk = open(LOCK, "a")
+    end = time.monotonic() + LOCK_WAIT
+    while True:
+        try:
+            fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            return lk
+        except OSError:
+            if time.monotonic() >= end:
+                msg = "i2pd's configuration is locked (i2pd is starting?) for more than %g s" % LOCK_WAIT
+                print("prestium-i2p-mode: " + msg, file=sys.stderr)
+                try: syslog.openlog("prestium-i2p-mode"); syslog.syslog(syslog.LOG_ERR, msg)
+                except OSError: pass
+                lk.close()
+                return None
+            time.sleep(0.1)
+
+def unlock(lk):
+    fcntl.flock(lk, fcntl.LOCK_UN); lk.close()
+
+def carry_port(old, cur):
+    """old i2pd.conf with the keys prestium-i2pd-port owns (global port; [http] auth, user, pass)
+    taken from cur, so a rollback never undoes the port script's work."""
+    cs = sections(cur.splitlines())
+    own = {None: (cs[0][1], ("port",))}
+    for name, body in cs[1:]:
+        if name == "http": own["http"] = (body, ("auth", "user", "pass"))
+    res = []
+    for name, body in sections(old.splitlines()):
+        if name in own:
+            src, keys = own[name]
+            for k in keys:
+                v = get(src, k)
+                if v is not None: body = put(body, k, v)
+        res += body
+    return "\n".join(res) + "\n"
+
 def listening():
     """Is something listening on 127.0.0.1:PROXY_PORT? Read from /proc/net/tcp, never by
     connecting: the firewall lets only the desktop user (and the DoH resolver) reach 4444, so a
@@ -209,11 +259,14 @@ def main():
         print(json.dumps(dict(state(safe_read("tunnels.conf"), safe_read("i2pd.conf")), ok=True)))
         return 0
     req = parse(sys.stdin.read(4096))
-    lk = open(LOCK, "w")
+    op = open(APPLY_LOCK, "a")   # kept open (locked) until exit
     try:
-        fcntl.flock(lk, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(op, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except OSError:
         die("another I2P settings change is already running")
+    lk = conf_lock()
+    if lk is None:
+        die("i2pd's configuration is busy (i2pd is starting); nothing changed, try again")
     tun, main_ = safe_read("tunnels.conf"), safe_read("i2pd.conf")
     tun2, main2 = edit(tun, main_, req)
     try:
@@ -223,16 +276,21 @@ def main():
             try: safe_write(name, text)
             except OSError: pass
         die("%s; previous settings restored" % e)
+    unlock(lk)   # before the restart: i2pd's ExecStartPre (prestium-i2pd-port) takes this lock
     # review of 8f5b9ce (N-4): the restart's result counts, and a failed rollback is reported, not a traceback
     r = subprocess.run([SYSTEMCTL, "restart", "i2pd"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     if r.returncode == 0 and proxy_up():
         print(json.dumps(dict(state(tun2, main2), ok=True)))
         return 0
     why = "i2pd did not restart" if r.returncode else "i2pd did not come back with the new settings"
+    lk = conf_lock()
+    if lk is None:
+        die("%s, and restoring the previous settings failed (configuration locked); restart Prestium" % why)
     try:
-        safe_write("tunnels.conf", tun); safe_write("i2pd.conf", main_)
+        safe_write("tunnels.conf", tun); safe_write("i2pd.conf", carry_port(main_, safe_read("i2pd.conf")))
     except OSError as e:
         die("%s, and restoring the previous settings failed (%s); restart Prestium" % (why, e))
+    unlock(lk)
     subprocess.run([SYSTEMCTL, "restart", "i2pd"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     die("%s, so the previous settings were restored" % why)
 
