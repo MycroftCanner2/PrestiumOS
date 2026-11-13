@@ -80,13 +80,13 @@ if command -v apparmor_parser >/dev/null; then
       grep -q 'kdbx' <<<"$al" && bad "$f may open KeePassXC databases" || ok "$f: no *.kdbx"; fi
     # never a write anywhere in the home outside the file folders and the app's own dot directories
     hw=$(grep -E '@\{HOME\}/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' \
-      | grep -vE '@\{HOME\}/(\.Private/|tmp/|Documents/Metadata Cleaner/\*\*\.cleaned\.\*" |Documents/[A-Za-z ]+/(\*\*)?"? |Pictures/vlcsnap|\.cache/|\.config/|\.local/share/|\.local/state/|\.audacity-data/|\.gnupg/|\*\*\.kdbx|\.Xauthority|\.fonts|\.recently)' \
+      | grep -vE '@\{HOME\}/(\.Private/|tmp/|Documents/\.remove-metadata\*/\*\*\.cleaned\.\*" |Documents/"? |Documents/\*\*"? |Pictures/vlcsnap|\.cache/|\.config/|\.local/share/|\.local/state/|\.audacity-data/|\.gnupg/|\*\*\.kdbx|\.Xauthority|\.fonts|\.recently)' \
       | grep -vE '@\{HOME\}/(\.\{,cache/\}fontconfig|tmp/|\.xsession-errors w|\.local/ rw|\.pulse-cookie|\.pulse/)' )
-    [ -z "$hw" ] && ok "$f: writes only its own output folder and its own directories" || bad "$f home writes: $hw"
-    # 2.1 (L-5): no write in a shared file folder (only its own ~/Documents/<App>/, or mat2's cleaned copies)
-    sw=$(grep -E '@\{HOME\}/(\{Desktop|Desktop/|Documents/\*|Documents/ |Downloads/|Pictures/\*|Music/|Videos/|Public/|Templates/|OnionShare/)' <<<"$al" \
-      | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '\*\*\.cleaned\.\* |Pictures/vlcsnap')
-    [ -z "$sw" ] && ok "$f: no write in a shared file folder (L-5)" || bad "$f shared folder writes: $sw"
+    [ -z "$hw" ] && ok "$f: writes only the shared ~/Documents and its own directories" || bad "$f home writes: $hw"
+    # 2.1 (L-5, revised): the shared ~/Documents is writable (the editors' folder); no write in any other file folder
+    sw=$(grep -E '@\{HOME\}/(\{Desktop|Desktop/|Downloads/|Pictures/\*|Music/|Videos/|Public/|Templates/|OnionShare/)' <<<"$al" \
+      | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE 'Pictures/vlcsnap')
+    [ -z "$sw" ] && ok "$f: no write outside the shared ~/Documents (L-5)" || bad "$f shared folder writes: $sw"
     # 2.1 (review of 6bf1234): volumes under /media are read-only (KeePassXC keeps its *.kdbx files there)
     mw=$(grep -E '\s/media/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '/media/\*\*\.kdbx(\.\*)? rwk,')
     [ -z "$mw" ] && ok "$f: no write under /media (but KeePassXC's .kdbx)" || bad "$f /media writes: $mw"

@@ -28,13 +28,14 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Enforced AppArmor profiles** for the browsers, Claws Mail, Gajim, Pidgin, OnionShare, Feather,
   LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra and the programs that open
   downloaded files.
-- **Separate folders per app:** each confined app saves only in its own folder (`~/Downloads/<App>`
-  for the browsers, mail and chat, `~/Documents/<App>` for the editors, `~/Tor Browser` for Tor
-  Browser), so one compromised app can't change files another app opens. To upload or attach a file,
-  put it in that app's folder (mail and chat can also take files directly from `~/Downloads`).
-  Attaching a document you made needs a manual copy: Claws Mail, Gajim and Pidgin can't read
-  `~/Documents/<App>`, so copy it to `~/Downloads` first. Volumes under `/media` are read-only for the
-  apps; move files onto them with the file manager.
+- **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail, Gajim
+  and Pidgin) and `~/Documents` (LibreOffice, GIMP, FeatherPad, File Roller, Xarchiver, Audacity,
+  Kleopatra, Metadata Cleaner and Feather). Only three folders are app-specific: the I2P Browser's
+  (`~/Downloads/I2P Browser`), I2P Torrents' (`~/Downloads/Torrents`) and Tor Browser's
+  (`~/Tor Browser`); the shared apps can't write in those three. The file manager pins exactly those
+  five, labelled i2P Browser, i2P Torrents, Tor Browser, Documents and Downloads. To attach a document
+  you made, copy it from `~/Documents` to `~/Downloads` first: mail and chat can't read `~/Documents`.
+  Volumes under `/media` are read-only for the apps; move files onto them with the file manager.
 - **Network privacy:** MAC address spoofing with a guard against leaks of the real address,
   default-deny firewall that stays closed when stopped, no system DNS, IPv6 off, no LAN access.
   In the terminal, `http_proxy` and `https_proxy` point to i2pd (127.0.0.1:4450), an I2P-only proxy with

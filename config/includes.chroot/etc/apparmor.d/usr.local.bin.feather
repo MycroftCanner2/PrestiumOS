@@ -28,8 +28,7 @@ profile feather /usr/local/bin/feather {
   owner @{HOME}/Monero/ rw,
   owner @{HOME}/Monero/** rwk,
   owner @{HOME}/Documents/ r,
-  owner @{HOME}/Documents/Feather/ rw,
-  owner @{HOME}/Documents/Feather/** rwk,
+  owner @{HOME}/Documents/** rwk,
 
   include if exists <local/usr.local.bin.feather>
 }

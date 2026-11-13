@@ -1,6 +1,6 @@
 [Common]
-attach_save_dir=/home/user/Downloads/Mail
-attach_load_dir=/home/user/Downloads/Mail
+attach_save_dir=/home/user/Downloads
+attach_load_dir=/home/user/Downloads
 hide_timezone=1
 render_html=1
 invoke_plugin_on_html=0

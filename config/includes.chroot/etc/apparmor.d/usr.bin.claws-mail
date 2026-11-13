@@ -2,7 +2,7 @@
 # 127.0.0.1:7659/7660). ENFORCED. Like the other apps it gets the shared Prestium rules: no sudo, su
 # or pkexec, no Prestium helpers (Tor mode, tunnel hops, reseed, date), no Tor control socket, no
 # system bus, no full Wayland socket, no other apps' data. Of $HOME it may use only ~/.claws-mail,
-# its mailbox ~/Mail and ~/Downloads/Mail (saving and attaching files; 2.1, L-5), so a compromise of Claws cannot
+# its mailbox ~/Mail and the shared ~/Downloads (saving and attaching files; 2.1, L-5), so a compromise of Claws cannot
 # change Tor, I2P or desktop settings, add autostart entries, or read browser and wallet data.
 # GnuPG (pgpcore/pgpmime/pgpinline) runs in a child profile that may use ~/.gnupg and nothing else:
 # Claws itself can't read the keyring files. Not yet tested on a booted ISO.
@@ -32,13 +32,14 @@ profile claws-mail /usr/bin/claws-mail {
   # (older versions used /tmp); without this it can't create the directory and exits at start
   owner @{run}/user/[0-9]*/claws-mail/ rw,
   owner @{run}/user/[0-9]*/claws-mail/* rwk,
-  # 2.1 (L-5): its own download folder, ~/Downloads/Mail, is the only place it writes files. Attachments are saved there;
+  # 2.1 (L-5): the shared ~/Downloads folder is the only place it writes files. Attachments are saved there;
   # to attach a file, put it there or directly in ~/Downloads.
-  # It may read the files you put directly in ~/Downloads (not another app's folder in it).
-  owner @{HOME}/Downloads/ r,
-  owner @{HOME}/Downloads/* r,
-  owner "@{HOME}/Downloads/Mail/" rw,
-  owner "@{HOME}/Downloads/Mail/**" rwk,
+  # It may read the files you put directly in ~/Downloads.
+  owner @{HOME}/Downloads/ rw,
+  owner @{HOME}/Downloads/* rwk,
+  # the two folders that stay app-specific: never the I2P Browser's or I2P Torrents'
+  deny "@{HOME}/Downloads/I2P Browser/**" rw,
+  deny "@{HOME}/Downloads/Torrents/**" rw,
 
   # OpenPGP: gpg and its tools in their own profile (below)
   /usr/bin/gpg Cx -> gpg,

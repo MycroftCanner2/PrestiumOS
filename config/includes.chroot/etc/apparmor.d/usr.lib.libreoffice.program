@@ -1,6 +1,6 @@
 # Prestium 2.0 r9: LibreOffice, ENFORCED, with no network at all (documents are a common exploit
 # vector, and an office suite doesn't need to go online here). It may open and save documents in
-# the usual user folders, saves only in ~/Documents/LibreOffice (2.1, L-5), and uses its own profile. No sudo, no Prestium helpers, no system bus.
+# the usual user folders, saves only in the shared ~/Documents (2.1, L-5), and uses its own profile. No sudo, no Prestium helpers, no system bus.
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
@@ -28,14 +28,14 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   owner @{HOME}/.cache/libreoffice/** rwk,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/ r,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/** r,
-  # 2.1 (L-5): it saves only in its own folder, so a crafted document can't change a file another app
-  # wrote or will open. A document opened from elsewhere opens, but saving it in place fails (AppArmor
-  # denies the write): save it with "Save As" into ~/Documents/LibreOffice, the default folder
+  # 2.1 (L-5): it saves only in the shared ~/Documents folder, so a crafted document can't change a
+  # file in ~/Downloads or the Tor Browser's folder. A document opened from elsewhere opens, but saving it in place fails (AppArmor
+  # denies the write): save it with "Save As" into ~/Documents, the default folder
   # (2.1, review of 6bf1234: /usr/lib/libreoffice/share/registry/prestium.xcd sets that Work path and
   # turns off lock files, UseLocking=false, so no ".~lock.<name>#" file is written next to a document;
   # nothing else in the home is writable for one, and Prestium is single-user)
-  owner @{HOME}/Documents/LibreOffice/ rw,
-  owner @{HOME}/Documents/LibreOffice/** rwk,
+  owner @{HOME}/Documents/ rw,
+  owner @{HOME}/Documents/** rwk,
   # 2.1 (review of 6bf1234): unlocked VeraCrypt/LUKS volumes are read-only (no shared "/media/** rwk");
   # move a saved document onto a volume with the file manager
   /media/ r,

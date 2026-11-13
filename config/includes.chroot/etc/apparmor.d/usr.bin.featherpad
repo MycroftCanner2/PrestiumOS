@@ -8,15 +8,15 @@ include <tunables/global>
 profile featherpad /usr/bin/{featherpad,fpad} {
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-write>
-  # 2.1 (L-5): the only folder in the home it may write: its own output folder
-  owner "@{HOME}/Documents/FeatherPad/" rw,
-  owner "@{HOME}/Documents/FeatherPad/**" rwkl,
+  # 2.1 (L-5): the shared ~/Documents folder is the only folder in the home it may write
+  owner @{HOME}/Documents/ rw,
+  owner @{HOME}/Documents/** rwkl,
   /usr/bin/{featherpad,fpad} mr,
   owner @{HOME}/.config/featherpad/ rw,
   owner @{HOME}/.config/featherpad/** rwk,
   owner @{HOME}/.local/share/featherpad/ rw,
   owner @{HOME}/.local/share/featherpad/** rwk,
-  # 2.1 (review of 6bf1234): Qt's file dialog reads its sidebar from here (~/Documents/FeatherPad is listed);
+  # 2.1 (review of 6bf1234): Qt's file dialog reads its sidebar from here (the shared ~/Documents is listed);
   # read-only, so it can't change what other Qt apps' dialogs show
   owner @{HOME}/.config/QtProject.conf r,
   # a running instance is found over D-Bus; never another program

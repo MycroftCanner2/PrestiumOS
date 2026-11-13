@@ -2,7 +2,7 @@
 # 2.1: Feather's network is I2P everywhere: the menu label, both settings.json copies (proxy 2 =
 # Feather's Config::Proxy::i2p, SOCKS host 127.0.0.1, port = i2pd's [socksproxy] port), ferm (that port
 # is open to "user"; the 9050 comment no longer names Feather) and the AppArmor profile (no exec, so no
-# bundled Tor, no Documents beyond its own folder).
+# bundled Tor; the shared ~/Documents is the only file folder it writes).
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); I=$R/config/includes.chroot; fail=0
 ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }
 port=""
@@ -35,7 +35,8 @@ r=$(grep -vE '^\s*#' "$A")
 grep -qE '^\s*(owner\s+|audit\s+)?/\S*\s+[a-zA-Z]*x[a-zA-Z]*\s*(->.*)?,\s*$|\s(ix|px|Px|ux|Ux|cx|Cx|pix|Pix|cix|Cix)\s+/' <<<"$r" && bad "feather profile allows exec" || ok "feather: no exec rules (no bundled Tor)"
 grep -qE 'ptrace|capability|/run/tor|9050|control' <<<"$r" && bad "feather: ptrace/capability/Tor control" || ok "feather: no ptrace, capabilities or Tor control"
 grep -q 'include <abstractions/prestium-app-base>' <<<"$r" && ok "feather: prestium-app-base" || bad "feather: base abstraction missing"
-grep -qE 'Documents/(\*\*|) *rw|Downloads' <<<"$r" && bad "feather writes shared folders" || ok "feather writes only its own folders"
+grep -qE 'Downloads' <<<"$r" && bad "feather writes shared folders" || ok "feather writes no shared download folder"
+grep -qE 'Documents/\*\* rwk' <<<"$r" && ok "feather writes the shared ~/Documents" || bad "feather: shared ~/Documents missing"
 grep -q 'usr.local.bin.feather' "$R/config/hooks/live/0600-prestium-apparmor.hook.chroot" && ok "profile installed and enforced by hook 0600" || bad "hook 0600 lost feather"
 grep -q '\bfeather\b' "$I/usr/local/bin/prestium-safety-notify" && ok "safety notice watches the feather profile" || bad "safety notify misses feather"
 exit $fail

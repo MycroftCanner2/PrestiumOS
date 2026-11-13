@@ -37,16 +37,17 @@ profile pidgin /usr/bin/pidgin {
   deny @{HOME}/.ssh/** rw,
   deny @{HOME}/.gnupg/** rw,
   deny @{HOME}/Tor\ Browser/** rw,
-  # plugins on any architecture, file transfers to ~/Downloads/Pidgin, links in Tor Browser (own sandbox)
+  # plugins on any architecture, file transfers to the shared ~/Downloads, links in Tor Browser (own sandbox)
   /usr/lib/@{multiarch}/purple-2/** mr,
   /usr/lib/@{multiarch}/pidgin/** mr,
-  # 2.1 (L-5): its own download folder, ~/Downloads/Pidgin, is the only place it writes files. Received files go there;
+  # 2.1 (L-5): the shared ~/Downloads folder is the only place it writes files. Received files go there;
   # to send a file, put it there or directly in ~/Downloads.
-  # It may read the files you put directly in ~/Downloads (not another app's folder in it).
-  owner @{HOME}/Downloads/ r,
-  owner @{HOME}/Downloads/* r,
-  owner "@{HOME}/Downloads/Pidgin/" rw,
-  owner "@{HOME}/Downloads/Pidgin/**" rwk,
+  # It may read the files you put directly in ~/Downloads.
+  owner @{HOME}/Downloads/ rw,
+  owner @{HOME}/Downloads/* rwk,
+  # the two folders that stay app-specific: never the I2P Browser's or I2P Torrents'
+  deny "@{HOME}/Downloads/I2P Browser/**" rw,
+  deny "@{HOME}/Downloads/Torrents/**" rw,
   /usr/bin/xdg-open ix,
   /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut} ix,
   # 2.1 (review): Px into the launcher profile, not Ux (see prestium.browser-launcher)

@@ -17,8 +17,8 @@
 	</pref>
 	<pref name='pidgin'>
 		<pref name='filelocations'>
-			<pref name='last_save_folder' type='path' value='/home/user/Downloads/Pidgin'/>
-			<pref name='last_open_folder' type='path' value='/home/user/Downloads/Pidgin'/>
+			<pref name='last_save_folder' type='path' value='/home/user/Downloads'/>
+			<pref name='last_open_folder' type='path' value='/home/user/Downloads'/>
 		</pref>
 		<pref name='plugins'>
 			<pref name='loaded' type='pathlist'>

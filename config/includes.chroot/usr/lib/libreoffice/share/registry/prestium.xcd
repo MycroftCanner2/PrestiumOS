@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- Prestium 2.1 (review of 6bf1234): LibreOffice defaults that match its AppArmor profile
-     (/etc/apparmor.d/usr.lib.libreoffice.program), which lets it write only ~/Documents/LibreOffice.
+     (/etc/apparmor.d/usr.lib.libreoffice.program), which lets it write only ~/Documents.
      Work: the default folder of Open and Save As. UseLocking=false: no ".~lock.<name>#" file next to
      a document (it could be written only in its own folder; Prestium is single-user).
      2.1 (UI pass): SymbolStyle colibre_dark: the dark variant of the shipped Colibre icons
@@ -21,7 +21,7 @@
     <node oor:name="Paths">
       <node oor:name="Work" oor:op="fuse">
         <prop oor:name="WritePath" oor:op="fuse">
-          <value>file:///home/user/Documents/LibreOffice</value>
+          <value>file:///home/user/Documents</value>
         </prop>
       </node>
     </node>

@@ -57,9 +57,9 @@ allow kleopatra $S/S.gpg-agent rw
 allow kleopatra $S/S.keyboxd rw
 allow kleopatra $S/S.dirmngr rw
 allow kleopatra $S/S.uiserver rw
-allow kleopatra $H/Documents/Kleopatra/letter.txt.gpg rw
-deny kleopatra $H/Documents/letter.txt.gpg w
-deny kleopatra $H/Downloads/Mail/letter.txt.gpg w
+allow kleopatra $H/Documents/letter.txt.gpg rw
+deny kleopatra $H/Downloads/letter.txt.gpg w
+deny kleopatra "$H/Downloads/I2P Browser/letter.txt.gpg" w
 allow kleopatra $H/Downloads/key.asc r
 deny kleopatra $G/gpg.conf w
 deny kleopatra $G/gpg-agent.conf w
@@ -136,21 +136,20 @@ echo "== mat2 (\"Remove metadata\"; ffmpeg and exiftool in bubblewrap)"
 run usr.bin.mat2 <<EOT
 allow mat2 /usr/bin/bwrap x:C
 allow mat2 /tmp/tmpab12cd/ w
-allow mat2 "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
-allow mat2 "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.mp4" r
-deny mat2 "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.mp4" w
+allow mat2 "$H/Documents/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
+allow mat2 "$H/Documents/.remove-metadata.Ab12Cd/1/clip.mp4" r
+deny mat2 "$H/Documents/.remove-metadata.Ab12Cd/1/clip.mp4" w
 deny mat2 $H/Downloads/clip.cleaned.mp4 w
-deny mat2 $H/Downloads/Mail/clip.cleaned.mp4 w
-deny mat2 $H/Documents/LibreOffice/clip.cleaned.mp4 w
+deny mat2 $H/Documents/clip.cleaned.mp4 w
 deny mat2 /media/user/STICK/clip.cleaned.mp4 w
-deny mat2 $H/Downloads/Mail/clip.mp4 w
+deny mat2 $H/Downloads/Torrents/clip.mp4 w
 deny mat2 $H/Downloads/clip.mp4 w
 $(bw mat2//bwrap)
 allow mat2//bwrap /usr/bin/ffmpeg x:i
 allow mat2//bwrap /usr/bin/exiftool x:i
 allow mat2//bwrap $H/Downloads/clip.mp4 r
-allow mat2//bwrap "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
-allow mat2//bwrap "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/photo.cleaned.heic_exiftool_tmp" w
+allow mat2//bwrap "$H/Documents/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
+allow mat2//bwrap "$H/Documents/.remove-metadata.Ab12Cd/1/photo.cleaned.heic_exiftool_tmp" w
 deny mat2//bwrap $H/Downloads/clip.cleaned.mp4 w
 deny mat2//bwrap $H/Downloads/photo.cleaned.heic_exiftool_tmp w
 deny mat2//bwrap "$H/Tor Browser/clip.cleaned.mp4" w
@@ -169,10 +168,10 @@ $(bw metadata-cleaner//bwrap)
 allow metadata-cleaner//bwrap /tmp/0123abcd.mp4 w
 deny metadata-cleaner//bwrap $H/Downloads/clip.cleaned.mp4 w
 allow metadata-cleaner /tmp/0123abcd.mp4 rw
-allow metadata-cleaner "$H/Documents/Metadata Cleaner/clip.mp4" rw
+allow metadata-cleaner "$H/Documents/clip.mp4" rw
 allow metadata-cleaner $H/Downloads/clip.mp4 r
 deny metadata-cleaner $H/Downloads/clip.mp4 w
-deny metadata-cleaner $H/Downloads/Mail/clip.mp4 w
+deny metadata-cleaner "$H/Downloads/I2P Browser/clip.mp4" w
 EOT
 
 echo "== GIMP (system configuration, plug-ins)"
@@ -202,7 +201,7 @@ allow audacity /dev/snd/pcmC0D0c rw
 allow audacity /run/user/1000/pulse/native rw
 allow audacity $H/.local/share/audacity/x rw
 allow audacity $H/.config/audacity/audacity.cfg rw
-allow audacity $H/Documents/Audacity/take1.aup3 rw
+allow audacity $H/Documents/take1.aup3 rw
 allow audacity $H/Music/take1.aup3 r
 deny audacity $H/Music/take1.aup3 w
 deny audacity $G/pubring.kbx r

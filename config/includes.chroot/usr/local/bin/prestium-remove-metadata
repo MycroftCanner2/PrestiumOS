@@ -3,14 +3,14 @@
 # Runs mat2 on the selected files, inside mat2's own bubblewrap sandbox (no network).
 # For each file it writes a cleaned copy "<name>.cleaned.<ext>" next to it; the original
 # is left unchanged. The result is shown in a dialog.
-# 2.1 (review of 6bf1234): mat2's AppArmor profile may write only its own folder,
-# ~/Documents/Metadata Cleaner, so a crafted file can't make it write into another app's folder.
+# 2.1 (review of 6bf1234): mat2's AppArmor profile may write only its own work folder,
+# ~/Documents/.remove-metadata.XXXXXX, so a crafted file can't make it write into ~/Downloads.
 # This script (run by the file manager, on your click) copies each selected regular file into a
 # fresh work folder there, runs mat2 on the copy, and moves the expected cleaned copy back next to
 # the original, only if it is a regular file and never over an existing file.
 [ $# -gt 0 ] || exit 0
 umask 077
-base="$HOME/Documents/Metadata Cleaner"
+base="$HOME/Documents"
 mkdir -p -- "$base" || exit 1
 work=$(mktemp -d -- "$base/.remove-metadata.XXXXXX") || exit 1
 trap 'rm -rf -- "$work"' EXIT

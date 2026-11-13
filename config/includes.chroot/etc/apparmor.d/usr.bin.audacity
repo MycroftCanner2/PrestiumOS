@@ -21,9 +21,9 @@ profile audacity /usr/libexec/prestium-audacity {
   include <abstractions/prestium-viewer-core>
   network inet stream,
   include <abstractions/prestium-viewer-write>
-  # 2.1 (L-5): the only folder in the home it may write: its own output folder
-  owner "@{HOME}/Documents/Audacity/" rw,
-  owner "@{HOME}/Documents/Audacity/**" rwkl,
+  # 2.1 (L-5): the shared ~/Documents folder is the only folder in the home it may write
+  owner @{HOME}/Documents/ rw,
+  owner @{HOME}/Documents/** rwkl,
   # 2.1 (ISO test): Audacity 3.x checks new plug-ins in a second copy of itself, its plug-in host
   # (PluginHost::Start: wxExecute("<own executable> --host <port>"), which reports back over TCP on
   # 127.0.0.1). rms.ny ("Measure RMS") is the one Nyquist plug-in Debian ships that is not in

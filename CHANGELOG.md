@@ -204,31 +204,36 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   a program a Prestium profile confines. The drop-in that lets apparmor.service run on the live overlay
   (Debian skips it when `/run/live/overlay/work` exists) is documented and tested. Tests:
   `test_apparmor_boot_load.sh`.
-- **Each confined app has its own download or output folder, and writes files nowhere else (L-5).** A
-  compromised app can no longer change a file another app wrote or will open. Network apps save in
-  `~/Downloads/<App>`: I2P Browser, Local Firefox, Mail (Claws attachments), Gajim and Pidgin (Tor
-  Browser keeps `~/Tor Browser`, I2P Torrents `~/Downloads/Torrents`). Editors save in
-  `~/Documents/<App>`: LibreOffice, GIMP, FeatherPad, File Roller, Xarchiver, Audacity, Kleopatra and
-  Metadata Cleaner (which cleans files in place, so copy a file there first), and Feather's
-  `~/Documents/Feather`. mat2 writes its `name.cleaned.ext` copy only in `~/Documents/Metadata Cleaner`
-  too; "Remove metadata" in the file manager copies the file there, runs mat2 and moves the cleaned copy
-  back next to the original (never over an existing file). Viewers and editors still open files from
-  every folder, but read-only. LibreOffice opens a document from elsewhere but can't save it in place
-  (use Save As; its default folder is `~/Documents/LibreOffice`), and it writes no `.~lock` files
-  (`UseLocking=false`, `/usr/lib/libreoffice/share/registry/prestium.xcd`).
-  The browsers see only their own folder, so to upload a file, put it there first, as with Tor Browser.
-  Mail and chat can also read files you put directly in `~/Downloads`, for attachments, but not another
-  app's folder: to attach a document, copy it from `~/Documents/<App>` to `~/Downloads` first.
+- **Two shared folders for the apps' files, and three app-specific ones (L-5, revised).** The local
+  Firefox, Claws Mail, Gajim and Pidgin all save in `~/Downloads`; LibreOffice, GIMP, FeatherPad,
+  File Roller, Xarchiver, Audacity, Kleopatra, Metadata Cleaner and Feather all save in `~/Documents`.
+  Only the browsers and torrents keep their own folders: the I2P Browser's `~/Downloads/I2P Browser`,
+  I2P Torrents' `~/Downloads/Torrents` and Tor Browser's `~/Tor Browser`, and the shared apps can't
+  write in those three (the local Firefox may still read `*.torrent` files in the I2P Browser's folder,
+  for I2P Torrents' Add .torrent). The file manager's pinned list is exactly those five, labelled
+  i2P Browser, i2P Torrents, Tor Browser, Documents and Downloads. mat2 writes its `name.cleaned.ext`
+  copy only in the "Remove metadata" work folder, `~/Documents/.remove-metadata.XXXXXX`; "Remove
+  metadata" in the file manager copies the file there, runs mat2 and moves the cleaned copy back next
+  to the original (never over an existing file; if that fails, the copy is left in `~/Documents`).
+  Viewers and editors still open files from every folder, but read-only. LibreOffice opens a document
+  from elsewhere but can't save it in place (use Save As; its default folder is `~/Documents`), and it
+  writes no `.~lock` files (`UseLocking=false`,
+  `/usr/lib/libreoffice/share/registry/prestium.xcd`).
+  The browsers see only their own folder (the local Firefox: files directly in `~/Downloads`), so to
+  upload a file, put it there first, as with Tor Browser.
+  Mail and chat can also read files you put directly in `~/Downloads`, for attachments, but not in
+  `~/Documents`: to attach a document, copy it from `~/Documents` to `~/Downloads` first.
   Unlocked volumes under `/media` are read-only for the editors, LibreOffice and mat2 (only KeePassXC
   writes its `.kdbx` there): move a file onto a volume with the file manager. Hook 0500 creates the
-  folders. The apps' settings point at them where the app has such a setting (LibreOffice's Work folder,
-  Xarchiver's extract folder, Audacity's save and export folders, the browsers', mail and chat apps'
-  download folders, in `/etc/skel` and the live user's home alike); GIMP, FeatherPad, File Roller and
-  Kleopatra have none and start in the home folder, which they can't write, so their folder is in the
-  file chooser's sidebar (GTK bookmarks; Qt's for FeatherPad and Kleopatra). (2.1, review of 6bf1234:
-  `/media` read-only, mat2 in its own folder, the editors' settings, the lock files, `/etc/skel` in
-  step with the live user's home and the second LibreWolf settings file, `~/Documents/Feather`, and
-  Pidgin's real file-folder settings: it has no `last_receive_folder`; received files use
+  I2P Browser's folder (Torrents is made by i2pd's helper, "Tor Browser" by its own launcher). The
+  apps' settings point at the shared folders where the app has such a setting (LibreOffice's Work
+  folder, Xarchiver's extract folder, Audacity's save and export folders, the browsers', mail and chat
+  apps' download folders, in `/etc/skel` and the live user's home alike); GIMP, FeatherPad, File Roller
+  and Kleopatra have none and start in the home folder, which they can't write, so the shared folders
+  are in the file chooser's sidebar (GTK bookmarks; Qt's for FeatherPad and Kleopatra). (2.1, review
+  of 6bf1234: `/media` read-only, mat2 in its own folder, the editors' settings, the lock files,
+  `/etc/skel` in step with the live user's home and the second LibreWolf settings file, and Pidgin's
+  real file-folder settings: it has no `last_receive_folder`; received files use
   `last_save_folder`.)
 - **The file manager makes no thumbnails and mounts no drives by itself.** PCManFM isn't confined, so it no
   longer decodes downloaded pictures for previews (`/etc/xdg/libfm/libfm.conf`). USB drives are mounted with
@@ -239,11 +244,11 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   FeatherPad, mat2, Metadata Cleaner, GIMP and Audacity run under enforced AppArmor profiles (no
   network, no camera, no admin tools, no other app's mail/chat/browser data, no OpenPGP keys or
   KeePassXC databases). They may read the file folders (Desktop, Documents, Downloads and the others),
-  save only in their own folder (see above) and use their own settings. Files outside those folders need to be moved into Documents first. VLC plays
+  save only in the shared ~/Documents folder (see above) and use their own settings. Files outside those folders need to be moved into Documents first. VLC plays
   local files only (no network streams). Loupe's image decoders and mat2's helpers keep their own
   bubblewrap sandbox, in a child profile with the same limits.
 - **KeePassXC and Kleopatra are confined too.** KeePassXC has no network and no browser integration.
-  Kleopatra and the GnuPG tools it starts may use `~/.gnupg`, read the file folders and save in `~/Documents/Kleopatra`; only dirmngr opens
+  Kleopatra and the GnuPG tools it starts may use `~/.gnupg`, read the file folders and save in `~/Documents`; only dirmngr opens
   TCP (through Tor), and passphrase prompts use a confined pinentry. Kleopatra may not write the GnuPG
   configuration files (those can name helper programs). The pinentry profile also applies when the
   session's own gpg-agent starts a prompt.

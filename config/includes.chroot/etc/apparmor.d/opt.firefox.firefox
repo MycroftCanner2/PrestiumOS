@@ -1,7 +1,7 @@
 # Prestium 2.0 r9: the local-only Firefox (/opt/firefox, "prestium-localfox") for Prestium's own
 # pages (I2P console, I2P Torrents, The Lounge: IRC (I2P) and IRC (Tor)), ENFORCED. Those pages show
 # content from the I2P and Tor networks (torrent names, IRC messages), so the browser is confined like
-# LibreWolf: its own profile, ~/Downloads/Local Firefox (2.1, L-5), read-only .torrent files in
+# LibreWolf: its own profile, the shared ~/Downloads folder, read-only .torrent files in
 # ~/Downloads/I2P Browser (2.1, for I2P Torrents), no other files in $HOME, no sudo or Prestium helpers, no Tor.
 # The firewall already limits it to 127.0.0.1 ports 7070, 7685, 9000 and 9010. Derived from the
 # LibreWolf profile.
@@ -91,11 +91,12 @@ profile prestium-localfox /opt/firefox/firefox{,-bin} {
   owner @{HOME}/.config/dconf/user r,
   /etc/dconf/** r,   # 2.0 r17
 
-  # the only user folder for saving and uploading files: its own (2.1, L-5), like Tor Browser's
-  # ~/Tor Browser; to upload a file, put it there
-  owner @{HOME}/Downloads/ r,
-  owner "@{HOME}/Downloads/Local Firefox/" rw,
-  owner "@{HOME}/Downloads/Local Firefox/**" rwk,
+  # the only user folder for saving and uploading files: the shared ~/Downloads (2.1, L-5);
+  # to upload a file, put it there
+  owner @{HOME}/Downloads/ rw,
+  owner @{HOME}/Downloads/* rwk,
+  # never the I2P Browser's or I2P Torrents' folders (the .torrent read below is the only exception)
+  deny "@{HOME}/Downloads/Torrents/**" rw,
   # 2.1: I2P Torrents' "Add .torrent" picker can open .torrent files the I2P Browser downloaded:
   # list ~/Downloads/I2P Browser and its subfolders, read *.torrent there. Read-only, nothing else in
   # that folder (the I2P Browser's other downloads stay unreadable), no write anywhere in it.

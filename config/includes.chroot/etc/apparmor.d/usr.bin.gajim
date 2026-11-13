@@ -1,5 +1,5 @@
 # Prestium 2.0 r9: Gajim (XMPP over Tor/I2P proxies), ENFORCED.
-# Gajim may use its own config, data and cache directories and ~/Downloads/Gajim (file transfers; 2.1, L-5).
+# Gajim may use its own config, data and cache directories and the shared ~/Downloads (file transfers; 2.1, L-5).
 # It can't run sudo or Prestium's helpers, read other apps' data, or open the system bus.
 # Links open in Tor Browser (its own sandbox); other programs can't be started from Gajim.
 # Not yet tested on a booted ISO.
@@ -37,13 +37,14 @@ profile gajim /usr/bin/gajim {
   # glibc's sem_open writes /dev/shm/sem.XXXXXX and then link()s it to its name, which needs "l".
   # Without it Gajim exits with PermissionError (Errno 13) in multiprocessing/synchronize.py.
   owner /dev/shm/sem.* rwkl,
-  # 2.1 (L-5): its own download folder, ~/Downloads/Gajim, is the only place it writes files. Received files go there;
+  # 2.1 (L-5): the shared ~/Downloads folder is the only place it writes files. Received files go there;
   # to send a file, put it there or directly in ~/Downloads.
-  # It may read the files you put directly in ~/Downloads (not another app's folder in it).
-  owner @{HOME}/Downloads/ r,
-  owner @{HOME}/Downloads/* r,
-  owner "@{HOME}/Downloads/Gajim/" rw,
-  owner "@{HOME}/Downloads/Gajim/**" rwk,
+  # It may read the files you put directly in ~/Downloads.
+  owner @{HOME}/Downloads/ rw,
+  owner @{HOME}/Downloads/* rwk,
+  # the two folders that stay app-specific: never the I2P Browser's or I2P Torrents'
+  deny "@{HOME}/Downloads/I2P Browser/**" rw,
+  deny "@{HOME}/Downloads/Torrents/**" rw,
 
   # links: Tor Browser, which runs in its own sandbox
   /usr/bin/xdg-open ix,
