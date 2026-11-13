@@ -142,8 +142,15 @@ else
 	ni=0
 	for i in live/initrd.img*; do
 		[ -f "$i" ] || continue
-		b=$(basename "$i")
-		if [ ! -f "$C/boot/$b" ] || ! cmp -s "$i" "$C/boot/$b"; then echo "E: binary/$i is not the chroot's /boot/$b"; exit 1; fi
+		# live-build puts the initrd into binary/live twice (initrd.img and initrd.img-<version>, hard
+		# links), but chroot/boot has only initrd.img-<version>: match by content, not by name (as 9040
+		# does for the kernel). $b is then the chroot's file name, which unmkinitramfs reads below.
+		src=
+		for k in "$C"/boot/initrd.img "$C"/boot/initrd.img-*; do
+			if [ -f "$k" ] && cmp -s "$i" "$k"; then src=$k; fi
+		done
+		if [ -z "$src" ]; then echo "E: binary/$i is not one of the chroot's /boot/initrd.img*"; exit 1; fi
+		b=${src##*/}
 		W=/tmp/prestium-initrd-9030
 		rm -rf "$C$W"
 		chroot "$C" unmkinitramfs "/boot/$b" "$W" || { echo "E: unmkinitramfs failed for $b"; exit 1; }

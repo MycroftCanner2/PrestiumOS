@@ -13,7 +13,8 @@
 #   - hook 9030 on a fake binary/ tree (after 9020): GRUB's EFI config searches for the per-build marker
 #     on the boot disk first and reboots when it is missing; a foreign option, a missing option, another
 #     root hash, chainloader, a foreign kernel, policy drift or a built-in kernel command line stop it
-#     (needs mtools and mkfs.msdos; grub-script-check when available)
+#     (needs mtools and mkfs.msdos; grub-script-check when available; its initramfs check needs a static
+#     busybox and user namespaces)
 #   - prestium-cmdline-check.service: before AppArmor and sysinit, reboots on failure, enabled
 #   - prestium-safety-notify alerts on a mismatch and when the check did not run
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); fail=0
@@ -190,6 +191,32 @@ if command -v mkfs.msdos >/dev/null && command -v mcopy >/dev/null && command -v
   mk; mcopy -o -i "$T/b/binary/boot/grub/efi.img" <(printf 'set prefix=(hd0)/boot/grub\nconfigfile (hd0)/boot/grub/grub.cfg\n') ::boot/grub/grub.cfg; t30 "an EFI config without live-build's search"
   mk; sed -i 's/^set default=0$/set default=2/' "$T/b/binary/boot/grub/config.cfg"; t30 "a default other than the first entry"
   mk; (cd "$T/b/binary" && sh "$H30") > "$T/out" 2>&1 && bad "9030 passed without checking the initramfs" || { grep -q 'initrd\|initramfs' "$T/out" && ok "9030 stops when the initramfs can't be checked"; } || bad "initramfs check: $(cat "$T/out")"
+  # The initramfs check (section 5) as live-build lays it out: binary/live has initrd.img and
+  # initrd.img-<version> (hard links), chroot/boot only initrd.img-<version>. Runs the hook as root in a
+  # user namespace so its "chroot ... unmkinitramfs" works; the fake chroot has a static busybox and an
+  # unmkinitramfs that untars, and the fake initrd is a tar of /init, the guard and the policy.
+  if [ -n "$BB" ] && [ -n "$CHR" ] && ! ldd "$BB" >/dev/null 2>&1 && command -v unshare >/dev/null && unshare -r true 2>/dev/null; then
+    mki(){ # $1: what the initrd holds (good | noguard)
+      mk; C=$T/b/chroot; mkdir -p "$C/bin" "$C/usr/bin" "$C/tmp" "$T/ird/main/scripts" "$T/ird/main/conf"
+      cp "$BB" "$C/bin/busybox"; for a in sh tar mkdir; do ln -sf busybox "$C/bin/$a"; done
+      printf '#!/bin/sh\nmkdir -p "$2" && tar -xf "$1" -C "$2"\n' > "$C/usr/bin/unmkinitramfs"; chmod +x "$C/usr/bin/unmkinitramfs"
+      printf '#!/bin/sh\n. /scripts/functions\n%s\n%s\n' '. /scripts/prestium-cmdline-guard # prestium-cmdline' 'prestium_cmdline_enforce # prestium-cmdline' > "$T/ird/main/init"
+      [ "$1" = noguard ] && printf '#!/bin/sh\n. /scripts/functions\n' > "$T/ird/main/init"
+      cp "$LIB" "$T/ird/main/scripts/prestium-cmdline-guard"; cp "$POL" "$T/ird/main/conf/prestium-cmdline.policy"
+      tar -cf "$C/boot/initrd.img-6.12.0-amd64" -C "$T/ird" main; rm -rf "$T/ird"
+      cp "$C/boot/initrd.img-6.12.0-amd64" "$T/b/binary/live/initrd.img-6.12.0-amd64"
+      ln "$T/b/binary/live/initrd.img-6.12.0-amd64" "$T/b/binary/live/initrd.img"; }
+    r30i(){ (cd "$T/b/binary" && unshare -r env PATH="$PATH:${CHR%/*}" sh "$H30") > "$T/out" 2>&1; }
+    mki good; if r30i; then ok "9030 initramfs check: live/initrd.img and live/initrd.img-<ver> both match chroot/boot/initrd.img-<ver>"
+    else bad "9030 initramfs check (live-build layout): $(grep -m1 '^E:' "$T/out")"; fi
+    mki good; printf 'other\n' > "$T/b/binary/live/initrd.img.new"; mv "$T/b/binary/live/initrd.img.new" "$T/b/binary/live/initrd.img"
+    if r30i; then bad "9030 accepted a live/initrd.img that is no chroot initrd"
+    else grep -q "^E: binary/live/initrd.img is not one of the chroot's /boot/initrd.img\*" "$T/out" && ok "9030 stops on a live/initrd.img that matches no chroot initrd" \
+      || bad "9030 unknown initrd: $(grep -m1 '^E:' "$T/out")"; fi
+    mki noguard; if r30i; then bad "9030 accepted an initramfs without the guard"
+    else grep -q '^E: initrd.img-6.12.0-amd64: /init does not run the command-line guard' "$T/out" && ok "9030 stops on an initramfs without the guard (named by the chroot file)" \
+      || bad "9030 no guard: $(grep -m1 '^E:' "$T/out")"; fi
+  else skip "static busybox, chroot or user namespaces missing: 9030's initramfs check not run"; fi
 else skip "mtools/mkfs.msdos missing: hook 9030 not run"; fi
 
 ## safety notifier

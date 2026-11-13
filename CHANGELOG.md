@@ -117,7 +117,10 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   - isolinux uses `config`, `localboot` or any `com32` module other than `hdt.c32`
   - the policy drifts from `LB_BOOTAPPEND_LIVE`
   - the kernel has a built-in or forced command line (`CONFIG_CMDLINE*`, `CONFIG_BOOT_CONFIG_FORCE`)
-  - the initrd in the image doesn't contain the check
+  - the initrd in the image doesn't contain the check. Each `live/initrd.img*` is matched to the
+    chroot's `/boot/initrd.img*` by content, not by name: live-build ships both `initrd.img` and
+    `initrd.img-<version>`, but the chroot has only the versioned name, which made real builds stop
+    with "binary/live/initrd.img is not the chroot's /boot/initrd.img"
   `tests/test_boot_cmdline_guard.sh` tests all of this. The existence checks at the top of the
   initramfs hook and of hook 9030 are plain `if`/`then` blocks now (shellcheck 0.10 flagged the
   `A && B || C` form, SC2015, which made the test fail); they refuse exactly the same cases.
