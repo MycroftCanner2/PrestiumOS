@@ -11,8 +11,12 @@ customised files, the setup hooks and the pinned third-party downloads.
   (`config/archives/prestium-firmware.pref.chroot`, priority 990), so `firmware-linux` is
   20260916 or newer. Extra firmware beyond Tails (network cards, TV tuners, Qualcomm, Samsung) is
   installed when the archive has it (`optional-packages.txt`).
-- Boot: hybrid ISO, BIOS (isolinux) and UEFI, with **Secure Boot** through Debian's signed shim and
-  GRUB (`--uefi-secure-boot enable`). Kernel command line: hardening options, the
+- Boot: hybrid ISO, BIOS (isolinux) and UEFI, with **Secure Boot** through Debian's signed boot chain,
+  as Tails does: `EFI/boot/bootx64.efi` is Debian's shim (signed by Microsoft), which loads
+  `EFI/boot/grubx64.efi`, Debian's signed GRUB for removable media (`gcdx64.efi.signed` from
+  `grub-efi-amd64-signed`), which loads Debian's signed kernel (`linux-image-amd64` from
+  `linux-signed-amd64`). live-build sets this up (`--uefi-secure-boot enable`); hook 9040 stops the
+  build when any of the three is not Debian's signed file (see Secure Boot below). Kernel command line: hardening options, the
   internal-disk (ahci/libata) blacklist with the patched live-boot fallback, `module.sig_enforce=1`
   and AppArmor. The live image is mounted through dm-verity (root hash on the command line).
 
@@ -21,7 +25,7 @@ customised files, the setup hooks and the pinned third-party downloads.
 A Debian 13 host (a VM is fine) with about 25 GB free and root access:
 
     sudo apt install live-build debootstrap squashfs-tools xorriso mtools dosfstools \
-        curl gnupg gpgv git unzip npm python3 openssl cryptsetup-bin
+        curl gnupg gpgv git unzip npm python3 openssl cryptsetup-bin sbsigntool
 
 On a host that is not amd64 (e.g. arm64), also install `qemu-user-static` and make sure
 `/proc/sys/fs/binfmt_misc/qemu-x86_64` exists with flag `F`. The amd64 chroot then runs emulated,
@@ -48,6 +52,24 @@ which works but is several times slower.
    update both copies; `tests/test_browser_install.py` and `tests/test_sigcheck.sh` compare them)
 2. runs `lb config` (options in `auto/config`);
 3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-amd64.iso`, `Prestium-2.1-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
+
+**Secure Boot.** The UEFI boot chain is Debian's signed one, the same as Debian's live images and
+Tails: firmware → shim → GRUB → kernel. live-build installs `shim-signed` and `grub-efi-amd64-signed`
+only for the binary stage (they are not in the live system) and copies `shimx64.efi.signed` to
+`EFI/boot/bootx64.efi` and `gcdx64.efi.signed` to `EFI/boot/grubx64.efi`, in the ISO tree and in
+`boot/grub/efi.img`. Hook 9040 checks the result with `sbverify` (sbsigntool) against the CA
+certificates in `thirdparty/keys/secure-boot/` (pinned by SHA-256 in the hook): shim is signed for the
+Microsoft UEFI CA 2011 or 2023 and has Debian's Secure Boot CA built in; GRUB is signed by Debian's
+`grub2` key, has every module the locked menu needs built in and does not turn shim's kernel check off;
+every `live/vmlinuz*` is the chroot's kernel from a `linux-signed-*` package (not `-unsigned`), matches
+dpkg's MD5 and is signed by Debian's `linux` key; there are no other EFI programs. With Secure Boot on,
+the firmware checks shim, shim checks GRUB, and GRUB has shim check the kernel; the Debian kernel then
+turns on kernel lockdown (integrity), so unsigned modules, `/dev/mem`, kexec of unsigned kernels and
+hibernation are refused (Prestium needs none of them; `module.sig_enforce=1` already refused unsigned
+modules). Not signed and not checked by the firmware: the initramfs, the GRUB configs (menu, root hash,
+password hash) and so the kernel command line, the same as in Tails. A signed unified kernel image
+(UKI) would cover them; it is future work. Booting with Secure Boot off still works (shim then checks
+nothing). The BIOS path (isolinux) is unchanged.
 
 **Boot menu password.** The boot menus are locked (hook 9020): the entries boot without a password,
 but editing an entry or GRUB's command line needs the GRUB superuser `prestium`. To set its password,
@@ -99,10 +121,12 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels |
 | `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash, exported for submenus, also in the EFI image's and per-platform grub.cfg; needs mtools), every entry `--unrestricted`; isolinux `allowoptions 0`; every kernel line checked against a banned list (shells, init, security modules, debug, persistence, findiso=); findiso= and loopback.cfg removed |
 | `scripts/grub-pbkdf2.py` | makes the GRUB password hash (`--random` for one nobody knows) |
+| `scripts/efi-inspect.py` | read-only facts about an EFI file for hook 9040: SBAT, a built-in certificate (shim's vendor CA), a GRUB image's built-in modules, prefix and objects |
 | `config/hooks/live/9010-prestium-verity-boot.hook.binary` | checks the image against its dm-verity hash tree and puts the root hash and `panic=10` (no initramfs shell) on every boot entry |
 | `config/hooks/live/9030-prestium-boot-cmdline.hook.binary` | only the image's own kernel command line: GRUB's EFI config searches for this build's `/.disk/prestium-<id>` on the boot disk first (no other disk's `/.disk/info`), reboots when it's missing; every boot entry checked against `cmdline.policy` with the initramfs's own code; no chainloader/loopback/load_env/foreign search or kernel; policy = `LB_BOOTAPPEND_LIVE`; no built-in kernel command line; the initrd runs the guard (needs mtools) |
+| `config/hooks/live/9040-prestium-secure-boot.hook.binary` | Secure Boot chain: `LB_UEFI_SECURE_BOOT="enable"`; the only EFI programs are `EFI/boot/bootx64.efi` and `grubx64.efi`, the same in the ISO tree and efi.img; shim signed for Microsoft's UEFI CA with Debian's CA built in, GRUB and every `live/vmlinuz*` signed by Debian (sbverify, CA certificates in `thirdparty/keys/secure-boot/`), GRUB's built-in modules, the kernel from `linux-signed-*` (needs sbsigntool, mtools) |
 | `config/bootloaders/` | boot menu entries: Prestium 2.1, nomodeset, camera and microphone off |
-| `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile |
+| `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile, the Secure Boot CA certificates (`keys/secure-boot/`: Microsoft UEFI CA 2011 and 2023, Debian Secure Boot CA; pinned in hook 9040) |
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |
 | `scripts/thelounge-themes.py` | regenerates The Lounge's 10 Theme Factory theme packages from `scripts/thelounge-theme.css.in` and checks their contrast (`--check` only verifies; the generated files are committed) |
 | `build.sh` | the whole build |

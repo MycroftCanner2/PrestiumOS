@@ -207,7 +207,7 @@ printf '#!/bin/sh\n[ "$1" = 20 ] && kill -TERM $PPID\nexit 0\n' > "$T/nb/sleep"
 printf '#!/bin/sh\necho "unexpected boot option: apparmor=0"\necho "missing boot option: apparmor=1"\nexit 1\n' > "$T/nb/cl-bad"
 chmod +x "$T/nb/"*; echo Y > "$T/aa"
 nrun(){ rm -f "$T/alerts"; env -i PATH="$T/nb:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" CLSTATE="$2" PRESTIUM_AA_ENABLED="$T/aa" \
-  PRESTIUM_AA_PROFILES="$T/none" PRESTIUM_CMDLINE_CHECK="$1" timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null; }
+  PRESTIUM_AA_PROFILES="$T/none" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_CMDLINE_CHECK="$1" timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null; }
 o=$(nrun true active); [ -z "$o" ] && ok "notifier: own command line, check ran: no alert" || bad "notifier false alert: $o"
 o=$(nrun "$T/nb/cl-bad" active); case $o in *"Protection NOT active"*"not started with Prestium's own boot settings"*"apparmor=0"*) ok "notifier: mismatch alert names the options";; *) bad "notifier mismatch: $o";; esac
 o=$(nrun true inactive); case $o in *"boot settings check did not run (prestium-cmdline-check.service: inactive)"*) ok "notifier: check did not run: alert";; *) bad "notifier inactive: $o";; esac

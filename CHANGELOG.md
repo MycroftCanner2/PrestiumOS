@@ -117,6 +117,38 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   - the kernel has a built-in or forced command line (`CONFIG_CMDLINE*`, `CONFIG_BOOT_CONFIG_FORCE`)
   - the initrd in the image doesn't contain the check
   `tests/test_boot_cmdline_guard.sh` tests all of this.
+- **Secure Boot uses Debian's signed boot chain, as Tails does, and the build proves it.** The UEFI
+  path was already firmware → Debian's shim (`EFI/boot/bootx64.efi`, signed by Microsoft) → Debian's
+  signed GRUB for removable media (`EFI/boot/grubx64.efi`, `gcdx64.efi.signed` from
+  `grub-efi-amd64-signed`) → Debian's signed kernel (`linux-image-amd64` from `linux-signed-amd64`),
+  set up by live-build (`--uefi-secure-boot enable`). Nothing checked the result. The new hook 9040
+  stops the build when:
+  - `config/binary` no longer says `LB_UEFI_SECURE_BOOT="enable"` (`auto` would quietly ship an
+    unsigned GRUB when the signed one can't be installed)
+  - there is any EFI program other than `EFI/boot/bootx64.efi` and `grubx64.efi`, the two differ
+    between the ISO tree and `boot/grub/efi.img`, or efi.img holds anything but them and its `grub.cfg`
+    (the unused `efi.img` that live-build leaves in the ISO root, holding an unsigned GRUB whose
+    built-in config takes any disk's `/.disk/info`, is removed)
+  - `bootx64.efi` is not signed for the Microsoft UEFI CA 2011 or 2023, has no Debian Secure Boot CA
+    built in, or has no `shim.debian` SBAT entry (so another vendor's Microsoft-signed shim fails)
+  - `grubx64.efi` is not signed by Debian's `grub2` key, has no `grub.debian` SBAT entry, has another
+    built-in prefix than `/boot/grub`, carries the object that turns shim's kernel check off, or lacks a
+    built-in module the locked menu and the marker search use (`password_pbkdf2`, `regexp`, `search`,
+    `sleep`, `reboot`, `linux`, `efifwsetup` and others: under Secure Boot GRUB can't load modules
+    from the stick)
+  - a `live/vmlinuz*` is not the chroot's kernel, comes from a package that is `-unsigned` or not built
+    from `linux-signed-*`, doesn't match dpkg's MD5, or isn't signed by Debian's `linux` key
+  Signatures are checked with `sbverify` against the CA certificates in `thirdparty/keys/secure-boot/`,
+  which the hook pins by SHA-256; the build host needs `sbsigntool`. `scripts/efi-inspect.py` reads
+  SBAT, shim's built-in certificate and GRUB's built-in modules. Under Secure Boot the Debian kernel
+  runs with lockdown (integrity): unsigned modules, `/dev/mem`, `/dev/port`, MSR writes, kexec of an
+  unsigned kernel and hibernation are refused. Prestium needs none of them (unsigned modules were
+  already refused by `module.sig_enforce=1`, kexec by `kernel.kexec_load_disabled`, and there is no
+  swap), and the kernel command line is the same, so the command-line policy is unchanged. The safety
+  notifier says once per session, as information rather than an alert, when a UEFI computer started
+  with Secure Boot off, or with it on but the kernel not locked down. The BIOS path is unchanged.
+  `tests/test_secure_boot.sh` tests the hook on a fake tree, with Debian's real signed files when they
+  are available.
 
 ### Base system
 - **Tor Browser 16.0.1** (or newer, as above) with Firefox security fixes and tor 0.4.9.16.
@@ -501,7 +533,8 @@ Not changed in 2.1, so you know where the edges are:
 - **X11 programs share one Xwayland server**, so an X11-only program can read the keyboard input and
   windows of the other X11 programs (not of Wayland apps such as the browsers).
 - **Neither dm-verity nor the boot menu lock stops someone who can write to the USB stick.** Secure
-  Boot checks shim, GRUB and the kernel, but the boot menus (`grub.cfg` with the root hash and the
+  Boot checks shim, GRUB and the kernel (GRUB has shim check the kernel; nothing checks the
+  initramfs), but the boot menus (`grub.cfg` with the root hash and the
   password hash, `isolinux/live.cfg`, the GRUB config in the EFI image), the initramfs and live-boot
   in it are unsigned files on the stick. Whoever can write to the stick can replace them together with
   the image, remove the root hash or `panic=10`, or reset the password, and the next boot trusts the
@@ -551,7 +584,9 @@ A booted 2.1 ISO should still be used to confirm: Audacity (start, microphone, s
 reach to Tor or I2P proxies); the Tor Connection Assistant and Nyx through onion-grater, including
 NEWNYM and the circuit display; Browser Updater on the live overlay (download through Tor or I2P,
 bind-mount install and Reset, onion-grater's mount namespace, RAM freed after the last Reset); bridges
-after the tighter loopback firewall rules; the onion time sync and boot clock randomization; and the
+after the tighter loopback firewall rules; the onion time sync and boot clock randomization; booting
+from USB and from a DVD or virtual CD with Secure Boot on and off (shim, signed GRUB, the locked menu
+and the marker search, `/sys/kernel/security/lockdown` showing `[integrity]` with it on); and the
 new look (Kvantum, libadwaita accent, Kleopatra's colours, the bar's pills and Papirus-Dark tray icons).
 
 ## 2.0: changes since Prestium 1.9.1.3

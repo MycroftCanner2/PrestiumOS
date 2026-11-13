@@ -54,6 +54,12 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Verified live image:** the root filesystem is mounted through dm-verity, and Prestium refuses to
   boot when it doesn't match the root hash in the boot menu (the kernel, initramfs and boot menu
   themselves are not covered yet; see the CHANGELOG's Known security limits).
+- **UEFI Secure Boot:** boots with Secure Boot on, through Debian's signed boot chain as Tails does:
+  Debian's shim (signed by Microsoft), Debian's signed GRUB and Debian's signed kernel, which then
+  runs with kernel lockdown. The build stops if any of them isn't Debian's signed file. The
+  initramfs and the boot menus (and so the kernel command line) are not signed, as in Tails; a signed
+  unified kernel image is future work. Booting with Secure Boot off, or on BIOS, works as before, and
+  Prestium tells you when Secure Boot is off.
 - **Fail-closed safety alerts** when the USB watchdog, MAC guard, Wayland broker, ptrace protection or
   shutdown memory wipe isn't working.
 - **Only its own boot settings:** Prestium refuses to start, and restarts the computer, when the
@@ -67,7 +73,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Someone who can write to the USB stick can change the next boot.** dm-verity checks the root
   filesystem and the boot menu is password-locked, but both checks live in unsigned files on the stick:
   the boot menus (`grub.cfg`, with the root hash and the password hash), the initramfs and live-boot in
-  it, and the initramfs check that refuses any kernel command line other than the image's own. Secure Boot covers only shim, GRUB and the kernel. Replacing those files together with the image
+  it, and the initramfs check that refuses any kernel command line other than the image's own. Secure Boot covers only shim, GRUB and the kernel (Debian's signed files, as in Tails); GRUB doesn't check the initramfs. Replacing those files together with the image
   defeats both checks. The future fix is a signed unified kernel image (UKI: kernel, initramfs and
   command line in one Secure Boot-signed file); it isn't implemented. Keep the stick with you, and
   check it against a signed release from another computer (see Verify a download).

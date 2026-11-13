@@ -1,0 +1,110 @@
+#!/bin/sh
+# Prestium 2.1 (Secure Boot): the UEFI boot chain is Debian's signed one, as in Tails and Debian's own
+# live images: firmware -> shim (signed by Microsoft) -> GRUB (signed by Debian) -> the kernel (signed
+# by Debian). live-build sets it up (auto/config --uefi-secure-boot enable: binary_grub-efi installs
+# shim-signed and grub-efi-amd64-signed for the binary stage, copies shimx64.efi.signed to
+# EFI/boot/bootx64.efi and gcdx64.efi.signed, Debian's GRUB for removable media, to EFI/boot/grubx64.efi,
+# in the ISO tree and in boot/grub/efi.img, then removes the packages again). This hook stops the build
+# when the result is anything else:
+#  1. config/binary still says LB_UEFI_SECURE_BOOT="enable" (not auto, which silently falls back to an
+#     unsigned GRUB, nor disable).
+#  2. The only EFI programs are EFI/boot/bootx64.efi and EFI/boot/grubx64.efi, the same two files in
+#     the ISO tree and in efi.img, and efi.img holds nothing else but boot/grub/grub.cfg (locked by 9020,
+#     marker search by 9030). No MokManager, fallback, 32-bit or unsigned GRUB beside them; the unused
+#     efi.img that live-build leaves in the ISO root (an unsigned GRUB) is removed.
+#  3. bootx64.efi is Debian's shim: signed for the Microsoft UEFI CA (2011 or 2023), Debian's
+#     Secure Boot CA built in as its vendor certificate, SBAT "shim.debian".
+#  4. grubx64.efi is Debian's signed GRUB: signed by a "Debian Secure Boot Signer ... - grub2"
+#     certificate under the Debian Secure Boot CA, SBAT "grub.debian", built-in prefix /boot/grub, no
+#     object that turns shim's kernel check off, and every module the locked menu and the marker search
+#     need is built in (signed GRUB can't load modules from the stick under Secure Boot).
+#  5. Every live/vmlinuz* is the chroot's kernel from Debian's signed linux-image package (Source
+#     linux-signed-*, not *-unsigned; its dpkg MD5 matches), signed by "Debian Secure Boot Signer ... -
+#     linux" under the Debian Secure Boot CA.
+# The CA certificates are in thirdparty/keys/secure-boot/, pinned here by SHA-256. Signatures are
+# checked with sbverify (sbsigntool on the build host). The initramfs and the GRUB configs are not
+# signed and not covered (see README, Known limits).
+# Runs in binary/ on the build host, after 9030; needs sbsigntool, mtools, openssl and python3.
+set -e
+C=../chroot
+K=../thirdparty/keys/secure-boot
+INS="python3 -I ../scripts/efi-inspect.py"
+fail() { echo "E: Secure Boot: $*"; exit 1; }
+
+## 1. live-build's Secure Boot setting
+grep -qx 'LB_UEFI_SECURE_BOOT="enable"' ../config/binary || fail 'config/binary does not say LB_UEFI_SECURE_BOOT="enable" (auto/config --uefi-secure-boot enable)'
+for t in sbverify openssl python3 mcopy mdir; do command -v "$t" >/dev/null || fail "$t missing on the build host (apt install sbsigntool mtools openssl python3)"; done
+
+## the CA certificates
+pin() { # $1 file, $2 sha256
+	[ -f "$K/$1" ] || fail "$K/$1 missing"
+	f=$(openssl x509 -in "$K/$1" -noout -fingerprint -sha256 2>/dev/null | sed 's/^.*=//; s/://g' | tr 'A-F' 'a-f')
+	[ "$f" = "$2" ] || fail "$K/$1 is not the pinned certificate ($f)"
+}
+pin microsoft-uefi-ca-2011.pem 48e99b991f57fc52f76149599bff0a58c47154229b9f8d603ac40d3500248507
+pin microsoft-uefi-ca-2023.pem f6124e34125bee3fe6d79a574eaa7b91c0e7bd9d929c1a321178efd611dad901
+pin debian-secure-boot-ca.pem 079646974bce09b1f04da67bd722d1fb0947ae4c4010bccdbba52d5b23cbf1a2
+MS11=$K/microsoft-uefi-ca-2011.pem; MS23=$K/microsoft-uefi-ca-2023.pem; DEB=$K/debian-secure-boot-ca.pem
+
+## 2. exactly shim and GRUB, the same in the ISO tree and in efi.img
+EFI=boot/grub/efi.img
+[ -f "$EFI" ] || fail "$EFI missing"
+# live-build's binary_grub-efi copies efi-image's own work image (an unsigned GRUB whose built-in config
+# takes any disk's /.disk/info) to the ISO root as efi.img. Nothing boots it (xorriso uses
+# boot/grub/efi.img), so it goes.
+if [ -e efi.img ]; then rm -f efi.img; echo "I: removed live-build's unused efi.img (unsigned GRUB) from the ISO root"; fi
+got=$(find . -type f -iname '*.efi' | LC_ALL=C sort | tr '\n' ' ')
+[ "$got" = "./EFI/boot/bootx64.efi ./EFI/boot/grubx64.efi " ] || fail "EFI programs in the ISO tree are not exactly EFI/boot/bootx64.efi and grubx64.efi: $got"
+got=$(mdir -/ -b -i "$EFI" :: | tr -d '\r' | grep -v '/$' | tr '[:upper:]' '[:lower:]' | LC_ALL=C sort | tr '\n' ' ')
+[ "$got" = "::/boot/grub/grub.cfg ::/efi/boot/bootx64.efi ::/efi/boot/grubx64.efi " ] || fail "$EFI does not hold exactly EFI/boot/bootx64.efi, grubx64.efi and boot/grub/grub.cfg: $got"
+W=../prestium-sb.9040
+rm -rf "$W"; mkdir "$W"
+for b in bootx64.efi grubx64.efi; do
+	mcopy -n -i "$EFI" "::EFI/boot/$b" "$W/$b" || fail "$EFI: EFI/boot/$b unreadable"
+	cmp -s "$W/$b" "EFI/boot/$b" || fail "$EFI::EFI/boot/$b differs from EFI/boot/$b"
+done
+signer() { sbverify --list "$1" 2>/dev/null | sed -n 's/^ *- subject: //p'; }
+sbok() { sbverify --cert "$2" "$1" >/dev/null 2>&1; }
+
+## 3. shim
+S=EFI/boot/bootx64.efi
+sbok "$S" "$MS11" || sbok "$S" "$MS23" || fail "$S is not signed for the Microsoft UEFI CA (2011 or 2023): not a shim that firmware trusts"
+$INS has-cert "$S" "$DEB" || fail "$S does not have Debian's Secure Boot CA built in: not Debian's shim"
+$INS sbat "$S" | grep -q '^shim\.debian,' || fail "$S: no shim.debian SBAT entry"
+
+## 4. GRUB
+G=EFI/boot/grubx64.efi
+sbok "$G" "$DEB" || fail "$G is not signed under the Debian Secure Boot CA"
+signer "$G" | grep -qE '^/CN=Debian Secure Boot Signer [0-9]+ - grub2$' || fail "$G is not signed by Debian's GRUB signing key ($(signer "$G" | tr '\n' ';'))"
+$INS sbat "$G" | grep -q '^grub\.debian,' || fail "$G: no grub.debian SBAT entry"
+$INS grub "$G" > "$W/grub.txt" || fail "$G is not a GRUB image"
+grep -qx 'prefix /boot/grub' "$W/grub.txt" || fail "$G: built-in prefix is not /boot/grub: $(grep '^prefix' "$W/grub.txt")"
+grep -qx 'disable-shim-lock' "$W/grub.txt" && fail "$G turns shim's kernel check off (disable_shim_lock)"
+for m in normal configfile password_pbkdf2 pbkdf2 gcry_sha512 search search_fs_file regexp test echo sleep reboot linux efifwsetup fat iso9660 part_gpt part_msdos font gfxterm png; do
+	grep -qx "module $m" "$W/grub.txt" || fail "$G lacks the built-in module $m (the locked menu or marker search needs it)"
+done
+
+## 5. the kernel
+nk=0
+for v in live/vmlinuz*; do
+	[ -f "$v" ] || continue
+	src=
+	for k in "$C"/boot/vmlinuz-*; do [ -f "$k" ] && cmp -s "$v" "$k" && src=$k; done
+	[ -n "$src" ] || fail "binary/$v is not one of the chroot's /boot/vmlinuz-* kernels"
+	b=${src##*/}
+	pkg=$(grep -lx "/boot/$b" "$C"/var/lib/dpkg/info/*.list 2>/dev/null | sed 's|.*/||; s|\.list$||; s|:amd64$||' | head -n 2)
+	[ "$(printf '%s\n' "$pkg" | grep -c .)" = 1 ] || fail "/boot/$b does not belong to exactly one package ($pkg)"
+	case "$pkg" in linux-image-*-unsigned) fail "/boot/$b is from $pkg, Debian's unsigned kernel" ;; linux-image-*) ;; *) fail "/boot/$b is from $pkg, not a linux-image package" ;; esac
+	st=$(awk -v p="$pkg" '/^Package: /{ok=($2==p)} ok && /^(Status|Source):/' "$C/var/lib/dpkg/status")
+	printf '%s\n' "$st" | grep -qx 'Status: install ok installed' || fail "$pkg is not installed in the chroot"
+	printf '%s\n' "$st" | grep -qE '^Source: linux-signed-[a-z0-9]+( |$)' || fail "$pkg is not built from Debian's linux-signed-* source ($(printf '%s' "$st" | tr '\n' ';'))"
+	md=$(sed -n "s|^\([0-9a-f]\{32\}\)  boot/$b\$|\1|p" "$C/var/lib/dpkg/info/$pkg.md5sums" 2>/dev/null)
+	if [ -z "$md" ] || [ "$(md5sum < "$v" | cut -d' ' -f1)" != "$md" ]; then fail "binary/$v does not match $pkg's packaged /boot/$b"; fi
+	sbok "$v" "$DEB" || fail "binary/$v is not signed under the Debian Secure Boot CA"
+	signer "$v" | grep -qE '^/CN=Debian Secure Boot Signer [0-9]+ - linux$' || fail "binary/$v is not signed by Debian's kernel signing key"
+	nk=$((nk + 1))
+done
+[ "$nk" -gt 0 ] || fail "no kernel in binary/live"
+rm -rf "$W"
+echo "P: Secure Boot chain: Debian's shim ($(signer "$S" | head -n 1 | sed 's/.*CN=//')), Debian's signed GRUB, $nk Debian-signed kernel(s)"
+exit 0
