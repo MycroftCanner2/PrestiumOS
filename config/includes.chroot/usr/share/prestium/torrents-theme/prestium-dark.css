@@ -5,25 +5,29 @@
    main.js sets inline colours meant for a white page; its progress colours are remapped onto the
    palette by matching the inline style (browsers serialise them as rgb()).
    r5: header bar, card panels, sticky table header, right-aligned numbers, status-coloured
-   progress bars, red delete buttons, totals row, focus rings, dark scrollbars, narrow layout. */
+   progress bars, red delete buttons, totals row, focus rings, dark scrollbars, narrow layout.
+   2.1 (UI pass): the desktop's palette and font instead of the old blue-grey one (#121417, #8fb3ff,
+   #2a3550): surfaces #161616 / #1e1e1e / #262626, edges #333333 / #4d4d4d, text #ffffff and #a8a8a8,
+   accent text #8ab8ff, accent fill #0050c8 behind white text (7.0:1), states #6ee7a0 / #ffd166 / #ff9494,
+   downloading #3d8bff, Cantarell; 6 px controls and 8 px panels as before (tests/test_ui_consistency.py). */
 :root {
-  --bg:#121417; --panel:#1b1e23; --panel2:#22262c; --line:#2c3038; --line2:#363b45;
-  --fg:#d7dae0; --muted:#8a919c; --accent:#8fb3ff; --accent-bg:#2a3550;
-  --ok:#7fd18b; --warn:#f0b35a; --bad:#ef6b6b; --dl:#6fa8ff; --stall:#4a6fa8;
+  --bg:#161616; --panel:#1e1e1e; --panel2:#262626; --line:#333333; --line2:#4d4d4d;
+  --fg:#ffffff; --muted:#a8a8a8; --accent:#8ab8ff; --accent-bg:#0050c8;
+  --ok:#6ee7a0; --warn:#ffd166; --bad:#ff9494; --dl:#3d8bff; --stall:#24324d;
   --radius:8px;
   color-scheme: dark;
 }
 * { box-sizing:border-box; }
 html, body { background:var(--bg); color:var(--fg); }
-html { scrollbar-color:#3a404b var(--bg); }
+html { scrollbar-color:#4d4d4d var(--bg); }
 body {
-  font:14px/1.45 "DejaVu Sans", "Noto Sans", sans-serif; margin:0; padding:0 20px 24px;
+  font:14px/1.45 Cantarell, "DejaVu Sans", sans-serif; margin:0; padding:0 20px 24px;
   font-variant-numeric:tabular-nums;
 }
 body::before {
   content:"I2P Torrents"; display:block; margin:0 -20px 16px; padding:12px 22px;
   font-size:19px; font-weight:bold; letter-spacing:.02em; color:var(--accent);
-  background:linear-gradient(180deg, #1d2128, #171a1f); border-bottom:1px solid var(--line);
+  background:var(--panel2); border-bottom:1px solid var(--line);
 }
 
 /* links, including main.js's <href> "Close" link with inline blue */
@@ -54,7 +58,7 @@ li::marker { color:var(--muted); }
 #session-stats-list li, #dht-stats-list li { list-style:none; color:var(--fg); }
 
 /* error box */
-#fs-error fieldset { background:#2a1719; border-color:#5a2a2e; padding:2px 4px; }
+#fs-error fieldset { background:#2b1616; border-color:#5c2424; padding:2px 4px; }
 #fs-error h2 { color:var(--bad) !important; font-size:15px; margin:8px 10px; }
 #fs-error h3 { color:var(--fg); font-size:13px; font-weight:normal; margin:4px 10px 8px; }
 #fs-error h2:empty, #fs-error h3:empty { display:none; }
@@ -68,9 +72,9 @@ button {
   cursor:pointer; padding:3px 8px; min-height:28px;
   transition:background-color .12s, border-color .12s;
 }
-button:hover { background-color:var(--accent-bg) !important; border-color:var(--accent); }
-button:active { background-color:#1f2940 !important; }
-:focus-visible { outline:2px solid var(--accent); outline-offset:1px; }
+button:hover { background-color:var(--accent-bg) !important; border-color:#3d8bff; color:#fff; }
+button:active { background-color:#003f9e !important; }
+:focus-visible { outline:2px solid #3d8bff; outline-offset:1px; }
 .fs-buttons { max-width:120px; }
 .button-column { gap:8px; }
 .button-column button { font-size:20px; min-height:40px; border-radius:var(--radius); }
@@ -91,8 +95,8 @@ button:active { background-color:#1f2940 !important; }
   border:0 !important; border-top:1px solid var(--line) !important; color:var(--fg);
   height:30px; padding:2px 8px; vertical-align:middle;
 }
-.compact-table tr:nth-child(even) td { background:#181b20; }
-.compact-table tr:hover td { background:#20252d; }
+.compact-table tr:nth-child(even) td { background:#1a1a1a; }
+.compact-table tr:hover td { background:#262626; }
 /* torrents table columns: id, name, progress, S / L, speedDw, speedUp, size, have, eta, actions */
 #torrents .compact-table td:nth-child(1) { color:var(--muted); width:3em; text-align:right; }
 #torrents .compact-table td:nth-child(2) { font-weight:600; }
@@ -110,15 +114,15 @@ td[style*="255, 51, 51"], li[style*="255, 51, 51"] { color:var(--bad) !important
 .progress-cell { min-width:140px; padding:5px 8px !important; }
 .progress-bar {
   position:relative !important; inset:auto !important; height:20px;
-  background:#2a2f37 !important; border-radius:999px; overflow:hidden;
+  background:#333333 !important; border-radius:999px; overflow:hidden;
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.04);
 }
 .progress-fill { border-radius:999px; transition:width .4s ease; }
-.progress-fill[style*="229, 231, 235"] { background-color:#3a404b !important; }  /* idle / metadata */
-.progress-fill[style*="68, 171, 255"]  { background-color:var(--dl) !important; }   /* downloading */
+.progress-fill[style*="229, 231, 235"] { background-color:#4d4d4d !important; }  /* idle / metadata */
+.progress-fill[style*="68, 171, 255"]  { background-color:var(--accent-bg) !important; } /* downloading */
 .progress-fill[style*="0, 114, 207"]   { background-color:var(--stall) !important; } /* stalled */
-.progress-fill[style*="0, 255, 90"]    { background-color:#4f9e5a !important; }     /* seeding */
-.progress-fill[style*="255, 208, 0"]   { background-color:#a87a2c !important; }     /* paused */
+.progress-fill[style*="0, 255, 90"]    { background-color:#1f7a4a !important; }     /* seeding */
+.progress-fill[style*="255, 208, 0"]   { background-color:#7a5c14 !important; }     /* paused */
 .progress-text {
   color:#fff !important; font-size:12px; font-weight:bold; text-shadow:0 1px 2px rgba(0,0,0,.8);
 }
@@ -135,11 +139,11 @@ td.buttons-cell { max-width:none; width:1%; padding:3px 6px !important; }
 .buttons-cell .button-row button:first-child { border-left:0; }
 .buttons-cell .button-row button.tr-delete:hover,
 .buttons-cell .button-row button.tr-deletefiles:hover {
-  background-color:#4a1e22 !important; border-color:var(--bad);
+  background-color:#a8231c !important; border-color:var(--bad);
 }
 
 /* details panel */
-#details fieldset { border-color:#3a4252; }
+#details fieldset { border-color:var(--line2); }
 #details legend { border-radius:6px; }
 #details ul { columns:2 320px; column-gap:28px; }
 

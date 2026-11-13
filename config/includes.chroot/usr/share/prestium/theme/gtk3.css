@@ -9,7 +9,12 @@
      accent line #3d8bff for focus, rings, progress and tabs (4.6:1 or more on every surface)
      entry edge #737373 (3.2:1 or more), error text #ff9494 (7.1:1 or more), links #00ffff
    The old hover #0a6cff (and #1a75ff) made white text 4.6:1 and 4.2:1; hover is now darker, not lighter.
-   tests/test_contrast.py computes every pair. */
+   tests/test_contrast.py computes every pair.
+   2.1 (UI pass): the design spec in tests/test_ui_consistency.py (one palette, 6 px controls, 8 px windows,
+   cards, tooltips and notifications). New here: destructive buttons #a8231c behind white text (7.2:1, hover
+   darker #921d17), message bars on the raised surfaces with a coloured edge (info #3d8bff, warning #ffd166,
+   error #ff6b6b) instead of Adwaita's grey-brown, sections of Prestium's own tools ("prestium-section"
+   frames) as rounded cards with a bold title, and 8 px tooltips. Still nothing about widget sizes. */
 @define-color theme_bg_color #1e1e1e;
 @define-color theme_base_color #161616;
 @define-color theme_fg_color #ffffff;
@@ -23,6 +28,8 @@
 @define-color accent_bg_color #0050c8;
 @define-color error_color #ff9494;
 @define-color warning_color #ffd166;
+@define-color destructive_color #ff9494;
+@define-color success_color #6ee7a0;
 
 window, .background { background-color: @theme_bg_color; }
 headerbar, .titlebar, menubar, toolbar, .toolbar, .inline-toolbar, actionbar, searchbar > revealer > box {
@@ -70,4 +77,26 @@ stacksidebar row:selected, placessidebar row:selected { background-color: #0050c
 *:link:hover { color: #80ffff; }
 *:visited { color: #8ab8ff; }
 
-tooltip.background { background-color: #262626; border: 1px solid #333333; color: #ffffff; }
+tooltip.background { background-color: #262626; border: 1px solid #333333; border-radius: 8px; color: #ffffff; }
+
+/* 2.1 (UI pass): destructive buttons (Restart…), in the palette's red; hover darker, as the accent */
+button.destructive-action {
+  background-image: none; background-color: #a8231c; border-color: #7d1813; color: #ffffff; text-shadow: none; }
+button.destructive-action:hover { background-image: none; background-color: #921d17; }
+button.destructive-action:active, button.destructive-action:checked { background-image: none; background-color: #7d1813; }
+button.destructive-action:backdrop { background-image: none; background-color: #a8231c; color: #ffffff; }
+button.destructive-action:disabled { background-image: none; background-color: #3d2020; border-color: #3d2020; color: #a8a8a8; }
+
+/* message bars (Tor Connection Assistant, Browser Updater): the raised surface with a coloured edge */
+infobar > revealer > box { background-image: none; background-color: #262626; color: #ffffff; border: none; border-radius: 8px;
+  box-shadow: inset 3px 0 #3d8bff; }
+infobar.warning > revealer > box { background-color: #2a2416; box-shadow: inset 3px 0 #ffd166; }
+infobar.error > revealer > box { background-color: #2b1616; box-shadow: inset 3px 0 #ff6b6b; }
+infobar > revealer > box label { color: #ffffff; }
+infobar button:not(.default):not(.suggested-action) { background-image: none; background-color: #333333;
+  border-color: #4d4d4d; color: #ffffff; text-shadow: none; box-shadow: none; }
+infobar button:not(.default):not(.suggested-action):hover { background-color: #3d3d3d; }
+
+/* sections of Prestium's own tools: a rounded card with a bold title */
+frame.prestium-section > border { border: 1px solid #333333; border-radius: 8px; background-color: #262626; }
+frame.prestium-section > label { font-weight: bold; color: #ffffff; }

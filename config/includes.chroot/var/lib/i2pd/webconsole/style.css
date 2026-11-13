@@ -1,23 +1,28 @@
 /* Prestium dark theme for the i2pd webconsole.
    Rebuilt for Prestium 1.6-update; the original was hosted on Prestium's
-   now-offline git server. i2pd loads <datadir>/webconsole/style.css. */
-:root { --bg:#121417; --panel:#1b1e23; --line:#2c3038; --fg:#d7dae0; --muted:#8a919c; --accent:#8fb3ff; --ok:#7fd18b; --warn:#f0b35a; --bad:#ef6b6b; }
-body { font:100%/1.5em sans-serif; margin:0; padding:1.5em; background:var(--bg); color:var(--fg); }
+   now-offline git server. i2pd loads <datadir>/webconsole/style.css.
+   2.1 (UI pass): the desktop's palette and font instead of the old blue-grey one (#121417, #8fb3ff, #2a3550):
+   surfaces #161616 / #1e1e1e / #262626, text #ffffff and #a8a8a8, accent text #8ab8ff, hover the accent
+   fill #0050c8 behind white text (7.0:1), states #6ee7a0 / #ffd166 / #ff9494, Cantarell, 6 px controls,
+   8 px panels (tests/test_ui_consistency.py). */
+:root { --bg:#161616; --panel:#1e1e1e; --line:#333333; --fg:#ffffff; --muted:#a8a8a8; --accent:#8ab8ff; --accent-bg:#0050c8; --ok:#6ee7a0; --warn:#ffd166; --bad:#ff9494; color-scheme:dark; }
+body { font:100%/1.5em Cantarell, "DejaVu Sans", sans-serif; margin:0; padding:1.5em; background:var(--bg); color:var(--fg); }
 a, .slide label { text-decoration:none; color:var(--accent); }
-a:hover, .slide label:hover, button[type=submit]:hover { color:#fff; background:#2a3550; }
-a.button, button[type=submit] { -webkit-appearance:button; -moz-appearance:button; appearance:button; text-decoration:none; padding:0 5px; border:1px solid var(--line); background:var(--panel); color:var(--fg); }
+a:hover, .slide label:hover, button[type=submit]:hover { color:#fff; background:var(--accent-bg); }
+a.button, button[type=submit] { -webkit-appearance:button; -moz-appearance:button; appearance:button; text-decoration:none; padding:0 8px; border:1px solid var(--line); border-radius:6px; background:var(--panel); color:var(--fg); }
 .header { font-size:2.5em; text-align:center; margin:1em 0; color:var(--accent); }
 .wrapper { margin:0 auto; padding:1em; max-width:64em; }
 .menu { display:block; float:left; overflow:hidden; padding:4px; max-width:12em; white-space:nowrap; text-overflow:ellipsis; }
 .listitem { display:block; font-family:monospace; font-size:1.2em; white-space:nowrap; }
 .tableitem { font-family:monospace; font-size:1.2em; white-space:nowrap; }
-.content { float:left; font-size:1em; margin-left:2em; padding:4px; max-width:50em; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:4px; }
+.content { float:left; font-size:1em; margin-left:2em; padding:4px; max-width:50em; overflow:auto; background:var(--panel); border:1px solid var(--line); border-radius:8px; }
 .tunnel.established { color:var(--ok); } .tunnel.expiring { color:var(--warn); } .tunnel.failed { color:var(--bad); } .tunnel.building { color:var(--muted); }
 caption { font-size:1.5em; text-align:center; color:var(--accent); }
 table { display:table; border-collapse:collapse; text-align:center; } table.extaddr { text-align:left; }
 table.services { width:100%; } th, td { border-bottom:1px solid var(--line); padding:2px 6px; }
-textarea { background:var(--bg); color:var(--fg); border:1px solid var(--line); word-break:break-all; }
-input, select { background:var(--bg); color:var(--fg); border:1px solid var(--line); }
+textarea { background:var(--bg); color:var(--fg); border:1px solid #737373; border-radius:6px; word-break:break-all; }
+input, select { background:var(--bg); color:var(--fg); border:1px solid #737373; border-radius:6px; }
+:focus-visible { outline:2px solid #3d8bff; outline-offset:1px; }
 .streamdest { width:120px; max-width:240px; overflow:hidden; text-overflow:ellipsis; }
 .slide div.slidecontent, .slide [type="checkbox"] { display:none; }
 .slide [type="checkbox"]:checked ~ div.slidecontent { display:block; margin-top:0; padding:0; }

@@ -303,6 +303,7 @@
 0644 root root /usr/share/plymouth/themes/connect/progress-99.png
 0755 root root /usr/share/prestium/initramfs-shutdown
 0644 root root /usr/share/themes/Prestium-Dark/openbox-3/themerc
+0644 root root /usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc
 0644 root root /usr/share/backgrounds/prestium/horizon.png
 0644 root root /usr/share/backgrounds/prestium/circuit.png
 0644 root root /usr/share/backgrounds/prestium/mark.png

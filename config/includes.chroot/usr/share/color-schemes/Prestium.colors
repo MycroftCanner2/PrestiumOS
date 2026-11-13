@@ -3,6 +3,8 @@
 # 2.1 (contrast review): selection #0050c8 (white text 7.0:1), focus #3d8bff, accent text #8ab8ff and
 # error text #ff9494 (both 7:1 or more), coloured text on the selection 4.5:1 or more (test_contrast.py).
 # Kleopatra picks it by default (/etc/xdg/kleopatrarc); its Settings, Color Scheme menu lists it as "Prestium".
+# 2.1 (UI pass): visited links #8ab8ff, the accent text colour, as GTK and Kvantum. /etc/xdg/kdeglobals carries
+# the same [Colors:*] sections (tests/test_ui_consistency.py keeps the two identical).
 [General]
 ColorScheme=Prestium
 Name=Prestium
@@ -27,7 +29,7 @@ ForegroundNormal=255,255,255
 ForegroundInactive=168,168,168
 ForegroundActive=138,184,255
 ForegroundLink=0,255,255
-ForegroundVisited=127,178,255
+ForegroundVisited=138,184,255
 ForegroundNegative=255,148,148
 ForegroundNeutral=255,209,102
 ForegroundPositive=110,231,160
@@ -41,7 +43,7 @@ ForegroundNormal=255,255,255
 ForegroundInactive=168,168,168
 ForegroundActive=138,184,255
 ForegroundLink=0,255,255
-ForegroundVisited=127,178,255
+ForegroundVisited=138,184,255
 ForegroundNegative=255,148,148
 ForegroundNeutral=255,209,102
 ForegroundPositive=110,231,160
@@ -55,7 +57,7 @@ ForegroundNormal=255,255,255
 ForegroundInactive=168,168,168
 ForegroundActive=138,184,255
 ForegroundLink=0,255,255
-ForegroundVisited=127,178,255
+ForegroundVisited=138,184,255
 ForegroundNegative=255,148,148
 ForegroundNeutral=255,209,102
 ForegroundPositive=110,231,160
@@ -83,7 +85,7 @@ ForegroundNormal=255,255,255
 ForegroundInactive=168,168,168
 ForegroundActive=138,184,255
 ForegroundLink=0,255,255
-ForegroundVisited=127,178,255
+ForegroundVisited=138,184,255
 ForegroundNegative=255,148,148
 ForegroundNeutral=255,209,102
 ForegroundPositive=110,231,160
@@ -97,7 +99,7 @@ ForegroundNormal=255,255,255
 ForegroundInactive=168,168,168
 ForegroundActive=138,184,255
 ForegroundLink=0,255,255
-ForegroundVisited=127,178,255
+ForegroundVisited=138,184,255
 ForegroundNegative=255,148,148
 ForegroundNeutral=255,209,102
 ForegroundPositive=110,231,160
@@ -111,7 +113,7 @@ ForegroundNormal=255,255,255
 ForegroundInactive=168,168,168
 ForegroundActive=138,184,255
 ForegroundLink=0,255,255
-ForegroundVisited=127,178,255
+ForegroundVisited=138,184,255
 ForegroundNegative=255,148,148
 ForegroundNeutral=255,209,102
 ForegroundPositive=110,231,160
@@ -125,7 +127,7 @@ ForegroundNormal=255,255,255
 ForegroundInactive=168,168,168
 ForegroundActive=138,184,255
 ForegroundLink=0,255,255
-ForegroundVisited=127,178,255
+ForegroundVisited=138,184,255
 ForegroundNegative=255,148,148
 ForegroundNeutral=255,209,102
 ForegroundPositive=110,231,160

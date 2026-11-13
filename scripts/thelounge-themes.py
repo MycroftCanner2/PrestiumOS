@@ -28,6 +28,9 @@ SANS_DEJAVU = '"DejaVu Sans", Cantarell, sans-serif'
 SANS_FREE = '"Nimbus Sans", "DejaVu Sans", Cantarell, sans-serif'
 SERIF_DEJAVU = 'C059, "Nimbus Roman", serif'
 SERIF_FREE = '"Nimbus Roman", C059, serif'
+# 2.1 (UI pass): Prestium's own default theme uses the desktop's font (Cantarell, as GTK, Qt/KDE, labwc,
+# waybar and mako), with DejaVu Sans for the characters Cantarell lacks
+SANS_PRESTIUM = 'Cantarell, "DejaVu Sans", sans-serif'
 
 # Roles:
 #  side_*   sidebar (The Lounge's --body-bg-color: channel list, footer, page background)
@@ -132,16 +135,19 @@ THEMES = [
     dict(slug="tech-innovation", name="Tech Innovation", dark=True,
          desc="Tech Innovation: electric blue, neon cyan, dark gray and white (Prestium's default)",
          palette="Electric Blue #0066ff, Neon Cyan #00ffff, Dark Gray #1e1e1e, White #ffffff",
-         body_font=SANS_DEJAVU, head_font=SANS_DEJAVU,
-         side_bg="#161616", side_fg="#ffffff", side_muted="#b4b4b4", side_hover="#262626",
-         side_active_bg="#0066ff", side_active_fg="#ffffff", side_lobby="#00ffff",
-         win="#1e1e1e", panel="#262626", line="#333333", line2="#4a4a4a",
+         body_font=SANS_PRESTIUM, head_font=SANS_PRESTIUM,
+         # 2.1 (UI pass): the desktop's palette exactly (gtk3.css): the active channel in the accent fill
+         # #0050c8 (white text 7.0:1; Electric Blue #0066ff was 4.83:1), selection the same, secondary
+         # sidebar text #c8c8c8, fields #161616 with a #737373 edge, errors #ff9494
+         side_bg="#161616", side_fg="#ffffff", side_muted="#c8c8c8", side_hover="#262626",
+         side_active_bg="#0050c8", side_active_fg="#ffffff", side_lobby="#00ffff",
+         win="#1e1e1e", panel="#262626", line="#333333", line2="#4d4d4d",
          fg="#ffffff", muted="#a8a8a8",
          link="#00ffff",  # Neon Cyan for links: Electric Blue #0066ff is under 4.5:1 on #1e1e1e
          button="#00ffff", button_hover="#1e1e1e",
-         sel="#0052cc", in_bg="#141414", in_fg="#ffffff", in_line="#4a4a4a",
-         hl_bg="#0a2a5c", hl_line="#00ffff", ok="#6ee7a0", warn="#ffd166", bad="#ff7a7a",
-         date="#00ffff", unread="#ff7a7a"),
+         sel="#0050c8", in_bg="#161616", in_fg="#ffffff", in_line="#737373",
+         hl_bg="#0a2a5c", hl_line="#3d8bff", ok="#6ee7a0", warn="#ffd166", bad="#ff9494",
+         date="#00ffff", unread="#ff9494"),
     dict(slug="botanical-garden", name="Botanical Garden", dark=False,
          desc="Botanical Garden: fern green, marigold, terracotta and cream",
          palette="Fern Green #4a7c59, Marigold #f9a620, Terracotta #b7472a, Cream #f5f3ed",
