@@ -208,7 +208,7 @@ class Assistant(Gtk.ApplicationWindow):
         self.custom.set_visible(custom); self.custom_hint.set_visible(custom)
         good = not custom or custom_ok(w["custom"])
         self.custom_hint.set_markup("" if good else
-            "<span foreground='#ff7b63'>Enter an I2P address, such as http://name.i2p:3128</span>")
+            "<span foreground='#ff9494'>Enter an I2P address, such as http://name.i2p:3128</span>")
         c = self.current or {}
         same = c and w == {"hops": c.get("hops"), "share": c.get("share"), "outproxy": c.get("outproxy"),
                            "custom": c.get("custom") if c.get("outproxy") == "custom" else ""}

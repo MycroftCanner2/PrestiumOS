@@ -1,5 +1,7 @@
 # Prestium 2.1: labwc window theme. Design batch: Tech Innovation colours (dark grey, Electric Blue #0066ff,
 # Neon Cyan #00ffff), the same palette as GTK (gtk.css), Qt (Kvantum "Prestium"), KDE, waybar and mako.
+# 2.1 (contrast review): highlighted menu items #0050c8 (white text 7.0:1), focus edges #3d8bff
+# (4.6:1 or more against the grey surfaces), as GTK, Qt, waybar, mako and the lock screen.
 # No button images: labwc draws its own. Rounded corners and drop shadows are on in rc.xml.
 border.width: 1
 # keys as labwc 0.8.3 reads them (titlebar about 32 px with Cantarell 10 bold)
@@ -14,7 +16,7 @@ window.active.title.bg.color: #262626
 window.inactive.title.bg.color: #1e1e1e
 window.active.label.text.color: #ffffff
 window.inactive.label.text.color: #a8a8a8
-window.active.border.color: #0066ff
+window.active.border.color: #3d8bff
 window.inactive.border.color: #333333
 window.active.button.unpressed.image.color: #ffffff
 window.inactive.button.unpressed.image.color: #a8a8a8
@@ -28,14 +30,14 @@ menu.items.padding.x: 12
 menu.items.padding.y: 6
 menu.items.bg.color: #262626
 menu.items.text.color: #ffffff
-menu.items.active.bg.color: #0066ff
+menu.items.active.bg.color: #0050c8
 menu.items.active.text.color: #ffffff
 menu.separator.color: #3a3a3a
 menu.separator.padding.height: 4
 menu.border.width: 1
 menu.border.color: #333333
 osd.bg.color: #262626
-osd.border.color: #0066ff
+osd.border.color: #3d8bff
 osd.border.width: 1
 osd.label.text.color: #ffffff
 osd.window-switcher.preview.border.color: #00ffff

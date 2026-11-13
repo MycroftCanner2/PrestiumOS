@@ -8,7 +8,8 @@ font-hinting='slight'
 cursor-theme='Adwaita'
 cursor-size=24
 color-scheme='prefer-dark'
-# 2.1 (design batch): libadwaita's nearest named accent; the exact Electric Blue (#0066ff) is in gtk.css
+# 2.1 (design batch): libadwaita's nearest named accent; the exact blue is in gtk.css (2.1, contrast review:
+# #0050c8 behind white text, 7.0:1)
 accent-color='blue'
 clock-format='24h'
 

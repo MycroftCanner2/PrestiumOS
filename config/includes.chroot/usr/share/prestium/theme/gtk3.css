@@ -1,17 +1,28 @@
 /* Prestium 2.1 (design batch): GTK 3 apps in the Tech Innovation colours on top of Adwaita-dark:
    dark grey surfaces, Electric Blue (#0066ff) accent, Neon Cyan (#00ffff) links.
-   Colours only: no sizes, fonts or hidden widgets, so layouts and accessibility stay as Adwaita has them. */
+   Colours only: no sizes, fonts or hidden widgets, so layouts and accessibility stay as Adwaita has them.
+   2.1 (contrast review): one accessible palette for every dark surface (also the broker's and the
+   assistants' dialogs and the GNOME passphrase prompt, which read this file):
+     text #ffffff, secondary #c8c8c8, dim #a8a8a8 (6.3:1 or more on every surface below)
+     surfaces #161616 (views, entries), #1e1e1e (windows), #262626 (bars, dialogs, tooltips)
+     accent fill #0050c8 behind white text (7.0:1), hover #0047b3 (8.2:1), pressed #003f9e (9.5:1)
+     accent line #3d8bff for focus, rings, progress and tabs (4.6:1 or more on every surface)
+     entry edge #737373 (3.2:1 or more), error text #ff9494 (7.1:1 or more), links #00ffff
+   The old hover #0a6cff (and #1a75ff) made white text 4.6:1 and 4.2:1; hover is now darker, not lighter.
+   tests/test_contrast.py computes every pair. */
 @define-color theme_bg_color #1e1e1e;
 @define-color theme_base_color #161616;
 @define-color theme_fg_color #ffffff;
 @define-color theme_text_color #ffffff;
-@define-color theme_selected_bg_color #0066ff;
+@define-color theme_selected_bg_color #0050c8;
 @define-color theme_selected_fg_color #ffffff;
 @define-color insensitive_bg_color #1e1e1e;
 @define-color borders #333333;
 @define-color unfocused_borders #333333;
-@define-color accent_color #3d8bff;
-@define-color accent_bg_color #0066ff;
+@define-color accent_color #8ab8ff;
+@define-color accent_bg_color #0050c8;
+@define-color error_color #ff9494;
+@define-color warning_color #ffd166;
 
 window, .background { background-color: @theme_bg_color; }
 headerbar, .titlebar, menubar, toolbar, .toolbar, .inline-toolbar, actionbar, searchbar > revealer > box {
@@ -19,29 +30,44 @@ headerbar, .titlebar, menubar, toolbar, .toolbar, .inline-toolbar, actionbar, se
 headerbar:backdrop, .titlebar:backdrop { background-color: #1e1e1e; }
 .view, textview text, iconview, treeview.view, list, row { background-color: @theme_base_color; }
 treeview.view:hover:not(:selected), row.activatable:hover:not(:selected) { background-color: #262626; }
+.dim-label, label.dim-label { color: #c8c8c8; opacity: 1; }
 
 selection, *:selected, .view:selected, treeview.view:selected, row:selected,
 textview text selection, entry selection, label selection, flowboxchild:selected {
-  background-color: #0066ff; color: #ffffff; }
-.view:selected:backdrop, row:selected:backdrop, treeview.view:selected:backdrop { background-color: #0052cc; }
+  background-color: #0050c8; color: #ffffff; }
+.view:selected:backdrop, row:selected:backdrop, treeview.view:selected:backdrop { background-color: #0047b3; }
 
-entry:focus, spinbutton:focus:not(.vertical), textview:focus { border-color: #0066ff; box-shadow: inset 0 0 0 1px #0066ff; }
+/* text and password fields (zenity forms, the Lock Screen password, passphrase prompts) */
+entry, spinbutton:not(.vertical), textview.view {
+  background-color: #161616; background-image: none; color: #ffffff; border-color: #737373; }
+entry:focus, spinbutton:focus:not(.vertical), textview:focus { border-color: #3d8bff; box-shadow: inset 0 0 0 1px #3d8bff; }
+entry.error, entry.error:focus { color: #ffffff; border-color: #ff9494; box-shadow: inset 0 0 0 1px #ff9494; }
+entry.warning { border-color: #ffd166; }
+entry:disabled { background-color: #1e1e1e; color: #a8a8a8; border-color: #4d4d4d; }
+entry image { color: #c8c8c8; }
+entry progress { border-color: #3d8bff; }
+label.error, .error > label { color: #ff9494; }
+
+/* keyboard focus: a clear blue outline instead of Adwaita's faint dashed one */
+button:focus, check:focus, radio:focus, switch:focus, row:focus, treeview.view:focus, notebook:focus > header > tabs > tab { outline-color: #8ab8ff; }
 
 button.suggested-action, button.default:not(.flat) {
-  background-image: none; background-color: #0066ff; border-color: #0052cc; color: #ffffff; text-shadow: none; }
-button.suggested-action:hover { background-color: #0a6cff; }
-button.suggested-action:active, button.suggested-action:checked { background-color: #0052cc; }
-button.suggested-action:disabled { background-color: #24324d; color: #a8a8a8; }
+  background-image: none; background-color: #0050c8; border-color: #003f9e; color: #ffffff; text-shadow: none; }
+button.suggested-action:hover, button.default:not(.flat):hover { background-image: none; background-color: #0047b3; }
+button.suggested-action:active, button.suggested-action:checked, button.default:not(.flat):active { background-image: none; background-color: #003f9e; }
+button.suggested-action:disabled { background-image: none; background-color: #24324d; border-color: #24324d; color: #a8a8a8; }
+button.suggested-action:backdrop { background-image: none; background-color: #0050c8; color: #ffffff; }
 
-check:checked, radio:checked, check:indeterminate, radio:indeterminate {
-  background-image: none; background-color: #0066ff; border-color: #0052cc; color: #ffffff; }
-switch:checked { background-color: #0066ff; border-color: #0052cc; }
-progressbar progress, levelbar block.filled, scale highlight { background-image: none; background-color: #0066ff; border-color: #0052cc; }
-notebook > header > tabs > tab:checked { box-shadow: inset 0 -3px #0066ff; }
-stacksidebar row:selected, placessidebar row:selected { background-color: #0066ff; }
+check:checked, radio:checked, check:indeterminate, radio:indeterminate,
+check:checked:hover, radio:checked:hover, check:checked:backdrop, radio:checked:backdrop {
+  background-image: none; background-color: #0050c8; border-color: #3d8bff; color: #ffffff; }
+switch:checked { background-color: #0050c8; border-color: #3d8bff; }
+progressbar progress, levelbar block.filled, scale highlight { background-image: none; background-color: #3d8bff; border-color: #3d8bff; }
+notebook > header > tabs > tab:checked { box-shadow: inset 0 -3px #3d8bff; }
+stacksidebar row:selected, placessidebar row:selected { background-color: #0050c8; color: #ffffff; }
 
 *:link, button:link, button:visited, link { color: #00ffff; }
 *:link:hover { color: #80ffff; }
-*:visited { color: #7fb2ff; }
+*:visited { color: #8ab8ff; }
 
 tooltip.background { background-color: #262626; border: 1px solid #333333; color: #ffffff; }

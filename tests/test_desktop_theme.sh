@@ -31,7 +31,8 @@ grep -q '<keybind key="A-Left"><action name="None" /></keybind>' "$I/etc/xdg/lab
 grep -q 'identifier="\*zenity\*"' "$I/etc/xdg/labwc/rc.xml" && ok "zenity window rule matches org.gnome.Zenity" || bad "zenity rule matches nothing"
 python3 -c "import xml.dom.minidom as m,sys;[m.parse(p) for p in sys.argv[1:]]" "$I/etc/xdg/labwc/rc.xml" "$I/etc/xdg/labwc/menu.xml" && ok "labwc XML parses" || bad "labwc XML broken"
 # Design batch (Tech Innovation): one palette everywhere, wired so it loads
-H="$R/config/hooks/live"; ACC='#0066ff'
+# 2.1 (contrast review): accent fill #0050c8 behind white text, accent line #3d8bff for edges and rings
+H="$R/config/hooks/live"; ACC='#0050c8'; LINE='#3d8bff'
 for pk in papirus-icon-theme qt-style-kvantum qt6-style-kvantum qt-style-kvantum-themes fonts-font-awesome; do
   grep -qx "$pk" "$L" && ok "package $pk" || bad "package $pk missing"; done
 grep -q '^Inherits=Papirus-Dark,' "$H/0450-prestium-tray-icons.hook.chroot" && ok "Prestium icon theme inherits Papirus-Dark first" || bad "icon theme not on Papirus-Dark"
@@ -50,10 +51,10 @@ grep -q 'extra_env=dict(DIALOG_STYLE, \*\*DIALOG_ENV)' "$B" && grep -q '        
 grep -q '^os.environ\["XDG_CONFIG_HOME"\] = "/nonexistent/prestium-stock-gtk"' "$I/usr/local/bin/prestium-browser-updater" && ok "Browser Updater stays stock GTK 3" || bad "Browser Updater picks up gtk.css"
 # Kleopatra: Prestium colour scheme by default (not Breeze Dark)
 grep -qx 'ColorScheme=Prestium' "$I/etc/xdg/kleopatrarc" && grep -qx 'Name=Prestium' "$I/usr/share/color-schemes/Prestium.colors" && ok "Kleopatra defaults to the Prestium colour scheme" || bad "Kleopatra colour scheme"
-grep -q '^BackgroundNormal=0,102,255$' "$I/usr/share/color-schemes/Prestium.colors" && ok "KDE selection $ACC" || bad "KDE selection colour"
+grep -q '^BackgroundNormal=0,80,200$' "$I/usr/share/color-schemes/Prestium.colors" && ok "KDE selection $ACC" || bad "KDE selection colour"
 # labwc, swaylock, mako, waybar
-grep -q "^window.active.border.color: $ACC" "$T" && grep -q '<dropShadows>yes</dropShadows>' "$I/etc/xdg/labwc/rc.xml" && grep -q '<cornerRadius>' "$I/etc/xdg/labwc/rc.xml" && ok "labwc accent, shadows, corners" || bad "labwc theme"
-grep -q '^ring-color=0066ffff' "$I/usr/share/prestium/swaylock.conf" && ok "swaylock accent" || bad "swaylock accent"
+grep -q "^window.active.border.color: $LINE" "$T" && grep -q "^menu.items.active.bg.color: $ACC" "$T" && grep -q '<dropShadows>yes</dropShadows>' "$I/etc/xdg/labwc/rc.xml" && grep -q '<cornerRadius>' "$I/etc/xdg/labwc/rc.xml" && ok "labwc accent, shadows, corners" || bad "labwc theme"
+grep -q '^ring-color=3d8bffff' "$I/usr/share/prestium/swaylock.conf" && grep -qx 'indicator-idle-visible' "$I/usr/share/prestium/swaylock.conf" && ok "swaylock accent ring, prompt always shown" || bad "swaylock accent"
 M="$I/etc/xdg/mako/config"
 grep -q '^\[category=prestium.osd\]' "$M" && grep -q -- '-c prestium.osd' "$I/usr/local/bin/prestium-media-key" && ok "OSD category styled" || bad "OSD category"
 grep -q '^icon-path=/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:' "$M" && ok "mako icons from Papirus-Dark" || bad "mako icon-path"

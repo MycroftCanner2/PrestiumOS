@@ -2,13 +2,15 @@
 # 2.1 (design batch): Tech Innovation colours (dark grey, Electric Blue #0066ff, Neon Cyan #00ffff), rounded
 # like the windows and the floating bar. One look per urgency: low (grey edge, 5 s), normal (blue edge, 8 s),
 # critical (red edge, stays until dismissed). The volume and brightness OSD (category prestium.osd) is compact.
+# 2.1 (contrast review): normal edge #3d8bff, progress #0050c8 under white text (7.0:1), low-urgency
+# edge #737373 so the three urgencies stay apart; critical text white on #2b1616 (17:1).
 # mako has no fade or slide animation. Sounds are off unless turned on (System, Notification Sounds).
 anchor=top-right
 default-timeout=8000
 font=Cantarell 10
 background-color=#1e1e1eF2
 text-color=#ffffff
-border-color=#0066ff
+border-color=#3d8bff
 border-size=1
 border-radius=14
 padding=14
@@ -23,7 +25,7 @@ icons=1
 icon-path=/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:/usr/share/icons/Papirus:/usr/share/icons/AdwaitaLegacy:/usr/share/icons/gnome:/usr/share/icons/Adwaita
 max-icon-size=32
 icon-location=left
-progress-color=over #0066ff
+progress-color=over #0050c8
 # 2.1: only identical repeats collapse (same app and summary); critical alerts are never hidden
 group-by=app-name,summary
 format=<b>%s</b>\n%b
@@ -31,7 +33,7 @@ on-notify=exec /usr/local/bin/prestium-notify-sound normal
 
 [urgency=low]
 default-timeout=5000
-border-color=#4a4a4a
+border-color=#737373
 text-color=#d0d0d0
 
 [urgency=critical]

@@ -3,6 +3,7 @@
 # set in prestium-session; the user's ~/.config/Kvantum/kvantum.kvconfig picks it). It is KvGnomeDark's
 # shapes (they match GTK's Adwaita-dark) with the Tech Innovation colours: dark grey, Electric Blue
 # selection, Neon Cyan links.
+# 2.1 (contrast review): selection #0050c8 (white text 7.0:1, as GTK), visited links #a3a3ff (8:1).
 set -e
 S=/usr/share/Kvantum/KvGnomeDark; D=/usr/share/Kvantum/Prestium
 [ -f "$S/KvGnomeDark.svg" ] && [ -f "$S/KvGnomeDark.kvconfig" ] || { echo "E: KvGnomeDark missing (qt-style-kvantum-themes)"; exit 1; }
@@ -24,8 +25,8 @@ set_color light.color '#4a4a4a'
 set_color mid.light.color '#3a3a3a'
 set_color dark.color '#0f0f0f'
 set_color mid.color '#333333'
-set_color highlight.color '#0066ff'
-set_color inactive.highlight.color '#0052cc'
+set_color highlight.color '#0050c8'
+set_color inactive.highlight.color '#0047b3'
 set_color text.color '#ffffff'
 set_color window.text.color '#ffffff'
 set_color button.text.color '#ffffff'
@@ -33,6 +34,6 @@ set_color disabled.text.color '#a8a8a8'
 set_color tooltip.text.color '#ffffff'
 set_color highlight.text.color '#ffffff'
 set_color link.color '#00ffff'
-set_color link.visited.color '#7575fd'
+set_color link.visited.color '#a3a3ff'
 chmod 755 "$D"
 echo "P: Kvantum theme Prestium (KvGnomeDark shapes, Tech Innovation colours)"

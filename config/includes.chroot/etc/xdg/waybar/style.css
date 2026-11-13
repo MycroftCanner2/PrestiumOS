@@ -1,16 +1,18 @@
 /* Prestium 2.1 (design batch): floating, rounded bar in the Tech Innovation colours (dark grey,
    Electric Blue #0066ff, Neon Cyan #00ffff), the same palette as the window titlebars (labwc theme
    Prestium-Dark), GTK, Qt and mako. Symbols come from Font Awesome 4.7 (fonts-font-awesome).
-   Only colour transitions on hover: labwc and waybar have no window animations. */
+   Only colour transitions on hover: labwc and waybar have no window animations.
+   2.1 (contrast review): Menu button #0050c8, hover darker #0047b3 (white text 7.0:1 and 8.2:1; the old
+   hover #0a6cff was 4.6:1); grey pill text #c8c8c8 (9:1), red #ff9494 (8:1), hover edges #3d8bff. */
 * { font-family: Cantarell, FontAwesome, sans-serif; font-size: 13px; min-height: 0; }
 window#waybar { background: rgba(22, 22, 22, 0.94); color: #ffffff; border: 1px solid #333333; border-radius: 14px; }
 tooltip { background: #262626; border: 1px solid #333333; border-radius: 10px; }
 tooltip label { color: #ffffff; padding: 2px 4px; }
 
 /* menu button */
-#custom-menu { padding: 0 14px; margin: 4px 4px 4px 5px; background: #0066ff; color: #ffffff; border-radius: 10px; font-weight: bold;
+#custom-menu { padding: 0 14px; margin: 4px 4px 4px 5px; background: #0050c8; color: #ffffff; border-radius: 10px; font-weight: bold;
   transition: background-color 150ms ease-in-out; }
-#custom-menu:hover { background: #0a6cff; }
+#custom-menu:hover { background: #0047b3; }
 
 /* windows */
 #taskbar button { padding: 0 8px; margin: 4px 2px; min-width: 0; color: #a8a8a8; border-radius: 8px; border: none;
@@ -25,20 +27,20 @@ tooltip label { color: #ffffff; padding: 2px 4px; }
   transition: background-color 150ms ease-in-out; }
 #network:hover, #pulseaudio:hover, #battery:hover { background: #262626; }
 #clock { font-size: 11px; font-weight: normal; margin-right: 6px; padding: 0 10px 0 6px; }
-#network.disconnected { color: #ff7a7a; }
+#network.disconnected { color: #ff9494; }
 #pulseaudio.muted { color: #a8a8a8; }
 #battery.warning:not(.charging) { color: #ffd166; }
-#battery.critical:not(.charging) { color: #ff7a7a; font-weight: bold; }
+#battery.critical:not(.charging) { color: #ff9494; font-weight: bold; }
 
 /* Tor and I2P pills: connecting (amber), ready (cyan), failed (red) */
 #custom-tor, #custom-i2p { padding: 0 11px; margin: 6px 2px; border-radius: 999px; font-size: 12px; font-weight: bold;
-  background: #262626; color: #a8a8a8; border: 1px solid #333333;
+  background: #262626; color: #c8c8c8; border: 1px solid #4d4d4d;
   transition: background-color 300ms ease-in-out, color 300ms ease-in-out, border-color 300ms ease-in-out; }
 #custom-tor.connecting, #custom-i2p.connecting { color: #ffd166; border-color: #5c4a1a; background: #2a2416; }
 #custom-tor.ready, #custom-i2p.ready { color: #00ffff; border-color: #0a4f5c; background: #10262b; }
-#custom-tor.failed, #custom-i2p.failed { color: #ff7a7a; border-color: #5c2424; background: #2b1616; }
-#custom-tor:hover, #custom-i2p:hover { border-color: #0066ff; }
+#custom-tor.failed, #custom-i2p.failed { color: #ff9494; border-color: #5c2424; background: #2b1616; }
+#custom-tor:hover, #custom-i2p:hover { border-color: #3d8bff; }
 /* 2.1: clock-sync symbol, only shown until the time is set over Tor */
 #custom-timesync { padding: 0 8px; margin: 6px 2px; font-size: 13px; }
 #custom-timesync.syncing { color: #ffd166; }
-#custom-timesync.failed { color: #ff7a7a; }
+#custom-timesync.failed { color: #ff9494; }

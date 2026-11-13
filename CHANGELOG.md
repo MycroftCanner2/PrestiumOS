@@ -349,6 +349,19 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **Wallpapers and lock screen.** Three Prestium wallpapers (Horizon, Circuit, Mark) are picked in
   System, Wallpaper; the broker takes only one of those names, never a path. The lock screen uses the
   palette and shows Caps Lock and keypresses on its ring.
+- **The lock screen's password prompt and every dark dialog are readable (contrast review).** The prompt
+  is always on screen (not only after the first key): a raised grey disc with a blue ring on the dark
+  screen. Typing shows white ticks, Backspace dark gaps; Verifying, Wrong, Caps Lock and Cleared each have
+  their own ring and a tinted disc, with white (Caps Lock: amber) text at 10:1 or more. Before, the disc
+  was the screen's grey (1.1:1), key ticks and the verify ring were the same neon cyan, and the prompt was
+  hidden until a key was pressed. One accessible palette now covers GTK 3 and 4 (apps, the broker's
+  dialogs such as the Lock Screen password, the Connection Assistants, the GNOME passphrase prompt), Qt,
+  Kleopatra, labwc, waybar and mako: white text behind the blue accent uses `#0050c8` (7.0:1; `#0066ff`
+  was 4.8:1), hover goes darker (`#0047b3`, 8.2:1; the old `#0a6cff` was 4.6:1), focus edges, rings and
+  progress use `#3d8bff` (4.6:1 or more), text fields are `#161616` with a `#737373` edge (3.2:1 or
+  more) and a blue focus edge, error text is `#ff9494` (7.1:1 or more), and secondary text `#c8c8c8`.
+  Every text pair is 7:1 or more (disabled text and coloured text on a selection 4.5:1), every edge,
+  ring and focus mark 3:1 or more. Tests: `test_contrast.py` (173 pairs, read from the shipped files).
 - **Keys and dialogs.** Alt+arrows go to the browsers (Back/Forward), not labwc; Super+Return opens the
   terminal. Log Out asks first; Restart and Shut Down have named buttons, and Restart… in the I2P
   Connection Assistant uses the same confirmation. Long dialog texts wrap on small screens, file names

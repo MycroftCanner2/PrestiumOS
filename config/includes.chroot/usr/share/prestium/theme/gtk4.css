@@ -1,9 +1,12 @@
 /* Prestium 2.1 (design batch): GTK 4 and libadwaita apps in the Tech Innovation colours.
    libadwaita's own accent setting offers only named colours (dconf accent-color is set to the nearest,
-   'blue'), so the exact Electric Blue comes from here. Colours only, nothing about sizes or behaviour. */
-@define-color accent_bg_color #0066ff;
+   'blue'), so the exact Electric Blue comes from here. Colours only, nothing about sizes or behaviour.
+   2.1 (contrast review): the same accessible palette as gtk3.css (see there): accent fill #0050c8 behind
+   white text (7.0:1), accent text and focus #8ab8ff / #3d8bff, entries #161616 with a #737373 edge,
+   placeholders #a8a8a8, errors #ff9494. tests/test_contrast.py computes every pair. */
+@define-color accent_bg_color #0050c8;
 @define-color accent_fg_color #ffffff;
-@define-color accent_color #3d8bff;
+@define-color accent_color #8ab8ff;
 @define-color window_bg_color #1e1e1e;
 @define-color window_fg_color #ffffff;
 @define-color view_bg_color #161616;
@@ -15,12 +18,22 @@
 @define-color card_bg_color #262626;
 @define-color dialog_bg_color #262626;
 @define-color popover_bg_color #262626;
-@define-color theme_selected_bg_color #0066ff;
+@define-color theme_selected_bg_color #0050c8;
+@define-color error_color #ff9494;
+@define-color error_fg_color #ffffff;
+@define-color warning_color #ffd166;
 :root {
-  --accent-bg-color: #0066ff; --accent-fg-color: #ffffff; --accent-color: #3d8bff;
+  --accent-bg-color: #0050c8; --accent-fg-color: #ffffff; --accent-color: #8ab8ff;
   --window-bg-color: #1e1e1e; --view-bg-color: #161616;
   --headerbar-bg-color: #262626; --headerbar-backdrop-color: #1e1e1e;
   --sidebar-bg-color: #1e1e1e; --card-bg-color: #262626; --dialog-bg-color: #262626; --popover-bg-color: #262626;
+  --error-color: #ff9494; --warning-color: #ffd166;
 }
 link, label link, .link, button.link { color: #00ffff; }
-selection { background-color: alpha(#0066ff, 0.5); }
+selection { background-color: alpha(#0050c8, 0.7); }
+entry, passwordentry, spinbutton { background-color: #161616; color: #ffffff; box-shadow: inset 0 0 0 1px #737373; }
+entry:focus-within, passwordentry:focus-within, spinbutton:focus-within { outline-color: #3d8bff; }
+entry.error, passwordentry.error { color: #ffffff; box-shadow: inset 0 0 0 1px #ff9494; }
+entry > text > placeholder, passwordentry > text > placeholder { color: #a8a8a8; }
+button.suggested-action:hover, button.default:hover { background-image: none; background-color: #0047b3; }
+button.suggested-action:active, button.default:active { background-image: none; background-color: #003f9e; }

@@ -422,7 +422,7 @@ class Assistant(Gtk.ApplicationWindow):
         if m == "webtunnel" and not user_lines(self.get_text()):
             self.valid.set_markup("<i>WebTunnel needs at least one bridge line.</i>")
         elif bad:
-            self.valid.set_markup('<span foreground="#ff7b63">%s</span>' % GLib.markup_escape_text("; ".join(bad[:4])))
+            self.valid.set_markup('<span foreground="#ff9494">%s</span>' % GLib.markup_escape_text("; ".join(bad[:4])))
             self.valid.set_tooltip_text("\n".join(bad))
         elif m != "direct" and user_lines(self.get_text()):
             n = len(user_lines(self.get_text()))
