@@ -15,7 +15,9 @@ case "$1" in prereqs) prereqs; exit 0 ;; esac
 # PRESTIUM_HOOK_ROOT: only for tests/test_boot_cmdline_guard.sh (a copy of the files); empty in mkinitramfs
 S=${PRESTIUM_HOOK_ROOT:-}/usr/share/prestium/boot
 M='# prestium-cmdline'
-[ -n "${DESTDIR:-}" ] && [ -f "$DESTDIR/init" ] || { echo "E: prestium-cmdline: no \$DESTDIR/init" >&2; exit 1; }
+if [ -z "${DESTDIR:-}" ] || [ ! -f "$DESTDIR/init" ]; then
+	echo "E: prestium-cmdline: no \$DESTDIR/init" >&2; exit 1
+fi
 for f in cmdline-guard.sh cmdline.policy; do
 	[ -f "$S/$f" ] || { echo "E: prestium-cmdline: $S/$f missing" >&2; exit 1; }
 done

@@ -23,7 +23,9 @@ set -e
 C=../chroot
 POL=$C/usr/share/prestium/boot/cmdline.policy
 LIB=$C/usr/share/prestium/boot/cmdline-guard.sh
-[ -f "$POL" ] && [ -f "$LIB" ] || { echo "E: $POL or $LIB missing"; exit 1; }
+if [ ! -f "$POL" ] || [ ! -f "$LIB" ]; then
+	echo "E: $POL or $LIB missing"; exit 1
+fi
 H=$(cat ../prestium-roothash.tmp 2>/dev/null || true)
 echo "$H" | grep -qxE '[0-9a-f]{64}' || { echo "E: no dm-verity root hash in ../prestium-roothash.tmp (hook 9010)"; exit 1; }
 ID=$(printf %.32s "$H")
