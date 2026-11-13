@@ -107,7 +107,7 @@ sh -e "$T/copy.sh" && [ -f "$T/root/var/lib/thelounge-tor/packages/node_modules/
 ## config.js and presets
 C=$I/var/lib/thelounge-tor/config.js; C0=$I/var/lib/thelounge/config.js; J=$I/usr/local/share/prestium-thelounge-tor/prestium.json
 if command -v node >/dev/null; then
-  node - "$C" "$C0" "$J" "$I/etc/tor/torrc" "$I/usr/local/share/prestium-thelounge/prestium.json" <<'JS' && ok "config.js: 127.0.0.1:9010, OFTC default through 127.0.0.1:9050; 8 presets, all through Tor" || bad "config.js / presets"
+  node - "$C" "$C0" "$J" "$I/etc/tor/torrc" "$I/usr/local/share/prestium-thelounge/prestium.json" <<'JS' && ok "config.js: 127.0.0.1:9010, OFTC default through 127.0.0.1:9050; 7 presets (no account first, no Pirate IRC), all through Tor" || bad "config.js / presets"
 const [c, c0, j, torrc, j0] = process.argv.slice(2).map((f, i) => i < 2 ? require(f) : require("fs").readFileSync(f, "utf8"));
 const assert = require("assert");
 assert.strictEqual(c.port, 9010); assert.strictEqual(c.host, "127.0.0.1"); assert.strictEqual(c.public, false);
@@ -120,22 +120,26 @@ assert.strictEqual(d.name, "OFTC"); assert.strictEqual(d.host, "oftcnet6xg6roj6d
 assert.strictEqual(d.port, 6697); assert.strictEqual(d.tls, true); assert.strictEqual(d.nick, c0.defaults.nick);
 assert.strictEqual(d.proxyEnabled, true); assert.strictEqual(d.proxyHost, "127.0.0.1"); assert.strictEqual(d.proxyPort, 9050);
 const p = JSON.parse(j);
+// 2.1: networks that need no account first, then the SASL ones; Pirate IRC removed.
+// [host, port, tls, rejectUnauthorized, sasl]
 const want = {
-	"OFTC": ["oftcnet6xg6roj6d7id4y4cu6dchysacqj2ldgea73qzdagufflqxrid.onion", 6697, true, false],
-	"Libera.Chat (SASL cert)": ["palladium.libera.chat", 6697, true, true],
-	"hackint": ["guybrush.hackint.org", 6697, true, true],
-	"Ergo": ["vrw7zcuarwx4oeju3iikiz3jffrvuijsysyznqf53mxizxrebomfnrid.onion", 6667, false, true],
-	"AlphaChat (SASL)": ["irc.alphachat.net", 6697, true, true],
-	"DarkScience": ["darkirc6tqgpnwd3blln3yfv5ckl47eg7llfxkmtovrv7c7iwohhb6ad.onion", 6667, false, true],
-	"Pirate IRC (SASL)": ["roubaix-fr.pirateirc.net", 6697, true, true],
-	"IRCNow": ["4ufrikyorlatp5ekgz6tlre22v6b5jxqbiid6cp7nuhemklukiohidqd.onion", 6667, false, true],
+	"OFTC": ["oftcnet6xg6roj6d7id4y4cu6dchysacqj2ldgea73qzdagufflqxrid.onion", 6697, true, false, ""],
+	"Ergo": ["vrw7zcuarwx4oeju3iikiz3jffrvuijsysyznqf53mxizxrebomfnrid.onion", 6667, false, true, ""],
+	"DarkScience": ["darkirc6tqgpnwd3blln3yfv5ckl47eg7llfxkmtovrv7c7iwohhb6ad.onion", 6667, false, true, ""],
+	"IRCNow": ["4ufrikyorlatp5ekgz6tlre22v6b5jxqbiid6cp7nuhemklukiohidqd.onion", 6667, false, true, ""],
+	"Libera.Chat (SASL certificate)": ["palladium.libera.chat", 6697, true, true, "external"],
+	"hackint (SASL optional)": ["guybrush.hackint.org", 6697, true, true, ""],
+	"AlphaChat (SASL)": ["irc.alphachat.net", 6697, true, true, "plain"],
 };
+assert.ok(!/pirate/i.test(j), "Pirate IRC still in the presets");
 assert.deepStrictEqual(p.networks.map(n => n.name), Object.keys(want));
 const maps = {};
 for (const l of torrc.split("\n")) { const m = l.match(/^MapAddress (\S+) ([a-z2-7]{56}\.onion)$/); if (m) maps[m[1]] = m[2]; }
 for (const n of p.networks) {
-	const [host, port, tls, rej] = want[n.name];
-	assert.deepStrictEqual([n.host, n.port, n.tls, n.rejectUnauthorized], [host, port, tls, rej], n.name);
+	const [host, port, tls, rej, sasl] = want[n.name];
+	assert.deepStrictEqual([n.host, n.port, n.tls, n.rejectUnauthorized, n.sasl], [host, port, tls, rej, sasl], n.name);
+	// no account or password ships in the image: each user brings their own
+	assert.deepStrictEqual([n.saslAccount, n.saslPassword, n.password], ["", "", ""], n.name);
 	assert.strictEqual(n.proxyEnabled, true, n.name); assert.strictEqual(n.proxyHost, "127.0.0.1"); assert.strictEqual(n.proxyPort, 9050);
 	assert.strictEqual(n.userDisconnected, true, n.name); assert.deepStrictEqual(n.channels, []);
 	// every server is an onion service: an .onion name, or a name torrc maps to one
@@ -153,10 +157,11 @@ else echo "SKIP node missing (config.js)"; fi
 TR=$I/etc/tor/torrc
 for l in 'MapAddress palladium.libera.chat libera75jm6of4wxpxt4aynol3xjmbtxgfyjpu34ss4d7r7q2v5zrpyd.onion' \
   'MapAddress guybrush.hackint.org dtlbunzs5b7s5sl775quwezleyeplxzicdoh3cnhm7feolxmkfd42nqd.onion' \
-  'MapAddress irc.alphachat.net rnjlael46gqqmfiuiqsswdeev6axrf47j7bq4dtuqdsv2qgqfumcy4yd.onion' \
-  'MapAddress roubaix-fr.pirateirc.net tll4bxf546kzf6iv4n2m4pbbjnifrfewe3kcritva2tuuuiowygx2cqd.onion'; do
+  'MapAddress irc.alphachat.net rnjlael46gqqmfiuiqsswdeev6axrf47j7bq4dtuqdsv2qgqfumcy4yd.onion'; do
   grep -qxF "$l" "$TR" && ok "torrc: $l" || bad "torrc: no $l"; done
-[ "$(grep -c '^MapAddress ' "$TR")" = 4 ] && ok "torrc: exactly 4 MapAddress lines, all to .onion" || bad "torrc MapAddress count"
+[ "$(grep -c '^MapAddress ' "$TR")" = 3 ] && ok "torrc: exactly 3 MapAddress lines, all to .onion" || bad "torrc MapAddress count"
+grep -qi 'pirate' "$TR" && bad "torrc still mentions Pirate IRC" || ok "torrc: no Pirate IRC"
+git -C "$R" grep -qi 'pirateirc\|pirate irc' -- . ':!CHANGELOG.md' ':!tests/test_thelounge_tor.sh' && bad "Pirate IRC still named outside the CHANGELOG" || ok "Pirate IRC gone (CHANGELOG notes the removal)"
 grep -qx 'SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort IsolateSOCKSAuth' "$TR" && grep -q '^SocksPort unix:/run/prestium-tbb/socks WorldWritable ExtendedErrors KeepAliveIsolateSOCKSAuth$' "$TR" \
   && grep -qx '%include /etc/tor/torrc.d/\*.conf' "$TR" && ok "torrc: SocksPorts and drop-in include unchanged" || bad "torrc existing options"
 
@@ -287,9 +292,9 @@ assert.ok(/^[0-9a-f]{128}$/.test(tok));
 const h = crypto.createHash("sha512").update(tok).digest("hex");
 assert.ok(b.sessions[h] && b.sessions[h].prestiumLaunch === true);
 for (const u of [a, b]) {
-	assert.strictEqual(u.networks.length, 8);
-	assert.strictEqual(new Set(u.networks.map(n => n.nick)).size, 8);
-	assert.strictEqual(new Set(u.networks.map(n => n.proxyUsername)).size, 8);
+	assert.strictEqual(u.networks.length, 7);
+	assert.strictEqual(new Set(u.networks.map(n => n.nick)).size, 7);
+	assert.strictEqual(new Set(u.networks.map(n => n.proxyUsername)).size, 7);
 	for (const n of u.networks) {
 		assert.ok(/^anon\d{4}$/.test(n.nick)); assert.strictEqual(n.userDisconnected, true);
 		assert.deepStrictEqual([n.proxyEnabled, n.proxyHost, n.proxyPort], [true, "127.0.0.1", 9050]);

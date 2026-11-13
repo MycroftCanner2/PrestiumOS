@@ -49,11 +49,10 @@ modernization of the 2023 Prestium build, with tighter security and new features
   relaying); the I2P Connection Assistant sets Low, Medium or High.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
-  SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets for OFTC
-  (default), Libera.Chat, hackint, Ergo, AlphaChat, DarkScience, Pirate IRC and IRCNow, and its own
-  Tor circuits per network. Networks connect only when you choose Connect. Libera.Chat over Tor needs
-  an account and client certificate (SASL EXTERNAL) set up beforehand without Tor; AlphaChat and
-  Pirate IRC need SASL.
+  SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets and its own
+  Tor circuits per network. Networks connect only when you choose Connect. OFTC (default), Ergo,
+  DarkScience and IRCNow need no account. Libera.Chat, hackint and AlphaChat are listed after them
+  because they sign you in with SASL; see *IRC over Tor: networks that need an account* below.
 - **Verified live image:** the root filesystem is mounted through dm-verity, and Prestium refuses to
   boot when it doesn't match the root hash in the boot menu (the kernel, initramfs and boot menu
   themselves are not covered yet; see the CHANGELOG's Known security limits).
@@ -72,7 +71,29 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Hardware:** current firmware, PipeWire audio, HiDPI scaling, laptop keys, touchpad settings and an
   on-screen keyboard.
 
-## Known limits
+## IRC over Tor: networks that need an account
+
+Prestium has no shared account for these networks: a password or key shipped in the image would be
+public, anyone could take the account over, and the network would ban it for everyone. Each person
+brings their own account. Sign-in details live only in RAM and are gone after a reboot, so you enter
+them again each session. Libera.Chat and AlphaChat don't connect until the sign-in is filled in; the
+network's lobby says what's missing.
+
+- **AlphaChat:** Tor users need a verified AlphaChat account, registered without Tor first
+  (alphachat.net/tor.xhtml). In *IRC (Tor)*, right-click *AlphaChat (SASL)*, choose *Edit this
+  network*, select *Username + password (SASL PLAIN)* under Authentication, enter the account and
+  password, choose *Save network*, then *Connect*.
+- **hackint:** works over Tor without an account. To use your hackint account, select
+  *Username + password (SASL PLAIN)* the same way. hackint no longer accepts `/msg NickServ IDENTIFY`
+  and lets Tor users register an account through a proof-of-work check (hackint.org/transport/tor).
+- **Libera.Chat:** over Tor it only takes an account registered without Tor, signed in with a client
+  certificate (SASL EXTERNAL), not a password (libera.chat/guides/connect). The preset already uses
+  *Client certificate (SASL EXTERNAL)*. Its lobby shows the certificate's SHA-512 fingerprint. From a
+  connection without Tor, such as a phone or another computer signed in to your account, send
+  `/msg NickServ CERT ADD <fingerprint>`, then choose *Connect* in Prestium. The Lounge makes a new
+  certificate every boot, so this is needed once per session, and `/msg NickServ CERT LIST` and
+  `CERT DEL` tidy up old ones. Importing your own long-lived certificate isn't supported yet.
+
 
 - **Someone who can write to the USB stick can change the next boot.** dm-verity checks the root
   filesystem and the boot menu is password-locked, but both checks live in unsigned files on the stick:

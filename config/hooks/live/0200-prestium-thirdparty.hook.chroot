@@ -7,7 +7,8 @@
 #   Firefox      -> /opt/firefox (local-only browser for Prestium's own pages) + policies.json
 #   Node.js      -> /opt/nodejs (runtime only: bin/node + LICENSE)
 #   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch, 320s IRC ping timeout, and connecting lobby text only when a connection starts;
-#                   shared by both instances, IRC (I2P) and IRC (Tor) (Tor: every network through 127.0.0.1:9050)
+#                   shared by both instances, IRC (I2P) and IRC (Tor) (Tor: every network through 127.0.0.1:9050,
+#                   no connection whose SASL sign-in can't work)
 #   Feather      -> /usr/local/bin/feather
 set -e
 S=/usr/src/prestium-thirdparty
@@ -257,6 +258,147 @@ assert s.count("else if (this.proxyEnabled) {") == 1, "The Lounge network.js: pr
 print("P: The Lounge Tor instance: every network through 127.0.0.1:9050")
 PY
 /opt/nodejs/bin/node --check "$NS"
+# 2.1: IRC (Tor) sign-in (SASL). Libera.Chat and AlphaChat accept Tor users only with SASL to an account
+# made beforehand (libera.chat/guides/connect: public-key SASL only, EXTERNAL; alphachat.net/tor.xhtml:
+# SASL to a verified account), so a connection without it was dropped at once with no explanation.
+# In the Tor instance (PRESTIUM_LOUNGE_TOR=1) a network does not connect when its sign-in can't work:
+# SASL PLAIN with an empty account or password (any network), Libera.Chat without a client certificate
+# (EXTERNAL; Libera's onion refuses PLAIN), AlphaChat without SASL. The lobby says why and what to fill in
+# (right-click > Edit this network > Authentication). hackint lets Tor users in without an account, so it
+# is not held back. With EXTERNAL the lobby shows the network's client certificate fingerprint (SHA-512,
+# what NickServ CERT ADD takes; The Lounge makes the certificate, a new one every boot), and a failed SASL
+# sign-in is reported in the lobby. Checked in irc.connect() itself (every way a connection starts:
+# /connect, the Connect menu, a new network, STS) and before /connect's "Connecting to" line. The I2P
+# instance is unchanged. The expected text must appear exactly once, or the build stops. Idempotent.
+NA=/opt/thelounge/node_modules/thelounge/dist/server/models/network.js
+IA=/opt/thelounge/node_modules/thelounge/dist/server/plugins/inputs/connect.js
+python3 - "$NA" "$IA" <<'PY'
+import sys
+na, ia = sys.argv[1], sys.argv[2]
+METHODS = r'''    // Prestium: IRC (Tor) sign-in rules (hook 0200). "" = may connect, otherwise why not.
+    prestiumTorSaslNetwork() {
+        const h = String(this.host || "").toLowerCase();
+        if (/(^|\.)libera\.chat$/.test(h) || h === "libera75jm6of4wxpxt4aynol3xjmbtxgfyjpu34ss4d7r7q2v5zrpyd.onion") {
+            return "Libera.Chat";
+        }
+        if (/(^|\.)alphachat\.net$/.test(h) || [
+            "rnjlael46gqqmfiuiqsswdeev6axrf47j7bq4dtuqdsv2qgqfumcy4yd.onion",
+            "cr4elesi2ifau6xivukboqj2ojz5gvmdxnuck4hvniaco4t2fgloihqd.onion",
+            "mynhbqethtsbad5trblr7t2xmrxgjeyrgk6peu2cpkqxw47yyj2o32id.onion",
+            "rjmhwz5coqxunj3taoceh6etng4tvvaqg6nh3brhn2mfudpikptblpad.onion",
+            "bh4jjq5zo26whufiroqab3bfvwcwtcygzmsr7jy7pzcbtaguqay56fid.onion",
+        ].includes(h)) {
+            return "AlphaChat";
+        }
+        if (/(^|\.)hackint\.org$/.test(h) || h === "dtlbunzs5b7s5sl775quwezleyeplxzicdoh3cnhm7feolxmkfd42nqd.onion") {
+            return "hackint";
+        }
+        return "";
+    }
+    prestiumTorSaslProblem() {
+        if (process.env.PRESTIUM_LOUNGE_TOR !== "1") {
+            return "";
+        }
+        const how = "Right-click this network in the list, choose \"Edit this network\", ";
+        const net = this.prestiumTorSaslNetwork();
+        if (net === "Libera.Chat" && this.sasl !== "external") {
+            return "Libera.Chat over Tor only accepts an account registered without Tor, signed in with a client certificate (not a password). " +
+                how + "select \"Client certificate (SASL EXTERNAL)\" under Authentication and choose \"Save network\". " +
+                "Then add the certificate fingerprint shown here to your account from a connection without Tor: /msg NickServ CERT ADD <fingerprint>";
+        }
+        if (this.sasl === "plain" && (!this.saslAccount || !this.saslPassword)) {
+            return (net || this.name) + " needs your account name and password before it can connect. " +
+                how + "select \"Username + password (SASL PLAIN)\" under Authentication, fill in Account and Password, and choose \"Save network\". Then Connect.";
+        }
+        if (net === "AlphaChat" && !this.sasl) {
+            return "AlphaChat over Tor only accepts a verified AlphaChat account (register it without Tor first). " +
+                how + "select \"Username + password (SASL PLAIN)\" under Authentication, fill in Account and Password, and choose \"Save network\". Then Connect.";
+        }
+        return "";
+    }
+    prestiumTorCertFingerprint() {
+        if (process.env.PRESTIUM_LOUNGE_TOR !== "1" || this.sasl !== "external") {
+            return "";
+        }
+        try {
+            const c = clientCertificate_1.default.get(this.uuid);
+            return c ? new crypto_1.default.X509Certificate(c.certificate).fingerprint512.replace(/:/g, "").toLowerCase() : "";
+        }
+        catch (e) {
+            return "";
+        }
+    }
+    prestiumTorLobby(client, text, error) {
+        this.getLobby().pushMessage(client, new msg_1.default(error ? {type: msg_2.MessageType.ERROR, text: text} : {text: text}), true);
+    }
+    prestiumTorHint(client) {
+        const net = this.prestiumTorSaslNetwork();
+        const fp = this.prestiumTorCertFingerprint();
+        if (fp) {
+            this.prestiumTorLobby(client, "Signing in with this network's client certificate. Its fingerprint (SHA-512) is " + fp +
+                ". Prestium makes a new certificate every boot: add it to your account from a connection without Tor with /msg NickServ CERT ADD " + fp, false);
+        }
+        if (net === "hackint" && !this.sasl) {
+            this.prestiumTorLobby(client, "hackint lets you in over Tor without an account. To sign in to your hackint account, " +
+                "right-click this network, choose \"Edit this network\" and select \"Username + password (SASL PLAIN)\" under Authentication.", false);
+        }
+        const p = this.prestiumTorSaslProblem();
+        if (p) {
+            this.prestiumTorLobby(client, p, false);
+        }
+    }
+    // true: not connecting (the lobby says why)
+    prestiumTorRefuse(client) {
+        const p = this.prestiumTorSaslProblem();
+        if (!p) {
+            return false;
+        }
+        this.userDisconnected = true;
+        this.prestiumTorLobby(client, "Not connecting. " + p, true);
+        client.save();
+        return true;
+    }
+'''
+s = open(na).read()
+if "Prestium: IRC (Tor) sign-in rules" not in s:
+    a = "    setIrcFrameworkOptions(client) {\n"
+    assert s.count(a) == 1, "The Lounge network.js: setIrcFrameworkOptions changed (SASL patch)"
+    s = s.replace(a, METHODS + a, 1)
+    b = ("        this.setIrcFrameworkOptions(client);\n"
+         "        this.irc.requestCap([\n")
+    assert s.count(b) == 1, "The Lounge network.js: createIrcFramework changed (SASL patch)"
+    s = s.replace(b,
+        "        this.setIrcFrameworkOptions(client);\n"
+        "        // Prestium: IRC (Tor): no connection whose sign-in can't work; lobby hints; failed SASL reported\n"
+        "        if (process.env.PRESTIUM_LOUNGE_TOR === \"1\") {\n"
+        "            const prestiumConnect = this.irc.connect.bind(this.irc);\n"
+        "            this.irc.connect = (...a) => (this.prestiumTorRefuse(client) ? undefined : prestiumConnect(...a));\n"
+        "            this.irc.on(\"sasl failed\", (e) => {\n"
+        "                this.prestiumTorLobby(client, \"Sign-in (SASL) failed (\" + String(e && e.reason || \"unknown\") +\n"
+        "                    \"). Check the account and password, or the certificate, under Edit this network > Authentication.\", true);\n"
+        "            });\n"
+        "            this.prestiumTorHint(client);\n"
+        "        }\n"
+        "        this.irc.requestCap([\n", 1)
+    open(na, "w").write(s)
+assert s.count("Prestium: IRC (Tor) sign-in rules") == 1, "The Lounge network.js: SASL rules not present once"
+assert s.count("this.irc.connect = (...a) => (this.prestiumTorRefuse(client)") == 1, "The Lounge network.js: connect guard not present once"
+assert "const crypto_1 = " in s and "const clientCertificate_1 = " in s and "const msg_2 = " in s, "The Lounge network.js: imports changed"
+s = open(ia).read()
+if "Prestium: IRC (Tor) sign-in check" not in s:
+    a = "        // Prestium: tell the user when a connection actually starts (/connect or the Connect menu)\n"
+    assert s.count(a) == 1, "The Lounge connect.js: Connecting to patch missing (SASL patch runs after it)"
+    s = s.replace(a,
+        "        // Prestium: IRC (Tor) sign-in check, before the Connecting to line (network.js has the rules)\n"
+        "        if (network.prestiumTorRefuse && network.prestiumTorRefuse(this)) {\n"
+        "            return;\n"
+        "        }\n" + a, 1)
+    open(ia, "w").write(s)
+assert s.count("network.prestiumTorRefuse(this)") == 1, "The Lounge connect.js: SASL check not present once"
+print("P: The Lounge Tor instance: SASL sign-in checks and hints")
+PY
+/opt/nodejs/bin/node --check "$NA"
+/opt/nodejs/bin/node --check "$IA"
 chown -R root:root /opt/thelounge; chmod -R u+rwX,go+rX,go-w /opt/thelounge
 echo "P: The Lounge $(sed -n 's/.*"version": "\(.*\)".*/\1/p' /opt/thelounge/node_modules/thelounge/package.json | head -1)"
 

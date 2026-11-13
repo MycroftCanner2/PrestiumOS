@@ -18,8 +18,8 @@
 //   browser its own session token, and writes the next launch token to the same file.
 // - 2.1: one script for both instances. No argument: IRC (I2P), thelounge.service, user "thelounge".
 //   "tor": IRC (Tor), thelounge-tor.service, user "thelounge-tor", its own state, run and launch
-//   directories and template (OFTC, Libera.Chat, hackint, Ergo, AlphaChat, DarkScience, Pirate IRC,
-//   IRCNow). On every start each of its networks is set to use Tor's SOCKS port 127.0.0.1:9050 with a
+//   directories and template (OFTC, Ergo, DarkScience, IRCNow, then the SASL ones: Libera.Chat,
+//   hackint, AlphaChat). On every start each of its networks is set to use Tor's SOCKS port 127.0.0.1:9050 with a
 //   new random SOCKS username/password of its own (Tor isolates circuits by them; IsolateSOCKSAuth).
 const fs = require("fs");
 const crypto = require("crypto");

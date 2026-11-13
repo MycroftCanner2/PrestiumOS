@@ -534,13 +534,20 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   service. Every network goes through that port (hook 0200 forces it, whatever a network's proxy
   setting says), the server name is resolved by Tor, never locally, and each network has its own
   random SOCKS username, so its own Tor circuits. Networks start disconnected with a random nick each,
-  as on I2P. Presets, all onion services: OFTC (default, no registration), Libera.Chat, hackint,
-  AlphaChat and Pirate IRC (through `MapAddress` lines in torrc, so their TLS certificates check
-  out), Ergo, DarkScience and IRCNow (plain IRC on the onion, which already encrypts). OFTC's onion
-  takes TLS but its certificate is for irc.oftc.net, so certificate checking is off for that one only.
-  Libera.Chat over Tor needs SASL EXTERNAL (client certificate) or ECDSA-NIST256P-CHALLENGE, not a
-  password, and the account and certificate must be set up beforehand over a normal connection;
-  AlphaChat needs SASL with a verified account, and Pirate IRC likely SASL too.
+  as on I2P. Presets, all onion services, those without an account first: OFTC (default), Ergo,
+  DarkScience and IRCNow (plain IRC on the onion, which already encrypts), then Libera.Chat, hackint
+  and AlphaChat (SASL; through `MapAddress` lines in torrc, so their TLS certificates check out).
+  Pirate IRC is no longer a preset. OFTC's onion takes TLS but its certificate is for irc.oftc.net, so
+  certificate checking is off for that one only.
+- **IRC (Tor) explains SASL before connecting.** Libera.Chat and AlphaChat used to drop a connection
+  without SASL at once, with no explanation. In the Tor instance, hook 0200 now stops a connection whose
+  sign-in can't work and the lobby says what to fill in under *Edit this network > Authentication*:
+  Libera.Chat without a client certificate (its onion takes only SASL EXTERNAL, not a password),
+  AlphaChat without SASL, and any network set to SASL PLAIN with an empty account or password. The
+  AlphaChat preset uses SASL PLAIN, Libera.Chat SASL EXTERNAL. hackint still connects without an
+  account. With a certificate the lobby shows its SHA-512 fingerprint for `/msg NickServ CERT ADD`,
+  and a failed SASL sign-in is reported. There is no shared Prestium account; the README says how to
+  bring your own. The I2P instance is unchanged.
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
   at every start, and sets:
   - tunnel hops, 1 to 7 (default 3);
