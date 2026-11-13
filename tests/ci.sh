@@ -10,6 +10,9 @@
 #      test_onion_grater_identity.py, test_onion_grater_peer_uid.py): those run on a Prestium build
 #      machine or the live system.
 set -u
+# 2.1 (UI pass): tests import tools from config/includes.chroot; without this Python leaves __pycache__
+# there, and live-build would copy it into the image
+export PYTHONDONTWRITEBYTECODE=1
 R=$(cd "$(dirname "$0")/.." && pwd); cd "$R" || exit 1
 fail=0; step(){ echo; echo "== $*"; }
 LIVE_ONLY="test_wayland_broker.sh test_wayland_session.sh test_browser_sandbox.sh test_onion_grater_identity.py test_onion_grater_peer_uid.py"

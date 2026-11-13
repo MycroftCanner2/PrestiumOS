@@ -76,12 +76,14 @@ wp = open(os.path.join(I, "usr/local/bin/prestium-wallpaper")).read()
 all(x[:-4] in wp for x in names) and ok("prestium-wallpaper knows all three") or bad("prestium-wallpaper misses a wallpaper")
 
 # OSD and notification icons
-OSD = ["audio-volume-muted", "audio-volume-low", "audio-volume-medium", "audio-volume-high",
-       "microphone-sensitivity-muted", "audio-input-microphone", "weather-clear"]
+# 2.1 (UI pass): Papirus's 48 px notification-* icons (mako draws icons at 48 px)
+OSD = ["notification-audio-volume-muted", "notification-audio-volume-low", "notification-audio-volume-medium",
+       "notification-audio-volume-high", "notification-microphone-sensitivity-muted",
+       "notification-microphone-sensitivity-high", "notification-display-brightness"]
 used = set()
 for f in ("usr/local/bin/prestium-media-key", "usr/local/bin/prestium-notify-sound"):
     s = open(os.path.join(I, f)).read()
-    used |= set(re.findall(r"\b(?:audio|microphone|weather|display)-[a-z-]+\b", s))
+    used |= set(re.findall(r"(?<![\w-])(?:notification-)?(?:audio|microphone|weather|display)-[a-z-]+\b", s))
 used.discard("audio-input")
 sorted(used) == sorted(OSD) and ok("OSD icon names are the checked list") or bad("OSD icon names changed: %s (update OSD in this test)" % sorted(used ^ set(OSD)))
 mk = open(os.path.join(I, "etc/xdg/mako/config")).read()

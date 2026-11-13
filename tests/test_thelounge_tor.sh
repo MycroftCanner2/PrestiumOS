@@ -186,8 +186,8 @@ import sys, xml.etree.ElementTree as E
 m = E.parse(sys.argv[1]).getroot()
 c = [x for x in m.iter("menu") if x.get("id") == "/Communication"][0]
 items = {i.get("label"): (i.get("icon"), i.find("action").get("command")) for i in c.findall("item")}
-assert items["IRC (I2P)"] == ("user-available", "prestium-run /usr/local/bin/prestium-irc"), items
-assert items["IRC (Tor)"] == ("user-available", "prestium-run /usr/local/bin/prestium-irc tor"), items
+assert items["IRC (I2P)"] == ("irc-chat", "prestium-run /usr/local/bin/prestium-irc"), items
+assert items["IRC (Tor)"] == ("irc-chat", "prestium-run /usr/local/bin/prestium-irc tor"), items
 labels = [i.get("label") for i in c.findall("item")]
 assert labels.index("IRC (Tor)") == labels.index("IRC (I2P)") + 1
 assert not any("The Lounge" in (i.get("label") or "") for i in m.iter("item"))

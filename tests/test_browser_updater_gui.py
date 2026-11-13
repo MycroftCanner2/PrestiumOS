@@ -64,6 +64,9 @@ class Widget:
     def get_content_area(self):
         return Widget()
 
+    def get_style_context(self):   # 2.1 (UI pass): the frame becomes a card (add_class)
+        return Widget()
+
     def hide(self):
         self._visible = False
 

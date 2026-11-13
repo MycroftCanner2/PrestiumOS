@@ -384,7 +384,8 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **A new Prestium look.** One palette everywhere: dark grey surfaces, an Electric Blue `#0066ff` accent
   and Neon Cyan `#00ffff` highlights (the colours of The Lounge's Tech Innovation theme), with Cantarell
   as the UI font. GTK 3 and 4 (libadwaita) apps are dark (prefer-dark, dconf `accent-color='blue'`) and
-  take the palette from a colour-only `gtk.css`; GTK 2 (Pidgin) uses Adwaita-dark. Qt 5 and 6 apps use
+  take the palette from a colour-only `gtk.css`; GTK 2 (Pidgin, the GnuPG passphrase prompt) uses
+  Prestium-Dark, Adwaita-dark's engine with the Prestium colours. Qt 5 and 6 apps use
   Kvantum with a "Prestium" theme (`QT_STYLE_OVERRIDE=kvantum`). KDE apps use a
   `Prestium` colour scheme, and Kleopatra picks it by default (`/etc/xdg/kleopatrarc`) instead of
   Breeze Dark. Audacity, KeePassXC and the foot terminal (11 pt, readable red, blue, magenta and grey)
@@ -393,6 +394,28 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **Windows.** The labwc theme uses the same palette, with 8 px rounded corners and drop shadows. Every
   window gets one labwc title bar; GTK and libadwaita apps no longer draw a second close button
   (`button-layout ':'`). There is one desktop. Minimize and Maximize have icons in the window menu.
+- **One design spec for every window, dialog and notification (UI pass).** The palette is the same
+  in every toolkit: KDE's `kdeglobals` had kept the old `#0066ff` selection and `#ff7a7a` red and now
+  equals the `Prestium` colour scheme; visited links are `#8ab8ff` in GTK, Qt, KDE and GTK 2; the foot
+  selection is the accent `#0050c8`. GTK 2 apps finally get the palette (a colour scheme in
+  `/etc/gtk-2.0/gtkrc` is overridden by the theme's own, so Prestium-Dark sets it). Shapes: 8 px
+  corners for windows, menus, the bar, notifications, tooltips and cards, 6 px for buttons and bar
+  items, pills for the Tor/I2P status; spacing on a 4 px grid (12 px around tool windows and inside
+  notifications). New GTK styles: red destructive buttons (`#a8231c`, white text 7.2:1), message bars
+  with a coloured edge (blue, amber, red), and the Connection Assistants and Browser Updater group
+  their settings in cards. The Browser Updater now uses Prestium's stylesheet too, from the root-owned
+  `broker-style` directory. Notifications draw 48 px icons (Papirus's `notification-*` set for volume,
+  microphone and brightness; the OSD shows mako's progress bar instead of a second bar of block
+  characters). Menu and window icons match: Tor Browser and the Tor Connection Assistant use the Tor
+  icon rather than a file path, the I2P tools the i2pd icon, IRC a chat icon (`internet-group-chat`
+  doesn't exist in the icon themes), Feather the Monero icon. Copy: window titles and menu items in
+  Title Case, buttons in sentence case with a verb ("Shut down", "Set password", "Unlock", "Set up
+  account"; no zenity form or question falls back to "OK"), dialogs 460 px wide, close and the main
+  action at the right end in the Tor Connection Assistant as in the I2P one. The I2P web console and
+  I2P torrents pages, The Lounge's default Tech Innovation theme (worst text pair 4.8:1 to 6.4:1) and
+  LibreOffice's icons (Colibre dark) follow the palette. Tests: `test_ui_consistency.py` (palette,
+  themes, fonts, radii, copy, icon names), `test_contrast.py` (now 284 pairs); `tests/ci.sh` no longer
+  leaves `__pycache__` in the image tree.
 - **Papirus-Dark icons.** The Prestium icon theme holds the new logo mark (a blue-to-cyan "P.") and
   inherits Papirus-Dark first; Adwaita, AdwaitaLegacy and gnome are fallbacks. Menus, notifications and
   the bar use it.

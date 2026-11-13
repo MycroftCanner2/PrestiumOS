@@ -48,7 +48,9 @@ for v in 3 4; do for b in etc/skel/.config home/user/.config usr/share/prestium/
 # broker dialogs: the style directory only, and accessibility still applied last
 B="$I/usr/local/sbin/prestium-wl-broker"
 grep -q 'extra_env=dict(DIALOG_STYLE, \*\*DIALOG_ENV)' "$B" && grep -q '        e.update(DIALOG_ENV)   # last' "$B" && ok "broker dialogs styled, accessibility off last" || bad "broker dialog env order"
-grep -q '^os.environ\["XDG_CONFIG_HOME"\] = "/nonexistent/prestium-stock-gtk"' "$I/usr/local/bin/prestium-browser-updater" && ok "Browser Updater stays stock GTK 3" || bad "Browser Updater picks up gtk.css"
+# 2.1 (UI pass): the Browser Updater uses Prestium's stylesheet like the Connection Assistants, from the
+# root-owned broker-style directory (never the user's ~/.config)
+grep -q '^os.environ\["XDG_CONFIG_HOME"\] = "/usr/share/prestium/broker-style"' "$I/usr/local/bin/prestium-browser-updater" && ok "Browser Updater in Prestium's GTK 3 style (root-owned)" || bad "Browser Updater style directory"
 # Kleopatra: Prestium colour scheme by default (not Breeze Dark)
 grep -qx 'ColorScheme=Prestium' "$I/etc/xdg/kleopatrarc" && grep -qx 'Name=Prestium' "$I/usr/share/color-schemes/Prestium.colors" && ok "Kleopatra defaults to the Prestium colour scheme" || bad "Kleopatra colour scheme"
 grep -q '^BackgroundNormal=0,80,200$' "$I/usr/share/color-schemes/Prestium.colors" && ok "KDE selection $ACC" || bad "KDE selection colour"
@@ -74,7 +76,8 @@ assert c["clock"]["tooltip"] is False and "\n" in c["clock"]["format"]
 assert c["pulseaudio"]["format"] == "{icon}" and c["battery"]["format"] == "{icon}"
 PY
 for cl in connecting ready failed; do grep -q "#custom-tor.$cl, #custom-i2p.$cl" "$W/style.css" && ok "pill colour: $cl" || bad "pill colour $cl"; done
-grep -q 'border-radius: 14px' "$W/style.css" && ok "rounded bar" || bad "bar not rounded"
+# 2.1 (UI pass): 8 px like windows, menus and notifications (the spec in test_ui_consistency.py)
+grep -q 'window#waybar {.*border-radius: 8px' "$W/style.css" && ok "rounded bar" || bad "bar not rounded"
 # panel status service: not root, read-only, sandboxed
 U="$I/etc/systemd/system/prestium-netstatus.service"
 for k in User=prestium-netstatus NoNewPrivileges=yes ProtectSystem=strict ReadWritePaths=/run/prestium/netstatus IPAddressDeny=any CapabilityBoundingSet=; do

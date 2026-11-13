@@ -4,6 +4,9 @@ pair on the dark surfaces, read from the files the image ships: the lock screen'
 (swaylock), GTK 3 and GTK 4 (the apps, the broker's zenity dialogs such as the Lock Screen password, the
 Connection Assistants, the GNOME passphrase prompt), Qt (Kvantum), KDE (Kleopatra), labwc (titles, menus,
 OSD), waybar, mako and the assistants' error text.
+2.1 (UI pass): also GTK 3 destructive buttons, message bars and section cards, GTK 4 destructive buttons,
+GTK 2 (Prestium-Dark's colour scheme for Pidgin and pinentry-gtk2), /etc/xdg/kdeglobals (as Prestium.colors),
+the terminal (foot), The Lounge's default theme (Tech Innovation) and the I2P web pages (webconsole, torrents).
 Targets: text 7:1 (4.5:1 for disabled text and for coloured text on the selection), indicators, rings,
 edges and focus 3:1. `-v` prints every pair; PRESTIUM_ROOT checks another checkout (for before/after)."""
 import os, re, sys
@@ -251,6 +254,103 @@ need(S, "critical text", top['text-color'], cbg, TEXT)
 need(S, "critical edge", mk['[urgency=critical]']['border-color'], cbg, INDICATOR)
 need(S, "volume/brightness OSD edge", mk['[category=prestium.osd]']['border-color'], nbg, INDICATOR)
 need(S, "text over the progress bar", top['text-color'], col(top['progress-color']), TEXT)
+
+# --- 2.1 (UI pass): GTK 3 destructive buttons, message bars, section cards ---
+S = "GTK 3"
+for st, sel in (("", 'button.destructive-action'), (" (hover)", 'button.destructive-action:hover'),
+                (" (pressed)", 'button.destructive-action:active'), (" (unfocused window)", 'button.destructive-action:backdrop')):
+    need(S, "destructive button text" + st, col(g['button.destructive-action']['color']), col(g[sel]['background-color']), TEXT)
+need(S, "destructive button text (disabled)", col(g['button.destructive-action:disabled']['color']),
+     col(g['button.destructive-action:disabled']['background-color']), DISABLED)
+for kind, sel in (("info", 'infobar > revealer > box'), ("warning", 'infobar.warning > revealer > box'),
+                  ("error", 'infobar.error > revealer > box')):
+    bg = col(g[sel]['background-color'])
+    need(S, "message bar text (%s)" % kind, col(g['infobar > revealer > box label']['color']), bg, TEXT)
+    need(S, "message bar edge (%s)" % kind, col(g[sel]['box-shadow']), bg, INDICATOR)
+ibb = g['infobar button:not(.default):not(.suggested-action)']
+need(S, "message bar button text", col(ibb['color']), col(ibb['background-color']), TEXT)
+need(S, "message bar button text (hover)", col(ibb['color']),
+     col(g['infobar button:not(.default):not(.suggested-action):hover']['background-color']), TEXT)
+card = col(g['frame.prestium-section > border']['background-color'])
+need(S, "section title on windows", col(g['frame.prestium-section > label']['color']), win, TEXT)
+need(S, "text in section cards", fg, card, TEXT)
+need(S, "secondary text in section cards", col(g['.dim-label']['color']), card, TEXT)
+need(S, "entry edge in section cards", col(e['border-color']), card, INDICATOR)
+
+# --- GTK 4 destructive buttons ---
+S = "GTK 4"
+need(S, "destructive button text", d['destructive_fg_color'], d['destructive_bg_color'], TEXT)
+need(S, "destructive button text (hover)", d['destructive_fg_color'], col(g4['button.destructive-action:hover']['background-color']), TEXT)
+need(S, "destructive button text (pressed)", d['destructive_fg_color'], col(g4['button.destructive-action:active']['background-color']), TEXT)
+for n in ("window_bg_color", "dialog_bg_color"):
+    need(S, "destructive text on %s" % n, d['destructive_color'], d[n], TEXT)
+
+# --- GTK 2 (Pidgin, pinentry-gtk2): Prestium-Dark's colour scheme ---
+S = "GTK 2"
+g2 = dict(re.findall(r'(\w+):(#[0-9a-fA-F]{6})', " ".join(re.findall(r'^gtk-color-scheme\s*=\s*"([^"]*)"',
+          read("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc"), re.M)).replace("\\n", " ")))
+need(S, "text on views", g2['text_color'], g2['base_color'], TEXT)
+need(S, "text on windows", g2['fg_color'], g2['bg_color'], TEXT)
+need(S, "selected text", g2['selected_fg_color'], g2['selected_bg_color'], TEXT)
+need(S, "disabled text", g2['insensitive_fg_color'], g2['insensitive_bg_color'], DISABLED)
+need(S, "menu text", g2['fg_color'], g2['menu_color'], TEXT)
+need(S, "links", g2['link_color'], g2['base_color'], TEXT)
+need(S, "visited links", g2['visited_link_color'], g2['base_color'], TEXT)
+need(S, "tooltips", g2['tooltip_fg_color'], g2['tooltip_bg_color'], TEXT)
+need(S, "column headers", g2['column_header_color'], g2['base_color'], TEXT)
+
+# --- KDE: /etc/xdg/kdeglobals carries the same colours as Prestium.colors ---
+S = "KDE (kdeglobals)"
+sec, kg = None, {}
+for l in read("etc/xdg/kdeglobals").splitlines():
+    if l.startswith('['):
+        sec = l
+    elif '=' in l and sec:
+        kg.setdefault(sec, {})[l.split('=', 1)[0]] = l.split('=', 1)[1]
+for s_ in ("[Colors:Window]", "[Colors:View]", "[Colors:Button]", "[Colors:Selection]", "[Colors:Tooltip]", "[Colors:Header]"):
+    c = kg[s_]; bg = c['BackgroundNormal']; sel = s_ == "[Colors:Selection]"
+    need(S, "%s text" % s_[8:-1], c['ForegroundNormal'], bg, TEXT)
+    for k in ('ForegroundActive', 'ForegroundLink', 'ForegroundVisited', 'ForegroundNegative'):
+        need(S, "%s %s" % (s_[8:-1], k[10:].lower()), c[k], bg, DISABLED if sel else TEXT)
+    if not sel:
+        need(S, "%s focus decoration" % s_[8:-1], c['DecorationFocus'], bg, INDICATOR)
+
+# --- terminal (foot) ---
+S = "terminal (foot)"
+ft = dict(l.split('=', 1) for l in read("etc/xdg/foot/foot.ini").splitlines() if '=' in l and not l.startswith('#'))
+need(S, "text", ft['foreground'], ft['background'], TEXT)
+need(S, "selected text", ft['selection-foreground'], ft['selection-background'], TEXT)
+
+# --- The Lounge's default theme (Tech Innovation): Prestium's palette ---
+S = "The Lounge (default)"
+tl = dict(re.findall(r'(--t-[\w-]+):\s*(#[0-9a-fA-F]{6})', read(
+    "var/lib/thelounge/packages/node_modules/thelounge-theme-tech-innovation/theme.css")))
+need(S, "active channel text", tl['--t-side-active-fg'], tl['--t-side-active'], TEXT)
+need(S, "chat text", tl['--t-fg'], tl['--t-win'], TEXT)
+need(S, "selected nick text", tl['--t-fg'], tl['--t-sel'], TEXT)
+need(S, "message field text", tl['--t-in-fg'], tl['--t-in-bg'], TEXT)
+need(S, "message field edge", tl['--t-in-line'], tl['--t-in-bg'], INDICATOR)
+
+# --- I2P web pages (webconsole, torrents): the desktop's palette ---
+for S, f in (("I2P webconsole", "var/lib/i2pd/webconsole/style.css"),
+             ("I2P torrents", "usr/share/prestium/torrents-theme/prestium-dark.css")):
+    t = re.sub(r'/\*.*?\*/', '', read(f), flags=re.S)
+    v = dict(re.findall(r'--([\w-]+):\s*(#[0-9a-fA-F]{6})', t))
+    for bgk in ("bg", "panel") + (("panel2",) if "panel2" in v else ()):
+        need(S, "text on %s" % bgk, v['fg'], v[bgk], TEXT)
+        need(S, "secondary text on %s" % bgk, v['muted'], v[bgk], DISABLED if bgk == "panel2" else TEXT)
+        need(S, "accent text on %s" % bgk, v['accent'], v[bgk], TEXT)
+        for k in ("ok", "warn", "bad"):
+            need(S, "%s text on %s" % (k, bgk), v[k], v[bgk], TEXT)
+    need(S, "text on the accent fill (hover)", "#ffffff", v['accent-bg'], TEXT)
+    if "dl" in v:
+        need(S, "download speed text", v['dl'], v['panel'], DISABLED)
+# torrent progress bars: bold 12 px white text over each state's fill (4.5:1)
+tt = read("usr/share/prestium/torrents-theme/prestium-dark.css")
+tv = dict(re.findall(r'--([\w-]+):\s*(#[0-9a-fA-F]{6})', tt))
+for fill, state in re.findall(r'\.progress-fill\[style\*="[^"]+"\]\s*\{\s*background-color:\s*([^ ;!]+)[^}]*\}\s*/\*\s*([\w /]+?)\s*\*/', tt):
+    fill = tv[fill[6:-1]] if fill.startswith("var(--") else fill
+    need("I2P torrents", "progress text (bold, %s)" % state, "#ffffff", fill, DISABLED)
 
 # --- Connection Assistants: error text in the window ---
 for f in ("usr/local/bin/prestium-tor-assistant", "usr/local/bin/prestium-i2p-assistant"):
