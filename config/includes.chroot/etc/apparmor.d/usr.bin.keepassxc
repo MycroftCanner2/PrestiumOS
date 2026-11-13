@@ -25,9 +25,20 @@ profile keepassxc /usr/bin/keepassxc {
   /usr/lib/@{multiarch}/keepassxc/** mr,
   owner @{HOME}/**.kdbx rwk,
   owner @{HOME}/**.kdbx.* rwk,
-  owner @{HOME}/**/ r,
+  # Saving a new database, its .lock sidecar on open, and an atomic-save
+  # temporary file all create files, which needs write on the containing
+  # directory: without it databases could neither be saved nor opened (the
+  # .lock sidecar could not be created) outside the pre-seeded config dir.
+  # Only directories are opened up here; file writes stay limited to *.kdbx
+  # and their sidecars by the two rules above.
+  owner @{HOME}/ rw,
+  owner @{HOME}/**/ rw,
   /media/**.kdbx rwk,
   /media/**.kdbx.* rwk,
+  # Same for a database kept on an unlocked volume (see prestium-user-files:
+  # only *.kdbx files there stay writable).
+  /media/ rw,
+  /media/**/ rw,
   owner @{HOME}/.config/keepassxc/ rw,
   owner @{HOME}/.config/keepassxc/** rwk,
   owner @{HOME}/.cache/keepassxc/ rw,

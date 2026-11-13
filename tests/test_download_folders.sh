@@ -5,8 +5,8 @@
 #             Kleopatra, Metadata Cleaner, Feather)
 #   specific: ~/I2P Browser (I2P Browser), ~/Torrents (I2P Torrents),
 #             ~/Tor Browser (Tor Browser)
-#   mat2:     only "<name>.cleaned.<ext>" in the "Remove metadata" work folder,
-#             ~/Documents/.remove-metadata.XXXXXX (the file manager's "Remove metadata" moves it back
+#   mat2:     only "<name>.cleaned.<ext>" in ~/Documents/.remove-metadata.XXXXXX
+#             (the prestium-remove-metadata helper moves the cleaned copy back
 #             next to the original; tested with a fake mat2)
 #   /media:   read-only for all of them (2.1, review of 6bf1234)
 # The apps' settings point at the shared folders (where the app has a setting), /etc/skel matches the
@@ -99,7 +99,7 @@ python3 -I -c 'import sqlite3,json,sys; v=json.loads(sqlite3.connect(sys.argv[1]
 H0500=$R/config/hooks/live/0500-prestium-permissions.hook.chroot
 grep -qF 'install -d -m 0700 "/home/user/I2P Browser"' "$H0500" && ok "hook 0500 creates the I2P Browser folder" || bad "hook 0500 I2P Browser folder"
 ! grep -qE 'Downloads/\$d|Documents/\$d|Local Firefox|Mail Gajim|Metadata Cleaner|Documents/Feather' "$H0500" && ok "hook 0500 creates no per-app folders" || bad "hook 0500 still creates per-app folders"
-echo "== \"Remove metadata\" (file manager): mat2 works in ~/Documents/.remove-metadata.XXXXXX (fake mat2)"
+echo "== prestium-remove-metadata: mat2 works in ~/Documents/.remove-metadata.XXXXXX (fake mat2)"
 T=$(mktemp -d); FH=$T/home; mkdir -p "$FH/Downloads" "$T/bin"
 printf 'pdf\n' > "$FH/Downloads/a.pdf"; printf 'pdf\n' > "$FH/Downloads/b.pdf"; printf 'old\n' > "$FH/Downloads/b.cleaned.pdf"
 printf 'x\n' > "$FH/Downloads/c.pdf"; ln -s "$FH/Downloads/a.pdf" "$FH/Downloads/l.pdf"

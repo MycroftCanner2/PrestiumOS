@@ -10,6 +10,32 @@ in 2.0. It is still built with live-build on Debian 13 "trixie".
 This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
 
 ### Fixes: viewers, media, metadata, LibreOffice, sharing, volume, logs and menu
+- **Right-click menus offer only Loupe for images; the "Remove Metadata" file entry is gone.**
+  `mimeapps.list` no longer falls back to Ristretto (a `org.xfce.ristretto.desktop`
+  shadow without `MimeType` keeps the installed viewer out of Open With, the same
+  mechanism as the Zenity shadow), and the file manager's `Remove Metadata`
+  custom action is removed (`prestium-remove-metadata` stays for terminal use).
+- **LibreOffice starts again ("Fatal Error" fixed).** A fresh home ships no
+  LibreOffice profile folders, and creating one needs write on its parent, which
+  the profile did not grant, so the first start could not create its user
+  installation and aborted. The profile now allows creating `~/.config`,
+  `~/.cache` and `~/.local/share` entries for its own three folders (file
+  writes stay limited to those folders, like Kleopatra's parent
+  `~/.local/state/` rule).
+- **KeePassXC can save and open databases in the home and ~/Documents again.**
+  Saving a new database, its `.lock` sidecar on open, and an atomic-save
+  temporary file all create files, which needs write on the containing
+  directory; the profile granted file-level `rwk` on `*.kdbx` but no directory
+  write, so both failed. The profile now grants directory write in the home
+  (and on unlocked volumes for databases kept there); file writes stay
+  `*.kdbx`-only.
+- **Network Logs show the logs again instead of "the journal could not be read".**
+  `prestium-logs.service` set `ProcSubset=pid`, which hides everything in
+  `/proc` but process directories, including `/proc/sys/kernel/random/boot_id`;
+  `journalctl -b` needs that file for the boot ID and failed with "Failed to
+  get boot ID: No such file or directory" (exit 1). The setting is removed
+  (`ProtectProc=invisible` still hides other users' processes, and
+  `ProtectKernelTunables=yes` keeps `/proc/sys` read-only).
 - **Ristretto can view files in ~/Documents, VLC can open files in ~/Torrents, Metadata Cleaner
   can clean files in ~/Documents, and the local Firefox can open files in ~/Torrents.**
   Ristretto and VLC now state those folders explicitly in their profiles; the shared

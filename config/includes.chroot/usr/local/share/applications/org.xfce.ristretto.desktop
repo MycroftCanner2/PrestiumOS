@@ -1,0 +1,15 @@
+[Desktop Entry]
+# Prestium: Ristretto stays installed as a fallback viewer, but it is not
+# offered for image files (no right-click "Open With" entry): Loupe is the
+# viewer. Same entry as Debian's org.xfce.ristretto.desktop, without the
+# MimeType line, so nothing associates it with a file type.
+# (/usr/local/share comes before /usr/share in XDG_DATA_DIRS.)
+Name=Ristretto Image Viewer
+Comment=Look at your images easily
+GenericName=Image Viewer
+Exec=ristretto %U
+Icon=org.xfce.ristretto
+Terminal=false
+Type=Application
+Categories=GTK;Graphics;Viewer;
+StartupNotify=true

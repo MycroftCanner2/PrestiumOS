@@ -221,9 +221,32 @@ deny prestium_tor_browser_launcher//bwrap $H/.librewolf/x w
 deny prestium_librewolf_launcher//bwrap $H/.tor-browser/x w
 EOT
 
-echo "== KeePassXC, VLC, the others: no ~/.gnupg, offline"
+echo "== LibreOffice (first start creates its user profile folders)"
+run usr.lib.libreoffice.program <<EOT
+allow libreoffice $H/.config/ w
+allow libreoffice $H/.config/libreoffice/ rw
+allow libreoffice $H/.cache/ w
+allow libreoffice $H/.cache/libreoffice/ rw
+allow libreoffice $H/.local/share/ w
+allow libreoffice $H/.local/share/libreoffice/ rw
+allow libreoffice $H/Documents/letter.odt rw
+allow libreoffice $H/Downloads/letter.odt r
+deny libreoffice $H/Downloads/letter.odt w
+deny libreoffice $G/pubring.kbx r
+EOT
+
+echo "== KeePassXC (new databases, the .lock sidecar and atomic-save temporaries need directory write; files stay .kdbx-only), VLC, the others: no ~/.gnupg, offline"
 run usr.bin.keepassxc <<EOT
-allow keepassxc $H/Documents/Passwords.kdbx rw
+allow keepassxc $H/ w
+allow keepassxc $H/Documents/ w
+allow keepassxc $H/Documents/Passwords.kdbx rwk
+allow keepassxc $H/Documents/New.kdbx w
+allow keepassxc $H/Documents/Passwords.kdbx.lock w
+deny keepassxc $H/Documents/notes.txt w
+allow keepassxc /media/user/STICK/ w
+allow keepassxc /media/user/STICK/Passwords.kdbx rwk
+deny keepassxc /media/user/STICK/notes.txt w
+allow keepassxc $H/.config/keepassxc/keepassxc.ini rwk
 allow keepassxc /tmp/keepassxc-user.socket rw
 allow keepassxc /dev/hidraw0 rw
 deny keepassxc $G/pubring.kbx r

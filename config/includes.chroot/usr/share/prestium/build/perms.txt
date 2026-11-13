@@ -168,7 +168,6 @@
 0644 root root /usr/share/applications/prestium-display-scale.desktop
 0644 root root /usr/share/applications/prestium-brightness.desktop
 0644 root root /usr/share/applications/prestium-touchpad.desktop
-0644 root root /usr/share/file-manager/actions/prestium-remove-metadata.desktop
 0644 root root /usr/share/i2pd/torrents/web/index.html
 0644 root root /usr/share/i2pd/torrents/web/main.js
 0644 root root /usr/share/i2pd/torrents/web/rpc.js
@@ -527,6 +526,7 @@
 0644 root root /usr/share/applications/prestium-audacity.desktop
 0644 root root /etc/gnupg/gpg-agent.conf
 0644 root root /usr/local/share/applications/org.gnome.Zenity.desktop
+0644 root root /usr/local/share/applications/org.xfce.ristretto.desktop
 # 2.1 (design batch): theme, branding, panel network status, wallpaper and notification sound tools
 0644 root root /etc/systemd/system/prestium-netstatus.service
 0755 root root /usr/local/sbin/prestium-netstatus

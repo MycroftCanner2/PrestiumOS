@@ -82,6 +82,13 @@ if command -v apparmor_parser >/dev/null; then
     hw=$(grep -E '@\{HOME\}/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' \
       | grep -vE '@\{HOME\}/(\.Private/|tmp/|Documents/\.remove-metadata\*/\*\*\.cleaned\.\*" |Documents/\*\*\.cleaned\.\*" |Documents/"? |Documents/\*\*"? |Pictures/vlcsnap|\.cache/|\.config/|\.local/share/|\.local/state/|\.audacity-data/|\.gnupg/|\*\*\.kdbx|\.Xauthority|\.fonts|\.recently)' \
       | grep -vE '@\{HOME\}/(\.\{,cache/\}fontconfig|tmp/|\.xsession-errors w|\.local/ rw|\.pulse-cookie|\.pulse/)' )
+    if [ "$f" = usr.bin.keepassxc ]; then
+      # KeePassXC databases live anywhere in the home: saving a new one, its
+      # .lock sidecar on open, and an atomic-save temporary file need write
+      # on the containing directory. File writes stay *.kdbx-only (the next
+      # checks), so only the two directory rules are excused here.
+      hw=$(grep -vE '@\{HOME\}/(\*\*/)? rw,$' <<<"$hw")
+    fi
     [ -z "$hw" ] && ok "$f: writes only the shared ~/Documents and its own directories" || bad "$f home writes: $hw"
     # 2.1 (L-5, revised): the shared ~/Documents is writable (the editors' folder); no write in any other file folder
     sw=$(grep -E '@\{HOME\}/(\{Desktop|Desktop/|Downloads/|Pictures/\*|Music/|Videos/|Public/|Templates/|OnionShare/)' <<<"$al" \
@@ -89,6 +96,12 @@ if command -v apparmor_parser >/dev/null; then
     [ -z "$sw" ] && ok "$f: no write outside the shared ~/Documents (L-5)" || bad "$f shared folder writes: $sw"
     # 2.1 (review of 6bf1234): volumes under /media are read-only (KeePassXC keeps its *.kdbx files there)
     mw=$(grep -E '\s/media/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '/media/\*\*\.kdbx(\.\*)? rwk,')
+    if [ "$f" = usr.bin.keepassxc ]; then
+      # A database on an unlocked volume needs its directory writable too
+      # (new database, .lock sidecar, atomic-save temporary file); files
+      # there stay *.kdbx-only.
+      mw=$(grep -vE '\s/media/(\*\*/)? rw,$' <<<"$mw")
+    fi
     [ -z "$mw" ] && ok "$f: no write under /media (but KeePassXC's .kdbx)" || bad "$f /media writes: $mw"
     # base and gnome grant ix and w under ~/.Private (ecryptfs) and ~/tmp: denied by prestium-viewer
     for d in '@{HOME}/.Private/** wx' '@{HOME}/tmp/** wx'; do

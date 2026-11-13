@@ -108,6 +108,7 @@ for d in ("User=prestium-logs", "SupplementaryGroups=systemd-journal", "NoNewPri
           "CapabilityBoundingSet=\n", "RestrictAddressFamilies=AF_UNIX\n", "SystemCallFilter=@system-service"):
     check(d in u, "prestium-logs.service: " + d.strip())
 check("User=root" not in u and "\nUser=" in u, "not root")
+check("\nProcSubset=" not in u, "no ProcSubset: journalctl -b needs /proc/sys/kernel/random/boot_id (subset=pid hides it)")
 for d in ("\nMemoryMax=", "\nTasksMax=", "\nStartLimitIntervalSec=", "\nStartLimitBurst="):
     check(d in u, "prestium-logs.service:" + d.strip() + " (no runaway memory, tasks or restart loop)")
 check(u.index("StartLimitBurst=") < u.index("[Service]"), "restart limit in [Unit]")

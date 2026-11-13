@@ -33,6 +33,14 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   # permission is for its lock/link files in the profile and cache.
   owner @{HOME}/.local/share/libreoffice/ rw,
   owner @{HOME}/.local/share/libreoffice/** rwkl,
+  # First start creates these three profile folders, and creating a folder
+  # needs write on its parent: on a fresh home (nothing of LibreOffice in
+  # /etc/skel) the mkdir failed, so the first run died with "Fatal Error"
+  # instead of opening. File writes stay limited to the profile folders
+  # themselves (like Kleopatra's parent ~/.local/state/ rule).
+  owner @{HOME}/.config/ rw,
+  owner @{HOME}/.cache/ rw,
+  owner @{HOME}/.local/share/ rw,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/ r,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/** r,
   owner "@{HOME}/I2P Browser/" r,
