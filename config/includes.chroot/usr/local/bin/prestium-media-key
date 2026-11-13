@@ -4,16 +4,16 @@
 # (user is in group "video"; the udev rule makes the backlight writable for that group).
 #   prestium-media-key volume-up|volume-down|mute|mic-mute|brightness-up|brightness-down
 # 2.1 (design batch): category prestium.osd, so mako draws these as a compact on-screen display
+# 2.1 (UI pass): the level is mako's progress bar only (the int:value hint); the text bar of ▮/▯ glyphs
+# drawn under it said the same thing twice. Icons: Papirus's 48 px notification-* set.
 ID_FILE="${XDG_RUNTIME_DIR:-/tmp}/prestium-osd.id"
 SINK=@DEFAULT_AUDIO_SINK@; SOURCE=@DEFAULT_AUDIO_SOURCE@
 
 osd() { # icon text percent
 	command -v notify-send >/dev/null || return 0
 	id=$(cat "$ID_FILE" 2>/dev/null); case "$id" in ''|*[!0-9]*) id=0;; esac
-	n=$(( ${3:-0} / 10 )); bar=""; i=0
-	while [ $i -lt 10 ]; do if [ $i -lt $n ]; then bar="$bar▮"; else bar="$bar▯"; fi; i=$((i+1)); done
 	new=$(notify-send -a Prestium -c prestium.osd -i "$1" -t 1500 -h string:x-canonical-private-synchronous:prestium-osd \
-		-h "int:value:${3:-0}" -r "$id" -p "$2" "$bar" 2>/dev/null) && echo "$new" > "$ID_FILE"
+		-h "int:value:${3:-0}" -r "$id" -p "$2" 2>/dev/null) && echo "$new" > "$ID_FILE"
 }
 
 vol_pct() {
@@ -25,10 +25,10 @@ vol_pct() {
 }
 
 vol_icon() { # pct muted
-	if [ -n "$2" ] || [ "$1" -eq 0 ]; then echo audio-volume-muted
-	elif [ "$1" -lt 34 ]; then echo audio-volume-low
-	elif [ "$1" -lt 67 ]; then echo audio-volume-medium
-	else echo audio-volume-high; fi
+	if [ -n "$2" ] || [ "$1" -eq 0 ]; then echo notification-audio-volume-muted
+	elif [ "$1" -lt 34 ]; then echo notification-audio-volume-low
+	elif [ "$1" -lt 67 ]; then echo notification-audio-volume-medium
+	else echo notification-audio-volume-high; fi
 }
 
 show_volume() {
@@ -54,13 +54,13 @@ mic-mute)
 		m=$(wpctl get-volume $SOURCE 2>/dev/null | grep -c MUTED)
 	else pactl set-source-mute @DEFAULT_SOURCE@ toggle
 		m=$(pactl get-source-mute @DEFAULT_SOURCE@ 2>/dev/null | grep -c yes); fi
-	if [ "$m" = 1 ]; then osd microphone-sensitivity-muted "Microphone muted" 0
-	else osd audio-input-microphone "Microphone on" 100; fi ;;
+	if [ "$m" = 1 ]; then osd notification-microphone-sensitivity-muted "Microphone muted" 0
+	else osd notification-microphone-sensitivity-high "Microphone on" 100; fi ;;
 brightness-up|brightness-down)
 	command -v brightnessctl >/dev/null || exit 0
 	if [ "$1" = brightness-up ]; then brightnessctl -q set 5%+; else brightnessctl -q --min-value=1 set 5%-; fi
 	p=$(brightnessctl -m 2>/dev/null | head -1 | cut -d, -f4 | tr -d %)
-	[ -n "$p" ] && osd weather-clear "Brightness $p %" "$p" ;;
+	[ -n "$p" ] && osd notification-display-brightness "Brightness $p %" "$p" ;;
 *)
 	echo "usage: $0 volume-up|volume-down|mute|mic-mute|brightness-up|brightness-down" >&2; exit 2 ;;
 esac

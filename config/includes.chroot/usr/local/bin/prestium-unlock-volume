@@ -267,7 +267,7 @@ def candidates():
 
 
 def ask(target):
-    form = zen("--forms", "--width", "460", "--text", html.escape(os.path.basename(target), quote=False),
+    form = zen("--forms", "--width", "460", "--ok-label", "Unlock", "--text", html.escape(os.path.basename(target), quote=False),
                "--add-password", "Passphrase (or BitLocker recovery key)",
                "--add-combo", "Volume type", "--combo-values", "|".join(TYPES),
                "--add-entry", "VeraCrypt PIM (empty if none)",

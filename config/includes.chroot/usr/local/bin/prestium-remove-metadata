@@ -53,9 +53,9 @@ if [ $rc -eq 0 ]; then
 	msg="Metadata removed. A cleaned copy (name.cleaned.ext) was written next to each file; the originals are unchanged.
 
 Note: mat2 can't remove information inside the content itself (e.g. faces, text, watermarks)."
-	zenity --info --no-markup --title="Remove Metadata" --text="$msg" 2>/dev/null || notify-send -a Prestium -i edit-clear "Remove Metadata" "Done: cleaned copies written next to the originals."
+	zenity --info --no-markup --title="Remove Metadata" --text="$msg" 2>/dev/null || notify-send -a Prestium -i fr.romainvigier.MetadataCleaner "Metadata removed" "Cleaned copies were written next to the originals."
 else
 	zenity --error --no-markup --title="Remove Metadata" --text="mat2 could not clean every file:
-$(printf '%s' "$out" | tail -n 15)" 2>/dev/null || notify-send -a Prestium -i dialog-error "Remove Metadata" "mat2 could not clean every file."
+$(printf '%s' "$out" | tail -n 15)" 2>/dev/null || notify-send -a Prestium -i dialog-error "Metadata not removed" "mat2 could not clean every file."
 fi
 exit $rc

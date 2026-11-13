@@ -29,7 +29,8 @@ first_start(){
 Your password is asked for the first time Mail connects."
   while :; do
     zr=0
-    out=$(zenity --forms --title "$T" --text "$msg" --separator '
+    # 2.1 (UI pass): the button says what it does, not zenity's "OK"
+    out=$(zenity --forms --title "$T" --ok-label "Set up account" --text "$msg" --separator '
 ' --add-entry "Your name (optional, shown to recipients)" --add-entry "Address (name@mail.i2p)" 2>/dev/null) \
       || zr=$?
     [ $zr = 1 ] && return 2                        # Cancel or window closed

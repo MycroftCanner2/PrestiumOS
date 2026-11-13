@@ -5,13 +5,18 @@
 <menu id="root-menu" label="Prestium">
   <!-- 2.1 (UI audit C4-C7): grouped by task; each networked app names its network in the label;
        entries that open a dialog first end in an ellipsis -->
+  <!-- 2.1 (UI pass): every icon from the Prestium icon theme (Papirus-Dark), the same name as the app's
+       .desktop file and window: Tor Browser and the Tor Connection Assistant use Papirus's Tor icons
+       instead of a PNG from inside /opt/tor-browser, the I2P Connection Assistant i2pd's, both IRC
+       entries an IRC icon (not the "user available" status dot), Feather the Monero icon, Brightness a
+       brightness icon (not the weather icon), Restart the restart icon. -->
   <item label="I2P Browser" icon="librewolf">
     <action name="Execute" command="prestium-run librewolf-i2p" />
   </item>
-  <item label="Tor Browser" icon="/opt/tor-browser/Browser/browser/chrome/icons/default/default128.png">
+  <item label="Tor Browser" icon="tor-browser">
     <action name="Execute" command="prestium-run tor-browser" />
   </item>
-  <item label="I2P Router Console" icon="applications-internet">
+  <item label="I2P Router Console" icon="network-workgroup">
     <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-console" />
   </item>
   <item label="Text Editor" icon="featherpad">
@@ -79,7 +84,7 @@
     <item label="Unlock Encrypted Volume…" icon="drive-harddisk">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-unlock-volume" />
     </item>
-    <item label="Feather (Monero Wallet, I2P)" icon="security-high">
+    <item label="Feather (Monero Wallet, I2P)" icon="monero">
       <action name="Execute" command="prestium-run feather" />
     </item>
   </menu>
@@ -93,10 +98,10 @@
     <item label="Pidgin (Chat, Tor)" icon="pidgin">
       <action name="Execute" command="prestium-run /usr/local/bin/pidgin-tor" />
     </item>
-    <item label="IRC (I2P)" icon="user-available">
+    <item label="IRC (I2P)" icon="irc-chat">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
     </item>
-    <item label="IRC (Tor)" icon="user-available">
+    <item label="IRC (Tor)" icon="irc-chat">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc tor" />
     </item>
   </menu>
@@ -109,10 +114,10 @@
     </item>
   </menu>
   <menu id="/Network" label="Network" icon="preferences-system-network">
-    <item label="I2P Connection Assistant" icon="network-workgroup">
+    <item label="I2P Connection Assistant" icon="i2pd">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-i2p-assistant" />
     </item>
-    <item label="Tor Connection Assistant" icon="/opt/tor-browser/Browser/browser/chrome/icons/default/default128.png">
+    <item label="Tor Connection Assistant" icon="tor">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-tor-assistant" />
     </item>
     <item label="Browser Updater" icon="system-software-update">
@@ -138,7 +143,7 @@
     <item label="Display Scale" icon="preferences-desktop-display">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-display-scale" />
     </item>
-    <item label="Brightness" icon="weather-clear">
+    <item label="Brightness" icon="display-brightness">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-brightness" />
     </item>
     <item label="Touchpad" icon="input-touchpad">
@@ -161,7 +166,7 @@
   <item label="Log Out…" icon="system-log-out">
     <action name="Execute" command="/usr/local/bin/prestium-power logout" />
   </item>
-  <item label="Restart…" icon="media-playlist-repeat">
+  <item label="Restart…" icon="system-reboot">
     <action name="Execute" command="/usr/local/bin/prestium-power reboot" />
   </item>
   <item label="Shut Down…" icon="system-shutdown">

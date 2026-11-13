@@ -5,16 +5,16 @@
 #   prestium-logs-view [tor|i2p|onion-grater]
 D=/run/prestium/logs
 pick() {
-	zenity --list --title="Network Logs" --text="Which log of this boot?" --width=420 --height=260 \
+	zenity --list --title="Network Logs" --text="Which log of this boot?" --width=460 --height=260 \
 		--column=log --column=Program --hide-column=1 --print-column=1 \
 		tor "Tor" i2p "I2P (i2pd)" onion-grater "Control-port filter (onion-grater)" 2>/dev/null
 }
 name=${1:-}
 [ -n "$name" ] || name=$(pick) || exit 0
 case "$name" in
-	tor) title="Tor log" ;;
-	i2p) title="I2P log (i2pd)" ;;
-	onion-grater) title="Control-port filter log (onion-grater)" ;;
+	tor) title="Tor Log" ;;
+	i2p) title="I2P Log (i2pd)" ;;
+	onion-grater) title="Control-Port Filter Log (onion-grater)" ;;
 	*) echo "usage: prestium-logs-view [tor|i2p|onion-grater]" >&2; exit 2 ;;
 esac
 f=$D/$name.log

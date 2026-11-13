@@ -389,7 +389,9 @@ class Session:
             st = subprocess.run([SESSION_PASSWORD, "status"], capture_output=True, timeout=10)
             if st.stdout.decode(errors="replace").strip() == "set":
                 return "ok already set"
+            # 2.1 (UI pass): the button says what it does ("Set password", not zenity's "OK")
             rc, out = self.dialog(["zenity", "--forms", "--title", "Lock Screen", "--text", PW_TEXT,
+                                   "--ok-label", "Set password", "--cancel-label", "Cancel",
                                    "--add-password", "Password", "--add-password", "Confirm password",
                                    "--separator", "\n"], capture=True, timeout=900)
             if rc != 0:
@@ -446,7 +448,7 @@ class Session:
             return "error an I2P settings dialog is already open"
         try:
             rc, _ = self.dialog(["zenity", "--question", "--no-markup", "--width", "460",
-                                 "--title", "I2P Connection Assistant", "--icon", "network-workgroup",
+                                 "--title", "I2P Connection Assistant", "--icon", "i2pd",
                                  "--ok-label", "Apply", "--cancel-label", "Cancel", "--text", text])
             if rc != 0:
                 log("uid %d: I2P settings change cancelled at the dialog (%s)" % (self.uid, summary))
@@ -464,7 +466,7 @@ class Session:
             if st.get("ok"):
                 log("uid %d: I2P settings applied: %s" % (self.uid, summary))
                 try:
-                    self.as_user(["notify-send", "-a", "Prestium", "-i", "network-workgroup",
+                    self.as_user(["notify-send", "-a", "Prestium", "-i", "i2pd",
                                   "I2P settings changed", summary])
                 except (OSError, subprocess.SubprocessError):
                     pass

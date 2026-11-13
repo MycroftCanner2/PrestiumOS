@@ -3,6 +3,6 @@ Type=Application
 Name=IRC (Tor)
 Comment=Chat on OFTC, Libera.Chat, hackint and other IRC networks over Tor with The Lounge (opens in the local-only Firefox)
 Exec=/usr/local/bin/prestium-irc tor
-Icon=internet-group-chat
+Icon=irc-chat
 Categories=Network;Chat;IRCClient;
 Terminal=false

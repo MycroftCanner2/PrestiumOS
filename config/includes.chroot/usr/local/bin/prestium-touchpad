@@ -55,7 +55,7 @@ def gui():
     gi.require_version("Gtk", "3.0")
     from gi.repository import Gtk
     c = load()
-    w = Gtk.Window(title="Touchpad"); w.set_border_width(14); w.set_default_size(380, -1)
+    w = Gtk.Window(title="Touchpad"); w.set_border_width(12); w.set_default_size(380, -1)
     w.set_position(Gtk.WindowPosition.CENTER)
     box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8); w.add(box)
     pads = touchpads()

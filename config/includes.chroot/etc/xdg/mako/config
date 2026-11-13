@@ -5,6 +5,11 @@
 # 2.1 (contrast review): normal edge #3d8bff, progress #0050c8 under white text (7.0:1), low-urgency
 # edge #737373 so the three urgencies stay apart; critical text white on #2b1616 (17:1).
 # mako has no fade or slide animation. Sounds are off unless turned on (System, Notification Sounds).
+# 2.1 (UI pass): 8 px corners, 12 px padding (the spec's radius and spacing steps, as windows, menus and the
+# bar); critical edge #ff6b6b (the palette's danger line, as the lock screen), low-urgency text #c8c8c8
+# (secondary text, 10:1); icons 48 px: every notification icon Prestium sends has a 48 px Papirus file
+# (the 24 px action/panel icons it used were scaled up and soft), and the volume, microphone and
+# brightness display uses Papirus's notification-* icons.
 anchor=top-right
 default-timeout=8000
 font=Cantarell 10
@@ -12,8 +17,8 @@ background-color=#1e1e1eF2
 text-color=#ffffff
 border-color=#3d8bff
 border-size=1
-border-radius=14
-padding=14
+border-radius=8
+padding=12
 margin=12
 outer-margin=4
 width=360
@@ -23,7 +28,7 @@ icons=1
 # inheritance, so list the themes Prestium inherits from in the same order
 # 2.1 (design batch): Papirus-Dark first, like the Prestium icon theme
 icon-path=/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:/usr/share/icons/Papirus:/usr/share/icons/AdwaitaLegacy:/usr/share/icons/gnome:/usr/share/icons/Adwaita
-max-icon-size=32
+max-icon-size=48
 icon-location=left
 progress-color=over #0050c8
 # 2.1: only identical repeats collapse (same app and summary); critical alerts are never hidden
@@ -34,11 +39,11 @@ on-notify=exec /usr/local/bin/prestium-notify-sound normal
 [urgency=low]
 default-timeout=5000
 border-color=#737373
-text-color=#d0d0d0
+text-color=#c8c8c8
 
 [urgency=critical]
 default-timeout=0
-border-color=#ff7a7a
+border-color=#ff6b6b
 border-size=2
 background-color=#2b1616F2
 on-notify=exec /usr/local/bin/prestium-notify-sound critical
@@ -46,11 +51,11 @@ on-notify=exec /usr/local/bin/prestium-notify-sound critical
 [category=prestium.osd]
 anchor=top-center
 width=260
-max-icon-size=32
+max-icon-size=48
 border-color=#00ffff
 default-timeout=1500
 group-by=none
-format=<b>%s</b>\n%b
+format=<b>%s</b>
 on-notify=none
 
 [grouped]

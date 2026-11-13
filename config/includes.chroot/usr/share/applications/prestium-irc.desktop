@@ -3,6 +3,6 @@ Type=Application
 Name=IRC (I2P)
 Comment=Chat on the IRC2P and Ilita networks over I2P with The Lounge (opens in the local-only Firefox)
 Exec=/usr/local/bin/prestium-irc
-Icon=internet-group-chat
+Icon=irc-chat
 Categories=Network;Chat;IRCClient;
 Terminal=false

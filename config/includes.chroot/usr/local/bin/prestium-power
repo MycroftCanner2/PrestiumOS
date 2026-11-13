@@ -1,14 +1,16 @@
 #!/bin/sh
 # Prestium 2.0 r10: Restart/Shut Down/Log Out from the menu, with a confirmation (labwc has no prompt).
 # 2.1: named buttons, and the live-system warning
+# 2.1 (UI pass): buttons in sentence case like every other Prestium dialog ("Shut down", not "Shut Down");
+# the window titles stay names (title case), as the menu entries; the width of Prestium's other dialogs
 w="Open windows will close. Prestium is a live system: anything not saved outside it is lost."
 case "$1" in
   reboot)   ti=Restart;   q="Restart the computer?";  ok=Restart;   ic=system-reboot ;;
-  poweroff) ti="Shut Down"; q="Shut down the computer?"; ok="Shut Down"; ic=system-shutdown ;;
-  logout)   ti="Log Out";  q="Log out?";               ok="Log Out";  ic=system-log-out ;;
+  poweroff) ti="Shut Down"; q="Shut down the computer?"; ok="Shut down"; ic=system-shutdown ;;
+  logout)   ti="Log Out";  q="Log out?";               ok="Log out";  ic=system-log-out ;;
   *) echo "usage: prestium-power reboot|poweroff|logout" >&2; exit 2 ;;
 esac
-prestium-run zenity --question --no-markup --width=420 --title "$ti" --icon "$ic" \
+prestium-run zenity --question --no-markup --width=460 --title "$ti" --icon "$ic" \
   --ok-label "$ok" --cancel-label Cancel --text "$q
 
 $w" 2>/dev/null || exit 0

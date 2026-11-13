@@ -75,7 +75,7 @@ def hint(text):
 class Assistant(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="I2P Connection Assistant")
-        self.set_icon_name("network-workgroup")
+        self.set_icon_name("i2pd")   # 2.1 (UI pass): the menu's and the .desktop file's icon
         self.set_position(Gtk.WindowPosition.CENTER)
         self.current = None; self.busy = False
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=16)

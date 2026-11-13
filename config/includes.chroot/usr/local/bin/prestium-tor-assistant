@@ -230,7 +230,7 @@ class ControlMonitor(threading.Thread):
 class Assistant(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Tor Connection Assistant")
-        self.set_icon_name("network-wired")
+        self.set_icon_name("tor")   # 2.1 (UI pass): the menu's and the .desktop file's icon
         # never larger than the screen minus the taskbar and the title bar (fits 1024x768 and 1366x768);
         # content that does not fit scrolls instead of growing the window
         ww, wh = workarea()
@@ -255,6 +255,7 @@ class Assistant(Gtk.ApplicationWindow):
         scroll.add(box)
 
         frame = Gtk.Frame(label=" Tor status ")
+        frame.get_style_context().add_class("prestium-section")   # 2.1 (UI pass): a card (gtk3.css)
         fb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6); fb.set_border_width(8)
         self.progress = Gtk.ProgressBar(show_text=True)
         self.status = wrap_label(lines=3, selectable=True)
@@ -282,6 +283,7 @@ class Assistant(Gtk.ApplicationWindow):
         box.pack_start(self.info, False, False, 0)
 
         frame2 = Gtk.Frame(label=" How to connect ")
+        frame2.get_style_context().add_class("prestium-section")
         mb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4); mb.set_border_width(8)
         self.radios = {}
         group = None
@@ -322,9 +324,11 @@ class Assistant(Gtk.ApplicationWindow):
         self.reconnect_btn = Gtk.Button(label='_Reconnect', use_underline=True); self.reconnect_btn.connect("clicked", self.on_reconnect)
         self.reconnect_btn.set_tooltip_text("Restart Tor with the current settings (new connections)")
         close = Gtk.Button(label='C_lose', use_underline=True); close.connect("clicked", lambda *_: self.close())
-        bb.pack_start(self.apply_btn, False, False, 0)
-        bb.pack_start(self.cancel_btn, False, False, 0)
+        # 2.1 (UI pass): the primary button last on the right, Close next to it (as the I2P Connection
+        # Assistant and zenity's dialogs); Reconnect and Cancel, which act on Tor, on the left
         bb.pack_start(self.reconnect_btn, False, False, 0)
+        bb.pack_start(self.cancel_btn, False, False, 0)
+        bb.pack_end(self.apply_btn, False, False, 0)
         bb.pack_end(close, False, False, 0)
         outer.pack_start(bb, False, False, 0)
 

@@ -14,10 +14,10 @@ normal|critical)
 	exec pw-play --volume 0.35 "$f" >/dev/null 2>&1 ;;
 toggle)
 	if [ -f "$FLAG" ]; then
-		rm -f "$FLAG"; notify-send -a Prestium -i audio-volume-muted "Notification sounds off" "Notifications are silent." 2>/dev/null
+		rm -f "$FLAG"; notify-send -a Prestium -i notification-audio-volume-muted "Notification sounds off" "Notifications are silent." 2>/dev/null
 	else
 		mkdir -p "${FLAG%/*}" && : > "$FLAG"
-		notify-send -a Prestium -i audio-volume-low "Notification sounds on" "Notifications play a quiet sound." 2>/dev/null
+		notify-send -a Prestium -i notification-audio-volume-low "Notification sounds on" "Notifications play a quiet sound." 2>/dev/null
 	fi ;;
 *) echo "usage: prestium-notify-sound normal|critical|toggle" >&2; exit 2 ;;
 esac

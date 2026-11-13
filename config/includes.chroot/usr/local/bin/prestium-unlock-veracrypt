@@ -196,11 +196,11 @@ def main():
             rows = candidates()
             if not rows:
                 fail("No locked encrypted partitions found. Plug in the drive and try again.")
-            target = zen("--list", "--width", "420", "--height", "300", "--text",
+            target = zen("--list", "--width", "460", "--height", "300", "--text",
                          "Choose the partition:", "--column", "Device", "--column", "Size", *rows)
         if not target:
             return
-    form = zen("--forms", "--width", "420", "--text", html.escape(os.path.basename(target), quote=False),
+    form = zen("--forms", "--width", "460", "--ok-label", "Unlock", "--text", html.escape(os.path.basename(target), quote=False),
                "--add-password", "Password", "--add-entry", "PIM (leave empty if none)",
                "--add-combo", "Volume type", "--combo-values", "Standard|Hidden|Windows system",
                "--add-combo", "Keyfiles", "--combo-values", "No|Yes", "--separator", "\x1f")
