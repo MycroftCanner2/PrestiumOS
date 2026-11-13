@@ -17,12 +17,13 @@
 #    per-platform ones (boot/grub/<platform>/grub.cfg). If they can't find or load grub.cfg, GRUB's
 #    command line still needs the superuser.
 #  - every kernel line (GRUB linux, isolinux append, in every config above) is checked token by token:
-#    apparmor=1 security=apparmor panic=10 must be there; nothing may open a shell, change init or the
-#    security modules, or load the system from elsewhere: init= rdinit= lsm= selinux= enforcing=
-#    single s S 1 -b emergency rescue break break= rd.break* rd.shell* rd.emergency* rd.debug*
-#    rd.systemd.* systemd.unit= systemd.debug_shell/-shell systemd.wants= systemd.run* systemd.mask=
-#    systemd.confirm_spawn* systemd.setenv= debug debug= persistence* findiso= fromiso= live-media=
-#    bootfrom= module.sig_enforce=0, another panic= or dm-verity-oncorruption= value.
+#    apparmor=1 security=apparmor panic=10 lockdown=integrity must be there; nothing may open a shell,
+#    change init or the security modules, or load the system from elsewhere: init= rdinit= lsm=
+#    selinux= enforcing= single s S 1 -b emergency rescue break break= rd.break* rd.shell*
+#    rd.emergency* rd.debug* rd.systemd.* systemd.unit= systemd.debug_shell/-shell systemd.wants=
+#    systemd.run* systemd.mask= systemd.confirm_spawn* systemd.setenv= debug debug= persistence*
+#    findiso= fromiso= live-media= bootfrom= module.sig_enforce=0, another panic=, lockdown= or
+#    dm-verity-oncorruption= value.
 #  - live-build adds findiso=${iso_path} (booting the ISO file from another disk's GRUB through
 #    loopback.cfg); Prestium doesn't support that, so findiso= and loopback.cfg are removed.
 #  - toram=<file> is not banned: it names one image, which must still pass the dm-verity check
@@ -97,7 +98,7 @@ kcheck() { # $1: label, $2: the config (default: stdin)
 	awk -v f="$1" '
 	function bad(t, why) { printf "E: %s:%d: %s (%s)\n", f, NR, why, t; err = 1 }
 	/^[[:space:]]*(linux|linuxefi|linux16|append)[[:space:]]/ {
-		n = 0; aa = 0; sec = 0; pn = 0; live = 0
+		n = 0; aa = 0; sec = 0; pn = 0; ld = 0; live = 0
 		for (i = 2; i <= NF; i++) {
 			t = $i
 			if (t ~ /^#/) break
@@ -105,6 +106,7 @@ kcheck() { # $1: label, $2: the config (default: stdin)
 			if (t ~ /^apparmor=/) { if (t == "apparmor=1") aa = 1; else bad(t, "AppArmor off") }
 			if (t ~ /^security=/) { if (t == "security=apparmor") sec = 1; else bad(t, "other security module") }
 			if (t ~ /^panic=/) { if (t == "panic=10") pn++; else bad(t, "panic= other than 10") }
+			if (t ~ /^lockdown=/) { if (t == "lockdown=integrity") ld++; else bad(t, "lockdown= other than integrity") }
 			if (t ~ /^dm-verity-oncorruption=/ && t != "dm-verity-oncorruption=panic") bad(t, "dm-verity corruption not fatal")
 			if (t == "single" || t == "s" || t == "S" || t == "1" || t == "-b" || t == "emergency" || t == "rescue" || t == "break" || t == "debug") bad(t, "shell or debug mode")
 			if (t ~ /^(init|rdinit|lsm|selinux|enforcing|break|debug|systemd\.unit|systemd\.wants|systemd\.mask|systemd\.setenv|findiso|fromiso|live-media|bootfrom)=/) bad(t, "banned option")
@@ -113,6 +115,7 @@ kcheck() { # $1: label, $2: the config (default: stdin)
 		}
 		if (live && !(aa && sec)) bad($0, "a live entry without apparmor=1 security=apparmor")
 		if (live && pn != 1) bad($0, "a live entry without exactly one panic=10")
+		if (live && ld != 1) bad($0, "a live entry without exactly one lockdown=integrity")
 	}
 	END { exit err }' "${2:--}"
 }

@@ -16,10 +16,10 @@ polkit.addRule(function(action, subject) {
     if (subject.user != "user" || !subject.local || !subject.active) {
         return polkit.Result.NOT_HANDLED;
     }
+    // hibernate is not granted: kernel lockdown (integrity) refuses it
     if (action.id == "org.freedesktop.login1.power-off" ||
         action.id == "org.freedesktop.login1.reboot" ||
         action.id == "org.freedesktop.login1.suspend" ||
-        action.id == "org.freedesktop.login1.hibernate" ||
         action.id == "org.freedesktop.login1.halt" ||
         prestiumNM.indexOf(action.id) >= 0) {
         return polkit.Result.YES;

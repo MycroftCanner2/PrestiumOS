@@ -79,14 +79,16 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   `rd.emergency`, `rd.debug`, `rd.systemd.*`, `systemd.unit=`, `systemd.debug-shell`,
   `systemd.wants=`, `systemd.run*`, `systemd.mask=`, `systemd.confirm_spawn`, `systemd.setenv=`,
   `debug`, `persistence*`, `findiso=`, `fromiso=`, `live-media=`, `bootfrom=`, `module.sig_enforce=0`,
-  a `panic=` other than 10 or a missing `panic=10`. live-build's `findiso=${iso_path}` and
+  a `panic=` other than 10 or a missing `panic=10`, a `lockdown=` other than integrity or a missing
+  `lockdown=integrity`. live-build's `findiso=${iso_path}` and
   `loopback.cfg` (booting the ISO file from another disk's GRUB) are removed. This word check lets
   `toram=<file>` through, because the named image must still pass dm-verity. The command line policy
   below refuses it anyway; plain `toram` is allowed.
 
 - **Only the image's own kernel command line boots.** One policy,
   `/usr/share/prestium/boot/cmdline.policy`, lists the command line: every option of `auto/config`'s
-  APPEND, the dm-verity root hash, `dm-verity-oncorruption=panic` and `panic=10`, each exactly once.
+  APPEND (including `lockdown=integrity`), the dm-verity root hash, `dm-verity-oncorruption=panic`
+  and `panic=10`, each exactly once.
   Only these may be added: `quiet`, `splash`, `nomodeset`, `prestium.nocammic`, `nomacspoof`,
   `verify-checksums`, plain `toram`, and the `BOOT_IMAGE=`/`initrd=` that GRUB and isolinux add.
   Anything else stops the boot: a missing option, an extra one (`apparmor=0`, `init=`, `break=`,
@@ -140,13 +142,14 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
     from `linux-signed-*`, doesn't match dpkg's MD5, or isn't signed by Debian's `linux` key
   Signatures are checked with `sbverify` against the CA certificates in `thirdparty/keys/secure-boot/`,
   which the hook pins by SHA-256; the build host needs `sbsigntool`. `scripts/efi-inspect.py` reads
-  SBAT, shim's built-in certificate and GRUB's built-in modules. Under Secure Boot the Debian kernel
-  runs with lockdown (integrity): unsigned modules, `/dev/mem`, `/dev/port`, MSR writes, kexec of an
-  unsigned kernel and hibernation are refused. Prestium needs none of them (unsigned modules were
-  already refused by `module.sig_enforce=1`, kexec by `kernel.kexec_load_disabled`, and there is no
-  swap), and the kernel command line is the same, so the command-line policy is unchanged. The safety
-  notifier says once per session, as information rather than an alert, when a UEFI computer started
-  with Secure Boot off, or with it on but the kernel not locked down. The BIOS path is unchanged.
+  SBAT, shim's built-in certificate and GRUB's built-in modules. The kernel command line includes
+  `lockdown=integrity`, so the kernel is locked down (integrity) even with Secure Boot off or on BIOS:
+  unsigned modules, `/dev/mem`, `/dev/port`, MSR writes, kexec of an unsigned kernel and hibernation
+  are refused. Prestium needs none of them (unsigned modules were already refused by
+  `module.sig_enforce=1`, kexec by `kernel.kexec_load_disabled`, and there is no swap). The safety
+  notifier raises a "Protection NOT active" alert when `/sys/kernel/security/lockdown` is `[none]` or
+  missing, and still says once per session, as information rather than an alert, when a UEFI computer
+  started with Secure Boot off. The BIOS path is otherwise unchanged.
   `tests/test_secure_boot.sh` tests the hook on a fake tree, with Debian's real signed files when they
   are available.
 
@@ -586,7 +589,8 @@ NEWNYM and the circuit display; Browser Updater on the live overlay (download th
 bind-mount install and Reset, onion-grater's mount namespace, RAM freed after the last Reset); bridges
 after the tighter loopback firewall rules; the onion time sync and boot clock randomization; booting
 from USB and from a DVD or virtual CD with Secure Boot on and off (shim, signed GRUB, the locked menu
-and the marker search, `/sys/kernel/security/lockdown` showing `[integrity]` with it on); and the
+and the marker search, `/sys/kernel/security/lockdown` showing `[integrity]` with Secure Boot on or
+off); and the
 new look (Kvantum, libadwaita accent, Kleopatra's colours, the bar's pills and Papirus-Dark tray icons).
 
 ## 2.0: changes since Prestium 1.9.1.3

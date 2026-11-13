@@ -17,8 +17,8 @@ customised files, the setup hooks and the pinned third-party downloads.
   `grub-efi-amd64-signed`), which loads Debian's signed kernel (`linux-image-amd64` from
   `linux-signed-amd64`). live-build sets this up (`--uefi-secure-boot enable`); hook 9040 stops the
   build when any of the three is not Debian's signed file (see Secure Boot below). Kernel command line: hardening options, the
-  internal-disk (ahci/libata) blacklist with the patched live-boot fallback, `module.sig_enforce=1`
-  and AppArmor. The live image is mounted through dm-verity (root hash on the command line).
+  internal-disk (ahci/libata) blacklist with the patched live-boot fallback, `module.sig_enforce=1`,
+  `lockdown=integrity` and AppArmor. The live image is mounted through dm-verity (root hash on the command line).
 
 ## Requirements
 
@@ -63,13 +63,14 @@ Microsoft UEFI CA 2011 or 2023 and has Debian's Secure Boot CA built in; GRUB is
 `grub2` key, has every module the locked menu needs built in and does not turn shim's kernel check off;
 every `live/vmlinuz*` is the chroot's kernel from a `linux-signed-*` package (not `-unsigned`), matches
 dpkg's MD5 and is signed by Debian's `linux` key; there are no other EFI programs. With Secure Boot on,
-the firmware checks shim, shim checks GRUB, and GRUB has shim check the kernel; the Debian kernel then
-turns on kernel lockdown (integrity), so unsigned modules, `/dev/mem`, kexec of unsigned kernels and
-hibernation are refused (Prestium needs none of them; `module.sig_enforce=1` already refused unsigned
-modules). Not signed and not checked by the firmware: the initramfs, the GRUB configs (menu, root hash,
-password hash) and so the kernel command line, the same as in Tails. A signed unified kernel image
-(UKI) would cover them; it is future work. Booting with Secure Boot off still works (shim then checks
-nothing). The BIOS path (isolinux) is unchanged.
+the firmware checks shim, shim checks GRUB, and GRUB has shim check the kernel. The kernel command line
+includes `lockdown=integrity`, so the kernel is locked down (integrity) even with Secure Boot off:
+unsigned modules, `/dev/mem`, kexec of unsigned kernels and hibernation are refused (Prestium needs
+none of them; `module.sig_enforce=1` already refused unsigned modules). Not signed and not checked by
+the firmware: the initramfs, the GRUB configs (menu, root hash, password hash) and so the kernel
+command line, the same as in Tails. A signed unified kernel image (UKI) would cover them; it is future
+work. Booting with Secure Boot off still works (shim then checks nothing; the kernel is still locked
+down from the command line). The BIOS path (isolinux) is unchanged.
 
 **Boot menu password.** The boot menus are locked (hook 9020): the entries boot without a password,
 but editing an entry or GRUB's command line needs the GRUB superuser `prestium`. To set its password,
@@ -119,7 +120,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
 | `config/hooks/live/*.hook.chroot` | setup steps, in order (below) |
 | `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels |
-| `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash, exported for submenus, also in the EFI image's and per-platform grub.cfg; needs mtools), every entry `--unrestricted`; isolinux `allowoptions 0`; every kernel line checked against a banned list (shells, init, security modules, debug, persistence, findiso=); findiso= and loopback.cfg removed |
+| `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash, exported for submenus, also in the EFI image's and per-platform grub.cfg; needs mtools), every entry `--unrestricted`; isolinux `allowoptions 0`; every kernel line checked against a banned list (shells, init, security modules, debug, persistence, findiso=) and must have exactly one `lockdown=integrity`; findiso= and loopback.cfg removed |
 | `scripts/grub-pbkdf2.py` | makes the GRUB password hash (`--random` for one nobody knows) |
 | `scripts/efi-inspect.py` | read-only facts about an EFI file for hook 9040: SBAT, a built-in certificate (shim's vendor CA), a GRUB image's built-in modules, prefix and objects |
 | `config/hooks/live/9010-prestium-verity-boot.hook.binary` | checks the image against its dm-verity hash tree and puts the root hash and `panic=10` (no initramfs shell) on every boot entry |

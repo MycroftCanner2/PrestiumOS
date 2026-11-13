@@ -15,7 +15,8 @@
 #     monolithic GRUB, MokManager as grubx64.efi, a kernel with its signature removed, a kernel from an
 #     -unsigned or non-linux-signed package, a kernel not from the chroot (skipped without the .debs)
 #   - efi-inspect.py reads a GRUB image's prefix, modules and the disable-shim-lock object
-#   - prestium-safety-notify: information (not an alert) for Secure Boot off or not locked down
+#   - prestium-safety-notify: information (not an alert) for Secure Boot off; a "Protection NOT
+#     active" alert when kernel lockdown is [none] or the lockdown file is missing
 #   (needs sbsigntool, mtools, dosfstools, openssl; skipped without them)
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); fail=0
 ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }; skip(){ echo "SKIP $1"; }
@@ -39,6 +40,7 @@ printf '%s\n' "$L" | grep -qE '^(shim-signed|grub-efi-amd64-signed|grub-efi-amd6
 grep -hE '^Package:' "$R"/config/archives/*.pref* | grep -qE '[[:space:]]linux-' && bad "an apt pin names a linux-* package" || ok "no apt pin moves the kernel (e.g. to backports)"
 grep -lE '\bdkms\b|make[^|;]*\bmodules\b|\.ko\b|/lib/modules/[^ ]*/(updates|extra)' "$R"/config/hooks/live/*.chroot >/dev/null 2>&1 && bad "a hook builds or installs a kernel module" || ok "no hook builds or installs a kernel module (lurch is userspace)"
 grep -qx 'module.sig_enforce=1' <(tr ' ' '\n' <<<"$(sed -n 's/^APPEND="\(.*\)"$/\1/p' "$R/auto/config")") && ok "module.sig_enforce=1 kept" || bad "module.sig_enforce=1 gone"
+grep -qx 'lockdown=integrity' <(tr ' ' '\n' <<<"$(sed -n 's/^APPEND="\(.*\)"$/\1/p' "$R/auto/config")") && ok "lockdown=integrity on the command line" || bad "lockdown=integrity gone"
 grep -q 'command -v sbverify' "$R/build.sh" && ok "build.sh checks for sbverify" || bad "build.sh does not check sbverify"
 grep -q 'cryptsetup-bin sbsigntool' "$R/BUILDING.md" && ok "BUILDING.md requirements: sbsigntool" || bad "BUILDING.md lacks sbsigntool"
 if command -v openssl >/dev/null; then
@@ -167,23 +169,33 @@ else
 fi
 fi
 
-## safety notifier: Secure Boot information
+## safety notifier: Secure Boot information; lockdown failure is an alert
 grep -q 'SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c' "$N" && ok "notifier reads the SecureBoot EFI variable" || bad "notifier: SecureBoot variable"
 mkdir -p "$T/nb"; printf '#!/bin/sh\necho "$@" >> "$ALERTS"\n' > "$T/nb/notify-send"; printf '#!/bin/sh\necho zenity >> "$ALERTS"\n' > "$T/nb/zenity"
 printf '#!/bin/sh\n[ "$1" = 20 ] && kill -TERM $PPID\nexit 0\n' > "$T/nb/sleep"; printf '#!/bin/sh\n[ "$2" = is-failed ] && exit 1\nexit 0\n' > "$T/nb/systemctl"; printf '#!/bin/sh\nexit 0\n' > "$T/nb/logger"
 chmod +x "$T/nb/"*; echo Y > "$T/aa"
-efi() { # $1 SecureBoot value (0/1, or "" for no variable, "bios" for no EFI), $2 lockdown file content
-  rm -rf "$T/efi"; [ "$1" = bios ] && return; mkdir -p "$T/efi/efivars"
-  [ -n "$1" ] && printf "\\006\\000\\000\\000\\$(printf %03o "$1")" > "$T/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
-  printf '%s\n' "$2" > "$T/lockdown"; }
+efi() { # $1 SecureBoot value (0/1, or "" for no variable, "bios" for no EFI), $2 lockdown file content (empty: file missing)
+  rm -rf "$T/efi" "$T/lockdown"
+  if [ "$1" != bios ]; then
+    mkdir -p "$T/efi/efivars"
+    [ -n "$1" ] && printf "\\006\\000\\000\\000\\$(printf %03o "$1")" > "$T/efi/efivars/SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c"
+  fi
+  [ -n "$2" ] && printf '%s\n' "$2" > "$T/lockdown"; }
 nrun(){ rm -f "$T/alerts"; env -i PATH="$T/nb:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" PRESTIUM_AA_ENABLED="$T/aa" PRESTIUM_AA_PROFILES="$T/none" \
   PRESTIUM_CMDLINE_CHECK=true PRESTIUM_EFI_DIR="$T/efi" PRESTIUM_LOCKDOWN="$T/lockdown" timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null; }
 efi 1 "none [integrity] confidentiality"; o=$(nrun); [ -z "$o" ] && ok "notifier: Secure Boot on, locked down: nothing shown" || bad "notifier: SB on: $o"
+efi 0 "none [integrity] confidentiality"; o=$(nrun)
+case $o in *"-u normal Secure Boot is off"*) case $o in *critical*|*zenity*|*"Protection NOT active"*) bad "notifier: SB off is shown as an alert: $o";; *) ok "notifier: Secure Boot off (kernel locked down): information (normal urgency, no dialog)";; esac;; *) bad "notifier: SB off not shown: $o";; esac
+efi 1 "[none] integrity confidentiality"; o=$(nrun)
+case $o in *"Protection NOT active"*"kernel is not locked down"*) case $o in *"-u critical"*"zenity"*) ok "notifier: Secure Boot on, no lockdown: Protection NOT active alert";; *) bad "notifier: SB on, no lockdown, not a critical alert: $o";; esac;; *) bad "notifier: SB on, no lockdown: $o";; esac
+efi 1 "none integrity [confidentiality]"; o=$(nrun); [ -z "$o" ] && ok "notifier: confidentiality is accepted (stricter than integrity)" || bad "notifier: confidentiality: $o"
+efi bios "none [integrity] confidentiality"; o=$(nrun); [ -z "$o" ] && ok "notifier: BIOS boot, locked down: nothing shown" || bad "notifier: BIOS integrity: $o"
+efi bios ""; o=$(nrun)
+case $o in *"Protection NOT active"*"kernel is not locked down"*"unavailable"*) ok "notifier: BIOS, lockdown file missing: Protection NOT active alert";; *) bad "notifier: BIOS missing lockdown: $o";; esac
+efi "" "[none] integrity confidentiality"; o=$(nrun)
+case $o in *"Protection NOT active"*"kernel is not locked down"*) ok "notifier: SecureBoot variable unreadable, no lockdown: alert";; *) bad "notifier: unknown, no lockdown: $o";; esac
 efi 0 "[none] integrity confidentiality"; o=$(nrun)
-case $o in *"-u normal Secure Boot is off"*) case $o in *critical*|*zenity*|*"Protection NOT active"*) bad "notifier: SB off is shown as an alert: $o";; *) ok "notifier: Secure Boot off: information (normal urgency, no dialog)";; esac;; *) bad "notifier: SB off not shown: $o";; esac
-efi 1 "[none] integrity confidentiality"; o=$(nrun); case $o in *"kernel not locked down"*) ok "notifier: Secure Boot on but no lockdown: information";; *) bad "notifier: SB on, no lockdown: $o";; esac
-efi bios ""; o=$(nrun); [ -z "$o" ] && ok "notifier: BIOS boot: nothing shown" || bad "notifier: BIOS: $o"
-efi "" "[none] integrity confidentiality"; o=$(nrun); [ -z "$o" ] && ok "notifier: SecureBoot variable unreadable: nothing shown" || bad "notifier: unknown: $o"
+case $o in *"-u normal Secure Boot is off"*"Protection NOT active"*"kernel is not locked down"*) ok "notifier: Secure Boot off and no lockdown: information plus alert";; *) bad "notifier: SB off and no lockdown: $o";; esac
 
 SC=$(command -v shellcheck || true)
 if [ -n "$SC" ]; then "$SC" -s sh "$H" && "$SC" -S warning "$N" && "$SC" -S warning "$0" && ok "shellcheck: hook 9040, notifier, this test" || bad "shellcheck findings"; else skip "shellcheck missing"; fi

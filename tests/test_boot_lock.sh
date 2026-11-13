@@ -7,7 +7,8 @@
 # 2.1 (review of 6bf1234): superusers is exported (submenus), the early GRUB configs (per-platform
 # grub.cfg, and the EFI image's grub.cfg when mtools and mkfs.msdos are installed) are locked and
 # checked, every kernel line is checked token by token against the banned list (shells, init, security
-# modules, debug, persistence, findiso=), findiso= and loopback.cfg are gone, and shellcheck (when
+# modules, debug, persistence, findiso=, lockdown= other than integrity) and must have exactly one
+# lockdown=integrity, findiso= and loopback.cfg are gone, and shellcheck (when
 # installed) finds nothing in the boot hooks.
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); fail=0
 ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }; skip(){ echo "SKIP $1"; }
@@ -21,7 +22,7 @@ grep -q 'export PRESTIUM_GRUB_PASSWORD_HASH' "$R/build.sh" && ok "build.sh hands
 if grep -rnE '(apparmor=0|security=[^a]|security=a[^p]|init=/|lsm=|selinux=)' "$R/config/bootloaders" "$R/auto/config"; then bad "a committed boot entry overrides security"; else ok "no apparmor=0/security= overrides in the templates"; fi
 SCK=${PRESTIUM_GRUB_SCRIPT_CHECK:-$(command -v grub-script-check || true)}
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-APPEND="boot=live dm-verity-root-hash=filesystem.squashfs:$(printf '%064d' 0) dm-verity-oncorruption=panic panic=10 quiet apparmor=1 security=apparmor"
+APPEND="boot=live dm-verity-root-hash=filesystem.squashfs:$(printf '%064d' 0) dm-verity-oncorruption=panic panic=10 quiet lockdown=integrity apparmor=1 security=apparmor"
 EFIOK=; command -v mkfs.msdos >/dev/null && command -v mcopy >/dev/null && command -v mtype >/dev/null && command -v mmd >/dev/null && EFIOK=1
 mk(){ rm -rf "$T/b"; mkdir -p "$T/b/binary/boot/grub" "$T/b/binary/isolinux" "$T/b/scripts"; cp "$PBK" "$T/b/scripts/"
   live=$(printf 'menuentry "Prestium 2.1" --hotkey=l {\n\tlinux\t/live/vmlinuz %s findiso=${iso_path}\n\tinitrd\t/live/initrd.img\n}\nmenuentry "Prestium 2.1 (nomodeset)" {\n\tlinux\t/live/vmlinuz %s nomodeset\n\tinitrd\t/live/initrd.img\n}' "$APPEND" "$APPEND")
@@ -93,21 +94,34 @@ for o in apparmor=0 "security=selinux" "security= " "init=/bin/sh" "lsm=landlock
          single s S 1 -b emergency rescue break break=premount rd.break rd.shell rd.emergency rd.debug rd.systemd.unit=emergency.target \
          systemd.unit=rescue.target systemd.debug-shell systemd.debug_shell=1 systemd.wants=debug-shell.service "systemd.run=/bin/sh" \
          systemd.mask=apparmor.service systemd.confirm_spawn=1 systemd.setenv=X=1 debug debug=1 persistence persistence-label=x \
-         "findiso=/x.iso" fromiso=/x.iso live-media=/dev/sdb bootfrom=/dev/sdb module.sig_enforce=0 panic=0 dm-verity-oncorruption=ignore; do
+         "findiso=/x.iso" fromiso=/x.iso live-media=/dev/sdb bootfrom=/dev/sdb module.sig_enforce=0 panic=0 dm-verity-oncorruption=ignore lockdown=none lockdown=confidentiality; do
   mk; sed -i "0,/boot=live /s|boot=live |boot=live $o |" "$G"
   PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted an entry with '$o'" || ok "stops on an entry with '$o'"; done
 mk; sed -i "0,/ panic=10/s| panic=10||" "$G"
 PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted a live entry without panic=10" || ok "stops on a live entry without panic=10"
+mk; sed -i "0,/ lockdown=integrity/s| lockdown=integrity||" "$G"
+PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted a live entry without lockdown=integrity" || ok "stops on a live entry without lockdown=integrity"
+mk; sed -i "0,/lockdown=integrity/s|lockdown=integrity|lockdown=integrity lockdown=integrity|" "$G"
+PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted a live entry with two lockdown=integrity" || ok "stops on a live entry with two lockdown=integrity"
 mk; sed -i "s|insmod part_acorn|insmod part_acorn\nlinux /live/vmlinuz boot=live init=/bin/sh|" "$T/b/binary/boot/grub/x86_64-efi/grub.cfg"
 PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted a banned option in a per-platform grub.cfg" || ok "stops on a banned option in a per-platform grub.cfg"
 if [ -n "$EFIOK" ]; then
   mk; printf 'linux /live/vmlinuz boot=live apparmor=0\n' >> "$T/efi.cfg"; mcopy -o -i "$T/b/binary/boot/grub/efi.img" "$T/efi.cfg" ::boot/grub/grub.cfg
   PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted a banned option in the EFI image" || ok "stops on a banned option in the EFI image grub.cfg"
-  mk; (cd "$T/b/binary" && PATH=$(echo "$PATH" | tr ':' '\n' | while read -r d; do [ -x "$d/mtype" ] || printf '%s:' "$d"; done) PRESTIUM_GRUB_PASSWORD_HASH=$HASH /bin/sh "$H") > "$T/out" 2>&1 \
+  mk; mkdir -p "$T/nomtools"
+  # /usr/bin also has mtype (Debian merged /bin), so drop whole PATH dirs that contain it and keep
+  # only the tools hook 9020 needs besides mtools
+  for b in python3 grep awk gawk mawk sed mv rm cat tr head cut touch chmod mkdir printf echo ln; do
+    c=$(command -v "$b") || continue
+    [ -e "$T/nomtools/$b" ] || ln -s "$c" "$T/nomtools/$b"
+  done
+  (cd "$T/b/binary" && PATH=$T/nomtools PRESTIUM_GRUB_PASSWORD_HASH=$HASH /bin/sh "$H") > "$T/out" 2>&1 \
     && bad "EFI image without mtools accepted" || { grep -q 'mtools' "$T/out" && ok "EFI image but no mtools: stops"; } || bad "no-mtools: $(cat "$T/out")"
 fi
-mk; sed -i "s|quiet apparmor=1|quiet apparmor=0|" "$T/b/binary/isolinux/live.cfg"
+mk; sed -i "s|apparmor=1|apparmor=0|" "$T/b/binary/isolinux/live.cfg"
 PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted isolinux apparmor=0" || ok "stops on isolinux apparmor=0"
+mk; sed -i "s| lockdown=integrity||" "$T/b/binary/isolinux/live.cfg"
+PRESTIUM_GRUB_PASSWORD_HASH=$HASH run && bad "accepted isolinux without lockdown=integrity" || ok "stops on isolinux without lockdown=integrity"
 # templates: no banned token in a committed boot entry (also checked rendered, through 9020 above)
 if grep -nE '(^|[[:space:]])(single|emergency|rescue|debug|persistence[^[:space:]]*|rdinit=[^[:space:]]*|findiso=[^[:space:]]*|systemd\.(unit|wants|run|debug[-_]shell)[^[:space:]]*|break(=[^[:space:]]*)?)([[:space:]]|$)' \
   "$R/config/bootloaders/grub-pc/grub.cfg" "$R/config/bootloaders/syslinux_common/live.cfg.in" | grep -v '^[^:]*:[0-9]*:[[:space:]]*#'; then

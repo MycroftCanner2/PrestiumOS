@@ -10,13 +10,13 @@ LB_BINARY_FILESYSTEM="fat32"
 LB_APT_INDICES="false"
 
 # Set boot parameters
-LB_BOOTAPPEND_LIVE="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 apparmor=1 security=apparmor quiet splash"
+LB_BOOTAPPEND_LIVE="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 lockdown=integrity apparmor=1 security=apparmor quiet splash"
 
 # Set boot parameters
 LB_BOOTAPPEND_INSTALL=""
 
 # Set boot parameters
-LB_BOOTAPPEND_LIVE_FAILSAFE="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 apparmor=1 security=apparmor quiet splash nomodeset"
+LB_BOOTAPPEND_LIVE_FAILSAFE="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 lockdown=integrity apparmor=1 security=apparmor quiet splash nomodeset"
 
 # Set BIOS bootloader
 LB_BOOTLOADER_BIOS="syslinux"

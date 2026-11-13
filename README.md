@@ -55,8 +55,9 @@ modernization of the 2023 Prestium build, with tighter security and new features
   boot when it doesn't match the root hash in the boot menu (the kernel, initramfs and boot menu
   themselves are not covered yet; see the CHANGELOG's Known security limits).
 - **UEFI Secure Boot:** boots with Secure Boot on, through Debian's signed boot chain as Tails does:
-  Debian's shim (signed by Microsoft), Debian's signed GRUB and Debian's signed kernel, which then
-  runs with kernel lockdown. The build stops if any of them isn't Debian's signed file. The
+  Debian's shim (signed by Microsoft), Debian's signed GRUB and Debian's signed kernel. The kernel
+  command line includes `lockdown=integrity`, so the kernel is locked down even with Secure Boot off
+  or on BIOS. The build stops if any of the signed boot files isn't Debian's signed file. The
   initramfs and the boot menus (and so the kernel command line) are not signed, as in Tails; a signed
   unified kernel image is future work. Booting with Secure Boot off, or on BIOS, works as before, and
   Prestium tells you when Secure Boot is off.

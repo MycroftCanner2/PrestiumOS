@@ -37,6 +37,7 @@ require iommu=force
 require iommu.strict=1
 require efi=disable_early_pci_dma
 require module.sig_enforce=1
+require lockdown=integrity
 require apparmor=1
 require security=apparmor
 # hook 9010 (dm-verity, no initramfs shell)

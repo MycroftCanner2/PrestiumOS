@@ -39,6 +39,7 @@ grep -qx 'DefaultDependencies=no' "$U" && grep -qE '^Before=.*\bapparmor\.servic
 grep -qx 'FailureAction=reboot-force' "$U" && grep -qx 'ExecStart=/usr/local/sbin/prestium-cmdline-check --enforce' "$U" \
   && ok "a mismatch restarts the computer (FailureAction=reboot-force)" || bad "unit does not enforce"
 grep -qx 'panic=10' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires panic=10" || bad "policy lacks panic=10"
+grep -qx 'lockdown=integrity' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires lockdown=integrity" || bad "policy lacks lockdown=integrity"
 
 ## policy == auto/config
 A=$(sed -n 's/^APPEND="\(.*\)"$/\1/p' "$R/auto/config")
@@ -70,17 +71,18 @@ for s in $SHELLS; do command -v "$s" >/dev/null || [ "$s" = busybox ] || { skip 
     o=$(chk "$s" "$c") || { bad "$s: refused a real entry: $o"; g=1; }; done
   [ $g = 0 ] && ok "$s: every real boot entry passes"
   r=0
-  for c in "${LIVE/apparmor=1 /}" "${LIVE/security=apparmor /}" "${LIVE/panic=10 /}" "${LIVE/ module.sig_enforce=1/}" "${LIVE/boot=live /}" \
+  for c in "${LIVE/apparmor=1 /}" "${LIVE/security=apparmor /}" "${LIVE/panic=10 /}" "${LIVE/lockdown=integrity /}" "${LIVE/ module.sig_enforce=1/}" "${LIVE/boot=live /}" \
            "${LIVE/dm-verity-oncorruption=panic /}" "${LIVE/$V /}" "$LIVE apparmor=0" "$LIVE security=selinux" "$LIVE lsm=landlock" \
            "$LIVE init=/bin/sh" "$LIVE rdinit=/bin/sh" "$LIVE break=top" "$LIVE break" "$LIVE debug" "$LIVE single" "$LIVE emergency" \
            "$LIVE systemd.unit=rescue.target" "$LIVE persistence" "$LIVE findiso=/x.iso" "$LIVE fetch=http://x/y" "$LIVE live-media=/dev/sdb" \
            "$LIVE toram=filesystem.squashfs" "$LIVE root=/dev/sda1" "$LIVE module.sig_enforce=0" "$LIVE panic=0" "$LIVE panic=10" \
+           "$LIVE lockdown=none" "$LIVE lockdown=confidentiality" "$LIVE lockdown=integrity" \
            "$LIVE nomodeset nomodeset" "$LIVE apparmor=1" "${LIVE/$HASH/${HASH}0}" "${LIVE/$HASH/${HASH^^}}" "${LIVE/$HASH/${HASH:1}}" \
            "$LIVE dm-verity-root-hash=filesystem.squashfs:$HASH" "$LIVE dm-verity-root-hash=other.squashfs:$HASH" \
            "BOOT_IMAGE=/boot/vmlinuz $LIVE" "BOOT_IMAGE=/live/vmlinuz BOOT_IMAGE=/live/vmlinuz $LIVE" "BOOT_IMAGE=/live/vmlinuz/../../x $LIVE" \
            "$LIVE -- single" "$LIVE \"init=/bin/sh x\"" "$LIVE a\$b" "$LIVE *" "$(printf '%s\tinit=/bin/sh' "$LIVE")" "$LIVE bootconfig" ""; do
     if o=$(chk "$s" "$c"); then bad "$s: accepted '${c: -60}'"; r=1; fi; done
-  [ $r = 0 ] && ok "$s: refuses 45 wrong command lines (missing, extra, repeated, malformed, odd characters, empty)"
+  [ $r = 0 ] && ok "$s: refuses 48 wrong command lines (missing, extra, repeated, malformed, odd characters, empty)"
   o=$(chk "$s" "$LIVE" "$T/no-policy") && bad "$s: accepted without a policy" || { case $o in *"policy"*"missing"*) ok "$s: no policy: refused";; *) bad "$s: no policy: $o";; esac; }
   printf 'allow quiet\n' > "$T/p0"; o=$(chk "$s" "quiet" "$T/p0") && bad "$s: a policy without require lines passed" || ok "$s: a policy that requires nothing is refused"
   printf 'require boot=live\nmaybe x\n' > "$T/p1"; o=$(chk "$s" "boot=live" "$T/p1") && bad "$s: unknown policy line passed" || ok "$s: a malformed policy is refused"
@@ -206,8 +208,9 @@ printf '#!/bin/sh\necho "$@" >> "$ALERTS"\n' > "$T/nb/notify-send"; printf '#!/b
 printf '#!/bin/sh\n[ "$1" = 20 ] && kill -TERM $PPID\nexit 0\n' > "$T/nb/sleep"
 printf '#!/bin/sh\necho "unexpected boot option: apparmor=0"\necho "missing boot option: apparmor=1"\nexit 1\n' > "$T/nb/cl-bad"
 chmod +x "$T/nb/"*; echo Y > "$T/aa"
+printf 'none [integrity] confidentiality\n' > "$T/lockdown"
 nrun(){ rm -f "$T/alerts"; env -i PATH="$T/nb:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" CLSTATE="$2" PRESTIUM_AA_ENABLED="$T/aa" \
-  PRESTIUM_AA_PROFILES="$T/none" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_CMDLINE_CHECK="$1" timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null; }
+  PRESTIUM_AA_PROFILES="$T/none" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_LOCKDOWN="$T/lockdown" PRESTIUM_CMDLINE_CHECK="$1" timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null; }
 o=$(nrun true active); [ -z "$o" ] && ok "notifier: own command line, check ran: no alert" || bad "notifier false alert: $o"
 o=$(nrun "$T/nb/cl-bad" active); case $o in *"Protection NOT active"*"not started with Prestium's own boot settings"*"apparmor=0"*) ok "notifier: mismatch alert names the options";; *) bad "notifier mismatch: $o";; esac
 o=$(nrun true inactive); case $o in *"boot settings check did not run (prestium-cmdline-check.service: inactive)"*) ok "notifier: check did not run: alert";; *) bad "notifier inactive: $o";; esac

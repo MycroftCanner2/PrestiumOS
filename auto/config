@@ -3,7 +3,7 @@
 # Run "lb config" (or ./build.sh) from the top of the repository; this file is the source of truth
 # for the generated config/{bootstrap,chroot,binary,common,source} files.
 set -e
-APPEND="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 apparmor=1 security=apparmor quiet splash"
+APPEND="boot=live loop.max_loop=64 modprobe.blacklist=ahci modprobe.blacklist=libahci modprobe.blacklist=libata modprobe.blacklist=nvme systemd.gpt_auto=0 noprompt block.events_dfl_poll_msecs=1000 slab_nomerge slub_debug=FZP mce=0 vsyscall=none page_poison=1 init_on_alloc=1 init_on_free=1 page_alloc.shuffle=1 randomize_kstack_offset=on pti=on mds=full,nosmt spec_store_bypass_disable=on debugfs=off intel_iommu=on amd_iommu=force_isolation iommu=force iommu.strict=1 efi=disable_early_pci_dma module.sig_enforce=1 lockdown=integrity apparmor=1 security=apparmor quiet splash"
 # 2.1 (security audit): PRESTIUM_SNAPSHOT=20261110T000000Z builds from snapshot.debian.org at that time
 # (main and security), so two builds of the same commit get the same Debian packages. Unset: the
 # current archive. The Tor, i2pd and LibreWolf repositories have no snapshots.
