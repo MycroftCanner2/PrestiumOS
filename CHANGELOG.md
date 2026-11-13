@@ -219,7 +219,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **Feather says I2P everywhere.** The menu and `settings.json` already used I2P (Feather's i2p mode
   through i2pd's SOCKS proxy 127.0.0.1:4447), but the firewall's comment still listed Feather on Tor's
   9050. It now lists Feather on 4447. Port 9050 stays open to the desktop user for Tor Browser, Gajim and
-  torsocks; Feather runs as the same user, so the firewall can't close a port for Feather alone. The
+  `curl --socks5-hostname` in the terminal; Feather runs as the same user, so the firewall can't close a port for Feather alone. The
   AppArmor profile lets Feather execute nothing, so its bundled Tor can't start, and its comment names the
   port. `test_feather_i2p.sh` checks that the menu, both settings files, i2pd's port, ferm and the
   profile agree.
