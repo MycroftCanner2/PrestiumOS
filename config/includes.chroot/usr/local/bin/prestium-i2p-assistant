@@ -40,7 +40,7 @@ def custom_ok(url):
 def helper(cmd, request=None):
     try:
         if cmd == "apply":
-            r = subprocess.run(BROKER_APPLY + [json.dumps(request)], capture_output=True, text=True, timeout=700)
+            r = subprocess.run(BROKER_APPLY + [json.dumps(request)], capture_output=True, text=True, timeout=900)   # the dialog, then the broker (420 s)
             out = r.stdout.strip()
             if out.startswith("ok "):
                 try:

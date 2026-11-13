@@ -207,6 +207,15 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   but keeps the port and console password the port script wrote in the meantime.
   `test_i2pd_config_lock.py` runs both scripts at the same time with a stubbed systemctl and checks
   for hangs and lost edits.
+  Review of 6bf1234: both lock files are made at boot by tmpfiles (`prestium-i2p.conf`) as root-only
+  regular files (0600). flock works on any file a process can open, so a lock file other users could
+  open would have let any of them hold Apply or i2pd's start up. Apply opens them with `O_NOFOLLOW` under
+  umask 077 and refuses a symlink, a non-regular file or another owner's file; the port script runs under
+  umask 077 and refuses the same before it opens the lock. i2pd's drop-in sets `TimeoutStartSec=180`
+  (the port script's rollback, two ferm reloads of at most 60 s each, no longer risks the default 90 s)
+  and `TimeoutStopSec=30`. Apply's restart is bounded (220 s) and the rollback's restart is queued, so
+  its worst case is about 345 s; the broker's timeout for it went from 330 s, which that could exceed,
+  to 420 s, and the assistant's from 700 s to 900 s (the confirmation dialog comes first).
 - **Feather says I2P everywhere.** The menu and `settings.json` already used I2P (Feather's i2p mode
   through i2pd's SOCKS proxy 127.0.0.1:4447), but the firewall's comment still listed Feather on Tor's
   9050. It now lists Feather on 4447. Port 9050 stays open to the desktop user for Tor Browser, Gajim and

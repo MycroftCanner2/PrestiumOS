@@ -7,7 +7,7 @@ safefile, systemctl (restart i2pd runs the port script, like ExecStartPre) and f
 port scripts at the same time (no hang, no lost edit), the port script waiting for the lock and failing
 loudly after its timeout, Apply refusing when the lock stays held, and a rollback that keeps the port
 script's port and console password."""
-import fcntl, json, os, re, shutil, socket, subprocess, sys, tempfile, time
+import fcntl, json, os, re, shutil, socket, stat, subprocess, sys, tempfile, time
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I = os.path.join(R, "config/includes.chroot")
 MODE = os.path.join(I, "usr/local/sbin/prestium-i2p-mode")
@@ -163,7 +163,8 @@ orig = (top(c, "share"), top(c, "bandwidth"), sect(c, "exploratory", "inbound.le
 a = apply(T, D, REQ, free_port())   # nothing listens: i2pd "doesn't come back"
 o, _ = a.communicate(json.dumps(REQ), timeout=60)
 check(a.returncode != 0 and "previous settings were restored" in o, "proxy didn't come back: rolled back (%s)" % o.strip())
-check(open(T + "/calls").read().count("restart i2pd") == 2, "i2pd restarted with the new, then the previous settings")
+cl = open(T + "/calls").read()
+check(cl.count("restart i2pd") == 1 and cl.count("restart --no-block i2pd") == 1, "i2pd restarted with the new, then (queued) the previous settings")
 check((top(c, "share"), top(c, "bandwidth"), sect(c, "exploratory", "inbound.length")) == orig and open(D + "/tunnels.conf").read() == orig_tun,
       "previous settings back")
 check(consistent(T, D), "rollback kept the port and console password the port script wrote")
@@ -175,6 +176,66 @@ check(s.index("flock -w 10 9") < s.index("$SAFE read") and s.index('exec 9>>"$LO
       and "LOCK=/run/prestium-hops.lock" in s, "port script: same lock file, taken (10 s max) before reading i2pd.conf")
 check("logger -p daemon.err" in s, "port script: timeout logged to the journal")
 m = open(MODE).read()
-check('"/run/prestium-hops.lock"' in m and m.index("unlock(lk)   # before the restart") < m.index('[SYSTEMCTL, "restart", "i2pd"]'),
+check('"/run/prestium-hops.lock"' in m and m.index("unlock(lk)   # before the restart") < m.index("restarted = restart()"),
       "Apply: same lock file, released before restarting i2pd")
+
+# 6. (review of 6bf1234) lock files: root-only, made by tmpfiles, never followed through a symlink
+tf = open(os.path.join(I, "usr/lib/tmpfiles.d/prestium-i2p.conf")).read()
+for f in ("/run/prestium-hops.lock", "/run/prestium-i2p-apply.lock"):
+    check(re.search(r"^f %s 0600 root root -$" % re.escape(f), tf, re.M) is not None, "tmpfiles: %s 0600 root" % f)
+check(" /usr/lib/tmpfiles.d/prestium-i2p.conf\n" in open(os.path.join(I, "usr/share/prestium/build/perms.txt")).read(), "perms.txt: prestium-i2p.conf")
+check("O_NOFOLLOW" in m and "umask(0o077)" in m and m.count("open_lock(") == 3 and 'open(LOCK' not in m and 'open(APPLY_LOCK' not in m,
+      "Apply opens both lock files with open_lock (O_NOFOLLOW, umask 077)")
+check("umask 077" in s and s.index("umask 077") < s.index('exec 9>>"$LOCK"') and '[ -L "$LOCK" ]' in s
+      and s.index('[ -L "$LOCK" ]') < s.index('exec 9>>"$LOCK"'), "port script: umask 077, refuses a symlink lock before opening it")
+for what in ("symlink", "fifo", "mode"):
+    T, D = setup()
+    before = open(D + "/i2pd.conf").read()
+    lk = T + "/run/prestium-hops.lock"; victim = T + "/victim"; open(victim, "w").write("keep\n")
+    if what == "symlink": os.symlink(victim, lk)
+    elif what == "fifo": os.mkfifo(lk)
+    else: open(lk, "w").close(); os.chmod(lk, 0o666)
+    a = apply(T, D, REQ, free_port())
+    o, _ = a.communicate(json.dumps(REQ), timeout=60)
+    if what == "mode":
+        check(stat.S_IMODE(os.stat(lk).st_mode) == 0o600, "Apply: a lock file readable by others is made 0600")
+    else:
+        check(a.returncode != 0 and "lock file" in o and open(D + "/i2pd.conf").read() == before and open(victim).read() == "keep\n",
+              "Apply: a %s lock file is refused, nothing changed (%s)" % (what, o.strip()[:120]))
+    if what != "mode":
+        os.unlink(lk)
+        if what == "symlink": os.symlink(victim, lk)
+        else: os.mkfifo(lk)
+        p = subprocess.run(["sh", T + "/port.sh"], capture_output=True, text=True, timeout=30)
+        check(p.returncode != 0 and "not a regular file" in p.stderr and open(D + "/i2pd.conf").read() == before and open(victim).read() == "keep\n",
+              "port script: a %s lock file is refused, nothing changed" % what)
+    shutil.rmtree(T)
+T, D = setup()
+a = apply(T, D, REQ, free_port()); a.communicate(json.dumps(REQ), timeout=60)
+check(all(stat.S_IMODE(os.stat(p).st_mode) == 0o600 for p in (T + "/run/prestium-hops.lock", T + "/apply.lock")), "lock files Apply creates are 0600")
+shutil.rmtree(T)
+T, D = setup()
+subprocess.run(["sh", T + "/port.sh"], check=True, stderr=subprocess.DEVNULL)
+check(stat.S_IMODE(os.stat(T + "/run/prestium-hops.lock").st_mode) == 0o600, "the lock file the port script creates is 0600")
+shutil.rmtree(T)
+
+# 7. time budget: Apply ends well before the broker kills it; the restart outlasts i2pd's own timeouts
+import importlib.machinery, importlib.util
+sys.dont_write_bytecode = True
+ld = importlib.machinery.SourceFileLoader("i2pmode", MODE); sp = importlib.util.spec_from_loader("i2pmode", ld)
+mm = importlib.util.module_from_spec(sp); ld.exec_module(mm)
+dropin = open(os.path.join(I, "etc/systemd/system/i2pd.service.d/prestium.conf")).read()
+tstart = int(re.search(r"^TimeoutStartSec=(\d+)$", dropin, re.M).group(1)); tstop = int(re.search(r"^TimeoutStopSec=(\d+)$", dropin, re.M).group(1))
+check(tstart == 180, "i2pd: TimeoutStartSec=180 (the port script's rollback fits)")
+check(mm.RESTART_TIMEOUT >= tstart + tstop + 5, "Apply's restart timeout %d s > i2pd's stop %d + start %d s" % (mm.RESTART_TIMEOUT, tstop, tstart))
+worst = mm.LOCK_WAIT + mm.RESTART_TIMEOUT + mm.WAIT + mm.LOCK_WAIT + 10
+broker = open(os.path.join(I, "usr/local/sbin/prestium-wl-broker")).read()
+bt = int(re.search(r'\[I2P_MODE, "apply"\][^\n]*\n[^\n]*timeout=(\d+)\)', broker).group(1))
+check(bt == mm.BROKER_BUDGET and worst + 60 <= bt, "Apply's worst case %d s, broker timeout %d s (margin %d s)" % (worst, bt, bt - worst))
+at = int(re.search(r"BROKER_APPLY \+ \[json.dumps\(request\)\][^\n]*timeout=(\d+)\)", open(os.path.join(I, "usr/local/bin/prestium-i2p-assistant")).read()).group(1))
+check(at >= bt + 300, "the assistant waits %d s: the dialog plus the broker's %d s" % (at, bt))
+T = tempfile.mkdtemp(); hang = os.path.join(T, "systemctl"); open(hang, "w").write("#!/bin/sh\nsleep 30\n"); os.chmod(hang, 0o755)
+mm.SYSTEMCTL = hang; mm.RESTART_TIMEOUT = 1; t0 = time.monotonic()
+check(mm.restart() is False and time.monotonic() - t0 < 10, "a restart that hangs counts as failed after RESTART_TIMEOUT")
+shutil.rmtree(T)
 sys.exit(fail)

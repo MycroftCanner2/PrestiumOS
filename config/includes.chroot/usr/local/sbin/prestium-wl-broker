@@ -452,7 +452,7 @@ class Session:
                 log("uid %d: I2P settings change cancelled at the dialog (%s)" % (self.uid, summary))
                 return "error cancelled"
             r = subprocess.run([I2P_MODE, "apply"], input=json.dumps(req), capture_output=True,
-                               text=True, timeout=330)
+                               text=True, timeout=420)   # prestium-i2p-mode BROKER_BUDGET (worst case about 345 s)
             st = None
             for line in reversed(r.stdout.splitlines()):
                 try:

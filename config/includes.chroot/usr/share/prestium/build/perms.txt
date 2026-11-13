@@ -492,6 +492,7 @@
 0440 root root /etc/sudoers.d/prestium-wayland
 0644 root root /etc/systemd/system/prestium-wl-broker.service
 0644 root root /usr/lib/tmpfiles.d/prestium-wl.conf
+0644 root root /usr/lib/tmpfiles.d/prestium-i2p.conf
 0644 root root /usr/share/prestium/swaylock.conf
 0440 root root /etc/sudoers.d/prestium-browser-updater
 0755 root root /usr/local/sbin/prestium-browser-install
