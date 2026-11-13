@@ -92,10 +92,10 @@
     <item label="Claws Mail (Email, I2P)" icon="claws-mail">
       <action name="Execute" command="prestium-run claws-mail-i2p" />
     </item>
-    <item label="Gajim (XMPP, Tor)" icon="org.gajim.Gajim">
+    <item label="Gajim" icon="org.gajim.Gajim">
       <action name="Execute" command="prestium-run gajim" />
     </item>
-    <item label="Pidgin (Chat, Tor)" icon="pidgin">
+    <item label="Pidgin" icon="pidgin">
       <action name="Execute" command="prestium-run /usr/local/bin/pidgin-tor" />
     </item>
     <item label="IRC (I2P)" icon="irc-chat">

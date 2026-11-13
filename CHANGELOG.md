@@ -36,6 +36,18 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   tag syslog messages with `_SYSTEMD_UNIT`.
 - **Log Out is removed from the menu.** Restart… and Shut Down… remain (the
   `prestium-power` helper itself is unchanged).
+- **Pidgin and Gajim have both Tor and I2P proxies ready to use, with plain menu names.**
+  Their Communication menu entries are now just *Gajim* and *Pidgin* (no "(Tor)" /
+  "(Chat, Tor)" suffix). Gajim's shipped `settings.sqlite` (both copies) holds Tor
+  (SOCKS5 127.0.0.1:9050), I2P SOCKS (SOCKS5 127.0.0.1:4447) and I2P HTTP
+  (HTTP 127.0.0.1:4444) proxy profiles with Tor as the global default, so either network
+  is a per-account / app-wide selection, not typed host/port by hand. Pidgin's global
+  proxy stays Tor (SOCKS5 127.0.0.1:9050, remote DNS on); its launcher now starts when
+  Tor *or* i2pd is up and, in I2P-only mode, swaps the global proxy port to 4447
+  (I2P SOCKS, remote DNS on) before starting, while per-account I2P use is SOCKS5
+  127.0.0.1:4447 in the account editor. New `tests/test_messenger_proxies.py` checks the
+  menu names, both Gajim proxy sets, both Pidgin prefs, the launcher, ferm's user ports
+  and both AppArmor profiles.
 
 ### Build system and supply chain
 - **Tor Browser is the newest signed release at every build.** `scripts/tb-latest.sh` asks the Tor
