@@ -5,6 +5,7 @@
 # selection, Neon Cyan links.
 # 2.1 (contrast review): selection #0050c8 (white text 7.0:1, as GTK), visited links #a3a3ff (8:1).
 # 2.1 (UI pass): visited links #8ab8ff (8.9:1 on #161616), the accent text colour GTK and KDE use too.
+# 2.1: unvisited links are also #8ab8ff, not the live-state cyan, matching GTK and KDE.
 set -e
 S=/usr/share/Kvantum/KvGnomeDark; D=/usr/share/Kvantum/Prestium
 [ -f "$S/KvGnomeDark.svg" ] && [ -f "$S/KvGnomeDark.kvconfig" ] || { echo "E: KvGnomeDark missing (qt-style-kvantum-themes)"; exit 1; }
@@ -34,7 +35,7 @@ set_color button.text.color '#ffffff'
 set_color disabled.text.color '#a8a8a8'
 set_color tooltip.text.color '#ffffff'
 set_color highlight.text.color '#ffffff'
-set_color link.color '#00ffff'
+set_color link.color '#8ab8ff'
 set_color link.visited.color '#8ab8ff'
 chmod 755 "$D"
 echo "P: Kvantum theme Prestium (KvGnomeDark shapes, Tech Innovation colours)"

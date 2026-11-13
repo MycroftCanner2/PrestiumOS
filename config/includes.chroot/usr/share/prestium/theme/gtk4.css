@@ -5,10 +5,14 @@
    white text (7.0:1), accent text and focus #8ab8ff / #3d8bff, entries #161616 with a #737373 edge,
    placeholders #a8a8a8, errors #ff9494. tests/test_contrast.py computes every pair.
    2.1 (UI pass): destructive buttons #a8231c behind white text (7.2:1), as gtk3.css; success #6ee7a0;
-   tooltips 8 px like every other floating surface. libadwaita's own sizes stay. */
+   tooltips 8 px like every other floating surface. libadwaita's own sizes stay.
+   2.1: links #8ab8ff (not the live-state cyan); progress bar text is white on a #161616 trough and
+   a #0050c8 fill (7.0:1 or more), as gtk3.css. Adwaita's progressbar text is 40% opaque. */
 @define-color accent_bg_color #0050c8;
 @define-color accent_fg_color #ffffff;
 @define-color accent_color #8ab8ff;
+@define-color link_color #8ab8ff;
+@define-color visited_link_color #8ab8ff;
 @define-color window_bg_color #1e1e1e;
 @define-color window_fg_color #ffffff;
 @define-color view_bg_color #161616;
@@ -30,13 +34,21 @@
 @define-color success_color #6ee7a0;
 :root {
   --accent-bg-color: #0050c8; --accent-fg-color: #ffffff; --accent-color: #8ab8ff;
+  --link-color: #8ab8ff; --visited-link-color: #8ab8ff;
   --window-bg-color: #1e1e1e; --view-bg-color: #161616;
   --headerbar-bg-color: #262626; --headerbar-backdrop-color: #1e1e1e;
   --sidebar-bg-color: #1e1e1e; --card-bg-color: #262626; --dialog-bg-color: #262626; --popover-bg-color: #262626;
   --error-color: #ff9494; --warning-color: #ffd166;
   --destructive-bg-color: #a8231c; --destructive-fg-color: #ffffff; --destructive-color: #ff9494; --success-color: #6ee7a0;
 }
-link, label link, .link, button.link { color: #00ffff; }
+link, label link, .link, button.link, :link { color: #8ab8ff; }
+link:visited, :visited, button.link:visited { color: #8ab8ff; }
+link:hover, :link:hover, button.link:hover, label link:hover { color: #ffffff; }
+progressbar { color: #ffffff; }
+progressbar trough, progressbar > trough {
+  background-image: none; background-color: #161616; border-color: #737373; }
+progressbar progress, progressbar > trough > progress {
+  background-image: none; background-color: #0050c8; border-color: #0050c8; }
 selection { background-color: alpha(#0050c8, 0.7); }
 entry, passwordentry, spinbutton { background-color: #161616; color: #ffffff; box-shadow: inset 0 0 0 1px #737373; }
 entry:focus-within, passwordentry:focus-within, spinbutton:focus-within { outline-color: #3d8bff; }

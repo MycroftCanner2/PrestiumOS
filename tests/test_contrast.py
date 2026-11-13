@@ -7,6 +7,7 @@ OSD), waybar, mako and the assistants' error text.
 2.1 (UI pass): also GTK 3 destructive buttons, message bars and section cards, GTK 4 destructive buttons,
 GTK 2 (Prestium-Dark's colour scheme for Pidgin and pinentry-gtk2), /etc/xdg/kdeglobals (as Prestium.colors),
 the terminal (foot), The Lounge's default theme (Tech Innovation) and the I2P web pages (webconsole, torrents).
+2.1: GTK 3/4 links and visited links #8ab8ff; progress bar text (show-text) on the trough and the fill.
 Targets: text 7:1 (4.5:1 for disabled text and for coloured text on the selection), indicators, rings,
 edges and focus 3:1. `-v` prints every pair; PRESTIUM_ROOT checks another checkout (for before/after)."""
 import os, re, sys
@@ -139,12 +140,19 @@ need(S, "default button text (disabled)", col(g['button.suggested-action:disable
      col(g['button.suggested-action:disabled']['background-color']), DISABLED)
 need(S, "check mark", col(g['check:checked']['color']), col(g['check:checked']['background-color']), DISABLED)
 need(S, "checked box edge", col(g['check:checked']['border-color']), win, INDICATOR)
-need(S, "progress and slider fill", col(g['progressbar progress']['background-color']), win, INDICATOR)
+need(S, "slider and level bar fill", col(g['scale highlight']['background-color']), win, INDICATOR)
 need(S, "selected tab underline", col(g['notebook > header > tabs > tab:checked']['box-shadow']), win, INDICATOR)
 need(S, "sidebar selection text", col(g['placessidebar row:selected']['color']), col(g['placessidebar row:selected']['background-color']), TEXT)
-for bgname, bg in (("windows", win), ("views", base)):
+pt, tr, pf = col(g['progressbar']['color']), col(g['progressbar trough']['background-color']), col(g['progressbar progress']['background-color'])
+need(S, "progress text on the trough", pt, tr, TEXT)
+need(S, "progress text on the fill", pt, pf, TEXT)
+need(S, "progress text on section cards", pt, "#262626", TEXT)
+need(S, "progress trough edge on the trough", col(g['progressbar trough']['border-color']), tr, INDICATOR)
+need(S, "progress trough edge on section cards", col(g['progressbar trough']['border-color']), "#262626", INDICATOR)
+for bgname, bg in (("windows", win), ("views", base), ("section cards", "#262626")):
     need(S, "links on " + bgname, col(g['*:link']['color']), bg, TEXT)
     need(S, "visited links on " + bgname, col(g['*:visited']['color']), bg, TEXT)
+    need(S, "link hover on " + bgname, col(g['*:link:hover']['color']), bg, TEXT)
 need(S, "tooltip text", col(g['tooltip.background']['color']), col(g['tooltip.background']['background-color']), TEXT)
 
 # --- GTK 4 / libadwaita ---
@@ -165,7 +173,16 @@ need(S, "entry edge", col(ent['box-shadow']), col(ent['background-color']), INDI
 need(S, "entry edge on dialogs", col(ent['box-shadow']), d['dialog_bg_color'], INDICATOR)
 need(S, "entry focus outline", col(g4['entry:focus-within']['outline-color']), col(ent['background-color']), INDICATOR)
 need(S, "entry error edge", col(g4['entry.error']['box-shadow']), col(ent['background-color']), INDICATOR)
-need(S, "links", col(g4['link']['color']), d['window_bg_color'], TEXT)
+for n in ("window_bg_color", "view_bg_color", "card_bg_color", "dialog_bg_color"):
+    need(S, "links on %s" % n, col(g4['link']['color']), d[n], TEXT)
+    need(S, "visited links on %s" % n, col(g4['link:visited']['color']), d[n], TEXT)
+    need(S, "link hover on %s" % n, col(g4['link:hover']['color']), d[n], TEXT)
+pt4, tr4, pf4 = col(g4['progressbar']['color']), col(g4['progressbar trough']['background-color']), col(g4['progressbar progress']['background-color'])
+need(S, "progress text on the trough", pt4, tr4, TEXT)
+need(S, "progress text on the fill", pt4, pf4, TEXT)
+need(S, "progress text on dialogs", pt4, d['dialog_bg_color'], TEXT)
+need(S, "progress trough edge on the trough", col(g4['progressbar trough']['border-color']), tr4, INDICATOR)
+need(S, "progress trough edge on dialogs", col(g4['progressbar trough']['border-color']), d['dialog_bg_color'], INDICATOR)
 
 # --- Qt (Kvantum "Prestium", hook 0455) ---
 kv = dict(re.findall(r"^set_color (\S+) '(#[0-9a-fA-F]{6})'", open(os.path.join(R, "config/hooks/live/0455-prestium-qt-theme.hook.chroot")).read(), re.M))

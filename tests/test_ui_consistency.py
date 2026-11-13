@@ -101,6 +101,34 @@ for sec in cols.sections():
         if g != v: diff.append("[%s] %s=%s (kdeglobals %s)" % (sec, k, v, g))
 check(not diff, "kdeglobals colours are Prestium.colors", "; ".join(diff[:6]))
 
+# links in every toolkit are the palette blue #8ab8ff, not the live-state cyan
+LINK = "8ab8ff"
+g3s, g4s = read("usr/share/prestium/theme/gtk3.css"), read("usr/share/prestium/theme/gtk4.css")
+g2s = read("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc")
+qts = read("../hooks/live/0455-prestium-qt-theme.hook.chroot")
+check(re.search(r"@define-color\s+link_color\s+#8ab8ff\b", g3s) and re.search(r"@define-color\s+visited_link_color\s+#8ab8ff\b", g3s),
+      "GTK 3: link_color and visited_link_color are #8ab8ff")
+check(re.search(r"@define-color\s+link_color\s+#8ab8ff\b", g4s) and re.search(r"@define-color\s+visited_link_color\s+#8ab8ff\b", g4s),
+      "GTK 4: link_color and visited_link_color are #8ab8ff")
+check(re.search(r"(?m)^\*:link, .*\{ color: #8ab8ff; \}", g3s) and re.search(r"(?m)^\*:visited, .*\{ color: #8ab8ff; \}", g3s),
+      "GTK 3: :link, button.link, label link and :visited use #8ab8ff")
+check(re.search(r"(?m)^link, label link, \.link, button\.link, :link \{ color: #8ab8ff; \}", g4s) and
+      re.search(r"link:visited, :visited, button\.link:visited \{ color: #8ab8ff; \}", g4s),
+      "GTK 4: link, label link, button.link and :visited use #8ab8ff")
+check('link_color:#8ab8ff' in g2s and 'visited_link_color:#8ab8ff' in g2s,
+      "GTK 2: link_color and visited_link_color are #8ab8ff")
+check("set_color link.color '#8ab8ff'" in qts and "set_color link.visited.color '#8ab8ff'" in qts,
+      "Qt (Kvantum): link.color and link.visited.color are #8ab8ff")
+link_rgb = ["ForegroundLink=138,184,255", "ForegroundVisited=138,184,255"]
+check(all(v in read("usr/share/color-schemes/Prestium.colors") and v in read("etc/xdg/kdeglobals") for v in link_rgb),
+      "KDE: ForegroundLink and ForegroundVisited are #8ab8ff")
+for pth, kind in (("usr/share/prestium/theme/gtk3.css", "css"), ("usr/share/prestium/theme/gtk4.css", "css"),
+                  ("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc"),
+                  ("../hooks/live/0455-prestium-qt-theme.hook.chroot", "sh")):
+    cyan = [h for h in hexes(strip_comments(read(pth), kind)) if h in ("00ffff", "80ffff")]
+    check(not cyan, "link styles on-palette and not cyan: %s" % pth.replace("../", "config/"),
+          "cyan " + ", ".join("#" + h for h in cyan))
+
 # foot (hex without '#'): background, foreground and selection
 foot = configparser.ConfigParser(interpolation=None, strict=False); foot.read_string("[main]\n" + read("etc/xdg/foot/foot.ini"))
 fc = foot["colors"] if foot.has_section("colors") else {}

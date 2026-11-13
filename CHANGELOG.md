@@ -414,8 +414,15 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   action at the right end in the Tor Connection Assistant as in the I2P one. The I2P web console and
   I2P torrents pages, The Lounge's default Tech Innovation theme (worst text pair 4.8:1 to 6.4:1) and
   LibreOffice's icons (Colibre dark) follow the palette. Tests: `test_ui_consistency.py` (palette,
-  themes, fonts, radii, copy, icon names), `test_contrast.py` (now 284 pairs); `tests/ci.sh` no longer
+  themes, fonts, radii, copy, icon names), `test_contrast.py` (now 310 pairs); `tests/ci.sh` no longer
   leaves `__pycache__` in the image tree.
+- **Links and progress-bar text in Prestium's GTK tools are readable.** Unvisited links
+  (`GtkLinkButton`, label links such as "about bridges") use the palette blue `#8ab8ff` instead of
+  cyan, in GTK 3 and 4, GTK 2, Qt and KDE (visited was already `#8ab8ff`). Progress bar text (for
+  example "Connecting: 62 %") is white, 7:1 or more on the trough (`#161616`) and on the fill
+  (`#0050c8`); Adwaita's default was 40% opaque (about 3.4:1). The AppArmor safety-notify test
+  supplies a fake lockdown file, so it no longer depends on the host kernel. Tests:
+  `test_contrast.py`, `test_ui_consistency.py`, `test_safety_notify_apparmor.sh`.
 - **Papirus-Dark icons.** The Prestium icon theme holds the new logo mark (a blue-to-cyan "P.") and
   inherits Papirus-Dark first; Adwaita, AdwaitaLegacy and gnome are fallbacks. Menus, notifications and
   the bar use it.

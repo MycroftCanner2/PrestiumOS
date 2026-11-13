@@ -1,13 +1,13 @@
 # Prestium 2.1 (UI pass): GTK 2 apps (Pidgin, pinentry-gtk2) in Prestium's palette. This is Adwaita-dark's
 # GTK 2 theme (gnome-themes-extra) with Prestium's named colours instead of its blue-grey #33393b surfaces,
 # #215d9c selection and #4a90d9 links: surfaces #1e1e1e / #161616 / #262626, selection #0050c8 behind white
-# text (7.0:1), links #00ffff, visited #8ab8ff, dim text #a8a8a8 (as gtk3.css). A colour scheme in
+# text (7.0:1), links and visited links #8ab8ff, dim text #a8a8a8 (as gtk3.css). A colour scheme in
 # /etc/gtk-2.0/gtkrc can't do this: Adwaita-dark's own gtkrc sets every colour again before its styles are
 # read. Entries, buttons and check boxes stay Adwaita-dark's images (#232729 / #272b2d).
 gtk-color-scheme = "text_color:#ffffff\nbase_color:#161616\nfg_color:#ffffff\nbg_color:#1e1e1e"
 gtk-color-scheme = "selected_fg_color:#ffffff\nselected_bg_color:#0050c8"
 gtk-color-scheme = "insensitive_fg_color:#a8a8a8\ninsensitive_bg_color:#1e1e1e\nmenu_color:#262626"
-gtk-color-scheme = "link_color:#00ffff\nvisited_link_color:#8ab8ff\nwindow_color:#262626"
+gtk-color-scheme = "link_color:#8ab8ff\nvisited_link_color:#8ab8ff\nwindow_color:#262626"
 gtk-color-scheme = "column_header_color:#a8a8a8\nhover_column_header_color:#ffffff"
 gtk-color-scheme = "tooltip_fg_color:#ffffff\ntooltip_bg_color:#262626"
 gtk-auto-mnemonics              = 1

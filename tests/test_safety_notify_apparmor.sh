@@ -25,9 +25,13 @@ printf '#!/bin/sh\nexit 0\n' > "$T/bin/zenity"
 # sleep stub: the 15 s start delay returns at once; the 20 s loop sleep ends the run after one pass
 printf '#!/bin/sh\n[ "$1" = 20 ] && kill -TERM $PPID\nexit 0\n' > "$T/bin/sleep"
 chmod +x "$T/bin/"*
+# The notifier raises a "Protection NOT active" alert when lockdown is [none] or the file is
+# missing (since 8959166). A fake locked-down file keeps these AppArmor cases independent of the
+# host, the same way test_secure_boot.sh and test_boot_cmdline_guard.sh do.
+printf 'none [integrity] confidentiality\n' > "$T/lockdown"
 run(){ # enabled-flag aastate [profiles-file]
   printf '%s\n' "$1" > "$T/enabled"; rm -f "$T/alerts"
-  env -i PATH="$T/bin:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" AASTATE="$2" PRESTIUM_AA_ENABLED="$T/enabled" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_CMDLINE_CHECK=true \
+  env -i PATH="$T/bin:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" AASTATE="$2" PRESTIUM_AA_ENABLED="$T/enabled" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_LOCKDOWN="$T/lockdown" PRESTIUM_CMDLINE_CHECK=true \
     PRESTIUM_AA_PROFILES="${3:-$T/no-profiles}" timeout 10 bash "$N" >/dev/null 2>&1
   cat "$T/alerts" 2>/dev/null; }
 o=$(run Y active); [ -z "$o" ] && ok "module enabled, service active: no alert" || bad "false alert: $o"
@@ -35,7 +39,7 @@ o=$(run Y inactive); case "$o" in *"AppArmor is not active (apparmor.service: in
 o=$(run Y failed); case "$o" in *"AppArmor is not active"*) ok "service failed: alert";; *) bad "no alert when failed: $o";; esac
 o=$(run Y activating); [ -z "$o" ] && ok "service activating: no alert yet" || bad "boot-time false alert: $o"
 o=$(run N active); case "$o" in *"AppArmor is not active (kernel module N)"*) ok "module disabled: alert";; *) bad "no alert when module off: $o";; esac
-rm -f "$T/enabled"; o=$(env -i PATH="$T/bin:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" AASTATE=active PRESTIUM_AA_ENABLED="$T/missing" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_CMDLINE_CHECK=true \
+rm -f "$T/enabled"; o=$(env -i PATH="$T/bin:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" AASTATE=active PRESTIUM_AA_ENABLED="$T/missing" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_LOCKDOWN="$T/lockdown" PRESTIUM_CMDLINE_CHECK=true \
   timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null)
 case "$o" in *"kernel module not loaded"*) ok "no apparmor module: alert";; *) bad "no alert without module: $o";; esac
 P=$T/profiles
