@@ -37,8 +37,9 @@ modernization of the 2023 Prestium build, with tighter security and new features
   apps; move files onto them with the file manager.
 - **Network privacy:** MAC address spoofing with a guard against leaks of the real address,
   default-deny firewall that stays closed when stopped, no system DNS, IPv6 off, no LAN access.
-  In the terminal, `http_proxy` and `https_proxy` point to i2pd (127.0.0.1:4450), so command-line
-  tools reach clearnet sites through the I2P outproxy, not Tor (Tor: `curl --socks5-hostname 127.0.0.1:9050`).
+  In the terminal, `http_proxy` and `https_proxy` point to i2pd (127.0.0.1:4450), an I2P-only proxy with
+  no outproxy, so command-line tools reach `.i2p` sites only. For clearnet, use Tor
+  (`curl --socks5-hostname 127.0.0.1:9050`) or the I2P outproxy (`curl -x http://127.0.0.1:4444`).
 - **Tor Connection Assistant:** Direct, Snowflake, WebTunnel, obfs4 and meek, with bootstrap progress,
   Cancel, Retry and Revert at any point.
 - **I2P:** i2pd with a per-boot port, signature-checked reseeding (over Tor or from a file), I2P mail
