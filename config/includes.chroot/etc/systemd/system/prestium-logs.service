@@ -4,6 +4,11 @@
 [Unit]
 Description=Prestium readable logs (Tor, I2P, control-port filter)
 After=systemd-journald.service systemd-tmpfiles-setup.service
+# 2.1 (review of 6bf1234): /run/prestium/logs is made by tmpfiles (prestium-safety.conf). If it is missing
+# anyway, ReadWritePaths= fails the start: give up after 5 tries in 5 minutes instead of a restart loop
+# every 10 seconds for ever (the viewer then says the log is not available).
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -45,6 +50,9 @@ SystemCallFilter=@system-service
 SystemCallFilter=~@privileged @resources
 SystemCallErrorNumber=EPERM
 UMask=0027
+# 2.1 (review of 6bf1234): one Python process and one journalctl at a time
+MemoryMax=128M
+TasksMax=16
 
 [Install]
 WantedBy=multi-user.target

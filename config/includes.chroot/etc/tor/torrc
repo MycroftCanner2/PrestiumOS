@@ -43,3 +43,7 @@ MapAddress roubaix-fr.pirateirc.net tll4bxf546kzf6iv4n2m4pbbjnifrfewe3kcritva2tu
 # Prestium 2.0: pluggable transports, bridges and UseBridges live in the Tor Connection
 # Assistant's drop-in (/etc/tor/torrc.d/50-prestium-assistant.conf; default = direct connection).
 %include /etc/tor/torrc.d/*.conf
+# 2.1 (review of 6bf1234): Tor's default, set explicitly and after the drop-ins so none of them can
+# turn it off: addresses in Tor's log are written as [scrubbed]. The log is readable on the desktop
+# (Network > Network Logs), so it must not show which sites or bridges were used.
+SafeLogging 1

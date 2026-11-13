@@ -20,7 +20,7 @@ esac
 f=$D/$name.log
 while :; do
 	if [ ! -r "$f" ]; then
-		zenity --info --no-markup --title="$title" --text="The log is not available yet (prestium-logs.service writes it within 10 seconds of starting)." 2>/dev/null
+		zenity --info --no-markup --title="$title" --text="The log is not available yet (prestium-logs.service writes it within 10 seconds of starting). If it stays unavailable, the service is not running: see systemctl status prestium-logs." 2>/dev/null
 		exit 0
 	fi
 	# --text-info is read-only unless --editable is given; no markup, no links

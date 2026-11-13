@@ -223,6 +223,15 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   can be read only by the desktop user (group `user`, setgid directory), not by the confined apps
   (AppArmor). There's no sudo rule, the user isn't in `systemd-journal` or `adm`, and nothing the user
   sends can choose another unit.
+  Review of 6bf1234: one journal entry is always one line (a newline inside a message is shown as
+  `\n`, a backslash as `\\`), so a message can't add a line that looks like another entry, and at most
+  two combining marks follow a character. onion-grater also escapes newlines, CR and other control,
+  format and separator characters (`\x0a`, `\u202e`) before it logs a refused client's reason, since that
+  client chose its own path. When journalctl fails, the file shows an error with the reason instead of an
+  empty log. The unit has `MemoryMax=128M`, `TasksMax=16` and a restart limit (5 starts in 5 minutes),
+  so a missing `/run/prestium/logs` (made by tmpfiles) doesn't restart it every 10 seconds for ever.
+  `torrc` sets `SafeLogging 1` (Tor's default) explicitly, after the drop-ins, so addresses in the
+  readable Tor log stay `[scrubbed]`.
 - **Time over Tor onion services, on Kicksecure's design.** `prestium-timesync` is now a daemon built on
   sdwdate's design (written for Prestium, not Kicksecure's code). Each round it asks one source from each
   of three pools of onion web servers run by unrelated operators (Kicksecure's own list, kept under its

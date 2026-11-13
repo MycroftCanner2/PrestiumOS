@@ -13,6 +13,11 @@ field only journald sets) or from systemd (PID 1) about that unit. Every control
 zero-width), private-use, unassigned, surrogate and line/paragraph separator character in it is
 replaced with "?", tabs become spaces, and each line is cut at 1000 characters, so a log line can't
 move the cursor, colour the terminal, reorder text or pretend to be several lines.
+2.1 (review of 6bf1234): one journal entry is always one line. A "\n" inside a message is written as
+the two characters "\n" (and a backslash as "\\"), so a program can't add a line that looks like
+another entry of the log (onion-grater logs a refused client's path, which that client chose). At most
+2 combining marks follow a character; the rest of a run is replaced with one "?" (no "zalgo" text
+covering the lines around it). When journalctl fails, the file says so, instead of being empty.
 """
 import json
 import os
@@ -43,14 +48,25 @@ UNITS = {
     "onion-grater": "prestium-onion-grater.service",
 }
 BAD_CATEGORIES = {"Cc", "Cf", "Co", "Cn", "Cs", "Zl", "Zp"}
+MAX_MARKS = 2
 
 
 def clean(text):
     out = []
+    marks = 0
     for ch in text:
+        cat = unicodedata.category(ch)
+        if cat[0] == "M":
+            marks += 1
+            if marks <= MAX_MARKS:
+                out.append(ch)
+            elif marks == MAX_MARKS + 1:
+                out.append("?")
+            continue
+        marks = 0
         if ch == "\t":
             out.append(" ")
-        elif unicodedata.category(ch) in BAD_CATEGORIES:
+        elif cat in BAD_CATEGORIES:
             out.append("?")
         else:
             out.append(ch)
@@ -88,18 +104,43 @@ def render(unit, json_lines):
         except ValueError:
             t = "????-??-?? ??:??:??"
         who = field(e, "SYSLOG_IDENTIFIER") or ("systemd" if field(e, "_PID") == "1" else "?")
-        # only "\n" starts a new (prefixed) line; CR, VT, FF, NEL and U+2028/2029 are replaced in clean()
-        for line in field(e, "MESSAGE").rstrip("\n").split("\n"):
-            rows.append(clean("%s UTC %s: %s" % (t, who, line)))
+        # one entry, one line: "\n" is shown as \n (a backslash as \\); CR, VT, FF, NEL and U+2028/2029
+        # are replaced in clean()
+        msg = field(e, "MESSAGE").rstrip("\n").replace("\\", "\\\\").replace("\n", "\\n")
+        rows.append(clean("%s UTC %s: %s" % (t, clean(who.replace("\n", " ")), msg)))
     head = "# %s, this boot, last %d entries (UTC), refreshed every %d s by prestium-logs\n" % (unit, LINES, EVERY)
     return head + "".join(r + "\n" for r in rows)
 
 
+class JournalError(Exception):
+    pass
+
+
 def read(unit):
-    r = subprocess.run([JOURNALCTL, "-b", "-u", unit, "-n", str(LINES), "-o", "json", "--no-pager", "-q"],
-                       stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                       timeout=30, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C.UTF-8", "SYSTEMD_PAGER": ""})
+    try:
+        r = subprocess.run([JOURNALCTL, "-b", "-u", unit, "-n", str(LINES), "-o", "json", "--no-pager", "-q"],
+                           stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                           timeout=30, env={"PATH": "/usr/bin:/bin", "LC_ALL": "C.UTF-8", "SYSTEMD_PAGER": ""})
+    except subprocess.TimeoutExpired:
+        raise JournalError("journalctl did not answer within 30 s")
+    except OSError as e:
+        raise JournalError("could not run journalctl: %s" % e.strerror)
+    err = r.stderr.decode("utf-8", "replace").strip().splitlines()
+    # some systemd versions exit 1 when nothing matched; with -q -o json that prints nothing at all
+    if r.returncode == 1 and not r.stdout.strip() and not [l for l in err if "No entries" not in l]:
+        return []
+    if r.returncode != 0:
+        raise JournalError("journalctl failed (exit status %d)%s" % (r.returncode, (": " + err[-1][:200]) if err else ""))
     return r.stdout.decode("utf-8", "replace").splitlines()
+
+
+def failed(unit, why):
+    """What the file shows when the journal can't be read: a clear error, not an empty log."""
+    now = time.strftime("%Y-%m-%d %H:%M:%S", time.gmtime())
+    return ("# %s, this boot (UTC), refreshed every %d s by prestium-logs\n"
+            "# ERROR at %s UTC: the journal could not be read: %s\n"
+            "# The log is not shown. It is tried again in %d s (see: systemctl status prestium-logs).\n"
+            % (unit, EVERY, now, clean(why), EVERY))
 
 
 def put(name, text):
@@ -127,7 +168,12 @@ def put(name, text):
 def once():
     for name, unit in UNITS.items():
         try:
-            put(name, render(unit, read(unit)))
+            try:
+                text = render(unit, read(unit))
+            except JournalError as e:
+                print("prestium-logs: %s: %s" % (unit, e), file=sys.stderr)
+                text = failed(unit, str(e))
+            put(name, text)
         except (OSError, subprocess.SubprocessError) as e:
             print("prestium-logs: %s: %s" % (unit, e), file=sys.stderr)
 

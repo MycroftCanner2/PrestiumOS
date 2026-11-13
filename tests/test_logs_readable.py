@@ -34,6 +34,8 @@ ENT = {
         ent("tor@default.service", "esc \x1b[31mred\x1b[0m bell\x07 nul\x00 cr\rlf"),
         ent("tor@default.service", "bidi \u202eevil\u202c zw\u200b\u2060 ls\u2028ps\u2029 tab\tend"),
         ent("tor@default.service", "two\nlines"),
+        ent("tor@default.service", "forge\n2025-11-12 09:33:20 UTC tor: Bootstrapped 100% FAKE \\n end"),
+        ent("tor@default.service", "zalgo a\u0301\u0302\u0303\u0304\u0305 b\u0301 c\u0301\u0302 d"),
         ent("tor@default.service", list(b"bytes \xff\x1b[2J ok")),
         ent("tor@default.service", "x" * 5000),
         ent(None, "Started tor@default.service.", pid="1", ident="systemd", UNIT="tor@default.service"),
@@ -64,13 +66,35 @@ bad_chars = [c for c in tor if c != "\n" and (ord(c) < 32 or 0x7f <= ord(c) < 0x
 check(not bad_chars, "no control, bidi, zero-width or separator characters: %r" % bad_chars[:5])
 check("esc ?[31mred?[0m bell? nul? cr?lf" in tor, "ESC, BEL, NUL and CR replaced with ?")
 check("bidi ?evil? zw?? ls?ps? tab end" in tor, "bidi, zero-width, line/paragraph separators replaced; tab is a space")
-check(": two\n" in tor and ": lines\n" in tor, "a multi-line message is several prefixed lines")
+check(": two\\nlines\n" in tor, "a multi-line message stays one line (\\n shown as text)")
+check(not any(l.startswith("2025-11-12 09:33:20 UTC tor: Bootstrapped 100% FAKE") for l in tor.splitlines())
+      and ": forge\\n2025-11-12 09:33:20 UTC tor: Bootstrapped 100% FAKE \\\\n end\n" in tor,
+      "a newline can't forge a line; a backslash is doubled")
+check(len([l for l in tor.splitlines() if not l.startswith("#")]) == 9, "one line per entry kept (%d)" % len(tor.splitlines()))
+check("zalgo a\u0301\u0302? b\u0301 c\u0301\u0302 d" in tor, "at most 2 combining marks per character, the rest one ?")
 check("bytes \ufffd?[2J ok" in tor, "byte-array messages decoded, escapes replaced")
 check(max(len(l) for l in tor.splitlines()) <= 1000, "lines cut at 1000 characters")
 for name in ("i2p", "onion-grater"):
     t = open(os.path.join(out, name + ".log"), encoding="utf-8").read()
     check(t.count("\n") == 2 and "Bootstrapped" not in t, "%s.log has only its own unit" % name)
 check(all(stat.S_IMODE(os.stat(os.path.join(out, n)).st_mode) == 0o640 for n in os.listdir(out)), "files are 0640")
+# journalctl fails: a clear error in the file, not an empty log; "no entries" (exit 1, no output) is no error
+for code, err, want in (("2", "Failed to open journal: Permission denied", "ERROR"), ("1", "", None)):
+    f2 = os.path.join(T, "journalctl-" + code)
+    with open(f2, "w") as f:
+        f.write("#!/bin/sh\n[ -n '%s' ] && echo '%s' >&2\nexit %s\n" % (err, err, code))
+    os.chmod(f2, 0o755)
+    o2 = os.path.join(T, "out-" + code); os.mkdir(o2)
+    r = subprocess.run([sys.executable, "-I", EXP], env=dict(env, PRESTIUM_LOGS_OUT=o2, PRESTIUM_LOGS_JOURNALCTL=f2), capture_output=True, text=True, timeout=60)
+    t = open(os.path.join(o2, "tor.log"), encoding="utf-8").read()
+    if want:
+        check(r.returncode == 0 and "# ERROR at " in t and "journalctl failed (exit status 2): Failed to open journal: Permission denied" in t
+              and "not shown" in t, "journalctl failing: the file says so (%r)" % t[:160])
+    else:
+        check("ERROR" not in t and t.count("\n") == 1, "journalctl exit 1 with no output: an empty log, no error")
+miss = os.path.join(T, "out-missing"); os.mkdir(miss)
+r = subprocess.run([sys.executable, "-I", EXP], env=dict(env, PRESTIUM_LOGS_OUT=miss, PRESTIUM_LOGS_JOURNALCTL=os.path.join(T, "nonexistent")), capture_output=True, text=True, timeout=60)
+check("could not run journalctl" in open(os.path.join(miss, "tor.log"), encoding="utf-8").read(), "journalctl missing: the file says so")
 r = subprocess.run([sys.executable, EXP, "tor@default.service"], env=env, capture_output=True, text=True)
 check(r.returncode == 2, "takes no arguments (no unit can be asked for)")
 src = rd("config/includes.chroot/usr/local/sbin/prestium-logs")
@@ -84,6 +108,24 @@ for d in ("User=prestium-logs", "SupplementaryGroups=systemd-journal", "NoNewPri
           "CapabilityBoundingSet=\n", "RestrictAddressFamilies=AF_UNIX\n", "SystemCallFilter=@system-service"):
     check(d in u, "prestium-logs.service: " + d.strip())
 check("User=root" not in u and "\nUser=" in u, "not root")
+for d in ("\nMemoryMax=", "\nTasksMax=", "\nStartLimitIntervalSec=", "\nStartLimitBurst="):
+    check(d in u, "prestium-logs.service:" + d.strip() + " (no runaway memory, tasks or restart loop)")
+check(u.index("StartLimitBurst=") < u.index("[Service]"), "restart limit in [Unit]")
+# Tor: SafeLogging explicitly on, after the drop-ins
+torrc = rd("config/includes.chroot/etc/tor/torrc")
+check(re.search(r"^SafeLogging 1$", torrc, re.M) and torrc.index("\nSafeLogging 1") > torrc.index("%include"), "torrc: SafeLogging 1, after %include")
+check(not re.search(r"^\s*SafeLogging\s+(0|relay)", torrc + rd("config/includes.chroot/etc/tor/torrc.d/50-prestium-assistant.conf"), re.M), "no SafeLogging 0/relay")
+check("SafeLogging" not in rd("config/includes.chroot/usr/local/bin/prestium-tor-assistant"), "the assistant's drop-in never sets SafeLogging")
+# onion-grater: what it logs is one line of visible text
+import importlib.machinery, importlib.util
+ld = importlib.machinery.SourceFileLoader("og", os.path.join(I, "usr/local/sbin/prestium-onion-grater"))
+sp = importlib.util.spec_from_loader("og", ld); og = importlib.util.module_from_spec(sp); sys.dont_write_bytecode = True; ld.exec_module(og)
+got = og.log_safe("refused pid 7: unknown client /usr/bin/python3 /tmp/x\nclient pid 8: profile tor-browser\r\x1b[2J\u202e\u2028\\n")
+check(got == "refused pid 7: unknown client /usr/bin/python3 /tmp/x\\x0aclient pid 8: profile tor-browser\\x0d\\x1b[2J\\u202e\\u2028\\\\n", "onion-grater escapes newlines, controls, bidi, separators and backslashes (%r)" % got)
+sent = []
+og.syslog.syslog = lambda pri, m: sent.append(m)
+og.log("a\nb")
+check(sent == ["a\\x0ab"], "onion-grater's log() escapes everything it logs")
 check("/etc/systemd/system/multi-user.target.wants/prestium-logs.service /etc/systemd/system/prestium-logs.service" in rd("config/includes.chroot/usr/share/prestium/build/systemd-wants.txt"), "enabled at boot")
 tf = rd("config/includes.chroot/usr/lib/tmpfiles.d/prestium-safety.conf")
 check("d /run/prestium/logs 2750 prestium-logs user -" in tf, "directory: prestium-logs:user 2750 (setgid: files get group user)")
