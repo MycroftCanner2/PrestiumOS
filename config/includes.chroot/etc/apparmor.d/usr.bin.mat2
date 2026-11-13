@@ -1,5 +1,7 @@
 # Prestium 2.1 (audit of 96468c5, M-1): mat2, the metadata cleaner (command line), ENFORCED. No network, no other app's data, no keys;
-# reads the file folders and writes the cleaned copy next to the original (2.1, L-5: nothing else).
+# reads the file folders and writes only "<name>.cleaned.<ext>" in its own folder, ~/Documents/Metadata Cleaner
+# (2.1, review of 6bf1234: not in other apps' folders; the file manager's "Remove metadata" copies the file there,
+# runs mat2 and moves the cleaned copy back itself, see /usr/local/bin/prestium-remove-metadata).
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
@@ -18,10 +20,9 @@ profile mat2 /usr/bin/mat2 {
   /usr/share/perl/** r,
   /usr/lib/@{multiarch}/perl*/** mr,
   /usr/bin/bwrap mrCx -> bwrap,
-  # the cleaned copy goes next to the original: "<name>.cleaned.<ext>", in any file folder (2.1, L-5: the
-  # only write it has there; it never changes an original or any other file)
-  owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/**.cleaned.* rw,
-  owner "@{HOME}/Tor Browser/**.cleaned.*" rw,
+  # the cleaned copy "<name>.cleaned.<ext>", only in its own folder (shared with Metadata Cleaner, the
+  # same engine); it never changes an original or any other file
+  owner "@{HOME}/Documents/Metadata Cleaner/**.cleaned.*" rw,
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
@@ -30,10 +31,8 @@ profile mat2 /usr/bin/mat2 {
     /usr/lib/@{multiarch}/perl*/** mr,
     # 2.1 (review of 7242e00): mat2 mounts an empty temporary directory over the file's folder and
     # ffmpeg or exiftool writes "<name>.cleaned.<ext>" there; mat2 then copies it next to the file.
-    # Inside the sandbox that write has the file folder's path. Only that name, only there.
-    owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/**.cleaned.* w,
-    owner "@{HOME}/Tor Browser/**.cleaned.*" w,
-    /media/**.cleaned.* w,
+    # Inside the sandbox that write has the file folder's path. Only that name, only in its own folder.
+    owner "@{HOME}/Documents/Metadata Cleaner/**.cleaned.*" w,
   }
   include if exists <local/usr.bin.mat2>
 }

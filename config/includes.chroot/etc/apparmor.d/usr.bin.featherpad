@@ -16,6 +16,9 @@ profile featherpad /usr/bin/{featherpad,fpad} {
   owner @{HOME}/.config/featherpad/** rwk,
   owner @{HOME}/.local/share/featherpad/ rw,
   owner @{HOME}/.local/share/featherpad/** rwk,
+  # 2.1 (review of 6bf1234): Qt's file dialog reads its sidebar from here (~/Documents/FeatherPad is listed);
+  # read-only, so it can't change what other Qt apps' dialogs show
+  owner @{HOME}/.config/QtProject.conf r,
   # a running instance is found over D-Bus; never another program
   include if exists <local/usr.bin.featherpad>
 }

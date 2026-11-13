@@ -136,18 +136,25 @@ echo "== mat2 (\"Remove metadata\"; ffmpeg and exiftool in bubblewrap)"
 run usr.bin.mat2 <<EOT
 allow mat2 /usr/bin/bwrap x:C
 allow mat2 /tmp/tmpab12cd/ w
-allow mat2 $H/Downloads/clip.cleaned.mp4 w
-allow mat2 $H/Downloads/Mail/clip.cleaned.mp4 w
+allow mat2 "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
+allow mat2 "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.mp4" r
+deny mat2 "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.mp4" w
+deny mat2 $H/Downloads/clip.cleaned.mp4 w
+deny mat2 $H/Downloads/Mail/clip.cleaned.mp4 w
+deny mat2 $H/Documents/LibreOffice/clip.cleaned.mp4 w
+deny mat2 /media/user/STICK/clip.cleaned.mp4 w
 deny mat2 $H/Downloads/Mail/clip.mp4 w
 deny mat2 $H/Downloads/clip.mp4 w
 $(bw mat2//bwrap)
 allow mat2//bwrap /usr/bin/ffmpeg x:i
 allow mat2//bwrap /usr/bin/exiftool x:i
 allow mat2//bwrap $H/Downloads/clip.mp4 r
-allow mat2//bwrap $H/Downloads/clip.cleaned.mp4 w
-allow mat2//bwrap $H/Downloads/photo.cleaned.heic_exiftool_tmp w
-allow mat2//bwrap "$H/Tor Browser/clip.cleaned.mp4" w
-allow mat2//bwrap /media/user/STICK/clip.cleaned.mp4 w
+allow mat2//bwrap "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
+allow mat2//bwrap "$H/Documents/Metadata Cleaner/.remove-metadata.Ab12Cd/1/photo.cleaned.heic_exiftool_tmp" w
+deny mat2//bwrap $H/Downloads/clip.cleaned.mp4 w
+deny mat2//bwrap $H/Downloads/photo.cleaned.heic_exiftool_tmp w
+deny mat2//bwrap "$H/Tor Browser/clip.cleaned.mp4" w
+deny mat2//bwrap /media/user/STICK/clip.cleaned.mp4 w
 deny mat2//bwrap $H/Downloads/clip.mp4 w
 deny mat2//bwrap $H/Downloads/other.txt w
 deny mat2//bwrap $H/x.cleaned.mp4 w

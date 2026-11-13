@@ -23,7 +23,8 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
   /usr/bin/bwrap mrCx -> bwrap,
   # 2.1 (L-5): Metadata Cleaner replaces the files it cleans, so it may write only its own folder,
   # ~/Documents/Metadata Cleaner: copy a file there to clean it in place. (For a file anywhere else,
-  # "Remove metadata" in the file manager runs mat2, which writes a cleaned copy next to it.) It still
+  # "Remove metadata" in the file manager copies it there, runs mat2 and moves the cleaned copy back
+  # next to it; mat2 too writes only this folder.) It still
   # reads every file folder, but can't change a file another app wrote or will open.
   owner "@{HOME}/Documents/Metadata Cleaner/" rw,
   owner "@{HOME}/Documents/Metadata Cleaner/**" rwk,

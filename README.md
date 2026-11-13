@@ -32,6 +32,9 @@ modernization of the 2023 Prestium build, with tighter security and new features
   for the browsers, mail and chat, `~/Documents/<App>` for the editors, `~/Tor Browser` for Tor
   Browser), so one compromised app can't change files another app opens. To upload or attach a file,
   put it in that app's folder (mail and chat can also take files directly from `~/Downloads`).
+  Attaching a document you made needs a manual copy: Claws Mail, Gajim and Pidgin can't read
+  `~/Documents/<App>`, so copy it to `~/Downloads` first. Volumes under `/media` are read-only for the
+  apps; move files onto them with the file manager.
 - **Network privacy:** MAC address spoofing with a guard against leaks of the real address,
   default-deny firewall that stays closed when stopped, no system DNS, IPv6 off, no LAN access.
   In the terminal, `http_proxy` and `https_proxy` point to i2pd (127.0.0.1:4450), so command-line

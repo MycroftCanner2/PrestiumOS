@@ -123,13 +123,27 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   `~/Downloads/<App>`: I2P Browser, Local Firefox, Mail (Claws attachments), Gajim and Pidgin (Tor
   Browser keeps `~/Tor Browser`, I2P Torrents `~/Downloads/Torrents`). Editors save in
   `~/Documents/<App>`: LibreOffice, GIMP, FeatherPad, File Roller, Xarchiver, Audacity, Kleopatra and
-  Metadata Cleaner (which cleans files in place, so copy a file there first). mat2 ("Remove metadata")
-  writes only its `name.cleaned.ext` copy next to the original. Viewers and editors still open files from
-  every folder, but read-only. A document opened elsewhere opens read-only in LibreOffice; use Save As.
+  Metadata Cleaner (which cleans files in place, so copy a file there first), and Feather's
+  `~/Documents/Feather`. mat2 writes its `name.cleaned.ext` copy only in `~/Documents/Metadata Cleaner`
+  too; "Remove metadata" in the file manager copies the file there, runs mat2 and moves the cleaned copy
+  back next to the original (never over an existing file). Viewers and editors still open files from
+  every folder, but read-only. LibreOffice opens a document from elsewhere but can't save it in place
+  (use Save As; its default folder is `~/Documents/LibreOffice`), and it writes no `.~lock` files
+  (`UseLocking=false`, `/usr/lib/libreoffice/share/registry/prestium.xcd`).
   The browsers see only their own folder, so to upload a file, put it there first, as with Tor Browser.
   Mail and chat can also read files you put directly in `~/Downloads`, for attachments, but not another
-  app's folder. Unlocked volumes under `/media` stay writable for the editors. Hook 0500 creates the
-  folders, the apps' settings point at them, and the file chooser has bookmarks for the download folders.
+  app's folder: to attach a document, copy it from `~/Documents/<App>` to `~/Downloads` first.
+  Unlocked volumes under `/media` are read-only for the editors, LibreOffice and mat2 (only KeePassXC
+  writes its `.kdbx` there): move a file onto a volume with the file manager. Hook 0500 creates the
+  folders. The apps' settings point at them where the app has such a setting (LibreOffice's Work folder,
+  Xarchiver's extract folder, Audacity's save and export folders, the browsers', mail and chat apps'
+  download folders, in `/etc/skel` and the live user's home alike); GIMP, FeatherPad, File Roller and
+  Kleopatra have none and start in the home folder, which they can't write, so their folder is in the
+  file chooser's sidebar (GTK bookmarks; Qt's for FeatherPad and Kleopatra). (2.1, review of 6bf1234:
+  `/media` read-only, mat2 in its own folder, the editors' settings, the lock files, `/etc/skel` in
+  step with the live user's home and the second LibreWolf settings file, `~/Documents/Feather`, and
+  Pidgin's real file-folder settings: it has no `last_receive_folder`; received files use
+  `last_save_folder`.)
 - **The file manager makes no thumbnails and mounts no drives by itself.** PCManFM isn't confined, so it no
   longer decodes downloaded pictures for previews (`/etc/xdg/libfm/libfm.conf`). USB drives are mounted with
   a click, not on insert or at start-up.

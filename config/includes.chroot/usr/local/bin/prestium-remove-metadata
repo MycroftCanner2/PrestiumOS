@@ -3,19 +3,59 @@
 # Runs mat2 on the selected files, inside mat2's own bubblewrap sandbox (no network).
 # For each file it writes a cleaned copy "<name>.cleaned.<ext>" next to it; the original
 # is left unchanged. The result is shown in a dialog.
+# 2.1 (review of 6bf1234): mat2's AppArmor profile may write only its own folder,
+# ~/Documents/Metadata Cleaner, so a crafted file can't make it write into another app's folder.
+# This script (run by the file manager, on your click) copies each selected regular file into a
+# fresh work folder there, runs mat2 on the copy, and moves the expected cleaned copy back next to
+# the original, only if it is a regular file and never over an existing file.
 [ $# -gt 0 ] || exit 0
-out=$(mat2 -- "$@" 2>&1); rc=$?
+umask 077
+base="$HOME/Documents/Metadata Cleaner"
+mkdir -p -- "$base" || exit 1
+work=$(mktemp -d -- "$base/.remove-metadata.XXXXXX") || exit 1
+trap 'rm -rf -- "$work"' EXIT
+out=""; rc=0; n=0
+for f in "$@"; do
+	name=${f##*/}
+	if [ -L "$f" ] || [ ! -f "$f" ]; then
+		out="$out
+$f: skipped (not a regular file)"; rc=1; continue
+	fi
+	case $name in
+	?*.*) stem=${name%.*}; ext=${name##*.}; cleaned="$stem.cleaned.$ext" ;;
+	*) out="$out
+$f: skipped (no file extension, mat2 can't tell its type)"; rc=1; continue ;;
+	esac
+	n=$((n + 1)); d="$work/$n"
+	if ! { mkdir -- "$d" && cp -- "$f" "$d/$name"; }; then
+		out="$out
+$f: could not copy it to $base"; rc=1; continue
+	fi
+	m=$(mat2 -- "$d/$name" 2>&1) || { out="$out
+$f: ${m:-mat2 failed}"; rc=1; continue; }
+	src="$d/$cleaned"; dst="${f%/*}"; [ "$dst" = "$f" ] && dst=.; dst="$dst/$cleaned"
+	if [ -L "$src" ] || [ ! -f "$src" ]; then
+		out="$out
+$f: mat2 wrote no cleaned copy"; rc=1
+	elif [ -e "$dst" ] || [ -L "$dst" ] || ! mv -n -- "$src" "$dst" || [ -e "$src" ]; then
+		keep="$base/$cleaned"
+		if [ ! -e "$keep" ] && [ ! -L "$keep" ] && mv -n -- "$src" "$keep" && [ ! -e "$src" ]; then
+			out="$out
+$f: $dst already exists (or the folder is read-only); the cleaned copy is in $keep"
+		else
+			out="$out
+$f: the cleaned copy could not be saved"
+		fi
+		rc=1
+	fi
+done
 if [ $rc -eq 0 ]; then
 	msg="Metadata removed. A cleaned copy (name.cleaned.ext) was written next to each file; the originals are unchanged.
 
 Note: mat2 can't remove information inside the content itself (e.g. faces, text, watermarks)."
-	[ -n "$out" ] && msg="$msg
-
-$out"
 	zenity --info --no-markup --title="Remove Metadata" --text="$msg" 2>/dev/null || notify-send -a Prestium -i edit-clear "Remove Metadata" "Done: cleaned copies written next to the originals."
 else
 	zenity --error --no-markup --title="Remove Metadata" --text="mat2 could not clean every file:
-
 $(printf '%s' "$out" | tail -n 15)" 2>/dev/null || notify-send -a Prestium -i dialog-error "Remove Metadata" "mat2 could not clean every file."
 fi
 exit $rc

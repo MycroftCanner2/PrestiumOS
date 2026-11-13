@@ -1,8 +1,11 @@
 # Prestium 2.1 (audit of 96468c5, M-1; L-5): for the viewers that save files (GIMP, Audacity, the text
 # editor, the archive managers, Kleopatra). Each of them writes only its own output folder,
-# ~/Documents/<App>/ (the rules are in its profile), and unlocked volumes under /media. They still read every file folder (abstractions/prestium-user-files),
+# ~/Documents/<App>/ (the rules are in its profile). They still read every file folder (abstractions/prestium-user-files),
 # so they open downloads from any app, but they can't change a file another app wrote or will open:
 # not in ~/Downloads (any app's folder), the Tor Browser's folder, another app's output folder, the
 # home directory itself or any dot directory.
+# 2.1 (review of 6bf1234): unlocked volumes under /media are read-only for them too (they used to
+# share "/media/** rwk", so one crafted file could change any file on a volume). To put a result on
+# a volume, move it there from ~/Documents/<App> in the file manager, which is your own action.
+# (KeePassXC keeps "/media/**.kdbx rwk" for one reason: a password database kept on a volume.)
   owner @{HOME}/Documents/ r,
-  /media/** rwk,
