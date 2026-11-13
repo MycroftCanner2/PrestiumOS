@@ -309,6 +309,26 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   the DHT. Every torrent announces to these trackers (i2pd has no per-torrent switch), as it already
   did to the DHT. `tests/test_i2p_tunnel_budget.py` checks 5+5, the default hops and that every
   tracker is a `.b32.i2p` address.
+- **I2P Torrents survive i2pd restarts.** The torrent client now uses a
+    persistent destination (`keys = torrents.dat`) and a DHT file (`dhtfile = dht.dat`): the peer
+    ID stays stable and the DHT routing table (the peer-finding node list) is saved on stop and
+    reloaded on start, instead of a fresh identity and empty DHT every i2pd start (transient
+    keys with no DHT file meant i2pd deliberately did not persist them). The torrent list and
+    progress already lived on disk (`.torrent`/`.magnet`/`.resume` plus `.part` data files in
+    `~/Downloads/Torrents`, reloaded at start); this makes peer discovery survive with them.
+    `/var/lib/i2pd/torrents` is now a real writable directory with only `web/` symlinked to the
+    shipped assets: the old whole-directory symlink put the DHT file in the read-only `/usr`
+    tree, so it could never persist. AppArmor allows the keys and DHT file, `[persist]`
+    profiles and address book are on, and more trackers were added (atia, opentracker.dg2,
+    InsulaOcculta hostname and skank/postman names alongside the `.b32.i2p` entries).
+    Torrent tunnels use the I2P Connection Assistant's hop count (default 3): the generated
+    tunnel reads the browser proxy's `outbound.length` back at every i2pd start, so changing
+    the hops in the assistant changes the torrents too. DHT, `i2p_pex` peer exchange and
+    `ut_metadata` run over I2P itself (streaming
+    tunnels and datagrams), so the firewall cannot block them; i2pd's network access is
+    already open. `tests/test_i2p_torrents_persist.py` and `tests/test_i2p_tunnel_budget.py`
+    check it. Like everything else on this live system, this survives i2pd restarts, not
+    reboots.
 - **I2P Torrents' *Add .torrent* button can open the I2P Browser's downloads.** The local Firefox
   that shows I2P Torrents could open files only in `~/Downloads/Local Firefox`, so a `.torrent`
   saved by the I2P Browser in `~/Downloads/I2P Browser` showed up in the file picker's sidebar but

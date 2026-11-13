@@ -2,3 +2,9 @@
 /home/user/Downloads/Torrents/ rw,
 /home/user/Downloads/Torrents/** rwk,
 /usr/share/i2pd/torrents/** r,
+# Prestium 2.1: the torrent client's persistent destination keys and DHT node list
+# (torrents.dat, torrents/dht.dat in i2pd's data dir), so torrent list/progress and the
+# DHT routing table survive i2pd restarts. Torrents dir only; nothing else user-writable.
+/var/lib/i2pd/torrents.dat rw,
+/var/lib/i2pd/torrents/ rw,
+/var/lib/i2pd/torrents/** rwk,

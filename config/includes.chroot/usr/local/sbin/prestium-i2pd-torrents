@@ -62,28 +62,67 @@ fi
 [ -d "$D" ] || skip "Torrents mount is not a directory"
 
 TOKEN=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# 2.1: tunnel hops follow the I2P Connection Assistant (default 3). The assistant sets
+# inbound/outbound.length on every tunnel in tunnels.conf (except socks-outproxy-*) and on
+# [exploratory]/[socksproxy] in i2pd.conf, but the torrents tunnel is generated here, not in
+# tunnels.conf, so it would never see the change. Read the assistant's hops back from the
+# browser proxy tunnel (the same source prestium-i2p-mode's status uses), falling back to
+# [exploratory] and then to i2pd's default. Anything outside 1-7 (hand-edited, missing,
+# commented) also falls back to 3, so a bad config never stops i2pd from starting.
+HOPS=3
+_h=$(awk '
+/^\[[^]]+\]/ { sec=$0; gsub(/^[ \t]*\[[ \t]*/,"",sec); gsub(/[ \t]*\][ \t]*$/,"",sec) }
+sec=="Web Browser HTTP Proxy" && $0 ~ /^[ \t]*outbound\.length[ \t]*=/ {
+  line=$0; sub(/^[^=]*=/,"",line); gsub(/[ \t]/,"",line); print line; exit }
+' /var/lib/i2pd/tunnels.conf 2>/dev/null)
+case $_h in 1|2|3|4|5|6|7) HOPS=$_h;; esac
+if [ "$HOPS" = "3" ]; then
+  _h=$(awk '
+/^\[[^]]+\]/ { sec=$0; gsub(/^[ \t]*\[[ \t]*/,"",sec); gsub(/[ \t]*\][ \t]*$/,"",sec) }
+sec=="exploratory" && $0 ~ /^[ \t]*outbound\.length[ \t]*=/ {
+  line=$0; sub(/^[^=]*=/,"",line); gsub(/[ \t]/,"",line); print line; exit }
+' /var/lib/i2pd/i2pd.conf 2>/dev/null)
+  case $_h in 1|2|3|4|5|6|7) HOPS=$_h;; esac
+fi
 # 2.1: 5+5 (i2pd's default), restored after the startup tunnel budget had cut it to 2+2: every
 # piece, DHT query and peer connection goes through these tunnels, and with two of each torrents and
-# magnet lookups were clearly slower. Length stays at i2pd's default (3 hops); the I2P Connection
-# Assistant's hop setting does not change it.
-# 2.1: common trackers. i2pd ships none, and with transient keys its DHT starts empty every boot and
-# has no bootstrap node, so a magnet without a tr= tracker had nowhere to find its first peer. These
-# are I2P's own i2psnark defaults (SnarkManager.java: postman, DgTrack HTTP+UDP, InsulaOcculta
-# HTTP+UDP) plus opentracker.skank.i2p from i2pd's torrent guide, all inside I2P. They are written as
-# .b32.i2p addresses because i2pd resolves this list once when the tunnel starts, before a fresh
-# boot's address book has any names; a hostname would be dropped. Every torrent announces to them
-# (i2pd has no per-torrent opt-out and ignores the private flag), as it already does to the DHT.
+# magnet lookups were clearly slower.
+# 2.1: persistent keys + DHT file, so torrents survive i2pd restarts. keys = torrents.dat keeps one
+# torrent destination for the whole boot: the peer ID stays stable, and peers/trackers/DHT nodes
+# recognise us. dhtfile = dht.dat (stored in /var/lib/i2pd/torrents/) saves the DHT routing table
+# (the peer-finding node list) on stop and reloads it on start. With transient keys + empty dhtfile
+# i2pd deliberately runs a non-persistent DHT: the routing table was empty on every start, so a
+# magnet without tr= had nowhere to find its first peer. Torrent list and progress already live on
+# disk (Torrents dir holds <name>.torrent/.magnet/.resume plus .part data files, reloaded by i2pd
+# at start and .resume refreshed as pieces complete); persistent keys + DHT make peer discovery
+# survive with them. Note: on this live system both /home/user and /var/lib/i2pd are tmpfs, so
+# this survives i2pd restarts, not reboots; reboots start fresh by design.
+# 2.1: common trackers. i2pd ships none (binary default ""); without them a magnet had nowhere to
+# find its first peer. I2P's own i2psnark defaults (SnarkManager.java: postman, DgTrack HTTP+UDP,
+# InsulaOcculta HTTP+UDP) plus opentracker.skank.i2p, atia.i2p and opentracker.dg2.i2p from i2pd's
+# torrent guide, all inside I2P. The .b32.i2p entries are the same destinations by address, so they
+# work on a cold boot before the address book has any names (i2pd resolves this list once when the
+# tunnel starts; an unresolvable hostname is dropped for that boot). The hostname entries take
+# effect once the address book is warm and follow a tracker that changes destination but keeps its
+# name; i2pd dedups them by destination, so a tracker present both ways is announced to once.
+# Every torrent announces to them (i2pd has no per-torrent opt-out and ignores the private flag),
+# as it already does to the DHT. DHT, i2p_pex (peer exchange) and ut_metadata all run over I2P
+# itself (streaming tunnels / datagrams), never direct IP, so ferm cannot block them; i2pd's
+# network access (TCP+UDP, outerface !lo) is already open. See tests/test_i2p_torrents_persist.py.
 $SAFE write "$TD" torrents.conf 0 i2pd 0640 --dir-owner 0 <<CONF
 [Torrents]
 type = torrents
 torrentsdir = $D
-keys = transient-torrents
+keys = torrents.dat
 dht = true
+dhtfile = dht.dat
 web = true
 rpcaddress = 127.0.0.1
 rpcport = 7685
 rpcpath = $TOKEN
-trackers = http://6a4kxkg5wp33p25qqhgwl6sj4yh4xuf5b3p3qldwgclebchm3eea.b32.i2p/announce.php,http://w7tpbzncbcocrqtwwm3nezhnnsw4ozadvi2hmvzdhrqzfxfum7wa.b32.i2p/a,udp://w7tpbzncbcocrqtwwm3nezhnnsw4ozadvi2hmvzdhrqzfxfum7wa.b32.i2p:6969,http://2rv2kch37xsn2fqdz6huyevq76njop4inumscnspklh3ufo7mkwa.b32.i2p/a,udp://2rv2kch37xsn2fqdz6huyevq76njop4inumscnspklh3ufo7mkwa.b32.i2p:6969,http://by7luzwhx733fhc5ug2o75dcaunblq2ztlshzd7qvptaoa73nqua.b32.i2p/a
+trackers = http://6a4kxkg5wp33p25qqhgwl6sj4yh4xuf5b3p3qldwgclebchm3eea.b32.i2p/announce.php,http://w7tpbzncbcocrqtwwm3nezhnnsw4ozadvi2hmvzdhrqzfxfum7wa.b32.i2p/a,udp://w7tpbzncbcocrqtwwm3nezhnnsw4ozadvi2hmvzdhrqzfxfum7wa.b32.i2p:6969,http://2rv2kch37xsn2fqdz6huyevq76njop4inumscnspklh3ufo7mkwa.b32.i2p/a,udp://2rv2kch37xsn2fqdz6huyevq76njop4inumscnspklh3ufo7mkwa.b32.i2p:6969,http://by7luzwhx733fhc5ug2o75dcaunblq2ztlshzd7qvptaoa73nqua.b32.i2p/a,http://atia.i2p/announce,udp://opentracker.dg2.i2p:6969,udp://tracker.insulaocculta.i2p:6969,http://opentracker.skank.i2p/a,http://postman.i2p/announce.php
+inbound.length = $HOPS
+outbound.length = $HOPS
 inbound.quantity = 5
 outbound.quantity = 5
 CONF

@@ -14,6 +14,8 @@
 #                 socks-outproxy-tcp/udp destination (local port 4500 never changes; a custom
 #                 outproxy is HTTP only, so the SOCKS outproxy then stays on Acetone)
 #   i2pd.conf     share and bandwidth; [exploratory] and [socksproxy] lengths
+#   (the generated torrents tunnel follows the same hops: prestium-i2pd-torrents reads the
+#   browser proxy's outbound.length back and writes it, default 3, at every i2pd start)
 # Never changed here: inbound/outbound.quantity anywhere (2.1 startup tunnel budget: 4444 2+2, other
 # tunnels 1+1, exploratory 3+3, shared destination 2+2; put() replaces only the keys it is given).
 # Never touched: the firewall (its i2pd rule follows /run/prestium/i2pd.port, which i2pd's

@@ -5,7 +5,8 @@ most. Checks that no pool falls back to i2pd's default of 5+5 (every tunnel in t
 quantities), that the browser proxy (4444) keeps 2+2 and no other client pool has more, that sections
 sharing one key file (one tunnel pool) agree, and that the total stays within the budget.
 2.1 (I2P torrents): the torrent client is back at 5+5 (the 2+2 cut made downloads and magnet lookups
-slow) and is the one pool allowed above 2+2; it gets common trackers, all inside I2P as .b32.i2p."""
+slow) and is the one pool allowed above 2+2; it gets common trackers, all inside I2P (.b32 for cold
+boot, hostnames once the address book is warm), on the assistant's hops (default 3), with persistent keys/DHT file."""
 import os, re, sys
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I = os.path.join(R, "config/includes.chroot")
@@ -86,14 +87,20 @@ tc = dict(ini(m.group(1) if m else ""))
 tq = qty("torrents.conf [Torrents]", tc.get("Torrents", {}))
 check(tq == (5, 5), "torrents: 5+5 (i2pd's default, restored: 2+2 made torrents slow)")
 tk = tc.get("Torrents", {})
-check(all(d + ".length" not in tk and d + ".lengthVariance" not in tk for d in ("inbound", "outbound")),
-      "torrents: hops left at i2pd's default (%d); fewer hops would be a visible choice, not a speed tweak" % DEFAULT_LEN)
+check(tk.get("inbound.length") == "$HOPS" and tk.get("outbound.length") == "$HOPS",
+      "torrents: hops are generated from the assistant's setting (not a fixed length)")
 tr = [x for x in tk.get("trackers", "").split(",") if x]
-check(len(tr) >= 3, "torrents: common trackers set (%d), so a magnet without tr= still finds peers" % len(tr))
-check(all(re.fullmatch(r"(?:http://[a-z2-7]{52}\.b32\.i2p(?::\d+)?/\S*|udp://[a-z2-7]{52}\.b32\.i2p:\d+/?)", x) for x in tr),
-      "torrents: every tracker is an I2P .b32.i2p address (resolved at start, before the address book has names): %s" % tr)
-check(tk.get("dht") == "true" and tk.get("keys", "").startswith("transient") and "dhtfile" not in tk,
-      "torrents: DHT on, transient keys, no DHT file (new identity and empty DHT every i2pd start)")
+check(len(tr) >= 8, "torrents: common trackers set (%d), so a magnet without tr= still finds peers" % len(tr))
+hosts = re.compile(r"(?:http://|udp://)([a-z0-9.-]+)(?::\d+)?(?:/\S*)?$")
+b32s, names = [], []
+for x in tr:
+    m = hosts.fullmatch(x)
+    h = m.group(1) if m else ""
+    (b32s if re.fullmatch(r"[a-z2-7]{52}\.b32\.i2p", h) else names).append(x)
+check(len(b32s) >= 4 and len(names) >= 2 and all(x.startswith("http://") or x.startswith("udp://") for x in tr),
+      "torrents: all trackers inside I2P (%d .b32 for cold boot, %d hostnames once the address book is warm): %s" % (len(b32s), len(names), tr))
+check(tk.get("dht") == "true" and tk.get("keys", "").startswith("torrents.dat") and tk.get("dhtfile") == "dht.dat",
+      "torrents: DHT on, persistent keys + DHT file (identity and DHT node list survive i2pd restarts)")
 pool("torrents", "torrents", tq, (DEFAULT_LEN, DEFAULT_LEN))
 
 check(max(p[0] + p[1] for p in pools.values() if p[4] not in ("exploratory", "torrents")) <= 4,
