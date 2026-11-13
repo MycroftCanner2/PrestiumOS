@@ -65,6 +65,7 @@ PRESETS = {   # name: (HTTP outproxy URL, SOCKS outproxy destination, its port)
     "stormycloud": ("http://%s" % STORMY, STORMY, "1080"),
 }
 SHARE = {"low": ("30", "L"), "medium": ("50", "64"), "high": ("80", "128")}   # share %, bandwidth (KB/s)
+# 2.1: i2pd.conf ships "medium" (bandwidth = 64, share = 50); L is i2pd's 32 KB/s class
 CUSTOM = re.compile(r"\Ahttp://(?:[a-z2-7]{52}\.b32|[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*)\.i2p"
                     r"(?::([1-9][0-9]{0,4}))?\Z")
 

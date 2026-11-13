@@ -529,7 +529,10 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
   at every start, and sets:
   - tunnel hops, 1 to 7 (default 3);
-  - share level: Low 30 % at 32 KB/s (default), Medium 50 % at 64 KB/s, High 80 % at 128 KB/s;
+  - share level: Low 30 % at 32 KB/s, Medium 50 % at 64 KB/s (default), High 80 % at 128 KB/s.
+    i2pd.conf ships Medium (`bandwidth = 64`, router class M; `share = 50`, so at most 32 KB/s of
+    transit), which the assistant shows as Medium. The default used to be Low (`L`, 30 %); transit
+    stays on and floodfill off. A share level set by hand shows as Medium until it is applied;
   - outproxy: Acetone (default), StormyCloud, or a custom I2P address.
   StormyCloud also takes the SOCKS outproxy. A custom outproxy is HTTP only, so SOCKS stays on Acetone.
   Local port 4500 never changes. *Apply* writes the settings through a root helper

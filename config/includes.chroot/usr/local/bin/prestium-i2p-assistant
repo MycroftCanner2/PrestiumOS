@@ -3,7 +3,7 @@
 # "I2P Tunnel Hops", "Restart I2P" and reseed menu items:
 #   - the router's port (random, new at every i2pd start; read-only)
 #   - tunnel hops (1-7, default 3)
-#   - share level: Low 30 % at 32 KB/s (default), Medium 50 % at 64 KB/s, High 80 % at 128 KB/s
+#   - share level: Low 30 % at 32 KB/s, Medium 50 % at 64 KB/s (default), High 80 % at 128 KB/s
 #   - outproxy: Acetone (default), StormyCloud, or a custom I2P address (HTTP only; the SOCKS
 #     outproxy on 127.0.0.1:4500 then stays on Acetone)
 #   - reseed from StormyCloud over Tor, or from a .su3 file (prestium-i2p-reseed-gui)
@@ -26,7 +26,7 @@ REBOOT = ["/usr/local/bin/prestium-power", "reboot"]
 # 2.1 (review N-2): Apply goes through the Wayland broker, which shows the change in a dialog only the
 # person at the screen can answer, then runs the helper as root
 BROKER_APPLY = ["/usr/local/bin/prestium-wl", "i2p-apply"]
-SHARES = [("low", "Low: 30 % of 32 KB/s (default)"), ("medium", "Medium: 50 % of 64 KB/s"),
+SHARES = [("low", "Low: 30 % of 32 KB/s"), ("medium", "Medium: 50 % of 64 KB/s (default)"),
           ("high", "High: 80 % of 128 KB/s")]
 OUTPROXIES = [("acetone", "Acetone (default)"), ("stormycloud", "StormyCloud"), ("custom", "Custom")]
 # same rule as the helper (it checks again)
@@ -190,7 +190,8 @@ class Assistant(Gtk.ApplicationWindow):
         self.status.set_markup("<b>i2pd is %s</b>" % ("running" if st.get("running") else "not running"))
         self.port.set_text("Router port: %s (TCP and UDP)" % (st.get("port") or "unknown"))
         self.hops.set_value(st.get("hops") or 3)
-        self.share.get(st.get("share") or "low", self.share["low"]).set_active(True)
+        # 2.1: a share level set by hand (no preset) shows the default, Medium
+        self.share.get(st.get("share") or "medium", self.share["medium"]).set_active(True)
         self.outproxy[st.get("outproxy", "acetone")].set_active(True)
         self.custom.set_text(st.get("custom") or "")
         self.changed()
