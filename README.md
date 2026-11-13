@@ -44,7 +44,11 @@ modernization of the 2023 Prestium build, with tighter security and new features
   Cancel, Retry and Revert at any point.
 - **I2P:** i2pd with a per-boot port, signature-checked reseeding (over Tor or from a file), I2P mail
   (Claws Mail), IRC, torrents and Feather on I2P. To get the browser going sooner after boot, i2pd
-  keeps only 32 tunnels ready: 2+2 for the browser proxy, 1+1 for most other services. i2pd relays
+  keeps only 38 tunnels ready: 2+2 for the browser proxy, 1+1 for most other services, and i2pd's
+  default 5+5 for the torrent client. Torrents (I2P) announces to I2P's usual open trackers (postman,
+  DgTrack, InsulaOcculta, skank) as well as the DHT, so magnet links without a tracker still find
+  peers; its *Add .torrent* button can open `.torrent` files from the I2P Browser's download folder
+  (read-only). i2pd relays
   other people's traffic at the *Medium* share level by default (64 KB/s, at most half of it for
   relaying); the I2P Connection Assistant sets Low, Medium or High.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each

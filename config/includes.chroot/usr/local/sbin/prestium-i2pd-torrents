@@ -62,9 +62,17 @@ fi
 [ -d "$D" ] || skip "Torrents mount is not a directory"
 
 TOKEN=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
-# 2.1 (startup tunnel budget): 2+2 instead of i2pd's default 5+5. Not 1+1: this is a published
-# destination that peers and the DHT reach through its inbound tunnels, and with one lease it drops
-# off the network whenever that tunnel fails or is rebuilt. Length stays at i2pd's default (3).
+# 2.1: 5+5 (i2pd's default), restored after the startup tunnel budget had cut it to 2+2: every
+# piece, DHT query and peer connection goes through these tunnels, and with two of each torrents and
+# magnet lookups were clearly slower. Length stays at i2pd's default (3 hops); the I2P Connection
+# Assistant's hop setting does not change it.
+# 2.1: common trackers. i2pd ships none, and with transient keys its DHT starts empty every boot and
+# has no bootstrap node, so a magnet without a tr= tracker had nowhere to find its first peer. These
+# are I2P's own i2psnark defaults (SnarkManager.java: postman, DgTrack HTTP+UDP, InsulaOcculta
+# HTTP+UDP) plus opentracker.skank.i2p from i2pd's torrent guide, all inside I2P. They are written as
+# .b32.i2p addresses because i2pd resolves this list once when the tunnel starts, before a fresh
+# boot's address book has any names; a hostname would be dropped. Every torrent announces to them
+# (i2pd has no per-torrent opt-out and ignores the private flag), as it already does to the DHT.
 $SAFE write "$TD" torrents.conf 0 i2pd 0640 --dir-owner 0 <<CONF
 [Torrents]
 type = torrents
@@ -75,8 +83,9 @@ web = true
 rpcaddress = 127.0.0.1
 rpcport = 7685
 rpcpath = $TOKEN
-inbound.quantity = 2
-outbound.quantity = 2
+trackers = http://6a4kxkg5wp33p25qqhgwl6sj4yh4xuf5b3p3qldwgclebchm3eea.b32.i2p/announce.php,http://w7tpbzncbcocrqtwwm3nezhnnsw4ozadvi2hmvzdhrqzfxfum7wa.b32.i2p/a,udp://w7tpbzncbcocrqtwwm3nezhnnsw4ozadvi2hmvzdhrqzfxfum7wa.b32.i2p:6969,http://2rv2kch37xsn2fqdz6huyevq76njop4inumscnspklh3ufo7mkwa.b32.i2p/a,udp://2rv2kch37xsn2fqdz6huyevq76njop4inumscnspklh3ufo7mkwa.b32.i2p:6969,http://by7luzwhx733fhc5ug2o75dcaunblq2ztlshzd7qvptaoa73nqua.b32.i2p/a
+inbound.quantity = 5
+outbound.quantity = 5
 CONF
 install -d -o root -g user -m 0750 "$RUN"
 printf 'http://127.0.0.1:7685/%s/\n' "$TOKEN" | $SAFE write "$RUN" url 0 user 0640 --dir-owner 0

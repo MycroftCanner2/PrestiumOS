@@ -292,12 +292,29 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
     the outproxy tunnels keep their 1 hop
   - exploratory: 3+3, i2pd's default (was 4+4)
   - i2pd's shared destination (address book updates and lookups): 2+2 (was 3+3 by default)
-  - the torrent client: 2+2 (was 5+5). It's a published destination, and with one inbound tunnel
-    it would drop off the DHT whenever that tunnel fails.
-  That's 32 tunnels, about 88 build requests at the default 3 hops. The I2P Connection Assistant
+  - the torrent client: 5+5, i2pd's default. It was cut to 2+2 at first, which made downloads and
+    magnet lookups clearly slower, so it's back (see the next entry).
+  That's 38 tunnels, about 106 build requests at the default 3 hops. The I2P Connection Assistant
   changes only the hops and never the tunnel counts. `tests/test_i2p_tunnel_budget.py` checks that
-  every pool sets its size, that nothing has more than the browser's 2+2, that tunnels sharing keys
-  agree, and that the total stays at 32 or less.
+  every pool sets its size, that no client pool but the torrent client has more than the browser's
+  2+2, that tunnels sharing keys agree, and that the total stays at 38 or less.
+- **I2P Torrents is faster and resolves magnet links without a tracker.** Its tunnels are 5+5 again
+  (were 2+2 for a short time), still 3 hops. i2pd's torrent client shipped with no trackers, and
+  with transient keys its DHT starts empty at every boot with no bootstrap node, so a magnet link
+  without a `tr=` tracker had nowhere to find its first peer. It now announces to I2P's usual open
+  trackers: postman (`tracker2.postman.i2p`), DgTrack (HTTP and UDP), InsulaOcculta (HTTP and UDP),
+  the defaults of I2P's own i2psnark, and `opentracker.skank.i2p` from i2pd's torrent guide. They are
+  all inside I2P and written as `.b32.i2p` addresses, because i2pd reads the list once when the
+  tunnel starts, before a fresh boot's address book knows any names. Peers found there also seed
+  the DHT. Every torrent announces to these trackers (i2pd has no per-torrent switch), as it already
+  did to the DHT. `tests/test_i2p_tunnel_budget.py` checks 5+5, the default hops and that every
+  tracker is a `.b32.i2p` address.
+- **I2P Torrents' *Add .torrent* button can open the I2P Browser's downloads.** The local Firefox
+  that shows I2P Torrents could open files only in `~/Downloads/Local Firefox`, so a `.torrent`
+  saved by the I2P Browser in `~/Downloads/I2P Browser` showed up in the file picker's sidebar but
+  couldn't be opened. Its AppArmor profile now lets it list that folder and its subfolders and read
+  `*.torrent` files there. Nothing else in the folder is readable and nothing in it is writable.
+  `tests/test_download_folders.sh` checks both.
 - **i2pd's port script and the I2P Connection Assistant no longer overwrite each other.**
   `prestium-i2pd-port` (run before every i2pd start) now takes the same lock as the assistant's root
   helper (`/run/prestium-hops.lock`) before it reads `i2pd.conf`. It waits at most 10 seconds; after

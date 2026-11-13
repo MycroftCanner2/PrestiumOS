@@ -2,8 +2,10 @@
 """2.1 (startup tunnel budget): i2pd builds every tunnel pool at once after a cold boot, when builds fail
 most. Checks that no pool falls back to i2pd's default of 5+5 (every tunnel in tunnels.conf, the
 [socksproxy] SOCKS proxy, [exploratory], [shareddest] and the generated torrents tunnel set both
-quantities), that the browser proxy (4444) keeps 2+2 and nothing else has more, that sections sharing
-one key file (one tunnel pool) agree, and that the total stays within the budget."""
+quantities), that the browser proxy (4444) keeps 2+2 and no other client pool has more, that sections
+sharing one key file (one tunnel pool) agree, and that the total stays within the budget.
+2.1 (I2P torrents): the torrent client is back at 5+5 (the 2+2 cut made downloads and magnet lookups
+slow) and is the one pool allowed above 2+2; it gets common trackers, all inside I2P as .b32.i2p."""
 import os, re, sys
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I = os.path.join(R, "config/includes.chroot")
@@ -13,7 +15,7 @@ def bad(m):
     global fail; print("FAIL " + m); fail = 1
 def check(c, m): (ok if c else bad)(m)
 
-BUDGET = 32          # tunnels kept ready at boot (2.0/2.1 before this change: 68)
+BUDGET = 38          # tunnels kept ready at boot (2.0/2.1 before the budget: 68; 32 with torrents at 2+2)
 DEFAULT_LEN = 3      # i2pd's default client tunnel length (the I2P Connection Assistant's default hops)
 
 def ini(text):
@@ -82,11 +84,20 @@ t = open(os.path.join(I, "usr/local/sbin/prestium-i2pd-torrents")).read()
 m = re.search(r"<<CONF\n(.*?)\nCONF", t, re.S)
 tc = dict(ini(m.group(1) if m else ""))
 tq = qty("torrents.conf [Torrents]", tc.get("Torrents", {}))
-check(tq == (2, 2), "torrents: 2+2 (published destination; one lease would drop off the DHT)")
+check(tq == (5, 5), "torrents: 5+5 (i2pd's default, restored: 2+2 made torrents slow)")
+tk = tc.get("Torrents", {})
+check(all(d + ".length" not in tk and d + ".lengthVariance" not in tk for d in ("inbound", "outbound")),
+      "torrents: hops left at i2pd's default (%d); fewer hops would be a visible choice, not a speed tweak" % DEFAULT_LEN)
+tr = [x for x in tk.get("trackers", "").split(",") if x]
+check(len(tr) >= 3, "torrents: common trackers set (%d), so a magnet without tr= still finds peers" % len(tr))
+check(all(re.fullmatch(r"(?:http://[a-z2-7]{52}\.b32\.i2p(?::\d+)?/\S*|udp://[a-z2-7]{52}\.b32\.i2p:\d+/?)", x) for x in tr),
+      "torrents: every tracker is an I2P .b32.i2p address (resolved at start, before the address book has names): %s" % tr)
+check(tk.get("dht") == "true" and tk.get("keys", "").startswith("transient") and "dhtfile" not in tk,
+      "torrents: DHT on, transient keys, no DHT file (new identity and empty DHT every i2pd start)")
 pool("torrents", "torrents", tq, (DEFAULT_LEN, DEFAULT_LEN))
 
-check(max(p[0] + p[1] for p in pools.values() if p[4] not in ("exploratory",)) <= 4,
-      "no client pool has more tunnels than the browser's")
+check(max(p[0] + p[1] for p in pools.values() if p[4] not in ("exploratory", "torrents")) <= 4,
+      "no client pool but the torrent client has more tunnels than the browser's")
 total = sum(p[0] + p[1] for p in pools.values())
 reqs = sum(p[0] * p[2] + p[1] * p[3] for p in pools.values())
 for p in sorted(pools.values(), key=lambda p: p[4]):

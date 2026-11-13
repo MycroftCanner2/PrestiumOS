@@ -8,7 +8,7 @@
 # The apps' settings point at the folders (where the app has a setting), /etc/skel matches the live
 # user's home, and every file there is in perms.txt.
 # Mail and chat may read what you put directly in ~/Downloads (attachments); the browsers see only their
-# own folder; viewers and editors read every file folder (to open downloads) but write none of them.
+# own folder (the local Firefox may also read *.torrent in ~/Downloads/I2P Browser, for I2P Torrents); viewers and editors read every file folder (to open downloads) but write none of them.
 # Checked on the compiled profiles (apparmor_parser -p, tests/aa_eval.py), plus the launchers, app
 # settings and hook 0500 that create and point at the folders.
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); A=$R/config/includes.chroot/etc/apparmor.d; I=$R/config/includes.chroot; fail=0
@@ -146,6 +146,22 @@ deny $2 $H/Documents/f.odt r
 $(others "$2" "$own")
 EOT
 done
+echo "== prestium-localfox: I2P Torrents' file picker reads .torrent files in ~/Downloads/I2P Browser, nothing else there"
+run opt.firefox.firefox <<EOT
+allow prestium-localfox "$H/Downloads/I2P Browser/" r
+allow prestium-localfox "$H/Downloads/I2P Browser/sub/" r
+allow prestium-localfox "$H/Downloads/I2P Browser/f.torrent" r
+allow prestium-localfox "$H/Downloads/I2P Browser/sub/F.TORRENT" r
+deny prestium-localfox "$H/Downloads/I2P Browser/f.torrent" w
+deny prestium-localfox "$H/Downloads/I2P Browser/new.torrent" w
+deny prestium-localfox "$H/Downloads/I2P Browser/f.pdf" r
+deny prestium-localfox "$H/Downloads/I2P Browser/f.torrent.part" r
+deny prestium-localfox "$H/Downloads/I2P Browser/f.torrent" m
+deny prestium-localfox $H/Downloads/Torrents/f.torrent r
+deny prestium-localfox $H/Downloads/f.torrent r
+deny prestium-localfox "$H/Tor Browser/f.torrent" r
+deny prestium-localfox $H/.librewolf/f.torrent r
+EOT
 echo "== the LibreWolf launcher's sandbox"
 run prestium.browser-launcher <<EOT
 allow prestium_librewolf_launcher//bwrap "$H/Downloads/I2P Browser/f.pdf" rw
