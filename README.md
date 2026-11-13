@@ -43,7 +43,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Tor Connection Assistant:** Direct, Snowflake, WebTunnel, obfs4 and meek, with bootstrap progress,
   Cancel, Retry and Revert at any point.
 - **I2P:** i2pd with a per-boot port, signature-checked reseeding (over Tor or from a file), I2P mail
-  (Claws Mail), IRC, torrents and Feather on I2P.
+  (Claws Mail), IRC, torrents and Feather on I2P. To get the browser going sooner after boot, i2pd
+  keeps only 32 tunnels ready: 2+2 for the browser proxy, 1+1 for most other services.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
   SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets for OFTC

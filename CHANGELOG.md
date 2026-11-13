@@ -278,6 +278,23 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   and the MAC guard read `PRESTIUM_*` variables only when run from the source tree.
 
 ### Network, firewall and privileges
+- **i2pd builds fewer tunnels at boot, so the browser's come first.** Right after a cold boot the
+  router list is days old and i2pd has no peer history, so many tunnel builds fail, and i2pd started
+  68 tunnels (about 180 build requests) at once. Only the browser proxy's (4444) decide when sites
+  load; the rest competed with them for the same good peers and build slots. Every pool now sets its
+  size, so none falls back to i2pd's default of 5+5:
+  - browser proxy 4444: 2+2 (unchanged)
+  - terminal proxy 4450, IRC2P, Ilita, postman SMTP and POP3: 1+1 (were 2+2)
+  - SOCKS proxy 4447 and the SOCKS outproxy tunnels on 4500: 1+1 (were 5+5 each, no count set);
+    the outproxy tunnels keep their 1 hop
+  - exploratory: 3+3, i2pd's default (was 4+4)
+  - i2pd's shared destination (address book updates and lookups): 2+2 (was 3+3 by default)
+  - the torrent client: 2+2 (was 5+5). It's a published destination, and with one inbound tunnel
+    it would drop off the DHT whenever that tunnel fails.
+  That's 32 tunnels, about 88 build requests at the default 3 hops. The I2P Connection Assistant
+  changes only the hops and never the tunnel counts. `tests/test_i2p_tunnel_budget.py` checks that
+  every pool sets its size, that nothing has more than the browser's 2+2, that tunnels sharing keys
+  agree, and that the total stays at 32 or less.
 - **i2pd's port script and the I2P Connection Assistant no longer overwrite each other.**
   `prestium-i2pd-port` (run before every i2pd start) now takes the same lock as the assistant's root
   helper (`/run/prestium-hops.lock`) before it reads `i2pd.conf`. It waits at most 10 seconds; after

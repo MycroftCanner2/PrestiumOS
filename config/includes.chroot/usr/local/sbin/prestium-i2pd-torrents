@@ -62,6 +62,9 @@ fi
 [ -d "$D" ] || skip "Torrents mount is not a directory"
 
 TOKEN=$(head -c 16 /dev/urandom | od -An -tx1 | tr -d ' \n')
+# 2.1 (startup tunnel budget): 2+2 instead of i2pd's default 5+5. Not 1+1: this is a published
+# destination that peers and the DHT reach through its inbound tunnels, and with one lease it drops
+# off the network whenever that tunnel fails or is rebuilt. Length stays at i2pd's default (3).
 $SAFE write "$TD" torrents.conf 0 i2pd 0640 --dir-owner 0 <<CONF
 [Torrents]
 type = torrents
@@ -72,6 +75,8 @@ web = true
 rpcaddress = 127.0.0.1
 rpcport = 7685
 rpcpath = $TOKEN
+inbound.quantity = 2
+outbound.quantity = 2
 CONF
 install -d -o root -g user -m 0750 "$RUN"
 printf 'http://127.0.0.1:7685/%s/\n' "$TOKEN" | $SAFE write "$RUN" url 0 user 0640 --dir-owner 0

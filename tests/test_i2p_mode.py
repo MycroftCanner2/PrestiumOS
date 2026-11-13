@@ -1,8 +1,8 @@
 #!/usr/bin/python3
 """2.1: the I2P Connection Assistant's root helper (prestium-i2p-mode). Runs it from the repo on
 copies of i2pd's files, with a fake safefile and systemctl: request checks, the edits (hops, share,
-bandwidth, outproxy; SOCKS outproxy tunnels keep 1 hop and port 4500), rollback when the browser
-proxy doesn't come back, and the menu, sudoers and desktop wiring."""
+bandwidth, outproxy; SOCKS outproxy tunnels keep 1 hop and port 4500; tunnel quantities never change),
+rollback when the browser proxy doesn't come back, and the menu, sudoers and desktop wiring."""
 import json, os, re, shutil, socket, subprocess, sys, tempfile
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 I = os.path.join(R, "config/includes.chroot")
@@ -49,6 +49,15 @@ def sect(path, name):
     return m.group(1) if m else ""
 
 orig = {f: open(os.path.join(D, f)).read() for f in ("tunnels.conf", "i2pd.conf")}
+QTY = re.compile(r"^\[([^\]]+)\]|^\s*((?:in|out)bound\.quantity)\s*=\s*(\S+)", re.M)
+def quantities(text):
+    """{(section, key): value} for every inbound/outbound.quantity (2.1 startup tunnel budget)."""
+    out, sec = {}, None
+    for m in QTY.finditer(text):
+        if m.group(1): sec = m.group(1)
+        else: out[(sec, m.group(2))] = m.group(3)
+    return out
+orig_qty = {f: quantities(orig[f]) for f in orig}
 orig_len = {s: re.findall(r"^\w+\.length = \d+$", sect(os.path.join(D, "tunnels.conf"), s), re.M)
             for s in ("socks-outproxy-tcp", "socks-outproxy-udp")}
 rc, st = run("status")
@@ -94,6 +103,8 @@ check(re.search(r"^share = 80$", m, re.M) and re.search(r"^bandwidth = 128$", m,
 check("inbound.length = 5" in sect(main, "exploratory") and "inbound.length = 5" in sect(main, "socksproxy"),
       "i2pd.conf: exploratory and SOCKS proxy 5 hops")
 check("restart i2pd" in open(os.path.join(T, "calls")).read(), "i2pd restarted")
+check(all(quantities(open(os.path.join(D, f)).read()) == orig_qty[f] for f in orig_qty) and len(orig_qty["tunnels.conf"]) >= 20
+      and ("exploratory", "inbound.quantity") in orig_qty["i2pd.conf"], "apply never changes a tunnel quantity (startup budget)")
 
 rc, st = run("apply", dict(hops=3, share="medium", outproxy="custom", custom="http://outproxy.example.i2p:3128"))
 check(rc == 0 and st["outproxy"] == "custom" and st["custom"] == "http://outproxy.example.i2p:3128" and st["share"] == "medium",
@@ -114,6 +125,7 @@ check(rc != 0 and all(open(os.path.join(D, f)).read() == before[f] for f in befo
 rc, st = run("apply", dict(hops=3, share="low", outproxy="acetone"))
 check(rc == 0 and st["share"] == "low" and st["outproxy"] == "acetone" and re.search(r"^bandwidth = L$", open(main).read(), re.M),
       "back to defaults: low (L), Acetone")
+check(all(quantities(open(os.path.join(D, f)).read()) == orig_qty[f] for f in orig_qty), "quantities still as shipped after every apply")
 
 h = open(HELPER).read()
 check('INSTALLED = os.path.abspath(sys.argv[0]).startswith("/usr/local/")' in h, "test overrides ignored when installed")
