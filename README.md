@@ -55,6 +55,17 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Hardware:** current firmware, PipeWire audio, HiDPI scaling, laptop keys, touchpad settings and an
   on-screen keyboard.
 
+## Known limits
+
+- **Someone who can write to the USB stick can change the next boot.** dm-verity checks the root
+  filesystem and the boot menu is password-locked, but both checks live in unsigned files on the stick:
+  the boot menus (`grub.cfg`, with the root hash and the password hash), the initramfs and live-boot in
+  it. Secure Boot covers only shim, GRUB and the kernel. Replacing those files together with the image
+  defeats both checks. The future fix is a signed unified kernel image (UKI: kernel, initramfs and
+  command line in one Secure Boot-signed file); it isn't implemented. Keep the stick with you, and
+  check it against a signed release from another computer (see Verify a download).
+- More, with details, in the CHANGELOG's Known security limits.
+
 ## Tor Connection Assistant: DNS design
 
 **DNS design.** Prestium has no system DNS on purpose, which is why Snowflake and WebTunnel did not

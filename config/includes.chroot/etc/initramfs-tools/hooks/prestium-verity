@@ -6,8 +6,10 @@ set -e
 PREREQ=""
 prereqs() { echo "$PREREQ"; }
 case "$1" in prereqs) prereqs; exit 0 ;; esac
+# shellcheck disable=SC1091
 . /usr/share/initramfs-tools/hook-functions
-lib=$(ls /usr/lib/x86_64-linux-gnu/libcryptsetup.so.12* 2>/dev/null | head -n 1)
+lib=
+for f in /usr/lib/x86_64-linux-gnu/libcryptsetup.so.12*; do [ -e "$f" ] && { lib=$f; break; }; done
 [ -n "$lib" ] || { echo "E: prestium-verity: libcryptsetup.so.12 not found (cryptsetup-bin)" >&2; exit 1; }
 copy_exec "$lib"
 manual_add_modules dm-verity

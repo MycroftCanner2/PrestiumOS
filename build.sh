@@ -22,6 +22,7 @@ flock -n 9 || { echo "another build.sh is running in $TOP (lock $TOP/.prestium-b
 # 2.1: the image's dm-verity hash tree is made on the build host (live-build's binary_dm-verity stage runs
 # veritysetup outside the chroot, and hook 9010 checks the tree with it)
 command -v veritysetup >/dev/null || { echo "veritysetup missing on the build host (apt install cryptsetup-bin)"; exit 1; }
+command -v mcopy >/dev/null && command -v mtype >/dev/null || { echo "mtools missing on the build host (apt install mtools): hook 9020 locks the GRUB config in the EFI image"; exit 1; }
 
 if [ "$(dpkg --print-architecture)" != amd64 ]; then
 	[ -e /proc/sys/fs/binfmt_misc/qemu-x86_64 ] || { echo "non-amd64 host: register qemu-x86_64 in binfmt_misc (qemu-user-static)"; exit 1; }

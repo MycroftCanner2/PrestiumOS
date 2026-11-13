@@ -6,11 +6,31 @@
 # can't be used. Here every image must pass prestium_verity_check (9989-prestium-verity.sh) first, any
 # failure to set dm-verity up stops the boot, and the "plain root" mode (no image at all) is refused.
 # Each change must apply exactly once; a changed live-boot stops the build.
+# 2.1 (review of 6bf1234): live-boot's initramfs-tools hook also sources (runs as root shell code)
+# live/boot.conf and live/boot/* from the medium when the initramfs is rebuilt on a running live
+# system (/run/live/medium mounted). At boot only /etc/live/boot.conf and /etc/live/boot/* inside the
+# initramfs are read (/usr/bin/live-boot), and the chroot has neither. The medium paths are removed,
+# so rebuilding the initramfs never runs code from the USB stick.
 set -e
 # PRESTIUM_HOOK_ROOT: only for tests/test_dm_verity.sh (a copy of live-boot's files); empty in the chroot
 R=${PRESTIUM_HOOK_ROOT:-}
 O=$R/usr/lib/live/boot/9990-overlay.sh
-[ -f "$O" ] && [ -f "$R/usr/lib/live/boot/9989-prestium-verity.sh" ] || { echo "E: live-boot or 9989-prestium-verity.sh missing"; exit 1; }
+IHL=$R/usr/share/initramfs-tools/hooks/live
+if [ ! -f "$O" ] || [ ! -f "$R/usr/lib/live/boot/9989-prestium-verity.sh" ]; then echo "E: live-boot or 9989-prestium-verity.sh missing"; exit 1; fi
+[ -f "$IHL" ] || { echo "E: live-boot's initramfs-tools hook missing"; exit 1; }
+python3 -I - "$IHL" <<'PY'
+import sys
+p = sys.argv[1]
+s = open(p).read()
+M = "# prestium-verity"
+if M not in s:
+    a = "for _FILE in /etc/live/boot.conf /etc/live/boot/* \\\n\t     /run/live/medium/live/boot.conf /run/live/medium/live/boot/*\n"
+    assert s.count(a) == 1, "live-boot's initramfs hook changed (boot.conf from the medium)"
+    s = s.replace(a, "for _FILE in /etc/live/boot.conf /etc/live/boot/* " + M + ": never from the medium\n")
+    open(p, "w").write(s)
+PY
+grep -q '/run/live/medium' "$IHL" && { echo "E: live-boot's initramfs hook still reads the medium"; exit 1; }
+sh -n "$IHL"
 python3 -I - "$O" <<'PY'
 import sys
 p = sys.argv[1]

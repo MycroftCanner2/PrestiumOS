@@ -18,15 +18,19 @@ fi
 # (hook 0405), and a copy outside the ISO is kept for the release files by build.sh
 cp -f "$SQ.roothash" ../prestium-roothash.tmp
 rm -f "$SQ.roothash"
-OPT="dm-verity-root-hash=filesystem.squashfs:$H dm-verity-oncorruption=panic"
+# panic=10: initramfs-tools and live-boot drop to a root shell on panic (a failed verity check, break=,
+# a missing init) unless panic= is set; with it they reboot after 10 s, as the kernel does after a
+# kernel panic (dm-verity-oncorruption=panic).
+OPT="dm-verity-root-hash=filesystem.squashfs:$H dm-verity-oncorruption=panic panic=10"
 n=0
 for f in boot/grub/*.cfg isolinux/*.cfg; do
 	[ -f "$f" ] || continue
 	grep -q 'boot=live' "$f" || continue
 	grep -q 'dm-verity-root-hash=' "$f" && { echo "E: $f already has a dm-verity root hash"; exit 1; }
+	grep -qE '(^|[[:space:]])panic=' "$f" && { echo "E: $f already sets panic="; exit 1; }
 	sed -i "s/boot=live /boot=live $OPT /g" "$f"
 	# every kernel line that boots the live system now carries the hash
-	if grep -E '(^|[[:space:]])(linux|append)[[:space:]].*boot=live' "$f" | grep -qv "dm-verity-root-hash=filesystem.squashfs:$H "; then
+	if grep -E '(^|[[:space:]])(linux|append)[[:space:]].*boot=live' "$f" | grep -qv "dm-verity-root-hash=filesystem.squashfs:$H dm-verity-oncorruption=panic panic=10 "; then
 		echo "E: $f: a boot entry without the dm-verity root hash"; exit 1
 	fi
 	n=$((n + 1))

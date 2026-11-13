@@ -55,6 +55,13 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   I/O error at mount time (the boot stops) or a kernel panic later (`dm-verity-oncorruption=panic`). The
   root hash is in the release files (`Prestium-2.1-amd64.roothash`, the manifest, `SHA256SUMS`), so
   a signed release signs it too. The kernel, initramfs and boot menu are not covered (see Known security limits).
+  Every boot entry also has `panic=10`: a failed check (or `break=`, or a missing init) reboots after 10
+  seconds instead of opening a root shell in the initramfs. Files live-boot would read from the stick
+  into its `mount` options or paths (`.fec`, `.fec.roots`, `.roothash`, `.roothash.p7s` next to the
+  image, `*.module` image lists) stop the boot, as does an image path with characters other than
+  letters, digits and `._/-`. live-boot's initramfs-tools hook no longer sources `live/boot.conf` from
+  the stick when the initramfs is rebuilt on a running system (at boot only the initramfs's own
+  `/etc/live/boot.conf` is read, and Prestium has none).
 
 - **Locked boot menus.** Nobody at the keyboard can edit a boot entry or open GRUB's command line, so
   nobody can boot with AppArmor off or with `init=`. GRUB (UEFI) has a superuser with a PBKDF2 password
@@ -62,8 +69,19 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   Settings" asks for it. isolinux (BIOS) takes no added options (`allowoptions 0`, `noescape 1`). The
   hash comes from `PRESTIUM_GRUB_PASSWORD_HASH` or the gitignored `grub-password.pbkdf2`
   (`scripts/grub-pbkdf2.py` makes it). Without one, the build locks the menu with the hash of a random
-  password nobody knows and prints a warning. Hook 9020 also stops the build if any entry passes
-  `apparmor=` other than 1, `security=` other than apparmor, `lsm=`, `init=` or `break=`.
+  password nobody knows and prints a warning. `superusers` is exported, so entries inside submenus
+  (Utilities) are locked too, and the GRUB configs that run before the menu (the one in the EFI system
+  partition image and `boot/grub/x86_64-efi/grub.cfg`) set the same superuser first, so GRUB's command
+  line is locked even if they can't load the menu (the build host needs `mtools`). Hook 9020 checks
+  every kernel line in all of them word by word and stops the build on: `apparmor=` other than 1,
+  `security=` other than apparmor, `lsm=`, `selinux=`, `enforcing=`, `init=`, `rdinit=`, `single`,
+  `s`, `S`, `1`, `-b`, `emergency`, `rescue`, `break`, `break=`, `rd.break`, `rd.shell`,
+  `rd.emergency`, `rd.debug`, `rd.systemd.*`, `systemd.unit=`, `systemd.debug-shell`,
+  `systemd.wants=`, `systemd.run*`, `systemd.mask=`, `systemd.confirm_spawn`, `systemd.setenv=`,
+  `debug`, `persistence*`, `findiso=`, `fromiso=`, `live-media=`, `bootfrom=`, `module.sig_enforce=0`,
+  a `panic=` other than 10 or a missing `panic=10`. live-build's `findiso=${iso_path}` and
+  `loopback.cfg` (booting the ISO file from another disk's GRUB) are removed. `toram=<file>` is
+  allowed: the named image must still pass dm-verity, so a wrong file just doesn't boot.
 
 ### Base system
 - **Tor Browser 16.0.1** (or newer, as above) with Firefox security fixes and tor 0.4.9.16.
@@ -391,17 +409,20 @@ Not changed in 2.1, so you know where the edges are:
   Turning them off would mean a setuid bubblewrap instead.
 - **X11 programs share one Xwayland server**, so an X11-only program can read the keyboard input and
   windows of the other X11 programs (not of Wayland apps such as the browsers).
-- **dm-verity covers the root filesystem image only.** Secure Boot checks the bootloader (shim, GRUB)
-  and the kernel, but not the initramfs or the boot menu (`grub.cfg`, `isolinux/live.cfg`), and those
-  hold the check and the expected root hash. So someone who can write to the USB stick can still change
-  the next boot by replacing the initramfs or the boot menu together with the image. What dm-verity
+- **Neither dm-verity nor the boot menu lock stops someone who can write to the USB stick.** Secure
+  Boot checks shim, GRUB and the kernel, but the boot menus (`grub.cfg` with the root hash and the
+  password hash, `isolinux/live.cfg`, the GRUB config in the EFI image), the initramfs and live-boot
+  in it are unsigned files on the stick. Whoever can write to the stick can replace them together with
+  the image, remove the root hash or `panic=10`, or reset the password, and the next boot trusts the
+  changes. A second stick that carries `/.disk/info` can also be picked up by GRUB's search. The fix is
+  a signed unified kernel image (kernel, initramfs and command line in one Secure Boot-signed file)
+  booted directly by shim, which isn't implemented yet. Until then, keep the stick in your possession
+  and check it against a signed release from another computer (below). What dm-verity
   does stop: a changed or swapped `filesystem.squashfs` on its own, an extra image or a missing hash
   tree, and blocks of the image that change after the boot check (a faulty or malicious stick). To
   check a stick against a signed release, compare it from another computer with `SHA256SUMS`
-  (`Prestium-2.1-amd64.roothash` is the hash the boot menu must carry). Closing the gap needs a signed
-  unified kernel image (kernel, initramfs and command line in one Secure Boot-signed file), which
-  Debian's shim and GRUB don't offer for a live image yet. The hash tree's salt is random, so two
-  builds of the same commit have different root hashes.
+  (`Prestium-2.1-amd64.roothash` is the hash the boot menu must carry). The hash tree's salt is
+  random, so two builds of the same commit have different root hashes.
 - **The boot menu lock is only as strong as the USB stick.** It stops changes made at the keyboard,
   not someone who can write `grub.cfg` on the stick (see dm-verity above). The password hash is on the
   stick, so a chosen password needs to be long; the default random one can't be guessed. Firmware

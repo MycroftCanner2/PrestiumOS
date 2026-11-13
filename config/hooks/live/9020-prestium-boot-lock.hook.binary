@@ -9,7 +9,25 @@
 #    nobody knows (printed as a warning), so the menu is locked for everyone; set a hash to be able to edit.
 #  - isolinux (BIOS): no options may be added (allowoptions 0), no escape to the boot: prompt (noescape 1).
 #  - no entry may pass apparmor= other than 1 or security= other than apparmor.
-# Runs in binary/ on the build host, after 9000 (labels) and 9010 (dm-verity root hash).
+# 2.1 (review of 6bf1234):
+#  - "export superusers": GRUB submenus (Utilities...) run in their own context and only see exported
+#    variables; without it, editing an entry inside a submenu needed no password.
+#  - the early GRUB configs that run before boot/grub/grub.cfg are locked the same way: the one in the
+#    EFI system partition image (boot/grub/efi.img ::boot/grub/grub.cfg, needs mtools) and the
+#    per-platform ones (boot/grub/<platform>/grub.cfg). If they can't find or load grub.cfg, GRUB's
+#    command line still needs the superuser.
+#  - every kernel line (GRUB linux, isolinux append, in every config above) is checked token by token:
+#    apparmor=1 security=apparmor panic=10 must be there; nothing may open a shell, change init or the
+#    security modules, or load the system from elsewhere: init= rdinit= lsm= selinux= enforcing=
+#    single s S 1 -b emergency rescue break break= rd.break* rd.shell* rd.emergency* rd.debug*
+#    rd.systemd.* systemd.unit= systemd.debug_shell/-shell systemd.wants= systemd.run* systemd.mask=
+#    systemd.confirm_spawn* systemd.setenv= debug debug= persistence* findiso= fromiso= live-media=
+#    bootfrom= module.sig_enforce=0, another panic= or dm-verity-oncorruption= value.
+#  - live-build adds findiso=${iso_path} (booting the ISO file from another disk's GRUB through
+#    loopback.cfg); Prestium doesn't support that, so findiso= and loopback.cfg are removed.
+#  - toram=<file> is not banned: it names one image, which must still pass the dm-verity check
+#    (9989-prestium-verity.sh), so a wrong file fails closed (no boot); plain toram works.
+# Runs in binary/ on the build host, after 9000 (labels) and 9010 (dm-verity root hash, panic=10).
 set -e
 G=boot/grub/grub.cfg
 [ -f "$G" ] || { echo "E: $G missing"; exit 1; }
@@ -28,9 +46,32 @@ grep -q '^set superusers=' "$G" && { echo "E: $G already has superusers"; exit 1
 # superuser first, right after config.cfg (sourced first, as live-build's template has it)
 awk -v h="$HASH" 'NR == 1 && $0 == "source /boot/grub/config.cfg" {
 	print; print ""; print "# Prestium: locked menu (hook 9020): entries boot without a password, editing needs the superuser"
-	print "set superusers=\"prestium\""; print "password_pbkdf2 prestium " h; done = 1; next }
+	print "set superusers=\"prestium\""; print "export superusers"; print "password_pbkdf2 prestium " h; done = 1; next }
 	{ print } END { if (!done) exit 3 }' "$G" > "$G.tmp" || { rm -f "$G.tmp"; echo "E: $G does not start with 'source /boot/grub/config.cfg'"; exit 1; }
 mv "$G.tmp" "$G"
+LOCK=$(printf '# Prestium: locked menu (hook 9020): the command line and editing need the superuser\nset superusers="prestium"\nexport superusers\npassword_pbkdf2 prestium %s\n' "$HASH")
+# early configs: per-platform (boot/grub/x86_64-efi/grub.cfg ...) and the EFI partition image
+for f in boot/grub/*/grub.cfg; do
+	[ -f "$f" ] || continue
+	grep -q 'superusers' "$f" && { echo "E: $f already has superusers"; exit 1; }
+	{ printf '%s\n\n' "$LOCK"; cat "$f"; } > "$f.tmp" && mv "$f.tmp" "$f"
+done
+EFI=boot/grub/efi.img
+if [ -f "$EFI" ]; then
+	if ! command -v mtype >/dev/null || ! command -v mcopy >/dev/null; then echo "E: mtools (mtype, mcopy) needed to lock the GRUB config in $EFI"; exit 1; fi
+	E=../prestium-efi-grub.cfg.tmp
+	mtype -i "$EFI" ::boot/grub/grub.cfg > "$E" 2>/dev/null || { echo "E: $EFI has no boot/grub/grub.cfg"; exit 1; }
+	grep -q 'superusers' "$E" && { echo "E: $EFI already has superusers"; exit 1; }
+	{ printf '%s\n\n' "$LOCK"; tr -d '\r' < "$E"; } > "$E.new"
+	[ -n "${SOURCE_DATE_EPOCH:-}" ] && touch -d "@$SOURCE_DATE_EPOCH" "$E.new"
+	mcopy -m -o -i "$EFI" "$E.new" ::boot/grub/grub.cfg
+	mtype -i "$EFI" ::boot/grub/grub.cfg | grep -qx 'export superusers' || { echo "E: $EFI: lock not written"; exit 1; }
+	rm -f "$E" "$E.new"
+fi
+# no booting the ISO file from another disk (live-build's findiso=${iso_path} and loopback.cfg)
+# shellcheck disable=SC2016
+sed -i 's/[[:space:]]findiso=\${iso_path}//g' boot/grub/*.cfg
+rm -f boot/grub/loopback.cfg
 for f in boot/grub/*.cfg; do
 	# every menuentry and submenu without its own --unrestricted/--users gets --unrestricted, except fwsetup
 	awk '
@@ -42,21 +83,47 @@ for f in boot/grub/*.cfg; do
 	fi
 done
 if [ -d isolinux ]; then
-	for f in isolinux/isolinux.cfg; do
-		[ -f "$f" ] || { echo "E: $f missing"; exit 1; }
-		grep -q '^allowoptions 0$' "$f" || sed -i '1i # Prestium: locked menu (hook 9020): no added kernel options, no escape to the boot: prompt\nallowoptions 0\nnoescape 1' "$f"
-	done
+	f=isolinux/isolinux.cfg
+	[ -f "$f" ] || { echo "E: $f missing"; exit 1; }
+	grep -q '^allowoptions 0$' "$f" || sed -i '1i # Prestium: locked menu (hook 9020): no added kernel options, no escape to the boot: prompt\nallowoptions 0\nnoescape 1' "$f"
 	sed -i 's/^menu tabmsg .*/menu tabmsg Press ENTER to boot/' isolinux/*.cfg
 	grep -rqi '^[[:space:]]*allowoptions[[:space:]]*1' isolinux/ && { echo "E: an isolinux file allows options"; exit 1; }
 	grep -rqi '^[[:space:]]*noescape[[:space:]]*0' isolinux/ && { echo "E: an isolinux file allows escape"; exit 1; }
 fi
-# no boot entry may turn the security modules off
-for f in boot/grub/*.cfg isolinux/*.cfg; do
+# every kernel line, token by token (see the header)
+kcheck() { # $1: label, $2: the config (default: stdin)
+	awk -v f="$1" '
+	function bad(t, why) { printf "E: %s:%d: %s (%s)\n", f, NR, why, t; err = 1 }
+	/^[[:space:]]*(linux|linuxefi|linux16|append)[[:space:]]/ {
+		n = 0; aa = 0; sec = 0; pn = 0; live = 0
+		for (i = 2; i <= NF; i++) {
+			t = $i
+			if (t ~ /^#/) break
+			if (t == "boot=live") live = 1
+			if (t ~ /^apparmor=/) { if (t == "apparmor=1") aa = 1; else bad(t, "AppArmor off") }
+			if (t ~ /^security=/) { if (t == "security=apparmor") sec = 1; else bad(t, "other security module") }
+			if (t ~ /^panic=/) { if (t == "panic=10") pn++; else bad(t, "panic= other than 10") }
+			if (t ~ /^dm-verity-oncorruption=/ && t != "dm-verity-oncorruption=panic") bad(t, "dm-verity corruption not fatal")
+			if (t == "single" || t == "s" || t == "S" || t == "1" || t == "-b" || t == "emergency" || t == "rescue" || t == "break" || t == "debug") bad(t, "shell or debug mode")
+			if (t ~ /^(init|rdinit|lsm|selinux|enforcing|break|debug|systemd\.unit|systemd\.wants|systemd\.mask|systemd\.setenv|findiso|fromiso|live-media|bootfrom)=/) bad(t, "banned option")
+			if (t ~ /^(rd\.break|rd\.shell|rd\.emergency|rd\.debug|rd\.systemd\.|systemd\.debug[-_]shell|systemd\.run|systemd\.confirm[-_]spawn|persistence)/) bad(t, "banned option")
+			if (t == "module.sig_enforce=0") bad(t, "unsigned modules")
+		}
+		if (live && !(aa && sec)) bad($0, "a live entry without apparmor=1 security=apparmor")
+		if (live && pn != 1) bad($0, "a live entry without exactly one panic=10")
+	}
+	END { exit err }' "${2:--}"
+}
+for f in boot/grub/*.cfg boot/grub/*/grub.cfg isolinux/*.cfg; do
 	[ -f "$f" ] || continue
-	if grep -nE '(^|[[:space:]])(apparmor=([^1[:space:]]|[[:space:]]|$)|apparmor=1[^[:space:]]|security=([^a[:space:]]|[[:space:]]|$|a[^p]|apparmor[^[:space:]])|lsm=|selinux=|init=|rd\.break|break=|single([[:space:]]|$)|systemd\.unit=)' "$f"; then
-		echo "E: $f: a boot entry overrides security or init options"; exit 1
-	fi
+	kcheck "$f" "$f" || { echo "E: $f: a boot entry overrides security, init or shell options"; exit 1; }
+	grep -q 'findiso=' "$f" && { echo "E: $f: findiso= left"; exit 1; }
+	case "$f" in boot/grub/grub.cfg) ;; boot/grub/*/grub.cfg) grep -qx 'export superusers' "$f" || { echo "E: $f not locked"; exit 1; } ;; esac
 done
+if [ -f "$EFI" ]; then
+	mtype -i "$EFI" ::boot/grub/grub.cfg | kcheck "$EFI::boot/grub/grub.cfg" || { echo "E: $EFI: a banned option"; exit 1; }
+fi
+grep -qx 'export superusers' "$G" || { echo "E: superusers not exported in $G"; exit 1; }
 echo "P: boot menus locked (GRUB superuser: $MODE)"
 echo "$MODE" > ../prestium-bootlock.tmp
 exit 0
