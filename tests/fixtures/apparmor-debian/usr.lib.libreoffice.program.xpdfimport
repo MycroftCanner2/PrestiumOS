@@ -1,0 +1,6 @@
+# Test fixture (not Debian's file): libreoffice-common's xpdfimport profile header; Prestium keeps it
+abi <abi/3.0>,
+include <tunables/global>
+profile libreoffice-xpdfimport /usr/lib/libreoffice/program/xpdfimport flags=(complain) {
+  include <abstractions/base>
+}

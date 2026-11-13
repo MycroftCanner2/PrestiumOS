@@ -9,6 +9,12 @@ rm -f /etc/apparmor.d/firefox /etc/apparmor.d/local/firefox
 # 2.1 (audit of 96468c5, M-1): the same for Debian's "loupe" (flags=unconfined, same attachment as
 # Prestium's confined Loupe profile)
 rm -f /etc/apparmor.d/loupe /etc/apparmor.d/local/loupe
+# 2.1: and Debian's LibreOffice profiles for oosplash and soffice.bin (libreoffice-common, complain mode).
+# They attach to the same two programs as Prestium's "libreoffice" profile and match them just as well,
+# so the kernel attached neither ("conflicting profile attachments") and LibreOffice ran unconfined.
+# senddoc and xpdfimport keep Debian's profiles: Prestium's LibreOffice runs them inside its own (ix).
+rm -f /etc/apparmor.d/usr.lib.libreoffice.program.oosplash /etc/apparmor.d/local/usr.lib.libreoffice.program.oosplash
+rm -f /etc/apparmor.d/usr.lib.libreoffice.program.soffice.bin /etc/apparmor.d/local/usr.lib.libreoffice.program.soffice.bin
 # 2.0 r12: Claws Mail (I2P mail) is confined too
 # 2.1 (audit of 96468c5, M-1): the programs that open downloaded files, KeePassXC and Kleopatra too
 # 2.1 (security audit): onion-grater too (ptrace read only); 2.1 (review): the browser launchers as
@@ -35,3 +41,11 @@ for p in usr.share.librewolf.librewolf usr.bin.pidgin usr.bin.gajim usr.bin.onio
 	usr.bin.loupe usr.bin.ristretto usr.bin.vlc usr.bin.file-roller usr.bin.xarchiver usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.bin.gimp usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra; do
 	grep -q 'prestium-no-admin\|prestium-app-base\|prestium-app-common\|prestium-viewer' "/etc/apparmor.d/$p" || { echo "E: $p does not deny sudo"; exit 1; }
 done
+# 2.1: the whole set as apparmor.service loads it at boot: every file in /etc/apparmor.d compiles (one that
+# doesn't makes the service fail), and no other profile attaches to a program a Prestium profile confines
+python3 -I /usr/share/prestium/build/aa-attach-check.py /etc/apparmor.d usr.share.librewolf.librewolf torbrowser.Browser.firefox \
+	usr.bin.pidgin usr.bin.gajim usr.bin.onionshare usr.local.bin.feather usr.lib.libreoffice.program prestium.thelounge \
+	prestium.thelounge-tor opt.firefox.firefox usr.bin.claws-mail usr.local.sbin.prestium-onion-grater prestium.browser-launcher \
+	prestium.pinentry usr.bin.loupe usr.bin.ristretto usr.bin.vlc usr.bin.file-roller usr.bin.xarchiver usr.bin.featherpad \
+	usr.bin.mat2 usr.bin.metadata-cleaner usr.bin.gimp usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra \
+	|| { echo "E: the AppArmor profile set would not load cleanly at boot"; exit 1; }

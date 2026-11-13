@@ -1,0 +1,7 @@
+# Test fixture (not Debian's file): the header of libreoffice-common's soffice.bin profile, which
+# attaches to the same program as Prestium's "libreoffice" profile (tests/test_apparmor_boot_load.sh)
+abi <abi/3.0>,
+include <tunables/global>
+profile libreoffice-soffice /usr/lib/libreoffice/program/soffice.bin flags=(complain) {
+  include <abstractions/base>
+}

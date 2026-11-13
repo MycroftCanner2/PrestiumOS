@@ -118,6 +118,17 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   press Reset to shipped copy.
 
 ### App confinement and sandboxes
+- **LibreOffice runs under its AppArmor profile, and the whole profile set is checked as the boot loads
+  it.** Debian's libreoffice-common ships complain-mode profiles for `oosplash` and `soffice.bin` that
+  attach to the same two programs as Prestium's enforced `libreoffice` profile and match them just as
+  well. The kernel then attaches neither ("conflicting profile attachments"), so LibreOffice ran
+  unconfined, with network access and every file the user can write. Hook 0600 removes those two Debian
+  profiles (senddoc and xpdfimport keep theirs; Prestium's LibreOffice runs them inside its own profile).
+  It now also runs `aa-attach-check.py` on `/etc/apparmor.d` as apparmor.service loads it at boot: every
+  profile file must compile (one that doesn't makes the service fail), and no other profile may attach to
+  a program a Prestium profile confines. The drop-in that lets apparmor.service run on the live overlay
+  (Debian skips it when `/run/live/overlay/work` exists) is documented and tested. Tests:
+  `test_apparmor_boot_load.sh`.
 - **Each confined app has its own download or output folder, and writes files nowhere else (L-5).** A
   compromised app can no longer change a file another app wrote or will open. Network apps save in
   `~/Downloads/<App>`: I2P Browser, Local Firefox, Mail (Claws attachments), Gajim and Pidgin (Tor
