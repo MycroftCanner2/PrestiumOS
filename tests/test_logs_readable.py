@@ -111,6 +111,10 @@ check("User=root" not in u and "\nUser=" in u, "not root")
 for d in ("\nMemoryMax=", "\nTasksMax=", "\nStartLimitIntervalSec=", "\nStartLimitBurst="):
     check(d in u, "prestium-logs.service:" + d.strip() + " (no runaway memory, tasks or restart loop)")
 check(u.index("StartLimitBurst=") < u.index("[Service]"), "restart limit in [Unit]")
+# i2pd: logs warnings to syslog (the journal), not off and not to a file
+i2 = rd("config/includes.chroot/etc/systemd/system/i2pd.service.d/prestium.conf")
+xs = [l for l in i2.splitlines() if l.startswith("ExecStart=/")]
+check(len(xs) == 1 and "--log=syslog" in xs[0] and "--loglevel=warn" in xs[0] and "--loglevel=none" not in xs[0] and "--logfile" not in xs[0], "i2pd logs to syslog at warn, so the I2P tab is not empty")
 # Tor: SafeLogging explicitly on, after the drop-ins
 torrc = rd("config/includes.chroot/etc/tor/torrc")
 check(re.search(r"^SafeLogging 1$", torrc, re.M) and torrc.index("\nSafeLogging 1") > torrc.index("%include"), "torrc: SafeLogging 1, after %include")
