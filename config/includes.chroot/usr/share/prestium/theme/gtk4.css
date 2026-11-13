@@ -7,7 +7,11 @@
    2.1 (UI pass): destructive buttons #a8231c behind white text (7.2:1), as gtk3.css; success #6ee7a0;
    tooltips 8 px like every other floating surface. libadwaita's own sizes stay.
    2.1: links #8ab8ff (not the live-state cyan); progress bar text is white on a #161616 trough and
-   a #0050c8 fill (7.0:1 or more), as gtk3.css. Adwaita's progressbar text is 40% opaque. */
+   a #0050c8 fill (7.0:1 or more), as gtk3.css. Adwaita's progressbar text is 40% opaque.
+   2.1 (confirm-dialog contrast): :root also sets --window-fg-color and the other --*-fg-color values
+   (libadwaita reads those, not only @define-color), so a light color-scheme cannot keep dark text on
+   the dark surfaces this file paints. Default and suggested buttons get the accent fill at rest, as
+   gtk3.css, so zenity's confirming action is the primary button. */
 @define-color accent_bg_color #0050c8;
 @define-color accent_fg_color #ffffff;
 @define-color accent_color #8ab8ff;
@@ -21,9 +25,13 @@
 @define-color headerbar_fg_color #ffffff;
 @define-color headerbar_backdrop_color #1e1e1e;
 @define-color sidebar_bg_color #1e1e1e;
+@define-color sidebar_fg_color #ffffff;
 @define-color card_bg_color #262626;
+@define-color card_fg_color #ffffff;
 @define-color dialog_bg_color #262626;
+@define-color dialog_fg_color #ffffff;
 @define-color popover_bg_color #262626;
+@define-color popover_fg_color #ffffff;
 @define-color theme_selected_bg_color #0050c8;
 @define-color error_color #ff9494;
 @define-color error_fg_color #ffffff;
@@ -35,9 +43,13 @@
 :root {
   --accent-bg-color: #0050c8; --accent-fg-color: #ffffff; --accent-color: #8ab8ff;
   --link-color: #8ab8ff; --visited-link-color: #8ab8ff;
-  --window-bg-color: #1e1e1e; --view-bg-color: #161616;
-  --headerbar-bg-color: #262626; --headerbar-backdrop-color: #1e1e1e;
-  --sidebar-bg-color: #1e1e1e; --card-bg-color: #262626; --dialog-bg-color: #262626; --popover-bg-color: #262626;
+  --window-bg-color: #1e1e1e; --window-fg-color: #ffffff;
+  --view-bg-color: #161616; --view-fg-color: #ffffff;
+  --headerbar-bg-color: #262626; --headerbar-fg-color: #ffffff; --headerbar-backdrop-color: #1e1e1e;
+  --sidebar-bg-color: #1e1e1e; --sidebar-fg-color: #ffffff;
+  --card-bg-color: #262626; --card-fg-color: #ffffff;
+  --dialog-bg-color: #262626; --dialog-fg-color: #ffffff;
+  --popover-bg-color: #262626; --popover-fg-color: #ffffff;
   --error-color: #ff9494; --warning-color: #ffd166;
   --destructive-bg-color: #a8231c; --destructive-fg-color: #ffffff; --destructive-color: #ff9494; --success-color: #6ee7a0;
 }
@@ -54,8 +66,17 @@ entry, passwordentry, spinbutton { background-color: #161616; color: #ffffff; bo
 entry:focus-within, passwordentry:focus-within, spinbutton:focus-within { outline-color: #3d8bff; }
 entry.error, passwordentry.error { color: #ffffff; box-shadow: inset 0 0 0 1px #ff9494; }
 entry > text > placeholder, passwordentry > text > placeholder { color: #a8a8a8; }
+/* resting state too (gtk3.css already had it): zenity 4 marks Apply as button.default but not
+   suggested-action, so without this the confirming button stayed a flat grey. */
+button.suggested-action, button.default:not(.flat) {
+  background-image: none; background-color: #0050c8; color: #ffffff;
+}
 button.suggested-action:hover, button.default:hover { background-image: none; background-color: #0047b3; }
 button.suggested-action:active, button.default:active { background-image: none; background-color: #003f9e; }
+button.suggested-action:backdrop, button.default:not(.flat):backdrop {
+  background-image: none; background-color: #0050c8; color: #ffffff; }
+button.suggested-action:disabled, button.default:disabled {
+  background-image: none; background-color: #24324d; color: #a8a8a8; }
 button.destructive-action:hover { background-image: none; background-color: #921d17; }
 button.destructive-action:active { background-image: none; background-color: #7d1813; }
 tooltip { border-radius: 8px; }

@@ -48,6 +48,11 @@ for v in 3 4; do for b in etc/skel/.config home/user/.config usr/share/prestium/
 # broker dialogs: the style directory only, and accessibility still applied last
 B="$I/usr/local/sbin/prestium-wl-broker"
 grep -q 'extra_env=dict(DIALOG_STYLE, \*\*DIALOG_ENV)' "$B" && grep -q '        e.update(DIALOG_ENV)   # last' "$B" && ok "broker dialogs styled, accessibility off last" || bad "broker dialog env order"
+grep -q 'ADW_DEBUG_COLOR_SCHEME": "prefer-dark"' "$B" && grep -q 'GTK_THEME": "Adwaita:dark"' "$B" && ok "broker dialogs prefer libadwaita dark" || bad "broker dialogs missing prefer-dark"
+for v in 3 4; do
+  grep -qx 'gtk-application-prefer-dark-theme=1' "$I/usr/share/prestium/broker-style/gtk-$v.0/settings.ini" \
+    && ok "broker-style GTK $v prefers dark" || bad "broker-style GTK $v not dark"
+done
 # 2.1 (UI pass): the Browser Updater uses Prestium's stylesheet like the Connection Assistants, from the
 # root-owned broker-style directory (never the user's ~/.config)
 grep -q '^os.environ\["XDG_CONFIG_HOME"\] = "/usr/share/prestium/broker-style"' "$I/usr/local/bin/prestium-browser-updater" && ok "Browser Updater in Prestium's GTK 3 style (root-owned)" || bad "Browser Updater style directory"

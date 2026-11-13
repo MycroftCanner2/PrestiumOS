@@ -33,7 +33,8 @@
 @define-color destructive_color #ff9494;
 @define-color success_color #6ee7a0;
 
-window, .background { background-color: @theme_bg_color; }
+/* color too: a missing prefer-dark must not leave Adwaita-light's dark text on this surface */
+window, .background { background-color: @theme_bg_color; color: @theme_fg_color; }
 headerbar, .titlebar, menubar, toolbar, .toolbar, .inline-toolbar, actionbar, searchbar > revealer > box {
   background-color: #262626; background-image: none; border-color: #333333; }
 headerbar:backdrop, .titlebar:backdrop { background-color: #1e1e1e; }

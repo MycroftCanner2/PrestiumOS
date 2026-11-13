@@ -124,10 +124,16 @@ DIALOG_ENV = {"GTK_A11Y": "none", "NO_AT_BRIDGE": "1"}
 # 2.1 (design batch): the broker's dialogs read the Prestium GTK colours from a root-owned directory
 # (gtk-3.0/gtk.css and gtk-4.0/gtk.css, colours only), never from the user's ~/.config. Only the look
 # changes: DIALOG_ENV is still applied last in env(), so accessibility stays off.
+# 2.1 (confirm-dialog contrast): that directory is not the session dconf, so libadwaita (zenity 4's
+# AdwMessageDialog) would stay on the light color-scheme while gtk4.css paints dark surfaces, leaving
+# near-black text on #262626. ADW_DEBUG_COLOR_SCHEME=prefer-dark is set here (the env accepts
+# default, prefer-dark or prefer-light; libadwaita ignores gtk-application-prefer-dark-theme and
+# GTK_THEME); settings.ini in broker-style covers GTK 3; gtk4.css also sets --*-fg-color.
 # 2.1 (design batch): the wallpapers the user can pick (System, Wallpaper); anything else means the default
 WALLPAPERS = ("horizon", "circuit", "mark")
 WALLPAPER_DIR = "/usr/share/backgrounds/prestium"
-DIALOG_STYLE = {"XDG_CONFIG_HOME": "/usr/share/prestium/broker-style"}
+DIALOG_STYLE = {"XDG_CONFIG_HOME": "/usr/share/prestium/broker-style",
+                "ADW_DEBUG_COLOR_SCHEME": "prefer-dark", "GTK_THEME": "Adwaita:dark"}
 INTERPRETER_RE = re.compile(r"\A(python[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node|(ba|da|z|k)?sh)\Z")
 
 # characters Python counts as printable that still show as blank (verification of e574474, N-6)

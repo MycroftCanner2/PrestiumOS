@@ -158,7 +158,9 @@ check(not olds, "no retired accent colours (#0066ff, #1c71d8, #a3a3ff, #ff7a7a, 
 
 # ------------------------------------------------------------------ 2. themes, icons, fonts, cursor
 ICON, FONT, CURSOR = "Prestium", "Cantarell 10", ("Adwaita", "24")
-for p in ("etc/gtk-3.0/settings.ini", "etc/gtk-4.0/settings.ini"):
+for p in ("etc/gtk-3.0/settings.ini", "etc/gtk-4.0/settings.ini",
+          "usr/share/prestium/broker-style/gtk-3.0/settings.ini",
+          "usr/share/prestium/broker-style/gtk-4.0/settings.ini"):
     c = configparser.ConfigParser(interpolation=None); c.read_string(read(p)); s = c["Settings"]
     got = (s.get("gtk-theme-name"), s.get("gtk-application-prefer-dark-theme"), s.get("gtk-icon-theme-name"),
            s.get("gtk-font-name"), s.get("gtk-cursor-theme-name"), s.get("gtk-cursor-theme-size"))
@@ -375,6 +377,16 @@ src = lounge or (open(lt[0], encoding="utf-8").read() if lt else "")
 check(re.search(r'theme:\s*"thelounge-theme-tech-innovation"', src) is not None, "The Lounge: Tech Innovation is the default theme")
 bu = read("usr/local/bin/prestium-browser-updater")
 check('os.environ["XDG_CONFIG_HOME"] = "/usr/share/prestium/broker-style"' in bu, "Browser Updater: Prestium's GTK style from the root-owned directory")
+# 2.1 (confirm-dialog contrast): broker zenity 4 (libadwaita) must force a dark color-scheme, because
+# XDG_CONFIG_HOME=broker-style has no session dconf and libadwaita ignores settings.ini prefer-dark.
+br = read("usr/local/sbin/prestium-wl-broker")
+check('"ADW_DEBUG_COLOR_SCHEME": "prefer-dark"' in br and '"GTK_THEME": "Adwaita:dark"' in br,
+      "broker dialogs: libadwaita prefer-dark and GTK_THEME=Adwaita:dark")
+check(re.search(r"--window-fg-color: #ffffff;", g4s) and re.search(r"--dialog-fg-color: #ffffff;", g4s),
+      "GTK 4: :root sets --window-fg-color and --dialog-fg-color to white")
+prim = r"button\.suggested-action, button\.default:not\(\.flat\) \{[^}]*background-color: #0050c8;[^}]*color: #ffffff"
+check(re.search(prim, g3s, re.S) and re.search(prim, g4s, re.S),
+      "GTK 3 and 4: primary buttons are #0050c8 behind white text at rest")
 # tracked files only: running the tests creates (git-ignored) __pycache__ next to imported tools
 import subprocess
 try:

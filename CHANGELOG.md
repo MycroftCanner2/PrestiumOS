@@ -438,6 +438,18 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   LibreOffice's icons (Colibre dark) follow the palette. Tests: `test_ui_consistency.py` (palette,
   themes, fonts, radii, copy, icon names), `test_contrast.py` (now 310 pairs); `tests/ci.sh` no longer
   leaves `__pycache__` in the image tree.
+- **Broker confirmation dialogs use white text and a primary Apply button.** Zenity 4
+  (`AdwMessageDialog`, used for I2P settings, the Lock Screen password form and the power
+  confirmations) is libadwaita. The broker points `XDG_CONFIG_HOME` at a root-owned
+  `broker-style` directory so those windows never read the user's theme, which also hides
+  the session dconf `color-scheme='prefer-dark'`. gtk4.css already painted the surfaces
+  dark, but did not set `--window-fg-color` / `--dialog-fg-color`, so libadwaita kept
+  light-scheme near-black text on `#262626`. The broker now sets `ADW_DEBUG_COLOR_SCHEME=prefer-dark`
+  and `GTK_THEME=Adwaita:dark`, `broker-style` ships `settings.ini` with prefer-dark, and
+  gtk4.css sets the foreground CSS variables and gives `button.default` the accent fill
+  (`#0050c8` behind white text, 7.0:1) at rest, as gtk3.css already did. Tests:
+  `test_contrast.py` (315 pairs), `test_ui_consistency.py`, `test_broker_dialogs.py`,
+  `test_desktop_theme.sh`.
 - **Links and progress-bar text in Prestium's GTK tools are readable.** Unvisited links
   (`GtkLinkButton`, label links such as "about bridges") use the palette blue `#8ab8ff` instead of
   cyan, in GTK 3 and 4, GTK 2, Qt and KDE (visited was already `#8ab8ff`). Progress bar text (for

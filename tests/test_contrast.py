@@ -162,10 +162,25 @@ d = g4['@']
 need(S, "accent button text", d['accent_fg_color'], d['accent_bg_color'], TEXT)
 need(S, "accent button text (hover)", d['accent_fg_color'], col(g4['button.suggested-action:hover']['background-color']), TEXT)
 need(S, "accent button text (pressed)", d['accent_fg_color'], col(g4['button.suggested-action:active']['background-color']), TEXT)
+need(S, "default button text", col(g4['button.suggested-action']['color']),
+     col(g4['button.suggested-action']['background-color']), TEXT)
+need(S, "default button text (unfocused window)", col(g4['button.suggested-action:backdrop']['color']),
+     col(g4['button.suggested-action:backdrop']['background-color']), TEXT)
+need(S, "default button text (disabled)", col(g4['button.suggested-action:disabled']['color']),
+     col(g4['button.suggested-action:disabled']['background-color']), DISABLED)
 for n in ("window_bg_color", "view_bg_color", "card_bg_color", "dialog_bg_color", "headerbar_bg_color"):
     need(S, "text on %s" % n, "#ffffff", d[n], TEXT)
     need(S, "accent text on %s" % n, d['accent_color'], d[n], TEXT)
     need(S, "error text on %s" % n, d['error_color'], d[n], TEXT)
+# 2.1 (confirm-dialog contrast): libadwaita (zenity 4) reads --*-fg-color on :root, not only
+# @define-color. Missing fg variables left light-scheme dark text on the dark surfaces this file paints.
+root = g4[':root']
+for var in ("--window-fg-color", "--view-fg-color", "--headerbar-fg-color",
+            "--dialog-fg-color", "--card-fg-color", "--popover-fg-color", "--sidebar-fg-color"):
+    if var not in root or col(root[var]) != "#ffffff":
+        fails.append("%s: %s is %s, needs #ffffff" % (S, var, root.get(var)))
+need(S, "libadwaita window text (--window-fg-color)", col(root["--window-fg-color"]), d["window_bg_color"], TEXT)
+need(S, "libadwaita dialog text (--dialog-fg-color)", col(root["--dialog-fg-color"]), d["dialog_bg_color"], TEXT)
 ent = g4['entry']
 need(S, "entry text", col(ent['color']), col(ent['background-color']), TEXT)
 need(S, "entry placeholder", col(g4['entry > text > placeholder']['color']), col(ent['background-color']), DISABLED)
