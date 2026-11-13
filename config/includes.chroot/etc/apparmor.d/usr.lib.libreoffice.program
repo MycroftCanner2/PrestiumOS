@@ -17,15 +17,22 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   deny network inet6,
 
   /usr/lib/libreoffice/** mr,
-  /usr/lib/libreoffice/program/{oosplash,soffice.bin,soffice,xpdfimport,gengal.bin,ui-previewer} ix,
+  /usr/lib/libreoffice/program/{oosplash,soffice.bin,soffice,xpdfimport,gengal.bin,ui-previewer,senddoc} ix,
   /{,usr/}bin/{sh,dash,bash,uname,sed,grep,dirname,basename,readlink,ls,cat} ix,
   /etc/libreoffice/** r,
   /var/lib/libreoffice/** r,
   /etc/papersize r,
 
   owner @{HOME}/.config/libreoffice/ rw,
-  owner @{HOME}/.config/libreoffice/** rwk,
-  owner @{HOME}/.cache/libreoffice/** rwk,
+  owner @{HOME}/.config/libreoffice/** rwkl,
+  owner @{HOME}/.cache/libreoffice/ rw,
+  owner @{HOME}/.cache/libreoffice/** rwkl,
+  # 2.1: LibreOffice 25.x also keeps user data under the XDG data dir; without
+  # it the first run could not finish creating its user profile and showed
+  # "the installation is not complete" instead of opening. The "l" (link)
+  # permission is for its lock/link files in the profile and cache.
+  owner @{HOME}/.local/share/libreoffice/ rw,
+  owner @{HOME}/.local/share/libreoffice/** rwkl,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/ r,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/** r,
   owner "@{HOME}/I2P Browser/" r,

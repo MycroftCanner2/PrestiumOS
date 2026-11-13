@@ -7,6 +7,10 @@ include <tunables/global>
 profile ristretto /usr/bin/ristretto {
   include <abstractions/prestium-viewer>
   /usr/bin/ristretto mr,
+  # files in ~/Documents (and the other file folders, via prestium-user-files):
+  # explicit here so the folder and its files are readable
+  owner @{HOME}/Documents/ r,
+  owner @{HOME}/Documents/** r,
   owner @{HOME}/.config/ristretto/ rw,
   owner @{HOME}/.config/ristretto/** rwk,
   owner @{HOME}/.config/xfce4/ r,

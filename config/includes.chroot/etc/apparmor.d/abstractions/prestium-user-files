@@ -2,12 +2,17 @@
 # Pictures, Music, Videos, Public, Templates, OnionShare, the browsers' and torrents' own top-level
 # folders (I2P Browser, Torrents, Tor Browser), and unlocked volumes under /media. No dot directory,
 # nothing else in the home.
+  # read on the folders themselves (list them), and read on everything inside them
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/ r,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates,OnionShare}/** r,
   owner "@{HOME}/I2P Browser/" r,
   owner "@{HOME}/I2P Browser/**" r,
-  owner @{HOME}/Torrents/ r,
-  owner @{HOME}/Torrents/** r,
+  # Torrents files are downloaded by i2pd (uid 2000), not by the desktop user,
+  # so an "owner" rule never matches them. The user is in group i2ptorrents
+  # and i2pd writes the files group-readable (UMask=0007), so read is granted
+  # without the owner qualifier (the group check is the POSIX one).
+  @{HOME}/Torrents/ r,
+  @{HOME}/Torrents/** r,
   owner "@{HOME}/Tor Browser/" r,
   owner "@{HOME}/Tor Browser/**" r,
   /media/ r,

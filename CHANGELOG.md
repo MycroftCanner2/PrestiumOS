@@ -9,6 +9,34 @@ in 2.0. It is still built with live-build on Debian 13 "trixie".
 
 This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
 
+### Fixes: viewers, media, metadata, LibreOffice, sharing, volume, logs and menu
+- **Ristretto can view files in ~/Documents, VLC can open files in ~/Torrents, Metadata Cleaner
+  can clean files in ~/Documents, and the local Firefox can open files in ~/Torrents.**
+  Ristretto and VLC now state those folders explicitly in their profiles; the shared
+  file-folder abstraction grants read on ~/Torrents without the `owner` qualifier, because
+  Torrents files are downloaded by i2pd (uid 2000, group i2ptorrents) and an owner-only rule
+  never matched them. Metadata Cleaner's sandbox used to deny every home write in its child
+  profile (a deny wins over any allow in AppArmor), so mat2's `<name>.cleaned.<ext>` copies
+  in ~/Documents got "Permission denied"; the child now allows only that cleaned name in
+  ~/Documents. The local Firefox used to deny all read in ~/Torrents (`deny ... rw`); it now
+  reads there and is denied only writes, so I2P Torrents' file picker and Firefox can open
+  `.torrent` files there.
+- **LibreOffice opens again.** Its profile now allows the XDG data dir
+  (`~/.local/share/libreoffice`), the cache directory itself, link (`l`) permission for its
+  lock files, and exec of `senddoc`; without a writable user profile the first run showed
+  "the installation is not complete" instead of opening.
+- **I2P Sharing defaults to Low again** (32 KB/s, 30 %): `i2pd.conf` ships L/30, the
+  Connection Assistant labels Low as the default, and Medium is no longer the fallback.
+- **Volume Control opens on the Playback tab.** Both the menu and the panel now launch
+  `pavucontrol --tab=1` (tab 1 is Playback; without it pavucontrol picks the first tab
+  with streams, so it opened on Recording/Input/Output when nothing was playing).
+- **i2pd network logs show in Network Logs.** i2pd now logs at `info` instead of `warn`
+  (at warn the I2P tab stayed empty in normal operation), and `prestium-logs` accepts
+  syslog-origin i2pd entries by `SYSLOG_IDENTIFIER=i2pd`, since journald does not always
+  tag syslog messages with `_SYSTEMD_UNIT`.
+- **Log Out is removed from the menu.** Restart… and Shut Down… remain (the
+  `prestium-power` helper itself is unchanged).
+
 ### Build system and supply chain
 - **Tor Browser is the newest signed release at every build.** `scripts/tb-latest.sh` asks the Tor
   Project's update service for the version, then downloads from dist.torproject.org. The tarball must

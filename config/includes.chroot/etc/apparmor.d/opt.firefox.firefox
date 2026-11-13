@@ -95,8 +95,15 @@ profile prestium-localfox /opt/firefox/firefox{,-bin} {
   # to upload a file, put it there
   owner @{HOME}/Downloads/ rw,
   owner @{HOME}/Downloads/* rwk,
-  # never the I2P Browser's or I2P Torrents' folders (the .torrent read below is the only exception)
-  deny "@{HOME}/Torrents/**" rw,
+  # never write in the I2P Browser's or I2P Torrents' folders (the .torrent
+  # read in ~/I2P Browser below, and the read in ~/Torrents below, are the
+  # only exceptions: read-only, never write)
+  # ~/Torrents files are downloaded by i2pd (uid 2000, group i2ptorrents),
+  # so no "owner" qualifier and no read deny: the local Firefox may open
+  # (read) files there, e.g. a .torrent to add, but never write there.
+  @{HOME}/Torrents/ r,
+  @{HOME}/Torrents/** r,
+  deny "@{HOME}/Torrents/**" w,
   # 2.1: I2P Torrents' "Add .torrent" picker can open .torrent files the I2P Browser downloaded:
   # list ~/I2P Browser and its subfolders, read *.torrent there. Read-only, nothing else in
   # that folder (the I2P Browser's other downloads stay unreadable), no write anywhere in it.

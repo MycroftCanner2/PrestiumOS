@@ -61,12 +61,12 @@ orig_qty = {f: quantities(orig[f]) for f in orig}
 orig_len = {s: re.findall(r"^\w+\.length = \d+$", sect(os.path.join(D, "tunnels.conf"), s), re.M)
             for s in ("socks-outproxy-tcp", "socks-outproxy-udp")}
 rc, st = run("status")
-check(rc == 0 and st.get("ok") and st["hops"] == 3 and st["share"] == "medium" and st["outproxy"] == "acetone"
-      and st["port"] == 21437, "status of the shipped files: 3 hops, medium, Acetone, port (%s)" % st)
-# 2.1: Medium is the default share level: the shipped i2pd.conf is exactly the preset (64 KB/s, 50 %)
-check(re.findall(r"^(bandwidth|share) = (\S+)$", orig["i2pd.conf"], re.M) == [("bandwidth", "64"), ("share", "50")]
+check(rc == 0 and st.get("ok") and st["hops"] == 3 and st["share"] == "low" and st["outproxy"] == "acetone"
+      and st["port"] == 21437, "status of the shipped files: 3 hops, low, Acetone, port (%s)" % st)
+# 2.1: Low is the default share level: the shipped i2pd.conf is exactly the preset (L, 30 %)
+check(re.findall(r"^(bandwidth|share) = (\S+)$", orig["i2pd.conf"], re.M) == [("bandwidth", "L"), ("share", "30")]
       and re.search(r"^notransit = false$", orig["i2pd.conf"], re.M) and re.search(r"^floodfill = false$", orig["i2pd.conf"], re.M),
-      "shipped i2pd.conf: bandwidth 64, share 50 (medium); transit on, floodfill off as before")
+      "shipped i2pd.conf: bandwidth L, share 30 (low); transit on, floodfill off as before")
 
 for req, why in ((dict(hops=0, share="low", outproxy="acetone"), "0 hops"),
                  (dict(hops=8, share="low", outproxy="acetone"), "8 hops"),
@@ -129,10 +129,10 @@ check(rc != 0 and all(open(os.path.join(D, f)).read() == before[f] for f in befo
 rc, st = run("apply", dict(hops=3, share="low", outproxy="acetone"))
 check(rc == 0 and st["share"] == "low" and st["outproxy"] == "acetone" and re.search(r"^bandwidth = L$", open(main).read(), re.M)
       and re.search(r"^share = 30$", open(main).read(), re.M), "apply low: bandwidth L, share 30")
-rc, st = run("apply", dict(hops=3, share="medium", outproxy="acetone"))
-check(rc == 0 and st["share"] == "medium" and st["outproxy"] == "acetone" and st["hops"] == 3
-      and re.findall(r"^(bandwidth|share) = (\S+)$", open(main).read(), re.M) == [("bandwidth", "64"), ("share", "50")],
-      "back to defaults (3 hops, medium, Acetone): bandwidth and share as shipped")
+rc, st = run("apply", dict(hops=3, share="low", outproxy="acetone"))
+check(rc == 0 and st["share"] == "low" and st["outproxy"] == "acetone" and st["hops"] == 3
+      and re.findall(r"^(bandwidth|share) = (\S+)$", open(main).read(), re.M) == [("bandwidth", "L"), ("share", "30")],
+      "back to defaults (3 hops, low, Acetone): bandwidth and share as shipped")
 check(all(quantities(open(os.path.join(D, f)).read()) == orig_qty[f] for f in orig_qty), "quantities still as shipped after every apply")
 
 h = open(HELPER).read()
@@ -150,9 +150,9 @@ if shutil.which("visudo"):
 else:
     print("SKIP visudo missing")
 app = open(os.path.join(I, "usr/local/bin/prestium-i2p-assistant")).read()
-check('("medium", "Medium: 50 % of 64 KB/s (default)")' in app and app.count("(default)\")") == 2
-      and 'st.get("share") or "medium", self.share["medium"]' in app,
-      "assistant: Medium labelled default and chosen when the share level was set by hand")
+check('("low", "Low: 30 % of 32 KB/s (default)")' in app and app.count("(default)\")") == 2
+      and 'st.get("share") or "low", self.share["low"]' in app,
+      "assistant: Low labelled default and chosen when the share level was set by hand")
 check('APP_ID = "org.prestium.I2PConnectionAssistant"' in app and
       os.path.exists(os.path.join(I, "usr/share/applications/org.prestium.I2PConnectionAssistant.desktop")),
       "desktop file named after the app ID (panel icon)")

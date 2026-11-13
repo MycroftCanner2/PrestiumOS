@@ -32,7 +32,17 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
     # (Metadata Cleaner has mat2 write the cleaned copy to /tmp, then moves it itself)
-    deny @{HOME}/** w,
+    # No blanket "deny @{HOME}/** w" here (unlike Loupe's child): a deny wins
+    # over any allow in AppArmor, so it would also deny the cleaned copy
+    # below and every file in ~/Documents got "Permission denied". Writes
+    # elsewhere in the home stay denied by default (viewer-bwrap denies the
+    # home's own files and dot directories, and nothing else is allowed).
+    # mat2's helpers write "<name>.cleaned.<ext>" next to the original in
+    # ~/Documents (the GUI cleans files in place there, unlike the file
+    # manager's wrapper which uses ~/Documents/.remove-metadata.XXXXXX);
+    # without this the helpers got "Permission denied" for every file in
+    # Documents. Only that cleaned name, only in ~/Documents.
+    owner "@{HOME}/Documents/**.cleaned.*" w,
     /usr/bin/{ffmpeg,exiftool,perl} mrix,
     /usr/share/perl5/** r,
     /usr/lib/@{multiarch}/perl*/** mr,

@@ -14,7 +14,7 @@
 # the five folders, labelled i2P Browser, i2P Torrents, Tor Browser, Documents, Downloads.
 # Mail and chat read and write files directly in ~/Downloads (attachments), never in the three
 # app-specific folders; the editors read every file folder (to open downloads) but write only
-# ~/Documents. The local Firefox may also read *.torrent in ~/I2P Browser, for I2P Torrents.
+# ~/Documents. The local Firefox may also read *.torrent in ~/I2P Browser and files in ~/Torrents, for I2P Torrents.
 # Checked on the compiled profiles (apparmor_parser -p, tests/aa_eval.py), plus the launchers, app
 # settings and hook 0500 that create and point at the folders.
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); A=$R/config/includes.chroot/etc/apparmor.d; I=$R/config/includes.chroot; fail=0
@@ -167,7 +167,7 @@ for pair in "usr.bin.claws-mail claws-mail" "usr.bin.gajim gajim" "usr.bin.pidgi
   run "$1" <<EOT
 allow $2 $H/Downloads/f.pdf rw
 deny $2 "$H/I2P Browser/f.pdf" rw
-deny $2 $H/Torrents/f.pdf rw
+deny $2 $H/Torrents/f.pdf w
 deny $2 "$H/Tor Browser/f.pdf" rw
 deny $2 $H/Documents/f.pdf w
 deny $2 $H/Desktop/f.pdf w
@@ -184,7 +184,9 @@ deny prestium-localfox "$H/I2P Browser/new.torrent" w
 deny prestium-localfox "$H/I2P Browser/f.pdf" r
 deny prestium-localfox "$H/I2P Browser/f.torrent.part" r
 deny prestium-localfox "$H/I2P Browser/f.torrent" m
-deny prestium-localfox $H/Torrents/f.torrent r
+allow prestium-localfox $H/Torrents/f.torrent r
+allow prestium-localfox $H/Torrents/sub/f.torrent r
+deny prestium-localfox $H/Torrents/f.torrent w
 allow prestium-localfox $H/Downloads/f.torrent r
 deny prestium-localfox "$H/Tor Browser/f.torrent" r
 deny prestium-localfox $H/.librewolf/f.torrent r

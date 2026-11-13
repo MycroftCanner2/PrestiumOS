@@ -45,7 +45,7 @@
   </menu>
   <menu id="/Multimedia" label="Multimedia" icon="applications-multimedia">
     <item label="Volume Control" icon="multimedia-volume-control">
-      <action name="Execute" command="prestium-run pavucontrol" />
+      <action name="Execute" command="prestium-run pavucontrol --tab=1" />
     </item>
     <item label="Audacity" icon="audacity">
       <action name="Execute" command="prestium-run audacity" />
@@ -163,9 +163,6 @@
     <item label="Reload Desktop Settings" icon="view-refresh"><action name="Reconfigure" /></item>
   </menu>
   <separator />
-  <item label="Log Out…" icon="system-log-out">
-    <action name="Execute" command="/usr/local/bin/prestium-power logout" />
-  </item>
   <item label="Restart…" icon="system-reboot">
     <action name="Execute" command="/usr/local/bin/prestium-power reboot" />
   </item>

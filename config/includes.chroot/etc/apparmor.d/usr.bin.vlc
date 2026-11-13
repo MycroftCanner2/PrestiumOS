@@ -12,6 +12,11 @@ profile vlc /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} {
   /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} mr,
   /usr/lib/@{multiarch}/vlc/** mr,
   /usr/lib/@{multiarch}/vlc/vlc-cache-gen ix,
+  # I2P Torrents files in ~/Torrents: downloaded by i2pd (uid 2000, group
+  # i2ptorrents), so no "owner" qualifier (see prestium-user-files); the
+  # folder and its files are readable.
+  @{HOME}/Torrents/ r,
+  @{HOME}/Torrents/** r,
   owner @{HOME}/.config/vlc/ rw,
   owner @{HOME}/.config/vlc/** rwk,
   owner @{HOME}/.local/share/vlc/ rw,

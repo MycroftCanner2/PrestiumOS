@@ -9,7 +9,9 @@ through the setgid directory). Nothing it does depends on input from the user: t
 here, and it takes no arguments. The desktop opens the files with prestium-logs-view (read-only).
 
 Cleaning: an entry is kept only if the journal says it came from the unit itself (_SYSTEMD_UNIT, a
-field only journald sets) or from systemd (PID 1) about that unit. Every control, format (bidi,
+field only journald sets), from systemd (PID 1) about that unit, or — for i2pd only, which logs via
+syslog — with SYSLOG_IDENTIFIER=i2pd (journald does not always tag syslog messages with
+_SYSTEMD_UNIT). Every control, format (bidi,
 zero-width), private-use, unassigned, surrogate and line/paragraph separator character in it is
 replaced with "?", tabs become spaces, and each line is cut at 1000 characters, so a log line can't
 move the cursor, colour the terminal, reorder text or pretend to be several lines.
@@ -87,7 +89,17 @@ def field(entry, name):
 def belongs(entry, unit):
     if field(entry, "_SYSTEMD_UNIT") == unit:
         return True
-    return field(entry, "_PID") == "1" and field(entry, "UNIT") == unit
+    if field(entry, "_PID") == "1" and field(entry, "UNIT") == unit:
+        return True
+    # i2pd logs via syslog (--log=syslog), and journald does not always tag
+    # syslog-origin messages with _SYSTEMD_UNIT, so journalctl -u i2pd.service
+    # can return them with only SYSLOG_IDENTIFIER=i2pd set. Accept that ident
+    # for this unit only (an arbitrary process could forge an ident, but the
+    # journal itself, not the message, is what prestium-logs reads; Tor and
+    # onion-grater log to stdout/stderr and keep the strict _SYSTEMD_UNIT rule).
+    if unit == "i2pd.service" and field(entry, "SYSLOG_IDENTIFIER") == "i2pd":
+        return True
+    return False
 
 
 def render(unit, json_lines):

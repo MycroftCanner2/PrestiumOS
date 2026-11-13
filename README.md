@@ -51,7 +51,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   peers; its *Add .torrent* button can open `.torrent` files from the I2P Browser's download folder
   (read-only). Torrents keep their list and progress across i2pd restarts (persistent destination and
   DHT peer list), on the Connection Assistant's hops (default 3). i2pd relays
-  other people's traffic at the *Medium* share level by default (64 KB/s, at most half of it for
+  other people's traffic at the *Low* share level by default (32 KB/s, at most 30 % of it for
   relaying); the I2P Connection Assistant sets Low, Medium or High.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's

@@ -78,7 +78,7 @@
     "tooltip-format": "Volume {volume} % (click: mixer, right-click: mute)",
     "scroll-step": 5,
     "max-volume": 100,
-    "on-click": "prestium-run pavucontrol",
+    "on-click": "prestium-run pavucontrol --tab=1",
     "on-click-right": "/usr/local/bin/prestium-media-key mute"
   },
   "battery": {

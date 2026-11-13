@@ -80,7 +80,7 @@ if command -v apparmor_parser >/dev/null; then
       grep -q 'kdbx' <<<"$al" && bad "$f may open KeePassXC databases" || ok "$f: no *.kdbx"; fi
     # never a write anywhere in the home outside the file folders and the app's own dot directories
     hw=$(grep -E '@\{HOME\}/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' \
-      | grep -vE '@\{HOME\}/(\.Private/|tmp/|Documents/\.remove-metadata\*/\*\*\.cleaned\.\*" |Documents/"? |Documents/\*\*"? |Pictures/vlcsnap|\.cache/|\.config/|\.local/share/|\.local/state/|\.audacity-data/|\.gnupg/|\*\*\.kdbx|\.Xauthority|\.fonts|\.recently)' \
+      | grep -vE '@\{HOME\}/(\.Private/|tmp/|Documents/\.remove-metadata\*/\*\*\.cleaned\.\*" |Documents/\*\*\.cleaned\.\*" |Documents/"? |Documents/\*\*"? |Pictures/vlcsnap|\.cache/|\.config/|\.local/share/|\.local/state/|\.audacity-data/|\.gnupg/|\*\*\.kdbx|\.Xauthority|\.fonts|\.recently)' \
       | grep -vE '@\{HOME\}/(\.\{,cache/\}fontconfig|tmp/|\.xsession-errors w|\.local/ rw|\.pulse-cookie|\.pulse/)' )
     [ -z "$hw" ] && ok "$f: writes only the shared ~/Documents and its own directories" || bad "$f home writes: $hw"
     # 2.1 (L-5, revised): the shared ~/Documents is writable (the editors' folder); no write in any other file folder
