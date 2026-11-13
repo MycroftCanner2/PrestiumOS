@@ -60,6 +60,10 @@ or pass it as `sudo PRESTIUM_GRUB_PASSWORD_HASH=grub.pbkdf2.sha512.... ./build.s
 `grub-mkpasswd-pbkdf2` works too). Without one, the build uses the hash of a random password nobody
 knows: the menu is locked for everyone, which is the safe default for a release; build with your own
 hash when you need to edit boot entries. The manifest says which (`boot_menu_lock`).
+Edited entries still have to follow the image's kernel command line policy
+(`config/includes.chroot/usr/share/prestium/boot/cmdline.policy`). The initramfs refuses any option
+the policy doesn't list and restarts the computer. To boot with other options, add them to the policy
+and rebuild.
 
 An interrupted build can be continued with `sudo ./build.sh --resume`; `sudo ./build.sh --clean`
 starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (much longer emulated).
@@ -96,6 +100,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash, exported for submenus, also in the EFI image's and per-platform grub.cfg; needs mtools), every entry `--unrestricted`; isolinux `allowoptions 0`; every kernel line checked against a banned list (shells, init, security modules, debug, persistence, findiso=); findiso= and loopback.cfg removed |
 | `scripts/grub-pbkdf2.py` | makes the GRUB password hash (`--random` for one nobody knows) |
 | `config/hooks/live/9010-prestium-verity-boot.hook.binary` | checks the image against its dm-verity hash tree and puts the root hash and `panic=10` (no initramfs shell) on every boot entry |
+| `config/hooks/live/9030-prestium-boot-cmdline.hook.binary` | only the image's own kernel command line: GRUB's EFI config searches for this build's `/.disk/prestium-<id>` on the boot disk first (no other disk's `/.disk/info`), reboots when it's missing; every boot entry checked against `cmdline.policy` with the initramfs's own code; no chainloader/loopback/load_env/foreign search or kernel; policy = `LB_BOOTAPPEND_LIVE`; no built-in kernel command line; the initrd runs the guard (needs mtools) |
 | `config/bootloaders/` | boot menu entries: Prestium 2.1, nomodeset, camera and microphone off |
 | `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile |
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |

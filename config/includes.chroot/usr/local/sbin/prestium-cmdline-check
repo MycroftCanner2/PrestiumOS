@@ -1,0 +1,29 @@
+#!/bin/sh
+# Prestium 2.1: is the kernel command line this image's own? (/usr/share/prestium/boot/cmdline.policy)
+#   prestium-cmdline-check [CMDLINE_FILE [POLICY]]   prints the problems, exit 1 when there are any
+#   prestium-cmdline-check --enforce                 prestium-cmdline-check.service, before AppArmor
+#     loads: on a mismatch it explains on the console and in the journal, waits 10 s and fails, and the
+#     unit's FailureAction restarts the computer.
+# The initramfs refuses such a boot first (hook prestium-cmdline); this second check, from the verified
+# image, also covers an initramfs without the guard (an old or foreign initrd next to this image).
+# prestium-safety-notify runs it too and alerts ("Protection NOT active") if both were bypassed.
+L=/usr/share/prestium/boot/cmdline-guard.sh
+if [ ! -r "$L" ]; then echo "prestium-cmdline-check: $L missing"; [ "${1:-}" = --enforce ] && sleep 10; exit 1; fi
+# shellcheck disable=SC1090,SC1091
+. "$L"
+if [ "${1:-}" = --enforce ]; then
+	[ $# = 1 ] || { echo "prestium-cmdline-check: --enforce checks only /proc/cmdline"; exit 2; }
+	c=$(cat /proc/cmdline 2>/dev/null) || c=
+	if p=$(prestium_cmdline_problems "$c" /usr/share/prestium/boot/cmdline.policy); then
+		echo "Prestium: the kernel command line is this image's own."
+		exit 0
+	fi
+	prestium_cmdline_report "$p"
+	echo "Restarting in 10 seconds."
+	sleep 10
+	exit 1
+fi
+F=${1:-/proc/cmdline}
+P=${2:-/usr/share/prestium/boot/cmdline.policy}
+c=$(cat "$F" 2>/dev/null) || { echo "cannot read $F"; exit 1; }
+prestium_cmdline_problems "$c" "$P"

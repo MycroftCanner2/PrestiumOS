@@ -3,6 +3,8 @@
 # active: the boot-medium watchdog did not arm (or died), or the shutdown memory wipe was not
 # prepared. Started from the session autostart; checks every 20 s and alerts once per new problem.
 # 2.1: also AppArmor (module enabled, apparmor.service active, Prestium's profiles in enforce mode).
+# 2.1 (boot command line): also when the computer was not started with the image's own kernel command
+# line (prestium-cmdline-check), or when the boot-time check of it did not run.
 D=/run/prestium/safety
 declare -A shown
 alert() {   # $1 key, $2 text
@@ -15,6 +17,7 @@ toram=; grep -qw toram /proc/cmdline && toram=1
 AA_ENABLED=${PRESTIUM_AA_ENABLED:-/sys/module/apparmor/parameters/enabled}
 AA_PROFILES=${PRESTIUM_AA_PROFILES:-/sys/kernel/security/apparmor/profiles}
 AA_PRESTIUM_PROFILES="torbrowser_firefox librewolf prestium-localfox claws-mail gajim pidgin onionshare feather libreoffice thelounge thelounge-tor loupe ristretto vlc file-roller xarchiver featherpad mat2 metadata-cleaner gimp audacity keepassxc kleopatra"
+CMDLINE_CHECK=${PRESTIUM_CMDLINE_CHECK:-/usr/local/sbin/prestium-cmdline-check}
 sleep 15
 while :; do
   for f in "$D"/*; do
@@ -60,6 +63,14 @@ while :; do
       printf '%s\n' "$aa_list" | grep -qx "$pr (enforce)" \
         || alert "aa:$pr" "The AppArmor profile \"$pr\" is not loaded in enforce mode. That application may run unconfined. Restart Prestium."
     done
+  fi
+  # 2.1 (boot command line): the initramfs and prestium-cmdline-check.service refuse to start with a
+  # kernel command line that is not the image's own; this alert means both were bypassed or did not run
+  if ! cl=$("$CMDLINE_CHECK" 2>&1); then
+    alert unit:cmdline "This computer was not started with Prestium's own boot settings ($(printf '%s' "$cl" | tr -c '[:alnum:] =.,:_/+()<>-' ';' | head -c 300)). AppArmor, dm-verity and other protections may be off. Shut down and start Prestium again from its own boot menu."
+  elif ! systemctl -q is-active prestium-cmdline-check.service; then
+    st=$(systemctl show -p ActiveState --value prestium-cmdline-check.service)
+    [ "$st" = activating ] || alert unit:cmdline "The boot settings check did not run (prestium-cmdline-check.service: $st), so Prestium cannot confirm it was started with its own boot settings. AppArmor, dm-verity and other protections may be off. Shut down and start Prestium again from its own boot menu."
   fi
   if systemctl -q is-failed prestium-initramfs-shutdown.service; then
     alert unit:wipe "The shutdown memory wipe could not be prepared. Memory will NOT be overwritten at shutdown; the kernel still zeroes freed memory (init_on_free=1), but no final wipe pass runs."

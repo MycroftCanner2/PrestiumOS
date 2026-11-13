@@ -27,6 +27,8 @@
 #    loopback.cfg); Prestium doesn't support that, so findiso= and loopback.cfg are removed.
 #  - toram=<file> is not banned: it names one image, which must still pass the dm-verity check
 #    (9989-prestium-verity.sh), so a wrong file fails closed (no boot); plain toram works.
+#    2.1 (boot command line): hook 9030 and the initramfs check every entry against the whole policy
+#    (/usr/share/prestium/boot/cmdline.policy), which allows only plain toram.
 # Runs in binary/ on the build host, after 9000 (labels) and 9010 (dm-verity root hash, panic=10).
 set -e
 G=boot/grub/grub.cfg

@@ -56,6 +56,9 @@ modernization of the 2023 Prestium build, with tighter security and new features
   themselves are not covered yet; see the CHANGELOG's Known security limits).
 - **Fail-closed safety alerts** when the USB watchdog, MAC guard, Wayland broker, ptrace protection or
   shutdown memory wipe isn't working.
+- **Only its own boot settings:** Prestium refuses to start, and restarts the computer, when the
+  kernel command line isn't exactly the one in its boot menu. The initramfs checks first, then a
+  service runs before AppArmor loads. GRUB loads only this stick's own boot files.
 - **Hardware:** current firmware, PipeWire audio, HiDPI scaling, laptop keys, touchpad settings and an
   on-screen keyboard.
 
@@ -64,7 +67,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Someone who can write to the USB stick can change the next boot.** dm-verity checks the root
   filesystem and the boot menu is password-locked, but both checks live in unsigned files on the stick:
   the boot menus (`grub.cfg`, with the root hash and the password hash), the initramfs and live-boot in
-  it. Secure Boot covers only shim, GRUB and the kernel. Replacing those files together with the image
+  it, and the initramfs check that refuses any kernel command line other than the image's own. Secure Boot covers only shim, GRUB and the kernel. Replacing those files together with the image
   defeats both checks. The future fix is a signed unified kernel image (UKI: kernel, initramfs and
   command line in one Secure Boot-signed file); it isn't implemented. Keep the stick with you, and
   check it against a signed release from another computer (see Verify a download).

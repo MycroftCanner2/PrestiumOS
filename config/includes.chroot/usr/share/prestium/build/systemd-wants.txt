@@ -46,3 +46,4 @@
 /etc/systemd/system/graphical.target.wants/prestium-wl-broker.service /etc/systemd/system/prestium-wl-broker.service
 /etc/systemd/system/timers.target.wants/prestium-gnupg-check.timer /etc/systemd/system/prestium-gnupg-check.timer
 /etc/systemd/system/sysinit.target.wants/prestium-bootclock.service /etc/systemd/system/prestium-bootclock.service
+/etc/systemd/system/sysinit.target.wants/prestium-cmdline-check.service /etc/systemd/system/prestium-cmdline-check.service

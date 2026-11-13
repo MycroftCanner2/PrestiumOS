@@ -80,8 +80,43 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   `systemd.wants=`, `systemd.run*`, `systemd.mask=`, `systemd.confirm_spawn`, `systemd.setenv=`,
   `debug`, `persistence*`, `findiso=`, `fromiso=`, `live-media=`, `bootfrom=`, `module.sig_enforce=0`,
   a `panic=` other than 10 or a missing `panic=10`. live-build's `findiso=${iso_path}` and
-  `loopback.cfg` (booting the ISO file from another disk's GRUB) are removed. `toram=<file>` is
-  allowed: the named image must still pass dm-verity, so a wrong file just doesn't boot.
+  `loopback.cfg` (booting the ISO file from another disk's GRUB) are removed. This word check lets
+  `toram=<file>` through, because the named image must still pass dm-verity. The command line policy
+  below refuses it anyway; plain `toram` is allowed.
+
+- **Only the image's own kernel command line boots.** One policy,
+  `/usr/share/prestium/boot/cmdline.policy`, lists the command line: every option of `auto/config`'s
+  APPEND, the dm-verity root hash, `dm-verity-oncorruption=panic` and `panic=10`, each exactly once.
+  Only these may be added: `quiet`, `splash`, `nomodeset`, `prestium.nocammic`, `nomacspoof`,
+  `verify-checksums`, plain `toram`, and the `BOOT_IMAGE=`/`initrd=` that GRUB and isolinux add.
+  Anything else stops the boot: a missing option, an extra one (`apparmor=0`, `init=`, `break=`,
+  `fetch=`, `root=`, `bootconfig` and so on), an option given twice, odd characters (quotes, `$`,
+  tabs) or a missing policy. The check runs three times:
+  - The initramfs runs it first. The initramfs-tools hook `prestium-cmdline` puts it into the
+    initramfs copy of `/init`, right after `/scripts/functions`. That's before `/init` reads `break=`,
+    `init=`, `debug` or `panic=`, before any initramfs script runs and before the root filesystem is
+    mounted. On a mismatch it shows what's wrong and restarts the computer after 10 seconds, the same
+    as `panic=10`. It never opens a shell, even when `panic=` is missing.
+  - `prestium-cmdline-check.service` runs it again from the verified image, before AppArmor loads
+    and before `sysinit.target`. A mismatch restarts the computer (`FailureAction=reboot-force`). This
+    also covers an initramfs that lacks the check, such as an old or foreign initrd.
+  - `prestium-safety-notify` shows a "Protection NOT active" alert that names the wrong options. It
+    also alerts when the boot-time check didn't run.
+  GRUB (UEFI) now boots only this stick's own files. live-build's GRUB config in the EFI image used to
+  pick the first disk that had `/.disk/info`, which every Debian live stick has, and then loaded that
+  disk's menu, kernel and initramfs. It now searches for `/.disk/prestium-<id>`, which is unique to
+  each build (the first 32 hex digits of the root hash), and tries the disk GRUB started from first.
+  If that file is missing, GRUB restarts the computer instead of booting anything else. The new build
+  hook 9030 stops the build in any of these cases:
+  - a boot entry in any GRUB or isolinux config fails the policy, using the same code as the initramfs
+  - an entry carries another root hash
+  - a config uses `chainloader`, `linux16`, `multiboot`, `loopback`, `load_env`/`save_env`, any other
+    `search`, or `configfile`/`source` outside `/boot/grub`
+  - isolinux uses `config`, `localboot` or any `com32` module other than `hdt.c32`
+  - the policy drifts from `LB_BOOTAPPEND_LIVE`
+  - the kernel has a built-in or forced command line (`CONFIG_CMDLINE*`, `CONFIG_BOOT_CONFIG_FORCE`)
+  - the initrd in the image doesn't contain the check
+  `tests/test_boot_cmdline_guard.sh` tests all of this.
 
 ### Base system
 - **Tor Browser 16.0.1** (or newer, as above) with Firefox security fixes and tor 0.4.9.16.
@@ -470,7 +505,9 @@ Not changed in 2.1, so you know where the edges are:
   password hash, `isolinux/live.cfg`, the GRUB config in the EFI image), the initramfs and live-boot
   in it are unsigned files on the stick. Whoever can write to the stick can replace them together with
   the image, remove the root hash or `panic=10`, or reset the password, and the next boot trusts the
-  changes. A second stick that carries `/.disk/info` can also be picked up by GRUB's search. The fix is
+  changes, including the kernel command line policy and its check in the initramfs. GRUB now looks
+  only for this build's own marker file, but a copy of the stick (or a disk made to look like it) can
+  still answer that search when the boot disk doesn't. The fix is
   a signed unified kernel image (kernel, initramfs and command line in one Secure Boot-signed file)
   booted directly by shim, which isn't implemented yet. Until then, keep the stick in your possession
   and check it against a signed release from another computer (below). What dm-verity

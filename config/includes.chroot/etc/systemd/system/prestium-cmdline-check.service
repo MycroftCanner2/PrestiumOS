@@ -1,0 +1,46 @@
+# Prestium 2.1: refuse to run with a kernel command line that is not this image's own (second check,
+# after the initramfs one; see /usr/local/sbin/prestium-cmdline-check). Runs before AppArmor loads its
+# profiles and before sysinit.target; a mismatch restarts the computer (FailureAction=reboot-force),
+# as the initramfs check and panic=10 do. It only reads /proc/cmdline and its own files.
+[Unit]
+Description=Prestium kernel command line check
+DefaultDependencies=no
+Before=sysinit.target apparmor.service shutdown.target
+Conflicts=shutdown.target
+FailureAction=reboot-force
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/prestium-cmdline-check --enforce
+StandardOutput=journal+console
+StandardError=journal+console
+TimeoutStartSec=60
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+PrivateIPC=yes
+ProtectHostname=yes
+ProtectClock=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectProc=invisible
+RestrictAddressFamilies=AF_UNIX
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+UMask=0077
+
+[Install]
+WantedBy=sysinit.target

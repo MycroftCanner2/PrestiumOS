@@ -1,0 +1,44 @@
+#!/bin/sh
+# Prestium 2.1: the initramfs refuses a kernel command line that is not this image's own
+# (/usr/share/prestium/boot/cmdline.policy, checked by cmdline-guard.sh). mkinitramfs copies
+# initramfs-tools' /init before it runs the hooks; this hook puts the guard into that copy, right after
+# "/scripts/functions" is sourced. That is before /init reads break=, init=, debug or panic= from the
+# command line, before any initramfs script runs (init-top, plymouth, live-boot) and before the root
+# file system is mounted. On a mismatch the guard prints what is wrong and restarts the computer after
+# 10 s; it never opens a shell. initramfs-tools' own init file is not changed, only the initramfs copy.
+# A changed initramfs-tools (the line not found exactly once) stops the build: mkinitramfs fails, so
+# update-initramfs in live-build's chroot_hacks fails. Hook 9030 checks the finished initrd as well.
+set -e
+PREREQ=""
+prereqs() { echo "$PREREQ"; }
+case "$1" in prereqs) prereqs; exit 0 ;; esac
+# PRESTIUM_HOOK_ROOT: only for tests/test_boot_cmdline_guard.sh (a copy of the files); empty in mkinitramfs
+S=${PRESTIUM_HOOK_ROOT:-}/usr/share/prestium/boot
+M='# prestium-cmdline'
+[ -n "${DESTDIR:-}" ] && [ -f "$DESTDIR/init" ] || { echo "E: prestium-cmdline: no \$DESTDIR/init" >&2; exit 1; }
+for f in cmdline-guard.sh cmdline.policy; do
+	[ -f "$S/$f" ] || { echo "E: prestium-cmdline: $S/$f missing" >&2; exit 1; }
+done
+mkdir -p "$DESTDIR/scripts" "$DESTDIR/conf"
+cp "$S/cmdline-guard.sh" "$DESTDIR/scripts/prestium-cmdline-guard"
+cp "$S/cmdline.policy" "$DESTDIR/conf/prestium-cmdline.policy"
+chmod 0644 "$DESTDIR/scripts/prestium-cmdline-guard" "$DESTDIR/conf/prestium-cmdline.policy"
+I=$DESTDIR/init
+if ! grep -qF "$M" "$I"; then
+	n=$(grep -cxF '. /scripts/functions' "$I" || true)
+	[ "$n" = 1 ] || { echo "E: prestium-cmdline: initramfs-tools' init changed ('. /scripts/functions' found $n times)" >&2; exit 1; }
+	awk -v m="$M" '{ print } $0 == ". /scripts/functions" {
+		print ". /scripts/prestium-cmdline-guard " m
+		print "prestium_cmdline_guard " m }' "$I" > "$I.prestium"
+	cat "$I.prestium" > "$I"
+	rm -f "$I.prestium"
+fi
+[ "$(grep -cF "$M" "$I")" = 2 ] || { echo "E: prestium-cmdline: guard not in the initramfs init" >&2; exit 1; }
+# the guard comes before the command line is parsed and before the first initramfs script runs
+awk -v m="$M" 'index($0, "prestium_cmdline_guard " m) == 1 { g = NR }
+	/^for x in \$\(cat \/proc\/cmdline\); do$/ { c = NR }
+	/^maybe_break top$/ { b = NR }
+	END { exit !(g && c && b && g < c && g < b) }' "$I" \
+	|| { echo "E: prestium-cmdline: the guard is not before the command-line parsing in init" >&2; exit 1; }
+sh -n "$I"
+sh -n "$DESTDIR/scripts/prestium-cmdline-guard"

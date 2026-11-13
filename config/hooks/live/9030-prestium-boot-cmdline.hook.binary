@@ -1,0 +1,159 @@
+#!/bin/sh
+# Prestium 2.1 (boot command line): the image boots only with its own kernel command line.
+#  1. GRUB (UEFI) finds this image's own files, not another disk's. live-build's early config in the EFI
+#     partition image (boot/grub/efi.img ::boot/grub/grub.cfg) took the first disk with /.disk/info,
+#     which every Debian live stick has, and then loaded that disk's grub.cfg, kernel and initramfs.
+#     It now looks for /.disk/prestium-<id> (the first 32 hex digits of this build's dm-verity root
+#     hash, so unique per build: the hash tree salt is random) on the disk GRUB itself was started from
+#     first ($cmdpath), and restarts the computer when it is not found instead of trying anything else.
+#  2. Every kernel line in every boot config (boot/grub/*.cfg, boot/grub/<platform>/grub.cfg, the EFI
+#     image's grub.cfg, isolinux/*.cfg) is checked against the image's policy
+#     (chroot /usr/share/prestium/boot/cmdline.policy) with the same code the initramfs runs
+#     (cmdline-guard.sh), including what the boot loader adds (BOOT_IMAGE=, isolinux's initrd=); the
+#     dm-verity hash must be this build's. Only "linux" (GRUB) / "linux" + "append" (isolinux) entries
+#     for /live/vmlinuz* are allowed: no chainloader, linux16, multiboot, loopback, load_env/save_env,
+#     extra search, and configfile/source only from /boot/grub.
+#  3. The policy's required options are exactly live-build's LB_BOOTAPPEND_LIVE (config/binary, from
+#     auto/config) without "quiet splash", plus hook 9010's dm-verity options and panic=10.
+#  4. The kernel has no built-in or forced command line (CONFIG_CMDLINE*, CONFIG_BOOT_CONFIG_FORCE).
+#  5. The initramfs in the image runs the guard (initramfs-tools hook prestium-cmdline): unpacked with
+#     the chroot's unmkinitramfs. PRESTIUM_SKIP_INITRD_CHECK=1 skips this (tests only).
+# Runs in binary/ on the build host, after 9010 (root hash, panic=10) and 9020 (menu lock); needs mtools.
+set -e
+C=../chroot
+POL=$C/usr/share/prestium/boot/cmdline.policy
+LIB=$C/usr/share/prestium/boot/cmdline-guard.sh
+[ -f "$POL" ] && [ -f "$LIB" ] || { echo "E: $POL or $LIB missing"; exit 1; }
+H=$(cat ../prestium-roothash.tmp 2>/dev/null || true)
+echo "$H" | grep -qxE '[0-9a-f]{64}' || { echo "E: no dm-verity root hash in ../prestium-roothash.tmp (hook 9010)"; exit 1; }
+ID=$(printf %.32s "$H")
+
+## 1. GRUB finds this image's own files
+[ -f .disk/info ] || { echo "E: binary/.disk/info missing (live-build binary_disk)"; exit 1; }
+for f in .disk/prestium-*; do [ -e "$f" ] && { echo "E: $f already there"; exit 1; }; done
+echo "Prestium boot medium marker (GRUB searches for this file name; hook 9030)" > ".disk/prestium-$ID"
+[ -n "${SOURCE_DATE_EPOCH:-}" ] && touch -d "@$SOURCE_DATE_EPOCH" ".disk/prestium-$ID"
+EFI=boot/grub/efi.img
+[ -f "$EFI" ] || { echo "E: $EFI missing (grub-efi)"; exit 1; }
+if ! command -v mtype >/dev/null || ! command -v mcopy >/dev/null; then echo "E: mtools (mtype, mcopy) needed for $EFI"; exit 1; fi
+E=../prestium-efi-grub.cfg.9030
+mtype -i "$EFI" ::boot/grub/grub.cfg | tr -d '\r' > "$E"
+[ "$(grep -cx 'search --set=root --file /.disk/info' "$E")" = 1 ] || { echo "E: $EFI: live-build's 'search --set=root --file /.disk/info' not found exactly once"; exit 1; }
+grep -q 'prestium-' "$E" && { echo "E: $EFI already searches for a Prestium marker"; exit 1; }
+# shellcheck disable=SC2016
+awk -v id="$ID" '$0 == "search --set=root --file /.disk/info" {
+	print "# Prestium (hook 9030): only this image'"'"'s own files. /.disk/prestium-" id " is unique to this build;"
+	print "# the disk GRUB was started from is tried first, and nothing else is booted when it is missing."
+	print "if regexp --set=1:prestium_dev '"'"'^\\(([^)]+)\\)'"'"' \"$cmdpath\"; then"
+	print "\tregexp --set=1:prestium_disk '"'"'^([^,]+)'"'"' \"$prestium_dev\""
+	print "\tsearch --no-floppy --set=root --hint=\"$prestium_dev\" --hint=\"$prestium_disk\" --hint=\"$prestium_disk,\" --file /.disk/prestium-" id
+	print "else"
+	print "\tsearch --no-floppy --set=root --file /.disk/prestium-" id
+	print "fi"
+	print "if [ ! -e \"($root)/.disk/prestium-" id "\" ]; then"
+	print "\techo \"Prestium: this USB stick'"'"'s boot files were not found. Not starting anything else.\""
+	print "\tsleep 10"
+	print "\treboot"
+	print "fi"
+	next }
+	{ print }' "$E" > "$E.new"
+[ -n "${SOURCE_DATE_EPOCH:-}" ] && touch -d "@$SOURCE_DATE_EPOCH" "$E.new"
+mcopy -m -o -i "$EFI" "$E.new" ::boot/grub/grub.cfg
+mtype -i "$EFI" ::boot/grub/grub.cfg | tr -d '\r' > "$E"
+if ! grep -qF -- "--file /.disk/prestium-$ID" "$E" || grep -qF '/.disk/info' "$E"; then echo "E: $EFI: marker search not written"; exit 1; fi
+grep -qx 'export superusers' "$E" || { echo "E: $EFI: the menu lock (hook 9020) is gone"; exit 1; }
+
+## 2. every boot config: only the image's own entries and command line
+problems() { sh -c '. "$1"; prestium_cmdline_problems "$2" "$3"' prestium-guard "$LIB" "$1" "$POL"; }
+n=0
+gcheck() { # $1 label, $2 file: a GRUB config
+	bad=$(awk '
+	{ sub(/^[[:space:]]+/, "") }
+	/^#/ { next }
+	$1 ~ /^(linuxefi|linux16|multiboot|multiboot2|chainloader|kfreebsd|knetbsd|kopenbsd|xnu_kernel|xnu_kernel64|appleloader|loopback|load_env|save_env|legacy_configfile|legacy_kernel|legacy_source|extract_entries_configfile|extract_entries_source|extract_legacy_entries_configfile|extract_legacy_entries_source|normal)$/ { print NR ": " $1 " is not allowed"; next }
+	$1 == "search" && $0 !~ /--file \/\.disk\/prestium-[0-9a-f]+$/ { print NR ": search other than the Prestium marker"; next }
+	($1 == "configfile" || $1 == "source") && $2 !~ /^(\/boot\/grub\/|\(\$root\)\/boot\/grub\/|\$prefix\/)[A-Za-z0-9_.\/-]+$/ { print NR ": " $1 " " $2 " is outside /boot/grub"; next }
+	$1 == "linux" && $2 !~ /^\/live\/vmlinuz(-[A-Za-z0-9._+-]+)?$/ { print NR ": kernel " $2 " is not the image'"'"'s /live/vmlinuz"; next }
+	$1 == "initrd" && $2 !~ /^\/live\/initrd\.img(-[A-Za-z0-9._+-]+)?$/ { print NR ": initrd " $2 " is not the image'"'"'s"; next }
+	' "$2")
+	[ -z "$bad" ] || { echo "E: $1: $bad"; return 1; }
+	awk '{ sub(/^[[:space:]]+/, "") } $1 == "linux" { k = $2; $1 = ""; $2 = ""; sub(/^[[:space:]]+/, ""); print "BOOT_IMAGE=" k " " $0 }' "$2" > ../prestium-cmdlines.9030
+	while IFS= read -r l; do
+		p=$(problems "$l") || { echo "E: $1: a boot entry is not the image's own command line:"; printf '%s\n' "$p" | sed 's/^/E:   /'; return 1; }
+		case " $l " in *" dm-verity-root-hash=filesystem.squashfs:$H "*) ;; *) echo "E: $1: an entry carries another dm-verity root hash"; return 1 ;; esac
+		n=$((n + 1))
+	done < ../prestium-cmdlines.9030
+}
+for f in boot/grub/*.cfg boot/grub/*/grub.cfg; do
+	[ -f "$f" ] || continue
+	gcheck "$f" "$f"
+done
+gcheck "$EFI::boot/grub/grub.cfg" "$E"
+[ -e boot/grub/loopback.cfg ] && { echo "E: boot/grub/loopback.cfg is back"; exit 1; }
+grep -q '^set default=0$' boot/grub/config.cfg 2>/dev/null || { echo "E: boot/grub/config.cfg: default is not the first entry"; exit 1; }
+if [ -d isolinux ]; then
+	for f in isolinux/*.cfg; do
+		[ -f "$f" ] || continue
+		bad=$(awk '{ sub(/^[[:space:]]+/, ""); k = tolower($1) }
+		/^#/ { next }
+		k ~ /^(config|localboot|chain|pxe|fdimage|comboot|com|bss|boot|ui|kbdmap|font|ipappend|sysappend)$/ { print NR ": " $1 " is not allowed"; next }
+		(k == "linux" || k == "kernel") && $2 !~ /^\/live\/vmlinuz(-[A-Za-z0-9._+-]+)?$/ { print NR ": kernel " $2 " is not the image'"'"'s /live/vmlinuz"; next }
+		k == "initrd" && $2 !~ /^\/live\/initrd\.img(-[A-Za-z0-9._+-]+)?$/ { print NR ": initrd " $2 " is not the image'"'"'s"; next }
+		k == "com32" && $2 != "hdt.c32" { print NR ": com32 " $2 " is not allowed"; next }
+		k == "default" && $2 != "vesamenu.c32" { print NR ": default " $2; next }' "$f")
+		[ -z "$bad" ] || { echo "E: $f: $bad"; exit 1; }
+		awk '{ sub(/^[[:space:]]+/, "") } tolower($1) == "append" { $1 = ""; sub(/^[[:space:]]+/, ""); print "BOOT_IMAGE=/live/vmlinuz initrd=/live/initrd.img " $0 }' "$f" > ../prestium-cmdlines.9030
+		while IFS= read -r l; do
+			p=$(problems "$l") || { echo "E: $f: a boot entry is not the image's own command line:"; printf '%s\n' "$p" | sed 's/^/E:   /'; exit 1; }
+			case " $l " in *" dm-verity-root-hash=filesystem.squashfs:$H "*) ;; *) echo "E: $f: an entry carries another dm-verity root hash"; exit 1 ;; esac
+			n=$((n + 1))
+		done < ../prestium-cmdlines.9030
+	done
+	if ! grep -qx 'allowoptions 0' isolinux/isolinux.cfg || ! grep -qx 'noescape 1' isolinux/isolinux.cfg; then echo "E: isolinux is not locked (hook 9020)"; exit 1; fi
+fi
+rm -f ../prestium-cmdlines.9030 "$E" "$E.new"
+[ "$n" -ge 2 ] || { echo "E: only $n boot entries found"; exit 1; }
+
+## 3. the policy is live-build's command line
+A=$(sed -n 's/^LB_BOOTAPPEND_LIVE="\(.*\)"$/\1/p' ../config/binary)
+[ -n "$A" ] || { echo "E: LB_BOOTAPPEND_LIVE not found in config/binary"; exit 1; }
+# shellcheck disable=SC2086 # word splitting is the point
+want=$(printf '%s\n' $A | grep -vx -e quiet -e splash | sort)
+have=$(awk '$1 == "require" { print $2 }' "$POL" | grep -v -e '^dm-verity-' -e '^panic=10$' | sort)
+[ "$want" = "$have" ] || { echo "E: cmdline.policy does not match LB_BOOTAPPEND_LIVE (auto/config):"; printf 'config: %s\npolicy: %s\n' "$(printf '%s ' "$want" | tr '\n' ' ')" "$(printf '%s ' "$have" | tr '\n' ' ')"; exit 1; }
+
+## 4. no built-in or forced kernel command line
+nk=0
+for k in "$C"/boot/config-*; do
+	[ -f "$k" ] || continue
+	nk=$((nk + 1))
+	if grep -qE '^CONFIG_(CMDLINE_BOOL|CMDLINE_OVERRIDE|CMDLINE_FORCE|CMDLINE_EXTEND|BOOT_CONFIG_FORCE)=y' "$k" || grep -qE '^CONFIG_CMDLINE="[^"]+' "$k"; then
+		echo "E: $k: the kernel has a built-in or forced command line"; exit 1
+	fi
+done
+[ "$nk" -gt 0 ] || { echo "E: no kernel config in $C/boot"; exit 1; }
+
+## 5. the initramfs runs the guard
+if [ -n "${PRESTIUM_SKIP_INITRD_CHECK:-}" ]; then
+	echo "W: PRESTIUM_SKIP_INITRD_CHECK is set: the initramfs is not checked for the command-line guard"
+else
+	ni=0
+	for i in live/initrd.img*; do
+		[ -f "$i" ] || continue
+		b=$(basename "$i")
+		if [ ! -f "$C/boot/$b" ] || ! cmp -s "$i" "$C/boot/$b"; then echo "E: binary/$i is not the chroot's /boot/$b"; exit 1; fi
+		W=/tmp/prestium-initrd-9030
+		rm -rf "$C$W"
+		chroot "$C" unmkinitramfs "/boot/$b" "$W" || { echo "E: unmkinitramfs failed for $b"; exit 1; }
+		d=$C$W; [ -f "$d/main/init" ] && d=$d/main
+		[ "$(grep -c '# prestium-cmdline$' "$d/init" 2>/dev/null)" = 2 ] || { echo "E: $b: /init does not run the command-line guard"; exit 1; }
+		if ! cmp -s "$d/scripts/prestium-cmdline-guard" "$LIB" || ! cmp -s "$d/conf/prestium-cmdline.policy" "$POL"; then
+			echo "E: $b: the guard or policy in the initramfs differs from the image's"; exit 1
+		fi
+		rm -rf "$C$W"
+		ni=$((ni + 1))
+	done
+	[ "$ni" -gt 0 ] || { echo "E: no initramfs in binary/live"; exit 1; }
+fi
+echo "P: kernel command line policy holds for $n boot entries; GRUB searches for .disk/prestium-$ID"
+exit 0
