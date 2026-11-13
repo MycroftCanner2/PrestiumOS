@@ -1,6 +1,6 @@
 #!/bin/sh
 # Prestium: set up i2pd's built-in torrent client (i2pd 3.0) each boot (ExecStartPre=+, as root).
-# - downloads go to /home/user/Downloads/Torrents (shared with "user" through
+# - downloads go to /home/user/Torrents (shared with "user" through
 #   the i2ptorrents group)
 # - the RPC/web page sits on 127.0.0.1 behind a random per-boot path, because
 #   i2pd answers RPC with "Access-Control-Allow-Origin: *": without the secret
@@ -16,7 +16,7 @@
 # cannot replace it with a symlink for the rest of the boot (confused-deputy into /var/lib/i2pd).
 # Status is published under /run/prestium-torrents/status: ready | disabled:<reason>.
 set -e
-D=/home/user/Downloads/Torrents
+D=/home/user/Torrents
 SAFE=/usr/local/lib/prestium/safefile
 TD=/var/lib/i2pd/tunnels.conf.d
 RUN=/run/prestium-torrents

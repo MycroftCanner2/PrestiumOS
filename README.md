@@ -31,7 +31,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail, Gajim
   and Pidgin) and `~/Documents` (LibreOffice, GIMP, FeatherPad, File Roller, Xarchiver, Audacity,
   Kleopatra, Metadata Cleaner and Feather). Only three folders are app-specific: the I2P Browser's
-  (`~/Downloads/I2P Browser`), I2P Torrents' (`~/Downloads/Torrents`) and Tor Browser's
+  (`~/I2P Browser`), I2P Torrents' (`~/Torrents`) and Tor Browser's
   (`~/Tor Browser`); the shared apps can't write in those three. The file manager pins exactly those
   five, labelled i2P Browser, i2P Torrents, Tor Browser, Documents and Downloads. To attach a document
   you made, copy it from `~/Documents` to `~/Downloads` first: mail and chat can't read `~/Documents`.

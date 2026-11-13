@@ -38,8 +38,8 @@ profile claws-mail /usr/bin/claws-mail {
   owner @{HOME}/Downloads/ rw,
   owner @{HOME}/Downloads/* rwk,
   # the two folders that stay app-specific: never the I2P Browser's or I2P Torrents'
-  deny "@{HOME}/Downloads/I2P Browser/**" rw,
-  deny "@{HOME}/Downloads/Torrents/**" rw,
+  deny "@{HOME}/I2P Browser/**" rw,
+  deny "@{HOME}/Torrents/**" rw,
 
   # OpenPGP: gpg and its tools in their own profile (below)
   /usr/bin/gpg Cx -> gpg,

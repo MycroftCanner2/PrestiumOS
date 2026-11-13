@@ -34,6 +34,10 @@ profile onionshare /usr/bin/onionshare{,-cli} {
   # files to share
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public}/ r,
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public}/** r,
+  owner "@{HOME}/I2P Browser/" r,
+  owner "@{HOME}/I2P Browser/**" r,
+  owner @{HOME}/Torrents/ r,
+  owner @{HOME}/Torrents/** r,
 
   include if exists <local/usr.bin.onionshare>
 }

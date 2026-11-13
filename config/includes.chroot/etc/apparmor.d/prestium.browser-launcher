@@ -53,16 +53,16 @@ profile prestium_librewolf_launcher {
   owner @{HOME}/.librewolf/prestium/ rw,
   owner @{HOME}/.librewolf/prestium/{cert9,key4}.db rw,
   owner @{HOME}/Downloads/ rw,
-  owner "@{HOME}/Downloads/I2P Browser/" rw,
+  owner "@{HOME}/I2P Browser/" rw,
   deny @{HOME}/.tor-browser/** w,
   deny "@{HOME}/Tor Browser/**" w,
 
-  # the sandbox: only LibreWolf's directories and ~/Downloads/I2P Browser (2.1, L-5; not Tor Browser's)
+  # the sandbox: only LibreWolf's directories and ~/I2P Browser (2.1, L-5; not Tor Browser's)
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-browser-launcher-bwrap>
     owner @{HOME}/.librewolf/** rwlk,
-    owner "@{HOME}/Downloads/I2P Browser/" rw,
-    owner "@{HOME}/Downloads/I2P Browser/**" rwlk,
+    owner "@{HOME}/I2P Browser/" rw,
+    owner "@{HOME}/I2P Browser/**" rwlk,
     # the inner relay to the bound-in proxy socket
     /usr/bin/socat mrix,
     # /usr/bin/librewolf links to /usr/share/librewolf/librewolf, which has its own profile

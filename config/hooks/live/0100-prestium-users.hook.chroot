@@ -56,7 +56,7 @@ gpasswd -a i2pd i2ptorrents >/dev/null
 # home: files from config/includes.chroot plus anything else from /etc/skel
 mkdir -p /home/user
 cp -an /etc/skel/. /home/user/
-for d in Downloads Downloads/Torrents Desktop Documents; do mkdir -p "/home/user/$d"; done
+for d in Downloads Torrents Desktop Documents; do mkdir -p "/home/user/$d"; done
 chown -R user:user /home/user; chmod 700 /home/user
 
 # root: locked (1.8+); no root login at all

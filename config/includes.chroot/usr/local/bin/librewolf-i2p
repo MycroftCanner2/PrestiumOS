@@ -7,7 +7,7 @@
 # distrusts the eMudhra (emSign) roots.
 # 2.0 r10: LibreWolf runs in the same sandbox as Tor Browser (/usr/local/lib/prestium/browser-sandbox.sh):
 # its own empty network namespace, Wayland only in its own security context, of $HOME only
-# ~/.librewolf and ~/Downloads/I2P Browser (2.1), no D-Bus, no_new_privs. Its only way out is i2pd's HTTP proxy: a
+# ~/.librewolf and ~/I2P Browser (2.1), no D-Bus, no_new_privs. Its only way out is i2pd's HTTP proxy: a
 # relay outside the sandbox (this script, socat) listens on a Unix socket that is bound in, and a
 # relay inside the sandbox listens on the sandbox's own 127.0.0.1:4444 and forwards to it, so
 # LibreWolf's proxy settings stay as they are. No other address is reachable from inside.
@@ -32,7 +32,7 @@ LIBREWOLF=/usr/bin/librewolf
 if [ "$(id -u)" -eq 0 ]; then echo "LibreWolf must not run as root." >&2; exit 1; fi
 P="$HOME/.librewolf/prestium"
 # 2.1 (L-5): its own download folder; no other app writes there, and it sees no other folder
-DL="$HOME/Downloads/I2P Browser"
+DL="$HOME/I2P Browser"
 umask 077
 if [ ! -e "$P/cert9.db" ]; then
   mkdir -p "$P" && cp /usr/local/share/prestium-nssdb/cert9.db /usr/local/share/prestium-nssdb/key4.db "$P/"

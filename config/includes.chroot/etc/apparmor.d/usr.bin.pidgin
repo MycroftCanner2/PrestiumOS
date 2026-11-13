@@ -46,8 +46,8 @@ profile pidgin /usr/bin/pidgin {
   owner @{HOME}/Downloads/ rw,
   owner @{HOME}/Downloads/* rwk,
   # the two folders that stay app-specific: never the I2P Browser's or I2P Torrents'
-  deny "@{HOME}/Downloads/I2P Browser/**" rw,
-  deny "@{HOME}/Downloads/Torrents/**" rw,
+  deny "@{HOME}/I2P Browser/**" rw,
+  deny "@{HOME}/Torrents/**" rw,
   /usr/bin/xdg-open ix,
   /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut} ix,
   # 2.1 (review): Px into the launcher profile, not Ux (see prestium.browser-launcher)

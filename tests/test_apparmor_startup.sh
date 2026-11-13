@@ -59,7 +59,7 @@ allow kleopatra $S/S.dirmngr rw
 allow kleopatra $S/S.uiserver rw
 allow kleopatra $H/Documents/letter.txt.gpg rw
 deny kleopatra $H/Downloads/letter.txt.gpg w
-deny kleopatra "$H/Downloads/I2P Browser/letter.txt.gpg" w
+deny kleopatra "$H/I2P Browser/letter.txt.gpg" w
 allow kleopatra $H/Downloads/key.asc r
 deny kleopatra $G/gpg.conf w
 deny kleopatra $G/gpg-agent.conf w
@@ -142,7 +142,7 @@ deny mat2 "$H/Documents/.remove-metadata.Ab12Cd/1/clip.mp4" w
 deny mat2 $H/Downloads/clip.cleaned.mp4 w
 deny mat2 $H/Documents/clip.cleaned.mp4 w
 deny mat2 /media/user/STICK/clip.cleaned.mp4 w
-deny mat2 $H/Downloads/Torrents/clip.mp4 w
+deny mat2 $H/Torrents/clip.mp4 w
 deny mat2 $H/Downloads/clip.mp4 w
 $(bw mat2//bwrap)
 allow mat2//bwrap /usr/bin/ffmpeg x:i
@@ -171,7 +171,7 @@ allow metadata-cleaner /tmp/0123abcd.mp4 rw
 allow metadata-cleaner "$H/Documents/clip.mp4" rw
 allow metadata-cleaner $H/Downloads/clip.mp4 r
 deny metadata-cleaner $H/Downloads/clip.mp4 w
-deny metadata-cleaner "$H/Downloads/I2P Browser/clip.mp4" w
+deny metadata-cleaner "$H/I2P Browser/clip.mp4" w
 EOT
 
 echo "== GIMP (system configuration, plug-ins)"

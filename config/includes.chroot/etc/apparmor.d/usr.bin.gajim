@@ -43,8 +43,8 @@ profile gajim /usr/bin/gajim {
   owner @{HOME}/Downloads/ rw,
   owner @{HOME}/Downloads/* rwk,
   # the two folders that stay app-specific: never the I2P Browser's or I2P Torrents'
-  deny "@{HOME}/Downloads/I2P Browser/**" rw,
-  deny "@{HOME}/Downloads/Torrents/**" rw,
+  deny "@{HOME}/I2P Browser/**" rw,
+  deny "@{HOME}/Torrents/**" rw,
 
   # links: Tor Browser, which runs in its own sandbox
   /usr/bin/xdg-open ix,

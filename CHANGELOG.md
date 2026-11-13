@@ -207,8 +207,8 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **Two shared folders for the apps' files, and three app-specific ones (L-5, revised).** The local
   Firefox, Claws Mail, Gajim and Pidgin all save in `~/Downloads`; LibreOffice, GIMP, FeatherPad,
   File Roller, Xarchiver, Audacity, Kleopatra, Metadata Cleaner and Feather all save in `~/Documents`.
-  Only the browsers and torrents keep their own folders: the I2P Browser's `~/Downloads/I2P Browser`,
-  I2P Torrents' `~/Downloads/Torrents` and Tor Browser's `~/Tor Browser`, and the shared apps can't
+  Only the browsers and torrents keep their own top-level folders, like Tor Browser's `~/Tor Browser`:
+  the I2P Browser's `~/I2P Browser` and I2P Torrents' `~/Torrents`, and the shared apps can't
   write in those three (the local Firefox may still read `*.torrent` files in the I2P Browser's folder,
   for I2P Torrents' Add .torrent). The file manager's pinned list is exactly those five, labelled
   i2P Browser, i2P Torrents, Tor Browser, Documents and Downloads. mat2 writes its `name.cleaned.ext`

@@ -55,7 +55,7 @@ check('sec=="Web Browser HTTP Proxy"' in t and "HOPS=3" in t and 'sec=="explorat
       "torrents: hops read back from the assistant's tunnels (browser proxy, then exploratory, else 3)")
 check('case $_h in 1|2|3|4|5|6|7)' in t,
       "torrents: a hand-edited hop count outside 1-7 falls back to 3, never stops i2pd")
-check('D=/home/user/Downloads/Torrents' in t and tk.get("torrentsdir") == "$D",
+check('D=/home/user/Torrents' in t and tk.get("torrentsdir") == "$D",
       "torrents: torrent list/progress live in the user's per-boot dir")
 
 # 2. hook: real writable dir + web symlink, not a whole-dir symlink into /usr

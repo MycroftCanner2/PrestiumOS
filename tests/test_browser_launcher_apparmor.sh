@@ -26,11 +26,11 @@ grep -q '/usr/local/bin/librewolf-i2p Px -> prestium_librewolf_launcher,' "$A/us
 # every write rule of the two launcher profiles (top level, child excluded) is a browser directory
 wr=$( { cat "$LA"; sed -n '/^profile prestium_/,/^}/p' "$L" | sed '/^  profile bwrap/,/^  }/d'; } \
   | grep -v '^\s*#' | grep -v '^\s*deny' | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -v -- '->' )
-odd=$(grep -vE '@\{HOME\}/\.tor-browser/|"@\{HOME\}/Tor Browser/|@\{HOME\}/\.librewolf/|@\{HOME\}/Downloads/|@\{run\}/user/\[0-9\]\*/prestium-sandbox/' <<<"$wr")
+odd=$(grep -vE '@\{HOME\}/\.tor-browser/|"@\{HOME\}/Tor Browser/|@\{HOME\}/\.librewolf/|"@\{HOME\}/I2P Browser/|@\{HOME\}/Downloads/|@\{run\}/user/\[0-9\]\*/prestium-sandbox/' <<<"$wr")
 [ -n "$wr" ] && [ -z "$odd" ] && ok "launchers write only browser directories ($(grep -c . <<<"$wr") rules)" || bad "launcher write rules: $odd"
 t=$(sed -n '/^profile prestium_tor_browser_launcher/,/^}/p' "$L" | grep -v '^\s*#\|deny'); l=$(sed -n '/^profile prestium_librewolf_launcher/,/^}/p' "$L" | grep -v '^\s*#\|deny')
 # the bubblewrap children (one per launcher) and their shared rules: no browser directory in common
-grep -v '^\s*#' "$LB" | grep -Eq 'tor-browser|Tor Browser|librewolf|Downloads' && bad "shared bwrap rules name a browser directory" || ok "shared bwrap rules: no browser directory"
+grep -v '^\s*#\|deny' "$LB" | grep -Eq 'tor-browser|Tor Browser|librewolf|I2P Browser|Downloads' && bad "shared bwrap rules name a browser directory" || ok "shared bwrap rules: no browser directory"
 [ "$(grep -c '^  profile bwrap flags=(attach_disconnected,mediate_deleted) {' "$L")" = 2 ] && ok "each launcher has its own bwrap child" || bad "bwrap children"
 grep -q 'librewolf' <<<"$t" && bad "Tor Browser launcher may touch LibreWolf" || ok "Tor Browser launcher: no LibreWolf paths"
 grep -q 'tor-browser/\|Tor Browser' <<<"$(grep ' rw,' <<<"$l")" && bad "LibreWolf launcher may write Tor Browser" || ok "LibreWolf launcher: no Tor Browser writes"

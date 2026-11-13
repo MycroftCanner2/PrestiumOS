@@ -115,7 +115,7 @@ j=$(printf '%s\n' "$out" | sed -n 's/^PROBE//p')
 if [ -z "$j" ]; then bad "LibreWolf probe did not run: $out"; else
   common "LibreWolf" "$j"
   check "LibreWolf: its 127.0.0.1:4444 reaches the I2P HTTP proxy (through the relay)" "$j" '"PRESTIUM-FAKE-I2P-PROXY" in r["tcp_4444"]'
-  check "LibreWolf: HOME holds only .librewolf and Downloads" "$j" 'r["home"] == [".librewolf", "Downloads"]'
+  check "LibreWolf: HOME holds only .librewolf and I2P Browser" "$j" 'r["home"] == [".librewolf", "I2P Browser"]'
   check "LibreWolf: no Tor SOCKS socket" "$j" '"TOR_SOCKS_IPC_PATH" not in r["env"]'
   check "LibreWolf: profile and arguments passed through" "$j" 'r["args"][:3] == ["--profile", "'"$HOME"'/.librewolf/prestium", "http://example.i2p/"]'
 fi
