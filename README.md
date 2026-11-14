@@ -56,10 +56,12 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Messengers (Gajim, Pidgin):** both have Tor and I2P proxies ready to use. Gajim ships Tor
   (SOCKS5 127.0.0.1:9050) plus I2P (SOCKS5 127.0.0.1:4447 and HTTP 127.0.0.1:4444) proxy
   profiles, with Tor as the global default; choose another per account in Account Settings.
-  Pidgin's global proxy is Tor (SOCKS5 127.0.0.1:9050, remote DNS on); it starts when Tor or
-  i2pd is up (in I2P-only mode its global proxy is switched to I2P SOCKS 127.0.0.1:4447),
-  and an account that must go over I2P sets SOCKS5 127.0.0.1:4447 as its own proxy in the
-  account editor. Their menu entries are plain *Gajim* and *Pidgin*.
+  Pidgin's global proxy is Tor (its own Tor/Privacy (SOCKS5) option at 127.0.0.1:9050,
+  remote DNS on); it starts when Tor or i2pd is up and its launcher keeps the port in
+  sync (Tor: 9050, I2P-only: 4447; a hand-set port is left alone), and an account that
+  must go over I2P sets SOCKS5 127.0.0.1:4447 as its own proxy in the account editor.
+  Pidgin runs in stock light Adwaita again (its own colours don't follow a dark theme).
+  Their menu entries are plain *Gajim* and *Pidgin*.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
   SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets and its own

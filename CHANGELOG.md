@@ -36,6 +36,17 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   get boot ID: No such file or directory" (exit 1). The setting is removed
   (`ProtectProc=invisible` still hides other users' processes, and
   `ProtectKernelTunables=yes` keeps `/proc/sys` read-only).
+- **Pidgin shows Tor on its proxy page, keeps the port in sync, and is light again.**
+  Its global proxy is Pidgin's own "Tor/Privacy (SOCKS5)" type at 127.0.0.1:9050
+  (the same SOCKS5 code as the plain type, with Tor's name on the page; stock
+  Pidgin has no named I2P proxy, I2P works through the launcher and per-account
+  SOCKS5 127.0.0.1:4447). `pidgin-tor` now syncs the port both ways, swapping
+  only between the known ports (Tor/both: 9050, I2P-only: 4447; a hand-set port
+  is left alone), so it can no longer get stuck on I2P after Tor comes back.
+  Pidgin also runs in stock light Adwaita again (`GTK2_RC_FILES` in the
+  launcher, this process only): its own colours don't follow Prestium-Dark,
+  and dark text was lost on the dark background. Pinentry, the tests for the
+  dark theme, and the system GTK 2 setup are untouched.
 - **Ristretto can view files in ~/Documents, VLC can open files in ~/Torrents, Metadata Cleaner
   can clean files in ~/Documents, and the local Firefox can open files in ~/Torrents.**
   Ristretto and VLC now state those folders explicitly in their profiles; the shared

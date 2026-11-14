@@ -1,13 +1,18 @@
 #!/bin/sh
-# Prestium: start Pidgin when Tor or I2P is up. Both proxies are ready to use:
-#   Tor:  global proxy SOCKS5 127.0.0.1:9050 (prefs.xml, Tor SOCKS, remote DNS on)
-#   I2P:  SOCKS5 127.0.0.1:4447 (i2pd SOCKS proxy), remote DNS on
-# When both networks are up, the global proxy is Tor; an account that must go
-# over I2P sets its own proxy in the account editor (Proxy: SOCKS5,
-# 127.0.0.1, 4447). When only I2P is up, this swaps the global proxy port in
-# prefs.xml from 9050 to 4447 before starting, so Pidgin works over I2P
-# without manual reconfiguration; switch it back in Tools > Preferences >
-# Proxy (Tor: 9050) when Tor is back.
+# Prestium: start Pidgin when Tor or I2P is up. Tor is the global proxy:
+# Pidgin's own "Tor/Privacy (SOCKS5)" type at 127.0.0.1:9050 (prefs.xml, remote
+# DNS on; the same SOCKS5 code as the plain "SOCKS 5" type, with Tor's name on
+# the proxy page). I2P: SOCKS5 127.0.0.1:4447 (i2pd SOCKS proxy), remote DNS on.
+# The launcher keeps the port in sync with the networks that are up, swapping
+# only between the two known ports (a port you set by hand is left alone):
+# both or Tor only -> 9050; I2P only -> 4447. An account that must go over I2P
+# while Tor is up sets its own proxy in the account editor (Proxy type SOCKS 5,
+# 127.0.0.1, 4447).
+# Pidgin is a GTK 2 program. Prestium's desktop is dark, but Pidgin's own
+# colours don't follow a dark GTK 2 theme (dark text is lost on the dark
+# background), so Pidgin runs in stock light Adwaita again, for this process
+# only (GTK2_RC_FILES replaces the system /etc/gtk-2.0/gtkrc): pinentry and
+# the rest of the desktop keep Prestium-Dark.
 tor_up=0; i2p_up=0
 systemctl is-active -q tor@default 2>/dev/null && tor_up=1
 systemctl is-active -q tor 2>/dev/null && tor_up=1
@@ -15,8 +20,22 @@ systemctl is-active -q i2pd 2>/dev/null && i2p_up=1
 if [ "$tor_up" = 0 ] && [ "$i2p_up" = 0 ]; then
   notify-send -a Prestium -i dialog-error "Pidgin not started" "Neither Tor nor I2P is running. Start one in the Tor or I2P Connection Assistant, then open Pidgin again." 2>/dev/null; exit 1
 fi
-if [ "$tor_up" = 0 ] && [ "$i2p_up" = 1 ] && [ -f "$HOME/.purple/prefs.xml" ]; then
-  python3 -c 'import re,sys; p=sys.argv[1]; s=open(p).read(); s2=re.sub(r"(<pref name=[\"\x27]port[\"\x27] type=[\"\x27]int[\"\x27] value=[\"\x27])9050([\"\x27])", r"\g<1>4447\g<2>", s, count=1); open(p,"w").write(s2)' "$HOME/.purple/prefs.xml" 2>/dev/null || true
+if [ -f "$HOME/.purple/prefs.xml" ]; then
+  if [ "$tor_up" = 0 ]; then
+    want=4447; have=9050
+  else
+    want=9050; have=4447
+  fi
+  PREFS="$HOME/.purple/prefs.xml" WANT="$want" HAVE="$have" python3 - <<'PY' 2>/dev/null || true
+import os, re
+p = os.environ['PREFS']
+s = open(p).read()
+s2 = re.sub(r"""(<pref name=["']port["'] type=["']int["'] value=["'])""" + os.environ['HAVE'] + r"""(["'])""",
+            r"""\g<1>""" + os.environ['WANT'] + r"""\g<2>""", s, count=1)
+open(p, 'w').write(s2)
+PY
 fi
+GTK2_RC_FILES=/usr/share/themes/Adwaita/gtk-2.0/gtkrc
+export GTK2_RC_FILES
 unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY no_proxy NO_PROXY
-exec /usr/bin/pidgin "$@"
+exec ${PIDGIN_BIN:-/usr/bin/pidgin} "$@"
