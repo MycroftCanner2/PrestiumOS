@@ -19,6 +19,9 @@
 # settings and hook 0500 that create and point at the folders.
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); A=$R/config/includes.chroot/etc/apparmor.d; I=$R/config/includes.chroot; fail=0
 ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }
+# 2.1 (audit): ~/Torrents is written by i2pd (uid 2000), so no profile may qualify a ~/Torrents
+# rule with "owner" - it can never match and the app silently loses read access to that folder.
+grep -rnE 'owner[^,]*@\{HOME\}/Torrents' "$A" && bad "an owner-qualified ~/Torrents rule (i2pd-owned files)" || ok "no owner-qualified ~/Torrents rule"
 H=/home/user
 grep -q 'DL="$HOME/I2P Browser"' "$I/usr/local/bin/librewolf-i2p" && grep -q -- '--bind "$DL" "$DL"' "$I/usr/local/bin/librewolf-i2p" \
   && ok "librewolf-i2p binds only ~/I2P Browser" || bad "librewolf-i2p download folder"
@@ -161,11 +164,13 @@ allow feather "$H/Documents/sub/f.pdf" rw
 deny feather $H/Downloads/f.pdf w
 $(spec feather)
 EOT
-# Network apps write files directly in the shared ~/Downloads, never in a specific folder.
+# Network apps write files directly in the shared ~/Downloads (not in subfolders: the rule is
+# Downloads/*, deliberately one level, as the header of this test has always said), never in a specific folder.
 for pair in "usr.bin.claws-mail claws-mail" "usr.bin.gajim gajim" "usr.bin.pidgin pidgin" "opt.firefox.firefox prestium-localfox"; do
   set -- $pair; echo "== $2: writes files directly in ~/Downloads, never in a specific folder"
   run "$1" <<EOT
 allow $2 $H/Downloads/f.pdf rw
+deny $2 $H/Downloads/sub/f.pdf w
 deny $2 "$H/I2P Browser/f.pdf" rw
 deny $2 $H/Torrents/f.pdf w
 deny $2 "$H/Tor Browser/f.pdf" rw

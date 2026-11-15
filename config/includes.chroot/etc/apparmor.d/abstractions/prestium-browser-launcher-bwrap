@@ -2,10 +2,18 @@
 # share: bubblewrap builds its own user, mount, network, PID and IPC namespaces as the user. Each
 # launcher's child adds only its own browser's directories and programs; the browsers inside run
 # under their own enforced profiles (torbrowser_firefox, librewolf).
+# 2.1 (audit): the system is read-only and the home is not readable except through the browser
+# directories each child adds, like prestium-viewer-bwrap. The old "/** r, /dev/** rw, /proc/** rw,
+# /run/** rwlk" let a process in this profile read every user secret (~/.gnupg, ~/.ssh, *.kdbx,
+# the other browser's profile) before the sandbox was built. The sockets and directories
+# browser-sandbox.sh binds into the sandbox are named below; nothing else under /run is open.
+# prestium-app-secrets cannot be included here: it denies the browsers' own home directories
+# (.tor-browser, .librewolf), which the children need, so the secret denies are spelled out.
   include <abstractions/base>
   include <abstractions/bash>
   include <abstractions/consoles>
   include <abstractions/nameservice>
+  include <abstractions/prestium-no-admin>
   userns,
   capability sys_admin,
   capability sys_chroot,
@@ -37,12 +45,70 @@
   # "mkdir /proc" or "/newroot/usr" and the sandboxed program never starts.
   /newroot/{,**} r,
   owner /newroot/{,**} rw,
-  /** r,
   deny /run/prestium/logs/** rw,   # 2.1: the desktop user's Tor/I2P logs
-  # the new root (a tmpfs on /tmp before pivot_root) and the sandbox's own /run
-  /dev/** rw,
-  /proc/** rw,
+  # the system (read-only), like prestium-viewer-bwrap; the browser install in /opt is read-only too
+  / r,
+  /usr/ r,
+  /usr/** mr,
+  /opt/ r,
+  /opt/** mr,
+  /etc/ r,
+  /etc/** r,
+  /sys/** r,
+  /var/ r,
+  /var/lib/ r,
+  deny /etc/shadow r,
+  # the home: only the GTK config the sandbox binds in; each child adds its own browser directories
+  owner @{HOME}/ r,
+  owner @{HOME}/.config/gtk-3.0/ r,
+  owner @{HOME}/.config/gtk-3.0/** r,
+  # the few device nodes bubblewrap's own /dev holds, plus the GPU it binds in
+  /dev/ r,
+  /dev/{null,zero,full,random,urandom,tty} rw,
+  /dev/pts/ r,
+  /dev/pts/* rw,
+  /dev/dri/ r,
+  /dev/dri/* rw,
+  owner /dev/shm/** rwk,
+  deny /dev/video* rw,
+  deny /dev/hidraw* rw,
+  deny /dev/snd/** rw,
+  # its own /proc entries, under /tmp its private newroot
+  owner @{PROC}/ w,
+  @{PROC}/ r,
+  @{PROC}/sys/** r,
+  owner @{PROC}/@{pid}/** r,
+  owner @{PROC}/@{pid}/{uid_map,gid_map,setgroups,oom_score_adj} rw,
   /tmp/** rwlk,
-  owner /run/** rwlk,
+  # the host /run: only the sockets and directories browser-sandbox.sh binds into the sandbox
+  # (the restricted Wayland socket, audio sockets, the two Tor sockets in /run, the relay socket
+  # directory); never the session bus, gpg-agent, the broker or the logs
+  /run/ r,
+  @{run}/prestium-wl/[0-9]*/apps rw,
+  deny @{run}/prestium-wl/broker rw,
+  owner /run/user/[0-9]*/pulse/ rw,
+  owner /run/user/[0-9]*/pulse/** rw,
+  owner /run/user/[0-9]*/pipewire-0 rw,
+  /run/prestium-tbb/ r,
+  /run/prestium-tbb/socks rw,
+  /run/onion-grater/ r,
+  /run/onion-grater/control rw,
+  owner /run/user/[0-9]*/prestium-sandbox/ rw,
+  owner /run/user/[0-9]*/prestium-sandbox/** rw,
+  deny /run/user/[0-9]*/bus rw,
+  deny /run/user/[0-9]*/gnupg/** rw,
+  # no user secrets, whatever else is open (see header: prestium-app-secrets cannot be included)
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/.ssh/** rw,
+  deny @{HOME}/.mozilla/** rw,
+  deny @{HOME}/.local/share/keyrings/** rw,
+  deny @{HOME}/**.kdbx rw,
+  deny @{HOME}/.config/autostart/** w,
+  deny @{HOME}/.bashrc w,
+  deny @{HOME}/.profile w,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.claws-mail/** rw,
+  deny @{HOME}/.config/feather/** rw,
+  deny @{HOME}/.local/share/gajim/** rw,
   /{,usr/}bin/{sh,dash,bash,sleep,dirname,expr,getconf,mkdir,ln,cp,sed,rm,realpath,readlink,id,pwd,env,cat} mrix,
   /{,usr/}bin/{grep,tr,awk,mawk,uname,file,head,tail,basename,ls,chmod,touch,test} mrix,

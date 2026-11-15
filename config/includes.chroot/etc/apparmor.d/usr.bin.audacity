@@ -5,6 +5,12 @@
 # (hook 0620 diverts /usr/bin/audacity there; /usr/bin/audacity is a shim that runs
 # /usr/local/bin/prestium-audacity, which starts it with bubblewrap --unshare-net). The file keeps its
 # old name.
+# 2.1 (audit): the "network inet stream" below is safe only because every normal start goes through
+# that wrapper into the empty network namespace; AppArmor cannot limit TCP to a namespace, so a
+# process that managed to exec /usr/libexec/prestium-audacity directly would keep the allowance on
+# the host network, where ferm still limits the desktop user to the local Tor/I2P proxy ports.
+# That direct exec is not reachable from any menu entry or desktop file (hook 0620 checks), and
+# closing it would need the real binary to be non-executable; accepted as documented.
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>

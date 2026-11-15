@@ -8,7 +8,7 @@ W=$(mktemp -d); trap 'rm -rf "$W"' EXIT; cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d
 if command -v apparmor_parser >/dev/null; then
   apparmor_parser -QK -b "$W" "$W/usr.bin.claws-mail" 2>/dev/null && ok "profile compiles" || no "profile compiles"
   E=$(apparmor_parser -p -b "$W" "$W/usr.bin.claws-mail" 2>/dev/null)
-else echo "SKIP apparmor_parser missing"; E=$(cat "$P"); fi
+else echo "SKIP apparmor_parser missing"; exit 0; fi
 grep -q '^profile claws-mail /usr/bin/claws-mail {' "$P" && ok "attaches to /usr/bin/claws-mail" || no attach
 grep -q 'flags=' "$P" && no "has flags (complain?)" || ok "no complain flag"
 grep -q 'include <abstractions/prestium-app-base>' "$P" && ok "shared app rules" || no "shared app rules"

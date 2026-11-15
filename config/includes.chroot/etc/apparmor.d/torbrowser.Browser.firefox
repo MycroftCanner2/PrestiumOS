@@ -1,3 +1,4 @@
+abi <abi/4.0>,
 #include <tunables/global>
 #include <tunables/torbrowser>
 
@@ -23,9 +24,8 @@ profile torbrowser_firefox @{torbrowser_firefox_executable} {
   # #include <abstractions/user-download>
   # @{HOME}/ r,
 
-  # Audio support
-  /{,usr/}bin/pulseaudio Pixr,
-
+  # Audio goes through the PipeWire/PulseAudio socket; there is no pulseaudio exec rule here
+  # (2.1 audit: the old "Pixr" was dead, a later "deny /usr/bin/pulseaudio x" overrides it).
   #dbus,
   network netlink raw,
   network tcp,
@@ -187,7 +187,8 @@ profile torbrowser_firefox @{torbrowser_firefox_executable} {
   /etc/xfce4/defaults.list r,
   /usr/share/xfce4/applications/ r,
 
-  # u2f (tested with Yubikey 4)
+  # u2f (tested with Yubikey 4); kept deliberately in the 2.1 audit: a hardware key is
+  # user-held, and without this WebAuthn/U2F cannot reach it
   /sys/class/ r,
   /sys/bus/ r,
   /sys/class/hidraw/ r,

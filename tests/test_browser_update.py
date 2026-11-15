@@ -316,6 +316,7 @@ class TestSignatures(Base):
         self.assertNotIsInstance(bu.sig_failure("[GNUPG:] REVKEYSIG X\n[GNUPG:] EXPKEYSIG X", "m"),
                                  bu.KeyExpiredError)
 
+    @unittest.skipUnless(T.have("dpkg"), "dpkg missing")
     def test_real_librewolf_inrelease(self):
         """LibreWolf's real InRelease (2026-11-04) against the key shipped in the image."""
         out = os.path.join(self.d, "Release")
@@ -382,6 +383,7 @@ class TestMetadata(Base):
             with self.assertRaises(bu.SignatureError):
                 bu.check_clearsigned_shape(bad)
 
+    @unittest.skipUnless(T.have("dpkg"), "dpkg missing")
     def test_lw_candidates_filter(self):
         st = bu.parse_packages(open(os.path.join(T.FIX, "librewolf-Packages")).read())
         st.append(dict(st[0], Version="999-1", Filename="pool/../../evil.deb"))

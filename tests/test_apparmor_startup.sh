@@ -217,8 +217,39 @@ echo "== The browser launchers' bubblewrap children (Tor Browser, LibreWolf from
 run prestium.browser-launcher <<EOT
 $(bw prestium_tor_browser_launcher//bwrap)
 $(bw prestium_librewolf_launcher//bwrap)
+allow prestium_tor_browser_launcher//bwrap $H/.tor-browser/profile.default/x rw
+allow prestium_librewolf_launcher//bwrap $H/.librewolf/prestium/x rw
+allow prestium_tor_browser_launcher//bwrap /opt/tor-browser/Browser/firefox.real r
+allow prestium_tor_browser_launcher//bwrap /run/prestium-tbb/socks rw
+allow prestium_tor_browser_launcher//bwrap /run/onion-grater/control rw
+allow prestium_tor_browser_launcher//bwrap /run/prestium-wl/1000/apps rw
+allow prestium_librewolf_launcher//bwrap /run/user/1000/prestium-sandbox/i2p-http-4242 rw
+allow prestium_tor_browser_launcher//bwrap /dev/dri/card0 rw
+allow prestium_tor_browser_launcher//bwrap $H/.config/gtk-3.0/settings.ini r
+deny prestium_tor_browser_launcher//bwrap $H/.librewolf/x r
 deny prestium_tor_browser_launcher//bwrap $H/.librewolf/x w
+deny prestium_librewolf_launcher//bwrap $H/.tor-browser/x r
 deny prestium_librewolf_launcher//bwrap $H/.tor-browser/x w
+deny prestium_librewolf_launcher//bwrap "$H/Tor Browser/x" r
+deny prestium_tor_browser_launcher//bwrap $G/private-keys-v1.d/x.key r
+deny prestium_librewolf_launcher//bwrap $G/private-keys-v1.d/x.key r
+deny prestium_tor_browser_launcher//bwrap $H/.ssh/id_ed25519 r
+deny prestium_tor_browser_launcher//bwrap $H/Passwords.kdbx r
+deny prestium_tor_browser_launcher//bwrap $H/.mozilla/firefox/profiles.ini r
+deny prestium_tor_browser_launcher//bwrap $H/.purple/accounts.xml r
+deny prestium_tor_browser_launcher//bwrap $H/.claws-mail/clawsrc r
+deny prestium_tor_browser_launcher//bwrap $H/.config/feather/settings.json r
+deny prestium_tor_browser_launcher//bwrap /etc/shadow r
+deny prestium_tor_browser_launcher//bwrap /run/user/1000/bus rw
+deny prestium_librewolf_launcher//bwrap /run/user/1000/bus rw
+deny prestium_tor_browser_launcher//bwrap /run/user/1000/gnupg/S.gpg-agent rw
+deny prestium_tor_browser_launcher//bwrap /run/prestium-wl/broker rw
+deny prestium_tor_browser_launcher//bwrap /run/prestium/logs/tor.log r
+deny prestium_tor_browser_launcher//bwrap $H/Downloads/x r
+deny prestium_tor_browser_launcher//bwrap $H/Documents/x r
+deny prestium_tor_browser_launcher//bwrap /dev/video0 rw
+deny prestium_tor_browser_launcher//bwrap /dev/hidraw0 rw
+deny prestium_tor_browser_launcher//bwrap /usr/bin/sudo x
 EOT
 
 echo "== LibreOffice (first start creates its user profile folders)"

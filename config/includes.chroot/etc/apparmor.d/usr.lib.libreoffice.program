@@ -48,8 +48,11 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   owner @{HOME}/{Desktop,Documents,Downloads,Pictures,Music,Videos,Public,Templates}/** r,
   owner "@{HOME}/I2P Browser/" r,
   owner "@{HOME}/I2P Browser/**" r,
-  owner @{HOME}/Torrents/ r,
-  owner @{HOME}/Torrents/** r,
+  # 2.1 (audit): ~/Torrents files are written by i2pd (uid 2000, group i2ptorrents), so an
+  # "owner" rule can never match them; read is granted without the owner qualifier (as in
+  # prestium-user-files and the local Firefox profile).
+  @{HOME}/Torrents/ r,
+  @{HOME}/Torrents/** r,
   # 2.1 (L-5): it saves only in the shared ~/Documents folder, so a crafted document can't change a
   # file in ~/Downloads or the Tor Browser's folder. A document opened from elsewhere opens, but saving it in place fails (AppArmor
   # denies the write): save it with "Save As" into ~/Documents, the default folder

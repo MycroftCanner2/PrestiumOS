@@ -21,8 +21,8 @@ profile prestium_tor_browser_launcher {
   owner @{HOME}/.tor-browser/profile.default/extensions/*.xpi rw,
   owner @{HOME}/.tor-browser/profile.default/{user.js,cert9.db,key4.db} rw,
   owner "@{HOME}/Tor Browser/" rw,
-  # never another browser's data
-  deny @{HOME}/.librewolf/** w,
+  # never another browser's data, read or write
+  deny @{HOME}/.librewolf/** rw,
 
   # the sandbox: only Tor Browser's directories (not LibreWolf's or Downloads)
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
@@ -34,7 +34,7 @@ profile prestium_tor_browser_launcher {
     /opt/tor-browser/Browser/start-tor-browser mrix,
     /opt/tor-browser/Browser/firefox mrix,
     /opt/tor-browser/Browser/firefox.real Px -> torbrowser_firefox,
-    deny @{HOME}/.librewolf/** w,
+    deny @{HOME}/.librewolf/** rw,
   }
   include if exists <local/prestium.browser-launcher>
 }
@@ -54,8 +54,8 @@ profile prestium_librewolf_launcher {
   owner @{HOME}/.librewolf/prestium/{cert9,key4}.db rw,
   owner @{HOME}/Downloads/ rw,
   owner "@{HOME}/I2P Browser/" rw,
-  deny @{HOME}/.tor-browser/** w,
-  deny "@{HOME}/Tor Browser/**" w,
+  deny @{HOME}/.tor-browser/** rw,
+  deny "@{HOME}/Tor Browser/**" rw,
 
   # the sandbox: only LibreWolf's directories and ~/I2P Browser (2.1, L-5; not Tor Browser's)
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
@@ -67,8 +67,8 @@ profile prestium_librewolf_launcher {
     /usr/bin/socat mrix,
     # /usr/bin/librewolf links to /usr/share/librewolf/librewolf, which has its own profile
     /usr/share/librewolf/librewolf{,-bin} Px -> librewolf,
-    deny @{HOME}/.tor-browser/** w,
-    deny "@{HOME}/Tor Browser/**" w,
+    deny @{HOME}/.tor-browser/** rw,
+    deny "@{HOME}/Tor Browser/**" rw,
   }
   include if exists <local/prestium.browser-launcher>
 }

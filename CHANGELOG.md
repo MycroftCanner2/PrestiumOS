@@ -347,6 +347,22 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   Tor Browser and I2P Browser launchers unconfined, and the launchers honoured the caller's
   environment. They now enter dedicated launcher profiles, take a fixed PATH and fixed paths only, and
   run as `bash -p`. Of the home directory, the sandbox child may write only its own browser's folders.
+- **The browser sandbox's bubblewrap child can no longer read the rest of the home, and ~/Torrents reads
+  work again for OnionShare and LibreOffice.** The shared launcher-bwrap rules granted `/** r, /dev/** rw,
+  /proc/** rw, /run/** rwlk`, so a process in that profile could read `~/.gnupg`, `~/.ssh`, `*.kdbx` and
+  the other browser's profile before the sandbox was built; they now grant a read-only system, the
+  browser install in `/opt`, only the sockets `browser-sandbox.sh` binds in (the restricted Wayland
+  socket, the Tor and onion-grater sockets, audio sockets, the I2P relay socket directory), and
+  explicit denies for the secrets, like the viewer bubblewrap children. Each launcher also denies the
+  other browser's folders for reading as well as writing. OnionShare and LibreOffice qualified their
+  `~/Torrents` reads with `owner`, which can never match i2pd-owned files (uid 2000); the qualifier is
+  dropped, as the shared file-folder rules already do. Audacity's loopback TCP allowance is documented
+  as relying on its network-namespace wrapper (ferm still limits the user to the local proxy ports if
+  the real binary were exec'd directly), Feather's `/tmp` rule is documented as map-only, Tor Browser's
+  dead pulseaudio exec rule is removed and its hardware-key access for U2F kept deliberately. Tests:
+  `test_apparmor_startup.sh` (the children deny the secrets and the other browser, and still get the
+  sockets and GPU they bind), `test_download_folders.sh` (no `owner`-qualified `~/Torrents` rule),
+  `test_apparmor_claws.sh` and `test_browser_update.py` (skip cleanly without `apparmor_parser`/`dpkg`).
 - **The first session password can only be set from the lock dialog.** The Wayland broker shows that
   dialog on the compositor's full socket and sets the password as root. `sudo prestium-session-password`
   no longer allows `set`, and plain `passwd` is no longer setuid. The password must have at least 8

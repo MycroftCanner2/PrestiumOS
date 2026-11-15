@@ -1,6 +1,9 @@
 # Prestium 2.1 (audit of 96468c5, M-1): KeePassXC, ENFORCED. A crafted database or key file gets no network, no OpenPGP keys and no
 # other app's data. It may read and write *.kdbx databases (and their save and backup files) anywhere
 # in the home, read key files in the file folders, and use a security key (hidraw, pcscd).
+# 2.1 (audit): directory write anywhere in the home (and on /media) is deliberate, for saving a
+# database and its sidecars in place; file writes stay *.kdbx-only, and the secret denies
+# (~/.ssh, ~/.gnupg, autostart) still win over it.
 # Off here: icon downloads and breach checks (no network), browser integration (it may not write the
 # browsers' directories) and opening URLs (no other programs).
 # Not yet tested on a booted ISO.
