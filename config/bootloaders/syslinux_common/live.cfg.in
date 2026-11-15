@@ -22,3 +22,9 @@ label live-@FLAVOUR@-nomacspoof
 	linux @LINUX@
 	initrd @INITRD@
 	append @APPEND_LIVE@ nomacspoof
+
+label live-@FLAVOUR@-network-logs
+	menu label Prestium @PRESTIUM_VERSION@ (Network Logs)
+	linux @LINUX@
+	initrd @INITRD@
+	append @APPEND_LIVE@ prestium.network-logs

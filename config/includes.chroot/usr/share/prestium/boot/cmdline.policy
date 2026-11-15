@@ -47,11 +47,13 @@ require panic=10
 # auto/config: quiet splash (the "Verify integrity" entry drops both)
 allow quiet
 allow splash
-# the other boot entries: nomodeset, camera and microphone off, MAC spoofing off, Verify integrity
+# the other boot entries: nomodeset, camera and microphone off, MAC spoofing off, Verify integrity,
+# Network Logs
 allow nomodeset
 allow prestium.nocammic
 allow nomacspoof
 allow verify-checksums
+allow prestium.network-logs
 # plain toram (copy the verified image to memory); only by editing an entry with the GRUB superuser
 allow toram
 # added by the boot loader

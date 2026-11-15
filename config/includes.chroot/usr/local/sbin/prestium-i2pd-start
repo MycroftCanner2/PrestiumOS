@@ -1,0 +1,55 @@
+#!/usr/bin/python3 -I
+"""Prestium 2.1: start i2pd with logging only in the "Network Logs" boot entry.
+
+i2pd's log level is a command-line option, so it cannot be chosen by a systemd
+condition. This launcher reads the kernel command line (the boot entry is the
+only way to set the token: cmdline.policy allows prestium.network-logs, and the
+boot menus are locked) and execs i2pd with the level for this boot:
+
+  prestium.network-logs on the command line: --log=syslog --loglevel=info
+    (journald files it under i2pd.service, where prestium-logs reads it for
+    Network > Network Logs; info is the level Tor logs at)
+  otherwise (the default boot): --log=syslog --loglevel=none
+    (i2pd logs nothing at all)
+
+Everything else is the command line i2pd.service.d/prestium.conf used to run
+directly. It takes no arguments.
+"""
+import os
+import sys
+
+TOKEN = "prestium.network-logs"
+
+
+def _test_env(name, default, _installed="/usr/local/sbin/prestium-i2pd-start"):
+    """The PRESTIUM_* overrides are for the test suite (run from the source tree); the installed copy
+    ignores them."""
+    if os.path.realpath(__file__) == _installed:
+        return default
+    return os.environ.get(name, default)
+
+
+def loglevel(cmdline):
+    return "info" if TOKEN in cmdline.split() else "none"
+
+
+def main(argv):
+    if argv[1:]:
+        print("prestium-i2pd-start takes no arguments", file=sys.stderr)
+        return 2
+    try:
+        with open(_test_env("PRESTIUM_CMDLINE", "/proc/cmdline"), encoding="utf-8") as f:
+            cmdline = f.read()
+    except OSError:
+        cmdline = ""   # unreadable: the default boot's level (no logs), never the verbose one
+    os.execv(_test_env("PRESTIUM_I2PD_BIN", "/usr/bin/i2pd"),
+             ["i2pd", "--conf=/var/lib/i2pd/i2pd.conf",
+              "--tunconf=/var/lib/i2pd/tunnels.conf",
+              "--tunnelsdir=/var/lib/i2pd/tunnels.conf.d",
+              "--pidfile=/run/i2pd/i2pd.pid", "--daemon", "--service",
+              "--log=syslog", "--loglevel=" + loglevel(cmdline)])
+    return 1   # execv only returns on failure (it raises, in fact)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

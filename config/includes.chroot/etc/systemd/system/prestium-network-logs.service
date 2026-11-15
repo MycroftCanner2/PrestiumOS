@@ -1,0 +1,47 @@
+# Prestium 2.1: Tor's log level for this boot (prestium-network-logs writes one torrc.d drop-in:
+# notice to syslog in the "Network Logs" boot entry, discarded in the default boot). Before Tor
+# starts; Tor re-reads torrc.d on every (re)start, and the file is written fresh every boot.
+[Unit]
+Description=Prestium Tor logging for this boot entry (Network Logs or none)
+After=local-fs.target
+Before=tor.service tor@default.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/sbin/prestium-network-logs
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/etc/tor/torrc.d
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+PrivateNetwork=yes
+IPAddressDeny=any
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectHostname=yes
+ProtectClock=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+ProtectKernelLogs=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RemoveIPC=yes
+ProtectProc=invisible
+DevicePolicy=closed
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources
+SystemCallErrorNumber=EPERM
+UMask=0027
+MemoryMax=64M
+TasksMax=16
+
+[Install]
+WantedBy=multi-user.target

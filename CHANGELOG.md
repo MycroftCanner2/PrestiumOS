@@ -33,6 +33,16 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   `*.kdbx`-only, with the temporary file covered too: the default safe save
   writes through QSaveFile, whose temporary file is `<name>.kdbx<random>`
   with no dot before the random suffix, which `*.kdbx.*` did not match.
+- **Network Logs are off unless you boot the new "Network Logs" entry.** The boot menus (GRUB and
+  isolinux) gain `Prestium 2.1 (Network Logs)`, the only entry with `prestium.network-logs` on the
+  kernel command line (`cmdline.policy` allows it, at most once). Only in that boot do Tor and i2pd
+  log (Tor `notice` to syslog, i2pd `--loglevel=info` to syslog), does `prestium-logs.service` run
+  (`ConditionKernelCommandLine`), and does the desktop menu show *Network > Network Logs*
+  (`prestium-wl-config` drops the entry from the labwc copy it writes in any other boot). In the
+  default boot Tor's log is discarded (`prestium-network-logs.service` writes `Log err file
+  /dev/null` to `torrc.d` before Tor starts; Tor has no "none" level), i2pd is exec'd with
+  `--loglevel=none` by `prestium-i2pd-start`, the logs service does not run, and there is no
+  Network Logs menu entry. New `tests/test_network_logs_boot.py`.
 - **Network Logs show the logs again instead of "the journal could not be read".**
   `prestium-logs.service` set `ProcSubset=pid`, which hides everything in
   `/proc` but process directories, including `/proc/sys/kernel/random/boot_id`;
@@ -71,7 +81,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
 - **Volume Control opens on the Playback tab.** Both the menu and the panel now launch
   `pavucontrol --tab=1` (tab 1 is Playback; without it pavucontrol picks the first tab
   with streams, so it opened on Recording/Input/Output when nothing was playing).
-- **i2pd network logs show in Network Logs.** i2pd now logs at `info` instead of `warn`
+- **i2pd network logs show in Network Logs** (in the Network Logs boot entry; see above). i2pd logs at `info` instead of `warn`
   (at warn the I2P tab stayed empty in normal operation), and `prestium-logs` accepts
   syslog-origin i2pd entries by `SYSLOG_IDENTIFIER=i2pd`, since journald does not always
   tag syslog messages with `_SYSTEMD_UNIT`.

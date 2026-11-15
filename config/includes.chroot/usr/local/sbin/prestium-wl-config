@@ -3,7 +3,11 @@
 /run/prestium-wl/<uid>/labwc (root-owned), from /etc/xdg/labwc plus the user's touchpad settings.
 labwc reads only that directory (labwc -C), never ~/.config/labwc: a file there could add key
 bindings or window rules that run commands, which an application must not be able to do.
-The touchpad settings (~/.config/prestium/touchpad.json) are only read as four checked values."""
+The touchpad settings (~/.config/prestium/touchpad.json) are only read as four checked values.
+2.1: the Network Logs menu entry is kept only in the "Network Logs" boot entry
+(prestium.network-logs on the kernel command line, the only boot with Tor/i2pd logging and
+prestium-logs.service); in the default boot the entry is dropped from the copy written here,
+so the menu the user sees has no Network Logs entry."""
 import json, os, pwd, re, sys
 
 def _test_env(name, default, _installed="/usr/local/sbin/prestium-wl-config"):
@@ -53,6 +57,16 @@ files = {"rc.xml": rc}
 for f in ("menu.xml", "autostart", "environment"):
     if os.path.exists(os.path.join(SRC, f)):
         files[f] = open(os.path.join(SRC, f)).read()
+if "menu.xml" in files:
+    try:
+        cmdline = open(_test_env("PRESTIUM_CMDLINE", "/proc/cmdline")).read()
+    except OSError:
+        cmdline = ""   # unreadable: the default boot's menu (no Network Logs entry)
+    if "prestium.network-logs" not in cmdline.split():
+        files["menu.xml"], n = re.subn(r'[ \t]*<item label="Network Logs[^>]*>.*?</item>\n', "",
+                                       files["menu.xml"], count=1, flags=re.S)
+        if n != 1:
+            print("prestium-wl-config: no Network Logs entry in %s/menu.xml" % SRC, file=sys.stderr); sys.exit(1)
 for f in os.listdir(out):
     if f not in files:
         os.unlink(os.path.join(out, f))

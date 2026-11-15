@@ -112,10 +112,12 @@ check("\nProcSubset=" not in u, "no ProcSubset: journalctl -b needs /proc/sys/ke
 for d in ("\nMemoryMax=", "\nTasksMax=", "\nStartLimitIntervalSec=", "\nStartLimitBurst="):
     check(d in u, "prestium-logs.service:" + d.strip() + " (no runaway memory, tasks or restart loop)")
 check(u.index("StartLimitBurst=") < u.index("[Service]"), "restart limit in [Unit]")
-# i2pd: logs warnings to syslog (the journal), not off and not to a file
+# i2pd: logging is chosen by the boot entry (prestium-i2pd-start; tests/test_network_logs_boot.py)
+# -- the drop-in must start the launcher, never i2pd with a fixed level
 i2 = rd("config/includes.chroot/etc/systemd/system/i2pd.service.d/prestium.conf")
 xs = [l for l in i2.splitlines() if l.startswith("ExecStart=/")]
-check(len(xs) == 1 and "--log=syslog" in xs[0] and "--loglevel=info" in xs[0] and "--loglevel=none" not in xs[0] and "--logfile" not in xs[0], "i2pd logs to syslog at info, so the I2P tab is not empty")
+check(xs == ["ExecStart=/usr/local/sbin/prestium-i2pd-start"], "i2pd starts through prestium-i2pd-start (log level per boot entry)")
+check("ConditionKernelCommandLine=prestium.network-logs" in u, "prestium-logs.service: only in the Network Logs boot entry")
 # Tor: SafeLogging explicitly on, after the drop-ins
 torrc = rd("config/includes.chroot/etc/tor/torrc")
 check(re.search(r"^SafeLogging 1$", torrc, re.M) and torrc.index("\nSafeLogging 1") > torrc.index("%include"), "torrc: SafeLogging 1, after %include")
@@ -143,7 +145,7 @@ check("journalctl" not in sudo and "prestium-logs" not in sudo, "no sudo rule fo
 check("journalctl" not in rd("config/includes.chroot/usr/local/bin/prestium-nyx") and "Network Logs" in rd("config/includes.chroot/usr/local/bin/prestium-nyx"), "Nyx's hint points to Network Logs")
 ta = rd("config/includes.chroot/usr/local/bin/prestium-tor-assistant")
 check("journalctl -u prestium-onion-grater" not in ta and "Network Logs" in ta, "the Tor Connection Assistant's hint points to Network Logs")
-check('command="prestium-run /usr/local/bin/prestium-logs-view"' in rd("config/includes.chroot/etc/xdg/labwc/menu.xml"), "menu: Network > Network Logs")
+check('command="prestium-run /usr/local/bin/prestium-logs-view"' in rd("config/includes.chroot/etc/xdg/labwc/menu.xml"), "menu source: Network > Network Logs (kept only in the Network Logs boot; prestium-wl-config drops it otherwise)")
 v = "\n".join(l for l in rd("config/includes.chroot/usr/local/bin/prestium-logs-view").splitlines() if not l.lstrip().startswith("#"))
 check("--editable" not in v and "--text-info" in v and "sudo" not in v and "journalctl" not in v, "viewer: read-only text window, no sudo, no journal")
 check("tor) " in v and "i2p) " in v and "onion-grater) " in v and '*) echo "usage' in v, "viewer: only the three logs")

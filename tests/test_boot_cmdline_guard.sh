@@ -49,7 +49,7 @@ have=$(awk '$1=="require"{print $2}' "$POL" | grep -v -e '^dm-verity-' -e '^pani
 [ -n "$A" ] && [ "$want" = "$have" ] && ok "policy requires exactly auto/config's APPEND (without quiet splash), same order" || bad "policy and auto/config differ: $(diff <(echo "$want") <(echo "$have") | tr '\n' ' ')"
 LBA=$(sed -n 's/^LB_BOOTAPPEND_LIVE="\(.*\)"$/\1/p' "$R/config/binary"); LBF=$(sed -n 's/^LB_BOOTAPPEND_LIVE_FAILSAFE="\(.*\)"$/\1/p' "$R/config/binary")
 [ "$LBA" = "$A" ] && [ "$LBF" = "$A nomodeset" ] && ok "config/binary matches auto/config (live and nomodeset)" || bad "config/binary differs from auto/config"
-for t in quiet splash nomodeset prestium.nocammic nomacspoof verify-checksums; do grep -qx "allow $t" "$POL" || bad "policy does not allow $t"; done
+for t in quiet splash nomodeset prestium.nocammic nomacspoof verify-checksums prestium.network-logs; do grep -qx "allow $t" "$POL" || bad "policy does not allow $t"; done
 extra=$(grep -hvE '^[[:space:]]*#' "$R/config/bootloaders/grub-pc/grub.cfg" "$R/config/bootloaders/syslinux_common/live.cfg.in" | grep -oE '@APPEND_LIVE(_FAILSAFE)?@[^}]*$' | sed 's/@APPEND_LIVE[A-Z_]*@//' | tr ' ' '\n' | sort -u | grep .)
 miss=; for t in $extra; do grep -qx "allow $t" "$POL" || miss="$miss $t"; done
 [ -z "$miss" ] && ok "every template entry's extra option is allowed ($(echo $extra))" || bad "template options not in the policy:$miss"
@@ -66,6 +66,7 @@ for s in $SHELLS; do command -v "$s" >/dev/null || [ "$s" = busybox ] || { skip 
   g=0
   for c in "BOOT_IMAGE=/live/vmlinuz-6.12.57+deb13-amd64 $LIVE" "BOOT_IMAGE=/live/vmlinuz-6.12.57+deb13-amd64 $LIVE nomodeset" \
            "BOOT_IMAGE=/live/vmlinuz-6.12.57+deb13-amd64 $LIVE prestium.nocammic" "BOOT_IMAGE=/live/vmlinuz-6.12.57+deb13-amd64 $LIVE nomacspoof" \
+           "BOOT_IMAGE=/live/vmlinuz-6.12.57+deb13-amd64 $LIVE prestium.network-logs" \
            "BOOT_IMAGE=/live/vmlinuz-6.12.57+deb13-amd64 $(echo "$LIVE" | sed 's/ quiet//; s/ splash//') verify-checksums" \
            "BOOT_IMAGE=/live/vmlinuz-6.12.57+deb13-amd64 initrd=/live/initrd.img-6.12.57+deb13-amd64 $LIVE" \
            "BOOT_IMAGE=(hd0,gpt1)/live/vmlinuz $LIVE toram" "$LIVE"; do

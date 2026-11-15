@@ -1,8 +1,12 @@
 # Prestium 2.1: the Tor, i2pd and onion-grater logs for the desktop user (prestium-logs-view), without a
 # sudo rule and without putting the user in the journal group. Not root; reads only those three units'
 # entries (fixed in /usr/local/sbin/prestium-logs) and writes only /run/prestium/logs.
+# Only in the "Network Logs" boot entry: in the default boot this service does not run, Tor and i2pd
+# log nothing (prestium-network-logs, prestium-i2pd-start), and the menu has no Network Logs entry
+# (prestium-wl-config drops it), so there are no logs for the desktop to read.
 [Unit]
 Description=Prestium readable logs (Tor, I2P, control-port filter)
+ConditionKernelCommandLine=prestium.network-logs
 After=systemd-journald.service systemd-tmpfiles-setup.service
 # 2.1 (review of 6bf1234): /run/prestium/logs is made by tmpfiles (prestium-safety.conf). If it is missing
 # anyway, ReadWritePaths= fails the start: give up after 5 tries in 5 minutes instead of a restart loop

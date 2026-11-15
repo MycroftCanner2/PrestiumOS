@@ -1,0 +1,78 @@
+#!/usr/bin/python3 -I
+"""Prestium 2.1: Tor's log level for this boot, chosen by the boot entry.
+
+Tor's log destination is a torrc option, and /etc/tor/torrc includes
+/etc/tor/torrc.d/*.conf. prestium-network-logs.service runs before Tor and
+writes exactly one drop-in there, from the kernel command line (the boot entry
+is the only way to set the token: cmdline.policy allows
+prestium.network-logs, and the boot menus are locked):
+
+  prestium.network-logs on the command line: Log notice syslog
+    (Debian's own level; journald files it under tor@default.service, where
+    prestium-logs reads it for Network > Network Logs. SafeLogging 1 in torrc,
+    after the include, keeps addresses scrubbed.)
+  otherwise (the default boot): Log err file /dev/null
+    (Tor has no "none" severity, so its log is sent nowhere: nothing of Tor's
+    operation is written to the journal or anywhere else.)
+
+A Log line in torrc overrides the "Log notice syslog" of
+tor-service-defaults-torrc (checked with tor --dump-config), so only the line
+written here is in effect. It takes no arguments.
+"""
+import os
+import sys
+import tempfile
+
+TOKEN = "prestium.network-logs"
+
+
+def _test_env(name, default, _installed="/usr/local/sbin/prestium-network-logs"):
+    """The PRESTIUM_* overrides are for the test suite (run from the source tree); the installed copy
+    ignores them."""
+    if os.path.realpath(__file__) == _installed:
+        return default
+    return os.environ.get(name, default)
+
+
+def enabled(cmdline):
+    return TOKEN in cmdline.split()
+
+
+def torrc_text(on):
+    if on:
+        return ("# Prestium 2.1: written by prestium-network-logs for the \"Network Logs\" boot entry.\n"
+                "Log notice syslog\n")
+    return ("# Prestium 2.1: written by prestium-network-logs for the default boot entry: Tor logs\n"
+            "# nowhere (Tor has no \"none\" severity, so the log is discarded).\n"
+            "Log err file /dev/null\n")
+
+
+def main(argv):
+    if argv[1:]:
+        print("prestium-network-logs takes no arguments", file=sys.stderr)
+        return 2
+    try:
+        with open(_test_env("PRESTIUM_CMDLINE", "/proc/cmdline"), encoding="utf-8") as f:
+            cmdline = f.read()
+    except OSError:
+        cmdline = ""   # unreadable: the default boot's setting (no logs), never the verbose one
+    outdir = _test_env("PRESTIUM_TORRC_D", "/etc/tor/torrc.d")
+    os.makedirs(outdir, exist_ok=True)
+    path = os.path.join(outdir, "40-prestium-logging.conf")
+    fd, tmp = tempfile.mkstemp(dir=outdir, prefix=".40-prestium-logging.")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(torrc_text(enabled(cmdline)))
+        os.chmod(tmp, 0o644)
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
