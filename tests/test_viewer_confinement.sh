@@ -89,13 +89,19 @@ if command -v apparmor_parser >/dev/null; then
       # checks), so only the two directory rules are excused here.
       hw=$(grep -vE '@\{HOME\}/(\*\*/)? rw,$' <<<"$hw")
     fi
+    if [ "$f" = usr.lib.libreoffice.program ]; then
+      # First start creates ~/.cache and ~/.local (neither is in /etc/skel),
+      # which needs write on ~/ itself. Only that one directory rule is
+      # excused here; file writes stay in the profile folders and Documents.
+      hw=$(grep -vE '@\{HOME\}/ rw,$' <<<"$hw")
+    fi
     [ -z "$hw" ] && ok "$f: writes only the shared ~/Documents and its own directories" || bad "$f home writes: $hw"
     # 2.1 (L-5, revised): the shared ~/Documents is writable (the editors' folder); no write in any other file folder
     sw=$(grep -E '@\{HOME\}/(\{Desktop|Desktop/|Downloads/|Pictures/\*|Music/|Videos/|Public/|Templates/|OnionShare/)' <<<"$al" \
       | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE 'Pictures/vlcsnap')
     [ -z "$sw" ] && ok "$f: no write outside the shared ~/Documents (L-5)" || bad "$f shared folder writes: $sw"
     # 2.1 (review of 6bf1234): volumes under /media are read-only (KeePassXC keeps its *.kdbx files there)
-    mw=$(grep -E '\s/media/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '/media/\*\*\.kdbx(\.\*)? rwk,')
+    mw=$(grep -E '\s/media/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '/media/\*\*\.kdbx\*? rwk,')
     if [ "$f" = usr.bin.keepassxc ]; then
       # A database on an unlocked volume needs its directory writable too
       # (new database, .lock sidecar, atomic-save temporary file); files

@@ -38,6 +38,9 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   # /etc/skel) the mkdir failed, so the first run died with "Fatal Error"
   # instead of opening. File writes stay limited to the profile folders
   # themselves (like Kleopatra's parent ~/.local/state/ rule).
+  # /etc/skel has neither ~/.cache nor ~/.local, so creating them needs
+  # write on ~/ itself; that one parent was missing (the others were not).
+  owner @{HOME}/ rw,
   owner @{HOME}/.config/ rw,
   owner @{HOME}/.cache/ rw,
   owner @{HOME}/.local/share/ rw,

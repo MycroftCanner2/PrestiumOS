@@ -223,6 +223,7 @@ EOT
 
 echo "== LibreOffice (first start creates its user profile folders)"
 run usr.lib.libreoffice.program <<EOT
+allow libreoffice $H/ w
 allow libreoffice $H/.config/ w
 allow libreoffice $H/.config/libreoffice/ rw
 allow libreoffice $H/.cache/ w
@@ -242,9 +243,12 @@ allow keepassxc $H/Documents/ w
 allow keepassxc $H/Documents/Passwords.kdbx rwk
 allow keepassxc $H/Documents/New.kdbx w
 allow keepassxc $H/Documents/Passwords.kdbx.lock w
+allow keepassxc $H/Documents/Passwords.kdbxAbC123 w
+allow keepassxc $H/Passwords.kdbxAbC123 w
 deny keepassxc $H/Documents/notes.txt w
 allow keepassxc /media/user/STICK/ w
 allow keepassxc /media/user/STICK/Passwords.kdbx rwk
+allow keepassxc /media/user/STICK/Passwords.kdbxAbC123 w
 deny keepassxc /media/user/STICK/notes.txt w
 allow keepassxc $H/.config/keepassxc/keepassxc.ini rwk
 allow keepassxc /tmp/keepassxc-user.socket rw

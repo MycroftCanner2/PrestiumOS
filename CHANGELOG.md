@@ -21,14 +21,18 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   installation and aborted. The profile now allows creating `~/.config`,
   `~/.cache` and `~/.local/share` entries for its own three folders (file
   writes stay limited to those folders, like Kleopatra's parent
-  `~/.local/state/` rule).
+  `~/.local/state/` rule). `/etc/skel` has neither `~/.cache` nor `~/.local`,
+  so creating them also needed write on `~/` itself; that one parent rule was
+  the remaining gap and is now granted too.
 - **KeePassXC can save and open databases in the home and ~/Documents again.**
   Saving a new database, its `.lock` sidecar on open, and an atomic-save
   temporary file all create files, which needs write on the containing
   directory; the profile granted file-level `rwk` on `*.kdbx` but no directory
   write, so both failed. The profile now grants directory write in the home
   (and on unlocked volumes for databases kept there); file writes stay
-  `*.kdbx`-only.
+  `*.kdbx`-only, with the temporary file covered too: the default safe save
+  writes through QSaveFile, whose temporary file is `<name>.kdbx<random>`
+  with no dot before the random suffix, which `*.kdbx.*` did not match.
 - **Network Logs show the logs again instead of "the journal could not be read".**
   `prestium-logs.service` set `ProcSubset=pid`, which hides everything in
   `/proc` but process directories, including `/proc/sys/kernel/random/boot_id`;

@@ -24,7 +24,11 @@ profile keepassxc /usr/bin/keepassxc {
   /usr/bin/keepassxc mr,
   /usr/lib/@{multiarch}/keepassxc/** mr,
   owner @{HOME}/**.kdbx rwk,
-  owner @{HOME}/**.kdbx.* rwk,
+  # The default "safe save" writes through QSaveFile, whose temporary file
+  # is "<name>.kdbx<random>" with NO dot before the random suffix (Qt5's
+  # QTemporaryFile template), and opening a database creates "<name>.kdbx.lock":
+  # both need a file rule of their own next to the database name itself.
+  owner @{HOME}/**.kdbx* rwk,
   # Saving a new database, its .lock sidecar on open, and an atomic-save
   # temporary file all create files, which needs write on the containing
   # directory: without it databases could neither be saved nor opened (the
@@ -34,7 +38,7 @@ profile keepassxc /usr/bin/keepassxc {
   owner @{HOME}/ rw,
   owner @{HOME}/**/ rw,
   /media/**.kdbx rwk,
-  /media/**.kdbx.* rwk,
+  /media/**.kdbx* rwk,
   # Same for a database kept on an unlocked volume (see prestium-user-files:
   # only *.kdbx files there stay writable).
   /media/ rw,
