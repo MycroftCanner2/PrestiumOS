@@ -50,6 +50,10 @@
   owner @{HOME}/.config/Kvantum/** r,
   owner @{HOME}/.config/fontconfig/** r,
   owner @{HOME}/.cache/fontconfig/** rwk,
+  # 2.1 (boot test): GTK saves the recent-files list by creating a temp file in ~/.local/share/
+  # and renaming it over recently-used.xbel. Without write on the directory itself the create is
+  # denied and Ristretto segfaults opening any picture (it adds every opened file to recents).
+  owner @{HOME}/.local/share/ rw,
   owner @{HOME}/.local/share/recently-used.xbel* rw,
   owner @{HOME}/.local/share/mime/** r,
   owner @{HOME}/.icons/** r,

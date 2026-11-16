@@ -132,6 +132,16 @@ deny loupe $H/.bashrc w
 deny loupe $G/pubring.kbx r
 EOT
 
+echo "== Ristretto (GTK recent-files: temp file in ~/.local/share/, renamed over the .xbel)"
+run usr.bin.ristretto <<EOT
+allow ristretto $H/.local/share/ w
+allow ristretto $H/.local/share/recently-used.xbel rw
+allow ristretto $H/Pictures/a.png r
+deny ristretto $H/Pictures/a.png w
+deny ristretto $H/.bashrc w
+deny ristretto $G/pubring.kbx r
+EOT
+
 echo "== mat2 (\"Remove metadata\"; ffmpeg and exiftool in bubblewrap)"
 run usr.bin.mat2 <<EOT
 allow mat2 /usr/bin/bwrap x:C
@@ -261,6 +271,7 @@ allow libreoffice $H/.cache/ w
 allow libreoffice $H/.cache/libreoffice/ rw
 allow libreoffice $H/.local/share/ w
 allow libreoffice $H/.local/share/libreoffice/ rw
+allow libreoffice $H/.config/libreoffice/4/user/registrymodifications.xcu mrw
 allow libreoffice $H/Documents/letter.odt rw
 allow libreoffice $H/Downloads/letter.odt r
 deny libreoffice $H/Downloads/letter.odt w

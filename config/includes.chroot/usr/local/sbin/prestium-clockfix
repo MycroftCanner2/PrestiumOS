@@ -11,7 +11,9 @@
 # bootstrap has succeeded; the two units are ordered so they do not fight.
 PATH=/usr/sbin:/usr/bin:/sbin:/bin; export PATH
 D=/var/lib/tor
-boot_ok(){ journalctl -b -u tor@default -o cat --no-pager 2>/dev/null | grep -q 'Bootstrapped 100'; }
+# 2.1: asked over the control port (the journal has no Tor lines in the default boot, where Tor
+# logs to /dev/null; clockfix then could never tell "Tor bootstrapped" from "never will")
+boot_ok(){ [ "$(PYTHONNOUSERSITE=1 python3 "${PRESTIUM_TOR_BOOTSTRAP:-/usr/local/lib/prestium/tor-bootstrap.py}" 2>/dev/null)" = 100 ]; }
 i=0; first=-1
 while [ $i -lt 90 ]; do
   boot_ok && { echo "Tor bootstrapped, clock left as is"; exit 0; }

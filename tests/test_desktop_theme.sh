@@ -88,10 +88,10 @@ U="$I/etc/systemd/system/prestium-netstatus.service"
 for k in User=prestium-netstatus NoNewPrivileges=yes ProtectSystem=strict ReadWritePaths=/run/prestium/netstatus IPAddressDeny=any CapabilityBoundingSet=; do
   grep -qx "$k" "$U" && ok "netstatus: $k" || bad "netstatus: no $k"; done
 grep -q 'prestium-netstatus.service' "$I/usr/share/prestium/build/systemd-wants.txt" && grep -q '^sysuser prestium-netstatus' "$H/0100-prestium-users.hook.chroot" && grep -q '/run/prestium/netstatus 0755 prestium-netstatus' "$I/usr/lib/tmpfiles.d/prestium-safety.conf" && ok "netstatus enabled, user and directory" || bad "netstatus wiring"
-D=$(mktemp -d); PATH="$R/tests/fixtures/netstatus:$PATH" PRESTIUM_NETSTATUS_OUT=$D PRESTIUM_NETSTATUS_ONCE=1 bash "$I/usr/local/sbin/prestium-netstatus"
+D=$(mktemp -d); PATH="$R/tests/fixtures/netstatus:$PATH" PRESTIUM_TOR_BOOTSTRAP="$R/tests/fixtures/netstatus/tor-bootstrap.py" PRESTIUM_NETSTATUS_OUT=$D PRESTIUM_NETSTATUS_ONCE=1 bash "$I/usr/local/sbin/prestium-netstatus"
 python3 -c "import json,sys;[json.load(open(sys.argv[1]+'/'+f)) for f in ('tor.json','i2p.json')]" "$D" && ok "netstatus writes valid JSON" || bad "netstatus JSON"
 grep -q '"class": "ready"' "$D/tor.json" && grep -q '"class": "connecting"' "$D/i2p.json" && ok "netstatus states (fixture: Tor 100 %, I2P 1 router)" || bad "netstatus states: $(cat "$D"/*.json)"
-PRESTIUM_FIXTURE_NOROUTE=1 PATH="$R/tests/fixtures/netstatus:$PATH" PRESTIUM_NETSTATUS_OUT=$D PRESTIUM_NETSTATUS_ONCE=1 bash "$I/usr/local/sbin/prestium-netstatus"
+PRESTIUM_FIXTURE_NOROUTE=1 PATH="$R/tests/fixtures/netstatus:$PATH" PRESTIUM_TOR_BOOTSTRAP="$R/tests/fixtures/netstatus/tor-bootstrap.py" PRESTIUM_NETSTATUS_OUT=$D PRESTIUM_NETSTATUS_ONCE=1 bash "$I/usr/local/sbin/prestium-netstatus"
 grep -q '"class": "connecting"' "$D/tor.json" && grep -q 'no network' "$D/tor.json" && ok "netstatus: Tor 100 % but no default route shows connecting" || bad "netstatus no-route: $(cat "$D/tor.json")"
 rm -rf "$D"
 # wallpapers: names only, never a path from the user's file

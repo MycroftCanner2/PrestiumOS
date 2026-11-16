@@ -50,6 +50,10 @@ passwd -d user >/dev/null          # empty until the user sets a session passwor
 gpasswd -d user i2pd >/dev/null 2>&1 || true
 usermod -aG autologin,i2ptorrents,prestium-localweb user
 usermod -aG prestium-tbb user       # 2.0 r9
+# 2.1: the panel/VM status checks ask Tor's bootstrap percentage over the control socket
+# (/run/onion-grater/control is 0660 prestium-tbb; the filter allows only their tor-bootstrap.py)
+usermod -aG prestium-tbb prestium-netstatus
+usermod -aG prestium-tbb prestium-vmcheck
 usermod -aG video user              # 2.0: backlight (brightnessctl, 90-prestium-backlight.rules)
 usermod -aG i2pd,i2ptorrents i2pd 2>/dev/null || true
 gpasswd -a i2pd i2ptorrents >/dev/null

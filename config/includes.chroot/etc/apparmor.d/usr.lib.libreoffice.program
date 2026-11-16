@@ -24,15 +24,20 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   /etc/papersize r,
 
   owner @{HOME}/.config/libreoffice/ rw,
-  owner @{HOME}/.config/libreoffice/** rwkl,
+  # 2.1 (boot test): LibreOffice maps its profile files (registrymodifications.xcu) into memory
+  # to write them. Without the "m" (mmap) permission the write is denied: first start and
+  # headless conversion die with "User installation could not be completed" (exit 77) while a
+  # later GUI start, which only reads the half-created profile, opens. "m" is mapping its own
+  # files, not executing anything.
+  owner @{HOME}/.config/libreoffice/** mrwkl,
   owner @{HOME}/.cache/libreoffice/ rw,
-  owner @{HOME}/.cache/libreoffice/** rwkl,
+  owner @{HOME}/.cache/libreoffice/** mrwkl,
   # 2.1: LibreOffice 25.x also keeps user data under the XDG data dir; without
   # it the first run could not finish creating its user profile and showed
   # "the installation is not complete" instead of opening. The "l" (link)
   # permission is for its lock/link files in the profile and cache.
   owner @{HOME}/.local/share/libreoffice/ rw,
-  owner @{HOME}/.local/share/libreoffice/** rwkl,
+  owner @{HOME}/.local/share/libreoffice/** mrwkl,
   # First start creates these three profile folders, and creating a folder
   # needs write on its parent: on a fresh home (nothing of LibreOffice in
   # /etc/skel) the mkdir failed, so the first run died with "Fatal Error"

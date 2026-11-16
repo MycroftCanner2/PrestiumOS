@@ -11,13 +11,17 @@ mkdir "$T/bin"
 # prestium-timesync is Python since 2.1 (sdwdate design); its bounds are in tests/test_timesync.py
 C=$I/usr/local/sbin/prestium-clockfix
 # clockfix, run: a fake consensus far in the past, Tor never bootstrapped, a fake clock
-mkdir -p "$T/tor"; printf '#!/bin/sh\nexit 0\n' > "$T/bin/journalctl"; printf '#!/bin/sh\nexit 0\n' > "$T/bin/sleep"; chmod 755 "$T/bin/"*
+mkdir -p "$T/tor"; printf '#!/bin/sh\nexit 0\n' > "$T/bin/journalctl"; printf '#!/bin/sh\nexit 0\n' > "$T/bin/sleep"
+printf 'import os\nprint(os.environ.get("TORBP","0"))\n' > "$T/bin/tor-bootstrap.py"; chmod 755 "$T/bin/"*
+export PRESTIUM_TOR_BOOTSTRAP="$T/bin/tor-bootstrap.py"
 cf(){ rm -f "$T/set" "$T/flag"
   printf 'valid-after %s\nvalid-until %s\n' "$1" "$2" > "$T/tor/cached-microdesc-consensus"
   sed -e "s#^PATH=.*#PATH=$T/bin:/usr/bin:/bin; export PATH#" -e "s#^D=/var/lib/tor#D=$T/tor#" \
       -e "s#/usr/share/prestium/build-date#$T/build#" -e "s#/usr/local/lib/prestium/safety-flag#$T/flag.sh#" \
       -e "s#date -u -s \"@\$new\" >/dev/null#echo \"\$new\" > $T/set#" "$C" > "$T/cf"; sh "$T/cf" 2>&1; }
 o=$(cf "2020-01-01 00:00:00" "2020-01-01 03:00:00"); { [ ! -e "$T/set" ] && grep -q clock-sync "$T/flag"; } && ok "clockfix: consensus before the build refused, flagged" || bad "clockfix old consensus: $o"
+# 2.1: bootstrap asked over the control port; when Tor has bootstrapped the clock is left alone
+o=$(TORBP=100 cf "2020-01-01 00:00:00" "2020-01-01 03:00:00"); { [ ! -e "$T/set" ] && grep -q "Tor bootstrapped, clock left as is" <<<"$o"; } && ok "clockfix: Tor bootstrapped, clock left as is" || bad "clockfix bootstrapped: $o"
 in=$(( $(cat "$T/build") + 30*86400 )); va=$(date -u -d "@$in" '+%F %T'); vu=$(date -u -d "@$((in+10800))" '+%F %T')
 if [ "$(date -u +%s)" -lt $((in - 600)) ]; then
   o=$(cf "$va" "$vu"); [ "$(cat "$T/set" 2>/dev/null)" = "$((in + 5400))" ] && ok "clockfix: consensus in bounds sets valid-after + 90 min" || bad "clockfix in bounds: $o"; fi

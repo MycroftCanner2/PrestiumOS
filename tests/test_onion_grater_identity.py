@@ -13,6 +13,7 @@ SRC = os.path.join(HERE, "..", "config", "includes.chroot", "usr", "local", "sbi
 PY = os.path.realpath("/usr/bin/python3")
 TB = "/opt/tor-browser/Browser/firefox.real"
 OS_SCRIPT = "/usr/bin/onionshare"
+BOOTSTRAP = "/usr/local/lib/prestium/tor-bootstrap.py"
 
 
 def load():
@@ -21,6 +22,8 @@ def load():
     m = importlib.util.module_from_spec(spec)
     loader.exec_module(m)
     m.USER_UID = os.getuid()
+    m.NETSTATUS_UID = os.getuid()
+    m.VMCHECK_UID = os.getuid()
     m.LOCALWEB_GID = None
     return m
 
@@ -42,6 +45,10 @@ class Identity(unittest.TestCase):
             src = os.path.join(cls.tmp, "client.py"); open(src, "w").write(CLIENT + "\n")
             subprocess.run(["sudo", "-n", "install", "-m", "0644", src, OS_SCRIPT], check=True)
             cls.created.append(OS_SCRIPT)
+        if not os.path.exists(BOOTSTRAP):
+            src = os.path.join(cls.tmp, "client.py"); open(src, "w").write(CLIENT + "\n")
+            subprocess.run(["sudo", "-n", "install", "-D", "-m", "0755", src, BOOTSTRAP], check=True)
+            cls.created.append(BOOTSTRAP)
         cls.fake = os.path.join(cls.tmp, "fake-python")
         shutil.copy(PY, cls.fake)
         cls.fake_script = os.path.join(cls.tmp, "fake-onionshare")
@@ -96,6 +103,29 @@ class Identity(unittest.TestCase):
         # a different binary bound over /usr/bin/python3.X
         who, why, _ = self.run_client(["--ro-bind", self.fake, PY], [PY, OS_SCRIPT])
         self.assertIsNone(who); self.assertIn("fake", why)
+
+    def test_real_tor_bootstrap(self):
+        # 2.1: the status checks ask here (panel, VM, clock); recognised by the system script
+        who = self.run_client(["--setenv", "PYTHONNOUSERSITE", "1"], [PY, BOOTSTRAP])[0]
+        self.assertEqual(who, "tor-bootstrap")
+
+    def test_fake_tor_bootstrap_script_refused(self):
+        fake = os.path.join(self.tmp, "fake-bootstrap")
+        with open(fake, "w") as f: f.write("# not tor-bootstrap\n" + CLIENT + "\n")
+        who, why, _ = self.run_client(["--setenv", "PYTHONNOUSERSITE", "1",
+                                       "--ro-bind", fake, BOOTSTRAP], [PY, BOOTSTRAP])
+        self.assertIsNone(who); self.assertIn("not the system file", why)
+
+    def test_tor_bootstrap_profile_is_minimal(self):
+        # one-shot read-only: version and bootstrap only; no GETCONF, signals, onions, streams
+        self.assertEqual(self.og.check("tor-bootstrap", "GETINFO status/bootstrap-phase"),
+                         ("GETINFO status/bootstrap-phase", None))
+        fwd, _ = self.og.check("tor-bootstrap", "GETINFO version")
+        self.assertEqual(fwd, "GETINFO version")
+        for line in ("GETCONF UseBridges", "SIGNAL NEWNYM", "ADD_ONION NEW:ED25519-V3 x Port=80,127.0.0.1:17600",
+                     "GETINFO status/circuit-established"):
+            fwd, local = self.og.check("tor-bootstrap", line)
+            self.assertIsNone(fwd, line); self.assertTrue(local.startswith("5"), line)
 
 
 if __name__ == "__main__":

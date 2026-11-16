@@ -363,6 +363,22 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   `test_apparmor_startup.sh` (the children deny the secrets and the other browser, and still get the
   sockets and GPU they bind), `test_download_folders.sh` (no `owner`-qualified `~/Torrents` rule),
   `test_apparmor_claws.sh` and `test_browser_update.py` (skip cleanly without `apparmor_parser`/`dpkg`).
+- **Ristretto no longer crashes opening pictures (found in a booted ISO).** GTK saves the
+  recent-files list by creating a temporary file in `~/.local/share/` and renaming it over
+  `recently-used.xbel`; the shared desktop rules granted the `.xbel` file itself but not write
+  on the directory, so the temporary create was denied and Ristretto segfaulted on every image
+  (Ristretto adds every opened file to recents; a fresh home has no `~/.local/share/` at all, and
+  the same app with an empty home or a /tmp data dir worked, which is how the cause was found).
+  The directory rule is granted next to the `.xbel` rule in `prestium-app-common`, as with
+  LibreOffice's own data-dir parent rules. `test_apparmor_startup.sh` checks the viewer may write
+  the directory and may not write other apps' data.
+- **LibreOffice first start and headless conversion finish their user installation (found in a
+  booted ISO).** On a fresh home the first start died with "User installation could not be
+  completed" (exit 77), and so did `soffice --convert-to`, while a later GUI start opened the
+  half-created profile. LibreOffice maps its profile files into memory to write them
+  (`registrymodifications.xcu`); the profile granted read/write/lock/link on them but not mapping,
+  so the mapped write was denied. The three profile folders now also grant `m`.
+  `test_apparmor_startup.sh` checks the mapped write on the registry file is allowed.
 - **The first session password can only be set from the lock dialog.** The Wayland broker shows that
   dialog on the compositor's full socket and sets the password as root. `sudo prestium-session-password`
   no longer allows `set`, and plain `passwd` is no longer setuid. The password must have at least 8
@@ -393,6 +409,19 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   and the MAC guard read `PRESTIUM_*` variables only when run from the source tree.
 
 ### Network, firewall and privileges
+- **The Tor pill, the VM warning, the clock sync and the clock fix now see Tor bootstrapped in the
+  default boot (found in a booted ISO).** They read Tor's bootstrap from the journal, but in the
+  default boot Tor logs nowhere (`Log err file /dev/null`, Network Logs off), so they reported
+  "Tor 0%" and "Tor NOT connected" while Tor itself worked - and `prestium-timesync` never synced
+  the clock, and `prestium-clockfix` would have moved the clock anyway. They now ask the control
+  port for `status/bootstrap-phase` through the onion-grater filter instead, via a new
+  read-only `tor-bootstrap.py` (GETINFO `version` and `status/bootstrap-phase` only; no events,
+  no GETCONF, no signals). The filter allows the two status service users as clients of that one
+  script only (socket group `prestium-tbb`; the hook puts both users in it). Default-boot logging
+  stays off. Tests: `test_vm_check.sh` (the helper is stubbed, the skew lines still come from the
+  journal), `test_desktop_theme.sh` (netstatus fixture), `test_timesync_bounds.sh` (clockfix sees
+  the helper and leaves a bootstrapped clock alone), `test_onion_grater_identity.py`
+  (`tor-bootstrap` recognised by the system script, minimal profile).
 - **i2pd builds fewer tunnels at boot, so the browser's come first.** Right after a cold boot the
   router list is days old and i2pd has no peer history, so many tunnel builds fail, and i2pd started
   68 tunnels (about 180 build requests) at once. Only the browser proxy's (4444) decide when sites

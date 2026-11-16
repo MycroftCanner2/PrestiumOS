@@ -11,6 +11,7 @@ FIRST=${PRESTIUM_VM_FIRST:-600}     # seconds before the first check (Tor and I2
 EVERY=${PRESTIUM_VM_EVERY:-120}     # seconds between checks
 ROUNDS=${PRESTIUM_VM_ROUNDS:-15}    # checks before giving up (about 40 minutes in all)
 I2PD_UID=${PRESTIUM_VM_I2PD_UID:-2000}
+TORBP=${PRESTIUM_TOR_BOOTSTRAP:-/usr/local/lib/prestium/tor-bootstrap.py}
 
 put() {   # name: stdin to $OUT/name, atomically, 0644
   local t; t=$(mktemp "$OUT/.$1.XXXXXX") || return 1
@@ -36,7 +37,10 @@ case "$virt" in
     clock_fix="Set the virtual machine's hardware clock to UTC, not local time." ;;
 esac
 
-tor_ok() { journalctl -b -u tor@default -o cat --no-pager 2>/dev/null | grep -q 'Bootstrapped 100'; }
+tor_ok() {   # 2.1: asked over the control port; the journal has no Tor lines in the default boot
+             # (Log err file /dev/null), so the old journal grep said "not connected" with Tor up
+  [ "$(PYTHONNOUSERSITE=1 python3 "$TORBP" 2>/dev/null)" = 100 ]
+}
 tor_skew() {   # Tor's last clock-skew warning, as "clock is 7 hours behind" (never Tor's own text:
   # 2.1 security audit, its log lines can name relays, and this goes to a world-readable file)
   local l r D='[0-9]{1,6} [a-z]{3,7}(, [0-9]{1,6} [a-z]{3,7}){0,4}'

@@ -20,6 +20,13 @@ case "$*" in
   *prestium-timesync*) [ -n "$SYNCLOG" ] && printf '%s\n' "$SYNCLOG";;
 esac; exit 0
 S
+# 2.1: Tor bootstrap is asked over the control port now (default boot logs nowhere), so the
+# tests stub the helper that asks (TORFCT = percentage, default 0; not TORBP, which is the
+# helper path variable in the scripts); TORLOG is for clock skew.
+cat > "$T/bin/tor-bootstrap.py" <<'S'
+import os
+print(os.environ.get("TORFCT", "0"))
+S
 cat > "$T/bin/ss" <<'S'
 #!/bin/sh
 [ -n "$SSOUT" ] && printf '%b\n' "$SSOUT"; exit 0
@@ -38,10 +45,11 @@ chmod +x "$T/bin/"*
 P2000='0 0 10.0.2.15:41000 198.51.100.7:23456 uid:2000 ino:1 sk:1'
 LOOP='0 0 127.0.0.1:41001 127.0.0.1:4500 uid:2000 ino:2 sk:2'
 OTHER='0 0 10.0.2.15:41002 198.51.100.8:443 uid:111 ino:3 sk:3'
-check(){ # runs one check round; env: VIRT GW TORLOG SYNCLOG SSOUT
+check(){ # runs one check round; env: VIRT GW TORFCT TORLOG SYNCLOG SSOUT
   rm -rf "$T/out"; mkdir -p "$T/out"
-  env -i PATH="$T/bin:/usr/bin:/bin" VIRT="${VIRT:-none}" GW="${GW:-}" TORLOG="${TORLOG:-}" SYNCLOG="${SYNCLOG:-}" \
+  env -i PATH="$T/bin:/usr/bin:/bin" VIRT="${VIRT:-none}" GW="${GW:-}" TORFCT="${TORFCT:-0}" TORLOG="${TORLOG:-}" SYNCLOG="${SYNCLOG:-}" \
     SSOUT="${SSOUT:-}" PRESTIUM_VM_OUT="$T/out" PRESTIUM_VM_FIRST=0 PRESTIUM_VM_EVERY=0 PRESTIUM_VM_ROUNDS=1 \
+    PRESTIUM_TOR_BOOTSTRAP="$T/bin/tor-bootstrap.py" \
     timeout 10 bash "$CHK" >/dev/null 2>&1
   echo $? > "$T/rc"; cat "$T/out/network" 2>/dev/null; }
 
@@ -50,6 +58,13 @@ grep -qx 'User=prestium-vmcheck' "$U" && grep -qx 'SupplementaryGroups=systemd-j
 for k in ProtectProc=invisible IPAddressDeny=any SystemCallFilter=@system-service RestrictNamespaces=yes ProtectKernelLogs=yes; do
   grep -qx "$k" "$U" && ok "service: $k" || bad "service: no $k"; done
 grep -q '^sysuser prestium-vmcheck ' "$R/config/hooks/live/0100-prestium-users.hook.chroot" && ok "user prestium-vmcheck created" || bad "no prestium-vmcheck user"
+# 2.1: Tor bootstrap asked over the control port (default boot logs nowhere): the two status
+# users are in prestium-tbb (socket group) and the filter lets only tor-bootstrap.py run for them
+grep -qx 'usermod -aG prestium-tbb prestium-netstatus' "$R/config/hooks/live/0100-prestium-users.hook.chroot" && ok "hook: netstatus in prestium-tbb" || bad "netstatus not in prestium-tbb"
+grep -qx 'usermod -aG prestium-tbb prestium-vmcheck' "$R/config/hooks/live/0100-prestium-users.hook.chroot" && ok "hook: vmcheck in prestium-tbb" || bad "vmcheck not in prestium-tbb"
+OG=$C/usr/local/sbin/prestium-onion-grater
+grep -q 'uid_of("prestium-netstatus")' "$OG" && grep -q 'uid_of("prestium-vmcheck")' "$OG" && grep -q '"tor-bootstrap":' "$OG" && ok "onion-grater: tor-bootstrap profile for the status users" || bad "onion-grater: no tor-bootstrap profile"
+grep -qxF '0755 root root /usr/local/lib/prestium/tor-bootstrap.py' $C/usr/share/prestium/build/perms.txt && ok "perms: tor-bootstrap.py" || bad "perms missing: tor-bootstrap.py"
 grep -q '^ConditionVirtualization=vm$' $C/etc/systemd/system/prestium-vm-netcheck.service && ok "service runs only in a VM" || bad "no ConditionVirtualization=vm"
 grep -qx '/etc/systemd/system/multi-user.target.wants/prestium-vm-netcheck.service /etc/systemd/system/prestium-vm-netcheck.service' \
   $C/usr/share/prestium/build/systemd-wants.txt && ok "service enabled (systemd-wants.txt)" || bad "service not enabled"
@@ -64,30 +79,30 @@ grep -qx 'prestium-run /usr/local/bin/prestium-vm-notify >/dev/null 2>&1 &' $C/e
 
 o=$(VIRT=none GW=192.168.122.1 check); [ -z "$o" ] && [ ! -e "$T/out/virt" ] && [ "$(cat $T/rc)" = 0 ] && ok "real hardware: nothing written" || bad "bare metal wrote: $o"
 
-o=$(VIRT=kvm GW=192.168.122.1 TORLOG='Bootstrapped 100% (done): Done' SSOUT="$P2000\n$OTHER" check)
+o=$(VIRT=kvm GW=192.168.122.1 TORFCT=100 SSOUT="$P2000\n$OTHER" check)
 [ -z "$o" ] && [ "$(cat $T/out/virt)" = kvm ] && ok "VM, Tor and I2P connected: virt recorded, no network problem" || bad "false problem: $o"
 
-o=$(VIRT=kvm GW=10.0.2.2 TORLOG='Bootstrapped 10% (conn_done)' SSOUT="$LOOP\n$OTHER" check)
+o=$(VIRT=kvm GW=10.0.2.2 TORFCT=10 SSOUT="$LOOP\n$OTHER" check)
 case "$o" in *"Tor NOT connected, I2P has NO peer connections"*) ok "status line";; *) bad "status: $o";; esac
 case "$o" in *"user-mode networking"*"User session"*) ok "10.0.2.2: user-mode networking explained";; *) bad "no user-mode hint: $o";; esac
 case "$o" in *"Check the clock: the VM thinks it is "*"<clock offset='utc'>"*) ok "no skew evidence, Tor down: clock check with the virt-manager fix";; *) bad "no clock hint: $o";; esac
 case "$o" in *"loopback"*|*"(1 peers)"*) bad "loopback counted as a peer";; *) ok "i2pd's own 127.0.0.1 tunnel is not a peer";; esac
 
-o=$(VIRT=kvm GW=192.168.122.1 TORLOG='Bootstrapped 100% (done): Done' SSOUT="0 0 10.0.2.15:41003 198.51.100.9:23456 uid:20000 ino:4 sk:4" check)
+o=$(VIRT=kvm GW=192.168.122.1 TORFCT=100 SSOUT="0 0 10.0.2.15:41003 198.51.100.9:23456 uid:20000 ino:4 sk:4" check)
 case "$o" in *"I2P has NO peer connections"*) ok "uid:20000 is not i2pd (uid 2000): not counted";; *) bad "uid:20000 counted as i2pd: $o";; esac
 
-o=$(VIRT=kvm GW=192.168.122.1 TORLOG=$'Bootstrapped 5%\nReceived NETINFO cell with skewed time: Our clock is 7 hours behind' check)
+o=$(VIRT=kvm GW=192.168.122.1 TORFCT=5 TORLOG='Received NETINFO cell with skewed time: Our clock is 7 hours behind' check)
 case "$o" in *"clock is or was wrong (Tor: "*"7 hours behind"*"<clock offset='utc'>"*) ok "Tor skew warning shown with the fix";; *) bad "skew: $o";; esac
 # 2.1 (security audit): Tor's text is never copied (its skew lines can name a relay's address)
-o=$(VIRT=kvm GW=192.168.122.1 TORLOG=$'Bootstrapped 5%\nReceived NETINFO cell with skewed time (OR:198.51.100.7:9001): It seems that our clock is behind by 7 hours, 3 minutes, or that theirs is ahead. Tor requires an accurate clock' check)
+o=$(VIRT=kvm GW=192.168.122.1 TORFCT=5 TORLOG='Received NETINFO cell with skewed time (OR:198.51.100.7:9001): It seems that our clock is behind by 7 hours, 3 minutes, or that theirs is ahead. Tor requires an accurate clock' check)
 case "$o" in *"198.51.100"*|*"OR:"*|*NETINFO*) bad "Tor's own text (relay address) copied: $o";;
   *"(Tor: clock is 7 hours, 3 minutes behind)"*) ok "connection skew: only the amount and direction, no relay address";; *) bad "connection skew: $o";; esac
-o=$(VIRT=kvm GW=192.168.122.1 TORLOG=$'Bootstrapped 5%\nclock skew detected from 203.0.113.9:443' check)
+o=$(VIRT=kvm GW=192.168.122.1 TORFCT=5 TORLOG='clock skew detected from 203.0.113.9:443' check)
 case "$o" in *"203.0.113"*) bad "address copied: $o";; *"(Tor: clock skew reported)"*) ok "unparsed skew line: fixed wording";; *) bad "unparsed skew: $o";; esac
 case "$o" in *"user-mode"*) bad "NAT network flagged as user-mode";; *) ok "libvirt NAT not flagged as user-mode";; esac
 case "$o" in *"Neither Tor nor I2P connects"*) ok "both down on NAT: host/bridge hint";; *) bad "no both-down hint: $o";; esac
 
-o=$(VIRT=oracle GW=192.168.122.1 TORLOG='Bootstrapped 100% (done): Done' SYNCLOG='median of 3 sources, skew 25200s' SSOUT="$OTHER" check)
+o=$(VIRT=oracle GW=192.168.122.1 TORFCT=100 SYNCLOG='median of 3 sources, skew 25200s' SSOUT="$OTHER" check)
 case "$o" in *"off by 25200 s at boot"*"Hardware Clock in UTC Time"*) ok "timesync's measured skew and the VirtualBox fix";; *) bad "sync skew: $o";; esac
 case "$o" in *"Tor works but I2P doesn't"*"VPN"*) ok "Tor up, no I2P peers: host VPN/firewall hint";; *) bad "no VPN hint: $o";; esac
 
@@ -97,7 +112,8 @@ case "$o" in *"VPN"*|*"Neither Tor"*) bad "route-less VM got host hints";; *) ok
 
 # a later check that finds both connected removes the old diagnosis
 mkdir -p "$T/out2"; echo old > "$T/out2/network"
-env -i PATH="$T/bin:/usr/bin:/bin" VIRT=kvm GW=192.168.122.1 TORLOG='Bootstrapped 100%' SSOUT="$P2000" PRESTIUM_VM_OUT="$T/out2" \
+env -i PATH="$T/bin:/usr/bin:/bin" VIRT=kvm GW=192.168.122.1 TORFCT=100 SSOUT="$P2000" PRESTIUM_VM_OUT="$T/out2" \
+  PRESTIUM_TOR_BOOTSTRAP="$T/bin/tor-bootstrap.py" \
   PRESTIUM_VM_FIRST=0 PRESTIUM_VM_EVERY=0 PRESTIUM_VM_ROUNDS=1 timeout 10 bash "$CHK" >/dev/null 2>&1
 [ ! -e "$T/out2/network" ] && ok "fixed later: diagnosis removed" || bad "stale diagnosis kept"
 [ "$(stat -c %a "$T/out/network" 2>/dev/null || stat -c %a "$T/out/virt")" = 644 ] && ok "files are 0644 (desktop can read)" || bad "mode"

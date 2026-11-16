@@ -480,6 +480,7 @@
 0755 root root /usr/local/bin/prestium-run
 0755 root root /usr/local/bin/prestium-audacity
 0755 root root /usr/local/lib/prestium/audacity-ns
+0755 root root /usr/local/lib/prestium/tor-bootstrap.py
 0755 root root /usr/local/bin/prestium-screenshot
 0755 root root /usr/local/bin/prestium-session
 0644 root root /usr/local/lib/prestium/browser-sandbox.sh

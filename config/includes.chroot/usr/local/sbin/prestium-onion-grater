@@ -39,6 +39,13 @@ def uid_of(name):
 
 USER_UID = uid_of("user")
 LOCALWEB_GID = gid_of("prestium-localweb")
+# 2.1 (Tor status in the default boot): the panel/VM status checks ask for the bootstrap
+# percentage through this filter (tor-bootstrap.py). Their service users are allowed as
+# clients of that one script only (see identify()); the socket group is prestium-tbb, so
+# the hook also puts both users in that group.
+NETSTATUS_UID = uid_of("prestium-netstatus")
+VMCHECK_UID = uid_of("prestium-vmcheck")
+BOOTSTRAP_SCRIPT = "/usr/local/lib/prestium/tor-bootstrap.py"
 
 def log_safe(msg):
     """2.1 (review of 6bf1234): what goes to the journal is one line of visible text. A refused client
@@ -79,6 +86,9 @@ GETCONF_RO = [r"UseBridges", r"Bridge", r"ClientTransportPlugin", r"Socks4Proxy"
 # Prestium 2.0: Tor Connection Assistant (read-only bootstrap status)
 GETINFO_TCA = [r"version", r"status/bootstrap-phase", r"status/circuit-established",
                r"net/listeners/socks", r"status/enough-dir-info", r"network-liveness"]
+# Prestium 2.1: the status checks' one-shot bootstrap percentage (panel, VM, clock).
+# Nothing else: no events, no GETCONF, no signals.
+GETINFO_BOOT = [r"version", r"status/bootstrap-phase"]
 GETCONF_TCA = [r"UseBridges", r"ClientTransportPlugin", r"DisableNetwork"]
 DENY_GETINFO_NYX = re.compile(r"^(address(/v[46])?|traffic/.*xx|fingerprint)$", re.I)
 
@@ -112,6 +122,14 @@ PROFILES = {
         "events": None,                     # any event type
         "signals": {"NEWNYM", "CLEARDNSCACHE"},
         "onion_auth": False, "add_onion": False, "nyx": True,
+        "stream_filter": False,
+    },
+    "tor-bootstrap": {
+        "getinfo": [re.compile("^(%s)$" % k, re.I) for k in GETINFO_BOOT],
+        "getconf": [],
+        "events": set(),
+        "signals": set(),
+        "onion_auth": False, "add_onion": False, "nyx": False,
         "stream_filter": False,
     },
 }
@@ -169,7 +187,8 @@ def tampered(pid, proc="/proc"):
 def identify(conn):
     creds = conn.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, struct.calcsize("3i"))
     pid, uid, gid = struct.unpack("3i", creds)
-    if uid not in (0, USER_UID):
+    # Prestium 2.1: the status checks run as their own users, not as root or the desktop user.
+    if uid not in (0, USER_UID, NETSTATUS_UID, VMCHECK_UID):
         return None, "uid %d" % uid, pid
     if LOCALWEB_GID is not None:
         # only the primary group counts (real/effective/saved/fs gid,
@@ -207,7 +226,7 @@ def identify(conn):
         if not script.startswith("/") or not same_file("/proc/%d/root%s" % (pid, script), script):
             return None, "unknown client %s %s (script is not the system file)" % (exe, script), pid
         if script in ("/usr/bin/onionshare", "/usr/bin/onionshare-cli", "/usr/bin/nyx",
-                      "/usr/local/bin/prestium-tor-assistant"):
+                      "/usr/local/bin/prestium-tor-assistant", BOOTSTRAP_SCRIPT):
             why = tampered(pid)
             if why:
                 return None, "%s refused: %s" % (script, why), pid
@@ -217,6 +236,8 @@ def identify(conn):
             return "nyx", script, pid
         if script == "/usr/local/bin/prestium-tor-assistant":
             return "tor-assistant", script, pid
+        if script == BOOTSTRAP_SCRIPT:
+            return "tor-bootstrap", script, pid
     return None, "unknown client %s %s" % (exe, " ".join(argv[:3])), pid
 
 def split_args(rest):

@@ -29,6 +29,7 @@ BUILD_FILE = "/usr/share/prestium/build-date"
 FLAG = "/usr/local/lib/prestium/safety-flag"
 STATE = os.environ.get("STATE_DIRECTORY", "/var/lib/prestium-timesync") + "/time-replay-protection"
 RUN = "/run/prestium/timesync"
+TORBP = os.environ.get("PRESTIUM_TOR_BOOTSTRAP", "/usr/local/lib/prestium/tor-bootstrap.py")
 MIN_FILES = ("/etc/minimum-unixtime", "/usr/local/etc/minimum-unixtime")
 CONSENSUS = ("/var/lib/tor/cached-microdesc-consensus", "/var/lib/tor/cached-consensus")
 SOCKS = "127.0.0.1:9050"
@@ -110,9 +111,12 @@ def consensus_window():
 
 
 def tor_ready():
-    r = subprocess.run(["journalctl", "-b", "-u", "tor@default", "-o", "cat", "--no-pager"],
-                       capture_output=True, text=True)
-    return "Bootstrapped 100" in r.stdout
+    # 2.1: asked over the control port (tor-bootstrap.py through the onion-grater filter); the
+    # journal has no Tor lines in the default boot (Log err file /dev/null), so the old journal
+    # check never saw "Bootstrapped 100" there and the clock never synced.
+    env = dict(os.environ, PYTHONNOUSERSITE="1")
+    r = subprocess.run([sys.executable, TORBP], capture_output=True, text=True, env=env)
+    return r.stdout.strip() == "100"
 
 
 def fetch(url):

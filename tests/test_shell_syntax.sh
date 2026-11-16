@@ -15,6 +15,7 @@ for f in \
   "$root/config/includes.chroot/usr/local/bin/prestium-tunnel-hops" \
   "$root/config/includes.chroot/usr/lib/systemd/system-sleep/prestium-usb-watchdog" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-vm-netcheck" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-netstatus" \
   "$root/config/includes.chroot/usr/local/bin/prestium-vm-notify"
 do
   if ! bash -n "$f"; then
@@ -28,6 +29,7 @@ for f in \
   "$root/config/includes.chroot/usr/local/bin/prestium-tor-assistant" \
   "$root/config/includes.chroot/usr/local/bin/prestium-torrents" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-onion-grater" \
+  "$root/config/includes.chroot/usr/local/lib/prestium/tor-bootstrap.py" \
   "$root/config/includes.chroot/usr/local/lib/prestium/safefile" \
   "$root/config/includes.chroot/usr/local/lib/prestium/browser_update.py" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-browser-install" \
