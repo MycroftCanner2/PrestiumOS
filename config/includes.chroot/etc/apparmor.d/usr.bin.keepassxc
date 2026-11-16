@@ -46,10 +46,16 @@ profile keepassxc /usr/bin/keepassxc {
   # only *.kdbx files there stay writable).
   /media/ rw,
   /media/**/ rw,
+  # First start creates its cache and data folders: creating a folder needs write on its parent,
+  # and ~/.local/share is two levels deep on a fresh home (nothing of KeePassXC in /etc/skel),
+  # so the ~/.cache/, ~/.local/ and ~/.local/share/ parents are granted too (same as LibreOffice).
   owner @{HOME}/.config/keepassxc/ rw,
   owner @{HOME}/.config/keepassxc/** rwk,
+  owner @{HOME}/.cache/ rw,
   owner @{HOME}/.cache/keepassxc/ rw,
   owner @{HOME}/.cache/keepassxc/** rwk,
+  owner @{HOME}/.local/ rw,
+  owner @{HOME}/.local/share/ rw,
   owner @{HOME}/.local/share/keepassxc/ rw,
   owner @{HOME}/.local/share/keepassxc/** rwk,
   owner @{run}/user/[0-9]*/ r,

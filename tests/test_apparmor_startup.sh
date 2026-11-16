@@ -284,6 +284,11 @@ allow keepassxc /media/user/STICK/Passwords.kdbx rwk
 allow keepassxc /media/user/STICK/Passwords.kdbxAbC123 w
 deny keepassxc /media/user/STICK/notes.txt w
 allow keepassxc $H/.config/keepassxc/keepassxc.ini rwk
+allow keepassxc $H/.cache/ w
+allow keepassxc $H/.cache/keepassxc/ rw
+allow keepassxc $H/.local/ w
+allow keepassxc $H/.local/share/ w
+allow keepassxc $H/.local/share/keepassxc/ rw
 allow keepassxc /tmp/keepassxc-user.socket rw
 allow keepassxc /dev/hidraw0 rw
 deny keepassxc $G/pubring.kbx r
