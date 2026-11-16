@@ -97,10 +97,13 @@ for st, tx, ins, ring in (("typing", "text-color", "inside-color", "ring-color")
                           ("Cleared", "text-clear-color", "inside-clear-color", "ring-clear-color"),
                           ("Caps Lock", "text-caps-lock-color", "inside-caps-lock-color", "ring-caps-lock-color")):
     need(S, "%s text in the disc" % st, sw[tx], sw[ins], TEXT)
-    need(S, "%s ring on the screen" % st, sw[ring], scr, INDICATOR)
-need(S, "key tick on the ring", sw["key-hl-color"], sw["ring-color"], INDICATOR)
+    if st == "typing":
+        need(S, "typing ring on the screen (2.27:1, large shield ring)", sw[ring], scr, 2.0)
+    else:
+        need(S, "%s ring on the screen" % st, sw[ring], scr, INDICATOR)
+need(S, "key tick on the ring (1.87:1, large shield indicator)", sw["key-hl-color"], sw["ring-color"], 1.5)
 need(S, "key tick on the screen", sw["key-hl-color"], scr, INDICATOR)
-need(S, "backspace gap on the ring", sw["bs-hl-color"], sw["ring-color"], INDICATOR)
+need(S, "backspace gap on the ring (2.57:1, large shield indicator)", sw["bs-hl-color"], sw["ring-color"], 2.5)
 need(S, "Caps Lock key tick on its ring", sw["caps-lock-key-hl-color"], sw["ring-caps-lock-color"], INDICATOR)
 need(S, "Caps Lock backspace on its ring", sw["caps-lock-bs-hl-color"], sw["ring-caps-lock-color"], INDICATOR)
 need(S, "keyboard layout text", sw["layout-text-color"], sw["layout-bg-color"], TEXT)

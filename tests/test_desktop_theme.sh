@@ -65,7 +65,7 @@ grep -qx 'ColorScheme=Prestium' "$I/etc/xdg/kleopatrarc" && grep -qx 'Name=Prest
 grep -q '^BackgroundNormal=53,132,228$' "$I/usr/share/color-schemes/Prestium.colors" && ok "KDE selection $ACC" || bad "KDE selection colour"
 # labwc, swaylock, mako, waybar
 grep -q '^window.active.border.color: #cdc7c2$' "$T" && grep -q '^menu.items.active.bg.color: #3584e4$' "$T" && grep -q '<dropShadows>yes</dropShadows>' "$I/etc/xdg/labwc/rc.xml" && grep -q '<cornerRadius>' "$I/etc/xdg/labwc/rc.xml" && ok "labwc accent, shadows, corners" || bad "labwc theme"
-grep -q '^ring-color=3d8bffff' "$I/usr/share/prestium/swaylock.conf" && grep -qx 'indicator-idle-visible' "$I/usr/share/prestium/swaylock.conf" && ok "swaylock accent ring, prompt always shown" || bad "swaylock accent"
+grep -q '^ring-color=0050c8ff' "$I/usr/share/prestium/swaylock.conf" && grep -qx 'indicator-idle-visible' "$I/usr/share/prestium/swaylock.conf" && ok "swaylock Prestium-blue ring, prompt always shown" || bad "swaylock ring"
 M="$I/etc/xdg/mako/config"
 grep -q '^\[category=prestium.osd\]' "$M" && grep -q -- '-c prestium.osd' "$I/usr/local/bin/prestium-media-key" && ok "OSD category styled" || bad "OSD category"
 grep -q '^icon-path=/usr/share/icons/Adwaita:/usr/share/icons/Papirus:' "$M" && ok "mako icons from Adwaita" || bad "mako icon-path"
