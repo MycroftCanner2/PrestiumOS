@@ -3,21 +3,21 @@
 # Window borders
 border.width: 1
 window.active.border.color: #cdc7c2
-window.inactive.border.color: #deddda
+window.inactive.border.color: #dc8add
 window.active.indicator.toggled-keybind.color: #3584e4
 
 # Titlebar geometry & alignment
 window.label.text.justify: Center
 
 # Active titlebar (Adwaita light headerbar)
-window.active.title.bg: Solid
+window.active.title.bg: flat solid
 window.active.title.bg.color: #ebebeb
 window.active.label.text.color: #2e3436
 
 # Inactive titlebar
-window.inactive.title.bg: Solid
-window.inactive.title.bg.color: #f6f5f4
-window.inactive.label.text.color: #77767b
+window.inactive.title.bg: flat solid
+window.inactive.title.bg.color: #fafafa
+window.inactive.label.text.color: #929595
 
 # Titlebar buttons
 window.button.width: 24
@@ -30,7 +30,7 @@ window.active.button.unpressed.image.color: #2e3436
 window.active.button.hover.image.color: #2e3436
 window.active.button.pressed.image.color: #2e3436
 window.active.button.disabled.image.color: #9a9996
-window.inactive.button.unpressed.image.color: #77767b
+window.inactive.button.unpressed.image.color: #929595
 window.inactive.button.hover.image.color: #2e3436
 window.inactive.button.pressed.image.color: #2e3436
 window.inactive.button.disabled.image.color: #9a9996

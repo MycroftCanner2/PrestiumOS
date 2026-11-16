@@ -45,7 +45,7 @@ PALETTE = {
     "0a4f5c", "10262b", "5c4a1a",
     # Adwaita light theme: purple slate, light surfaces, dark text, success green
     "56347c", "7d4fb2", "1f5c3a", "2ec27e", "26a269", "e5a50a", "c01c28", "3584e4", "1c71d8",
-    "1a5fb4", "7a5600", "1e7b44",
+    "1a5fb4", "7a5600", "1e7b44", "929595", "fafafa", "dc8add",
     "cdc7c2", "deddda", "ebebeb", "f6f5f4", "2e3436", "5e5c64", "77767b", "9a9996", "808080",
 }
 OLD = ["0066ff", "1a75ff", "0a6cff", "0052cc", "a3a3ff", "7fb2ff", "8fb3ff", "ff7a7a",

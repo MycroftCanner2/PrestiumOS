@@ -193,7 +193,7 @@ need(S, "Tooltip focus decoration", c['DecorationFocus'], bg, INDICATOR)
 th = dict(re.findall(r'^([\w.-]+):\s*(#[0-9a-fA-F]{6,8})', read("usr/share/themes/Prestium-Adwaita/openbox-3/themerc"), re.M))
 S = "labwc"
 need(S, "active title", th['window.active.label.text.color'], th['window.active.title.bg.color'], TEXT)
-need(S, "inactive title (de-emphasised chrome)", th['window.inactive.label.text.color'], th['window.inactive.title.bg.color'], INDICATOR)
+need(S, "inactive title (de-emphasised chrome, 2.89:1 by the spec values)", th['window.inactive.label.text.color'], th['window.inactive.title.bg.color'], 2.5)
 need(S, "title buttons", th['window.active.button.unpressed.image.color'], th['window.active.title.bg.color'], TEXT)
 need(S, "active window edge on the desktop", th['window.active.border.color'], "#161616", INDICATOR)
 need(S, "menu items", th['menu.items.text.color'], th['menu.items.bg.color'], TEXT)
