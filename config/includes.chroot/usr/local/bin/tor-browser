@@ -11,7 +11,7 @@
 #  - The control port is reached through the onion-grater filter
 #    (/run/onion-grater/control: NEWNYM, circuit display, onion auth only).
 TB=/opt/tor-browser
-# 2.1 (security audit): Claws Mail, Gajim and Pidgin start this launcher (AppArmor "Px", which
+# 2.1 (security audit): Claws Mail and Gajim start this launcher (AppArmor "Px", which
 # keeps most of their environment; only the loader's unsafe variables are dropped). So nothing here may come
 # from the caller's environment: "bash -p" ignores BASH_ENV, ENV, SHELLOPTS, BASHOPTS, CDPATH,
 # GLOBIGNORE and exported functions; PATH is fixed; every file and program is a fixed path (no
@@ -19,7 +19,7 @@ TB=/opt/tor-browser
 PATH=/usr/bin:/bin; export PATH
 unset IFS
 # 2.1 (review): HOME and XDG_RUNTIME_DIR from the system, not the caller. A crafted HOME would aim
-# the profile writes below at another place. (Started from Claws Mail, Gajim or Pidgin, this runs
+# the profile writes below at another place. (Started from Claws Mail or Gajim, this runs
 # under the AppArmor profile prestium_browser_launcher, which allows writes only to the browser's
 # own directories.)
 HOME=$(getent passwd "$(id -u)" | cut -d: -f6)

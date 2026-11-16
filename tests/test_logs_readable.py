@@ -161,10 +161,10 @@ if aa:
     try: os.unlink(os.path.join(W, "loupe"))
     except OSError: pass
     shutil.copytree(os.path.join(I, "etc/apparmor.d"), W, dirs_exist_ok=True)
-    for f, prof in (("usr.bin.claws-mail", "claws-mail"), ("usr.bin.gajim", "gajim"), ("usr.bin.pidgin", "pidgin"),
+    for f, prof in (("usr.bin.claws-mail", "claws-mail"), ("usr.bin.gajim", "gajim"),
                     ("usr.share.librewolf.librewolf", "librewolf"), ("torbrowser.Browser.firefox", "torbrowser_firefox"),
                     ("opt.firefox.firefox", "prestium-localfox"), ("usr.lib.libreoffice.program", "libreoffice"),
-                    ("usr.bin.loupe", "loupe"), ("usr.bin.vlc", "vlc"), ("usr.bin.gimp", "gimp"), ("usr.local.bin.feather", "feather"),
+                    ("usr.bin.loupe", "loupe"), ("usr.bin.vlc", "vlc"), ("usr.local.bin.feather", "feather"),
                     ("prestium.browser-launcher", "prestium_librewolf_launcher//bwrap"), ("prestium.thelounge", "thelounge")):
         x = subprocess.run([aa, "-p", "-b", W, os.path.join(W, f)], capture_output=True, text=True)
         if x.returncode:

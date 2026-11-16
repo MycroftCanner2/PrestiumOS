@@ -38,7 +38,7 @@ k=$(printf '%s\n' "$L" | grep -E '^(linux-(image|headers|kbuild|source)|.*-dkms$
 [ -z "$k" ] && ok "package lists: no extra kernel, headers or DKMS modules" || bad "package lists bring kernels or modules: $k"
 printf '%s\n' "$L" | grep -qE '^(shim-signed|grub-efi-amd64-signed|grub-efi-amd64)$' && bad "shim/GRUB in the live system's package lists (live-build installs them for the binary stage only)" || ok "shim and signed GRUB not in the live system (binary stage only)"
 grep -hE '^Package:' "$R"/config/archives/*.pref* | grep -qE '[[:space:]]linux-' && bad "an apt pin names a linux-* package" || ok "no apt pin moves the kernel (e.g. to backports)"
-grep -lE '\bdkms\b|make[^|;]*\bmodules\b|\.ko\b|/lib/modules/[^ ]*/(updates|extra)' "$R"/config/hooks/live/*.chroot >/dev/null 2>&1 && bad "a hook builds or installs a kernel module" || ok "no hook builds or installs a kernel module (lurch is userspace)"
+grep -lE '\bdkms\b|make[^|;]*\bmodules\b|\.ko\b|/lib/modules/[^ ]*/(updates|extra)' "$R"/config/hooks/live/*.chroot >/dev/null 2>&1 && bad "a hook builds or installs a kernel module" || ok "no hook builds or installs a kernel module"
 grep -qx 'module.sig_enforce=1' <(tr ' ' '\n' <<<"$(sed -n 's/^APPEND="\(.*\)"$/\1/p' "$R/auto/config")") && ok "module.sig_enforce=1 kept" || bad "module.sig_enforce=1 gone"
 grep -qx 'lockdown=integrity' <(tr ' ' '\n' <<<"$(sed -n 's/^APPEND="\(.*\)"$/\1/p' "$R/auto/config")") && ok "lockdown=integrity on the command line" || bad "lockdown=integrity gone"
 grep -q 'command -v sbverify' "$R/build.sh" && ok "build.sh checks for sbverify" || bad "build.sh does not check sbverify"

@@ -37,12 +37,3 @@ IRC_FRAMEWORK_TAR_SHA256=0c25dd1efea08411f4df8e2a950efe1d720ea76650b8df8af406499
 FEATHER_VERSION=2.9.1
 FEATHER_SHA256=f1d40d619664d9e6318c086b9015ee72bc69741ec86148ce2ea2ef75ef47feed
 FEATHER_KEY=8185E158A33330C7FD61BC0D1F76E155CEFBA71C     # featherwallet.org (dsc)
-
-# lurch (OMEMO for libpurple), built from source in a chroot hook.
-# Trust: a git commit hash cryptographically binds the full tree (same content-addressing
-# guarantee as pinning a tar SHA-256 of that commit). We pin lurch + both submodules and
-# verify HEAD after clone. Upstream does not publish OpenPGP-signed release tarballs for
-# these tags, so commit pins are the integrity control (not weaker than an unsigned tar SHA).
-LURCH_COMMIT=84f72d85a6735d64ade8f8bc8619bd61699298b2    # lurch 0.7.0 (gkdr/lurch)
-AXC_COMMIT=1d4454ea42d39a2064955f2a8de5f89787743f2a      # lib/axc v0.3.4
-LIBOMEMO_COMMIT=7667e54d6488aba85701bb4dd6e09fd98bfb3a2c # lib/libomemo v0.7.1

@@ -1,7 +1,7 @@
 #!/bin/bash
 # 2.1 (L-5, revised): the apps share two folders and three stay app-specific.
-#   shared:   ~/Downloads (local Firefox, Claws Mail, Gajim, Pidgin),
-#             ~/Documents (LibreOffice, GIMP, FeatherPad, File Roller, Xarchiver, Audacity,
+#   shared:   ~/Downloads (local Firefox, Claws Mail, Gajim),
+#             ~/Documents (LibreOffice, FeatherPad, File Roller, Audacity,
 #             Kleopatra, Metadata Cleaner, Feather)
 #   specific: ~/I2P Browser (I2P Browser), ~/Torrents (I2P Torrents),
 #             ~/Tor Browser (Tor Browser)
@@ -28,15 +28,6 @@ grep -q 'DL="$HOME/I2P Browser"' "$I/usr/local/bin/librewolf-i2p" && grep -q -- 
 grep -q 'pref("browser.download.dir", "/home/user/I2P Browser");' "$I/home/user/.librewolf/librewolf.overrides.cfg" && ok "LibreWolf download.dir" || bad "LibreWolf download.dir"
 grep -q 'user_pref("browser.download.dir", "/home/user/Downloads");' "$I/usr/local/share/prestium-localfox/user.js" && ok "local Firefox download.dir" || bad "local Firefox download.dir"
 grep -qx 'attach_save_dir=/home/user/Downloads' "$I/home/user/.claws-mail/clawsrc" && grep -qx 'attach_load_dir=/home/user/Downloads' "$I/home/user/.claws-mail/clawsrc" && ok "Claws Mail saves attachments in ~/Downloads" || bad "clawsrc attach_save_dir"
-grep -q "last_save_folder' type='path' value='/home/user/Downloads'" "$I/home/user/.purple/prefs.xml" && ok "Pidgin saves received files in ~/Downloads" || bad "Pidgin prefs"
-# Pidgin 2 registers only these (pidgin/gtkprefs.c); a received file's dialog uses last_save_folder
-python3 -I - "$I/home/user/.purple/prefs.xml" <<'PY' && ok "Pidgin: only real filelocations prefs" || bad "Pidgin: unknown filelocations pref"
-import sys, xml.etree.ElementTree as E
-r = E.parse(sys.argv[1]).getroot()
-fl = [n for n in r.iter('pref') if n.get('name') == 'filelocations']
-names = {c.get('name') for f in fl for c in f}
-sys.exit(not (len(fl) == 1 and names and names <= {'last_save_folder', 'last_open_folder', 'last_icon_folder'}))
-PY
 for f in "$I/home/user/.librewolf/librewolf.overrides.cfg" "$I/home/user/.config/librewolf/librewolf/librewolf.overrides.cfg"; do
   for k in browser.download.dir browser.download.lastDir; do
     grep -qF "pref(\"$k\", \"/home/user/I2P Browser\");" "$f" && ok "$k in ${f#"$I/"}" || bad "$k missing in ${f#"$I/"}"; done; done
@@ -68,15 +59,6 @@ grep -qF '/usr/lib/libreoffice/** mr,' "$A/usr.lib.libreoffice.program" && ok "L
 grep -q "UseLocking=false" "$A/usr.lib.libreoffice.program" && ! grep -q "opens read-only" "$A/usr.lib.libreoffice.program" \
   && ok "LibreOffice profile comment: lock files off, Save As" || bad "LibreOffice profile comment"
 for h in home/user etc/skel; do
-  python3 -I - "$I/$h/.config/xarchiver/xarchiverrc" <<'PY' && ok "Xarchiver ($h): extracts to ~/Documents, complete file" || bad "Xarchiver xarchiverrc ($h)"
-import sys, configparser
-c = configparser.ConfigParser(interpolation=None); c.read(sys.argv[1]); x = c['xarchiver']
-need = {'preferred_extract_dir': '/home/user/Documents', 'preferred_temp_dir': '/tmp', 'prefer_unzip': 'true',
-        'confirm_deletion': 'true', 'advanced_isearch': 'true', 'auto_expand': 'true', 'show_toolbar': 'true',
-        'show_location_bar': 'true', 'show_sidebar': 'true', 'ensure_directory': 'true', 'full_path': '2',
-        'updadd': 'true', 'recurse': 'true', 'icon_size': '2'}
-sys.exit(any(x.get(k) != v for k, v in need.items()))
-PY
   for o in Save Export; do
     python3 -I - "$I/$h/.config/audacity/audacity.cfg" "$o" <<'PY' && ok "Audacity ($h): $o folder ~/Documents" || bad "Audacity $o folder ($h)"
 import sys
@@ -137,8 +119,8 @@ run() { apparmor_parser -p -b "$W" "$W/$1" > "$W/.exp" 2>"$W/.err" || { bad "$1 
 spec() { for d in "I2P Browser" Torrents "Tor Browser"; do echo "deny $1 \"$H/$d/f.pdf\" w"; done; }
 # Editors write the shared ~/Documents and nothing in ~/Downloads or a specific folder.
 # Others read the file folders but write nowhere in them.
-for pair in "usr.lib.libreoffice.program libreoffice" "usr.bin.gimp gimp" "usr.bin.featherpad featherpad" \
-    "usr.bin.file-roller file-roller" "usr.bin.xarchiver xarchiver" "usr.bin.audacity audacity" \
+for pair in "usr.lib.libreoffice.program libreoffice" "usr.bin.featherpad featherpad" \
+    "usr.bin.file-roller file-roller" "usr.bin.audacity audacity" \
     "usr.bin.kleopatra kleopatra" "usr.bin.metadata-cleaner metadata-cleaner"; do
   set -- $pair; echo "== $2: writes only the shared ~/Documents"
   run "$1" <<EOT
@@ -166,7 +148,7 @@ $(spec feather)
 EOT
 # Network apps write files directly in the shared ~/Downloads (not in subfolders: the rule is
 # Downloads/*, deliberately one level, as the header of this test has always said), never in a specific folder.
-for pair in "usr.bin.claws-mail claws-mail" "usr.bin.gajim gajim" "usr.bin.pidgin pidgin" "opt.firefox.firefox prestium-localfox"; do
+for pair in "usr.bin.claws-mail claws-mail" "usr.bin.gajim gajim" "opt.firefox.firefox prestium-localfox"; do
   set -- $pair; echo "== $2: writes files directly in ~/Downloads, never in a specific folder"
   run "$1" <<EOT
 allow $2 $H/Downloads/f.pdf rw

@@ -2,7 +2,7 @@
 7zip
 adduser
 adwaita-icon-theme
-# 2.1: dark GTK 2 theme (Pidgin) and full-colour icons the Prestium icon theme inherits (menu icons)
+# 2.1: dark GTK 2 theme (pinentry) and full-colour icons the Prestium icon theme inherits (menu icons)
 gnome-themes-extra
 adwaita-icon-theme-legacy
 # 2.1 (design batch): one complete icon theme (Papirus-Dark; the Prestium theme inherits it first),
@@ -101,8 +101,6 @@ gajim-triggers
 gcc-14-base
 gcr
 gdisk
-gimp
-gimp-data
 glib-networking
 glib-networking-common
 glib-networking-services
@@ -183,7 +181,6 @@ liblzma5
 libmd0
 libmenu-cache-bin
 libmount1
-libmxml1
 libnotify-bin
 libpam-cap
 libpam-gnome-keyring
@@ -271,8 +268,6 @@ pcmanfm
 pcscd
 perl
 perl-base
-pidgin
-pidgin-otr
 pinentry-curses
 pinentry-gnome3
 pinentry-gtk2
@@ -286,7 +281,6 @@ ppp
 procps
 psmisc
 publicsuffix
-purple-xmpp-carbons
 qrencode
 qt5-gtk-platformtheme
 qtqr
@@ -342,7 +336,6 @@ x11-session-utils
 x11-utils
 x11-xkb-utils
 x11-xserver-utils
-xarchiver
 xauth
 xbitmaps
 xdg-dbus-proxy

@@ -162,23 +162,6 @@ done
 echo "OK IRC_FRAMEWORK $IRC_FRAMEWORK_COMMIT ($(find "$IRCF" -type f | wc -l) files match the commit)"
 echo "OK THELOUNGE $THELOUNGE_VERSION (npm ci, lockfile integrity + pinned irc-framework tarball)"
 
-# lurch source at pinned commits (submodules checked too)
-LS=$C/lurch-src
-# 2.0 r12: the marker sits beside the tree, not in it (an untracked .done made the clean-tree check below always fail)
-if [ ! -e "$LS.done" ] || [ ! -d "$LS" ]; then
-  rm -rf "$LS" "$LS.done"; git clone -q --recursive https://github.com/gkdr/lurch "$LS"
-  git -C "$LS" checkout -q "$LURCH_COMMIT"; git -C "$LS" submodule -q update --init --recursive
-  touch "$LS.done"
-fi
-[ "$(git -C "$LS" rev-parse HEAD)" = "$LURCH_COMMIT" ] && [ "$(git -C "$LS/lib/axc" rev-parse HEAD)" = "$AXC_COMMIT" ] && \
-  [ "$(git -C "$LS/lib/libomemo" rev-parse HEAD)" = "$LIBOMEMO_COMMIT" ] || { echo "ERROR: lurch commits"; exit 1; }
-# 2.0 r7: HEAD alone does not cover the checked-out files; the work trees must match their commits
-for r in "$LS" "$LS/lib/axc" "$LS/lib/libomemo"; do
-  [ -z "$(git -C "$r" status --porcelain --untracked-files=all --ignore-submodules=none)" ] \
-    || { echo "ERROR: cached lurch work tree $r differs from its pinned commit (delete $LS)"; exit 1; }
-done
-echo "OK LURCH $LURCH_COMMIT"
-
 [ "$REPIN" = 1 ] && exit 0
 
 # I2P reseed file, checked every time before use: SU3 format, allowed signer (StormyCloud or echelon3),
@@ -250,5 +233,4 @@ if [ ! -s "$LT" ] || [ ! -s "$LT.sha256" ] || [ "$L/.done" -nt "$LT" ]; then
 fi
 cp "$LT" "$S/thelounge.tar"
 [ "$(sha "$S/thelounge.tar")" = "$(cat "$LT.sha256")" ] || { echo "ERROR: cached The Lounge tar is corrupt (delete $LT)"; exit 1; }
-tar -C "$LS" --exclude=.git -cf "$S/lurch-src.tar" .
 echo "STAGED $S"; ls -la "$S"

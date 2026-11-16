@@ -6,7 +6,7 @@
 // filesystem-mount to the active local user (allow_active=yes), so dropping it here changes nothing,
 // and polkit can't tell the unlock helpers from any other program running as "user" (same uid; an
 // encrypted container with a crafted filesystem inside goes through the helpers' own path). The
-// confined apps (Claws Mail, Gajim, Pidgin, the browsers, ...) can't reach udisks at all: the
+// confined apps (Claws Mail, Gajim, the browsers, ...) can't reach udisks at all: the
 // system bus is denied in their AppArmor profiles (prestium-no-admin). What such an image can reach is
 // limited instead: rarely used filesystem drivers are not loadable (etc/modprobe.d/prestium-blacklist.conf).
 polkit.addRule(function(action, subject) {

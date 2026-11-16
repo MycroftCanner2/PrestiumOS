@@ -16,7 +16,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
 ## Highlights
 
 - **Built from git:** the whole image is built from the live-build configuration here, and every
-  third-party download (Tor Browser, Firefox, Node.js, The Lounge, Feather, lurch, the I2P reseed file)
+  third-party download (Tor Browser, Firefox, Node.js, The Lounge, Feather, the I2P reseed file)
   is checked against its publisher's signature and a pinned SHA-256 (Tor Browser: the newest signed
   release at build time, no older than a pinned minimum).
 - **Wayland desktop** (labwc, waybar, swaylock, mako) with a restricted Wayland socket for apps:
@@ -25,11 +25,11 @@ modernization of the 2023 Prestium build, with tighter security and new features
   network namespace. Tor Browser can reach only Tor, and LibreWolf only i2pd's HTTP proxy.
 - **Browser Updater:** install the latest publisher-signed Tor Browser or I2P Browser for this session,
   over Tor or the I2P outproxy, and reset to the copy on the image.
-- **Enforced AppArmor profiles** for the browsers, Claws Mail, Gajim, Pidgin, OnionShare, Feather,
+- **Enforced AppArmor profiles** for the browsers, Claws Mail, Gajim, OnionShare, Feather,
   LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra and the programs that open
   downloaded files.
-- **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail, Gajim
-  and Pidgin) and `~/Documents` (LibreOffice, GIMP, FeatherPad, File Roller, Xarchiver, Audacity,
+- **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail
+  and Gajim) and `~/Documents` (LibreOffice, FeatherPad, File Roller, Audacity,
   Kleopatra, Metadata Cleaner and Feather). Only three folders are app-specific: the I2P Browser's
   (`~/I2P Browser`), I2P Torrents' (`~/Torrents`) and Tor Browser's
   (`~/Tor Browser`); the shared apps can't write in those three. The file manager pins exactly those
@@ -53,15 +53,10 @@ modernization of the 2023 Prestium build, with tighter security and new features
   DHT peer list), on the Connection Assistant's hops (default 3). i2pd relays
   other people's traffic at the *Low* share level by default (32 KB/s, at most 30 % of it for
   relaying); the I2P Connection Assistant sets Low, Medium or High.
-- **Messengers (Gajim, Pidgin):** both have Tor and I2P proxies ready to use. Gajim ships Tor
+- **Messenger (Gajim):** Tor and I2P proxies ready to use. Gajim ships Tor
   (SOCKS5 127.0.0.1:9050) plus I2P (SOCKS5 127.0.0.1:4447 and HTTP 127.0.0.1:4444) proxy
   profiles, with Tor as the global default; choose another per account in Account Settings.
-  Pidgin's global proxy is Tor (its own Tor/Privacy (SOCKS5) option at 127.0.0.1:9050,
-  remote DNS on); it starts when Tor or i2pd is up and its launcher keeps the port in
-  sync (Tor: 9050, I2P-only: 4447; a hand-set port is left alone), and an account that
-  must go over I2P sets SOCKS5 127.0.0.1:4447 as its own proxy in the account editor.
-  Pidgin runs in stock light Adwaita again (its own colours don't follow a dark theme).
-  Their menu entries are plain *Gajim* and *Pidgin*.
+  Its menu entry is plain *Gajim*.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
   SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets and its own

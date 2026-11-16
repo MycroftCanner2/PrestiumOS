@@ -50,9 +50,6 @@
     <item label="Audacity" icon="audacity">
       <action name="Execute" command="prestium-run audacity" />
     </item>
-    <item label="GIMP" icon="gimp">
-      <action name="Execute" command="prestium-run gimp" />
-    </item>
     <item label="VLC Media Player" icon="vlc">
       <action name="Execute" command="prestium-run vlc" />
     </item>
@@ -94,9 +91,6 @@
     </item>
     <item label="Gajim" icon="org.gajim.Gajim">
       <action name="Execute" command="prestium-run gajim" />
-    </item>
-    <item label="Pidgin" icon="pidgin">
-      <action name="Execute" command="prestium-run /usr/local/bin/pidgin-tor" />
     </item>
     <item label="IRC (I2P)" icon="irc-chat">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />

@@ -40,7 +40,7 @@ which works but is several times slower.
 `build.sh`:
 
 1. runs `scripts/fetch-thirdparty.sh`: downloads Tor Browser, Firefox, Node.js, Feather, The Lounge
-   (npm) and the lurch source, checks each one against its publisher's OpenPGP signature
+   (npm), checks each one against its publisher's OpenPGP signature
    (`thirdparty/keys/`) **and** the SHA-256 pinned in `thirdparty/versions.sh`, and stages them in
    `config/includes.chroot/usr/src/prestium-thirdparty/` (not committed; removed from the image by
    the last hook); it also stages an I2P reseed file — the repo-shipped `i2pseeds.su3` first (see CHANGELOG), checks it with
@@ -140,7 +140,6 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `thelounge-tor` (2.1, IRC (Tor)), `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
 | `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + uBlock Origin), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, connecting line only when a connection starts, 320s IRC ping timeout, and for the Tor instance every network through Tor's SOCKS port), Feather |
-| `0300-prestium-lurch` | builds lurch 0.7.0 (OMEMO for Pidgin) from the pinned source and purges the build tools again |
 | `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives (iptables/ip6tables pinned to legacy, the backend ferm and `prestium-firewall-early` share), CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
 | `0405-prestium-verity` | live-boot mounts the image only through dm-verity: every image needs its hash tree and a root hash on the command line (`/usr/lib/live/boot/9989-prestium-verity.sh`), no plain-mount or root-hash-file fallback, no plain root, no `.fec`/`.fec.roots`/`.roothash`/`.roothash.p7s`/`*.module` next to the image; live-boot's initramfs hook stops sourcing `boot.conf` from the medium; the initramfs gets libcryptsetup (`/etc/initramfs-tools/hooks/prestium-verity`) |
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them); copies The Lounge's packages for the Tor instance (root:thelounge-tor, read-only) |

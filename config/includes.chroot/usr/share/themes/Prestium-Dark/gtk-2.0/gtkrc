@@ -1,4 +1,4 @@
-# Prestium 2.1 (UI pass): GTK 2 apps (Pidgin, pinentry-gtk2) in Prestium's palette. This is Adwaita-dark's
+# Prestium 2.1 (UI pass): GTK 2 apps (pinentry-gtk2) in Prestium's palette. This is Adwaita-dark's
 # GTK 2 theme (gnome-themes-extra) with Prestium's named colours instead of its blue-grey #33393b surfaces,
 # #215d9c selection and #4a90d9 links: surfaces #1e1e1e / #161616 / #262626, selection #0050c8 behind white
 # text (7.0:1), links and visited links #8ab8ff, dim text #a8a8a8 (as gtk3.css). A colour scheme in

@@ -1,6 +1,6 @@
 # Prestium 2.1 (audit of 96468c5, M-1; split in the review of 7242e00): what the programs that open
 # downloaded files share (image viewers, VLC, the archive managers, the text editor, the metadata
-# cleaners, GIMP, Audacity). A crafted image, video, sound file, archive or document that exploits one
+# cleaners, Audacity). A crafted image, video, sound file, archive or document that exploits one
 # of them gets no network, no admin tools, no other app's data (mail, chat, browser profiles), no
 # OpenPGP keys and no KeePassXC databases: only the user's file folders, which it may read. Each
 # profile adds where it may write. Profiles include prestium-viewer (this plus no IPv4 TCP); only

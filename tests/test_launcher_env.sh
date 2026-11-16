@@ -1,5 +1,5 @@
 #!/bin/bash
-# 2.1 (security audit): Claws Mail, Gajim and Pidgin start tor-browser and librewolf-i2p (AppArmor
+# 2.1 (security audit): Claws Mail and Gajim start tor-browser and librewolf-i2p (AppArmor
 # "Px" since the review; "Ux" before), which keeps most of their environment. The launchers (and the sandbox library they source)
 # must run only fixed files: no PRESTIUM_* overrides, no BASH_ENV/ENV, no exported functions, no
 # PATH lookups in a directory the caller chose. No root, network or bwrap needed.

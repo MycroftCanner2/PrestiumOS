@@ -174,20 +174,6 @@ deny metadata-cleaner $H/Downloads/clip.mp4 w
 deny metadata-cleaner "$H/I2P Browser/clip.mp4" w
 EOT
 
-echo "== GIMP (system configuration, plug-ins)"
-run usr.bin.gimp <<EOT
-allow gimp /etc/gimp/3.0/gimprc r
-allow gimp /etc/gimp/3.0/unitrc r
-allow gimp /etc/gimp/3.0/templaterc r
-allow gimp /usr/lib/x86_64-linux-gnu/gimp/3.0/plug-ins/file-png/file-png x:i
-allow gimp /usr/lib/x86_64-linux-gnu/gimp/3.0/plug-ins/foggify/foggify.py x:i
-allow gimp /usr/bin/env x:i
-allow gimp /usr/bin/python3.13 x:i
-allow gimp /usr/bin/gjs-console x:i
-allow gimp /usr/bin/gimp-script-fu-interpreter-3.0 x:i
-deny gimp /etc/shadow r
-EOT
-
 echo "== Audacity (audio through PipeWire; started in its own network namespace by prestium-audacity)"
 run usr.bin.audacity <<EOT
 allow audacity /usr/libexec/prestium-audacity mr

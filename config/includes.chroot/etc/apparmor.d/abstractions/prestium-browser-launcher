@@ -1,5 +1,5 @@
 # Prestium 2.1 (review of the security audit): what both browser launchers need when a confined
-# app (Claws Mail, Gajim, Pidgin) starts them: run the launcher script and the few tools it uses,
+# app (Claws Mail, Gajim) starts them: run the launcher script and the few tools it uses,
 # read the sandbox library and the shared NSS database, send a desktop notice, and start bubblewrap
 # in the child profile "bwrap". Each launcher profile adds the only directories it may write.
   include <abstractions/base>

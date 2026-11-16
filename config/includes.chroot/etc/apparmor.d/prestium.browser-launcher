@@ -1,5 +1,5 @@
 # Prestium 2.1 (review of the security audit): the browser launchers when a confined app starts
-# them. Claws Mail, Gajim and Pidgin used "Ux", so a compromised client could run the launcher with
+# them. Claws Mail and Gajim used "Ux", so a compromised client could run the launcher with
 # its own environment, before any sandbox. Now they use "Px -> prestium_*_launcher": the launcher
 # may write only its own browser's directories (a crafted HOME or a symlink in the profile cannot
 # reach another file), runs only the tools it needs, and starts bubblewrap in its own child profile, which

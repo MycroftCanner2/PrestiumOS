@@ -23,7 +23,6 @@ gir1.2-babl-0.1
 gir1.2-freedesktop
 gir1.2-gdkpixbuf-2.0
 gir1.2-gegl-0.4
-gir1.2-gimp-3.0
 gir1.2-girepository-2.0
 gir1.2-glib-2.0
 gir1.2-graphene-1.0
@@ -249,7 +248,6 @@ libgeocode-glib-2-0
 libgexiv2-2
 libgfortran5
 libgif7
-libgimp-3.0-0
 libgirepository-1.0-1
 libgl1
 libgl1-mesa-dri
@@ -894,7 +892,6 @@ ocl-icd-libopencl1
 paperkey
 perl-modules-5.40
 perl-openssl-defaults
-pidgin-data
 python3
 python3-apparmor
 python3-autocommand

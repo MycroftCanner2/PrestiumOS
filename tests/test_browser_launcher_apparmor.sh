@@ -1,5 +1,5 @@
 #!/bin/bash
-# 2.1 (review of the security audit): Claws Mail, Gajim and Pidgin start the browser launchers with
+# 2.1 (review of the security audit): Claws Mail and Gajim start the browser launchers with
 # "Px" into named profiles (not "Ux"), and Claws Mail's pinentry runs in its own profile. The launcher
 # profiles may write only their own browser's directories, so a crafted HOME or a symlink planted in
 # a browser profile cannot make the launcher overwrite another file before the sandbox starts.
@@ -11,14 +11,14 @@ H=$R/config/hooks/live/0600-prestium-apparmor.hook.chroot; PM=$R/config/includes
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
 cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; cp -r "$A"/. "$W"/
 if command -v apparmor_parser >/dev/null; then
-  for p in prestium.browser-launcher prestium.pinentry usr.bin.claws-mail usr.bin.gajim usr.bin.pidgin; do
+  for p in prestium.browser-launcher prestium.pinentry usr.bin.claws-mail usr.bin.gajim; do
     apparmor_parser -QK -b "$W" "$W/$p" >/dev/null 2>"$W/.err" && ok "$p compiles" || { bad "$p: $(head -2 "$W/.err")"; }
   done
 else echo "SKIP apparmor_parser missing (compile)"; fi
 for n in prestium_tor_browser_launcher prestium_librewolf_launcher; do
   grep -qx "profile $n {" "$L" && ok "$n: named, no attachment (the menu's launch is unchanged)" || bad "$n header"; done
 grep -qx 'profile prestium_pinentry /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11} {' "$PE" && ok "prestium_pinentry: attached to the pinentry programs" || bad "pinentry header"
-for a in usr.bin.claws-mail usr.bin.gajim usr.bin.pidgin; do
+for a in usr.bin.claws-mail usr.bin.gajim; do
   grep -Eq '\bUx,' "$A/$a" && bad "$a still has Ux" || ok "$a: no Ux"
   grep -q '/usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,' "$A/$a" && ok "$a: tor-browser Px" || bad "$a: tor-browser not Px"
 done

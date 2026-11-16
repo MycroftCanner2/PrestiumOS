@@ -72,6 +72,10 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   ~/Documents. The local Firefox used to deny all read in ~/Torrents (`deny ... rw`); it now
   reads there and is denied only writes, so I2P Torrents' file picker and Firefox can open
   `.torrent` files there.
+- **Pidgin, GIMP and Xarchiver are gone.** Pidgin (GTK 2, XWayland-only) is removed with its
+  Tor launcher, OMEMO plugin build (lurch), OTR and XMPP extras, proxy prefs and menu entry;
+  Gajim stays as the messenger, with Tor and I2P proxies ready. GIMP and Xarchiver are removed
+  with their profiles and settings (Loupe views images, File Roller manages archives).
 - **Viewers can't see mail or chat, trace each other, or reach the session bus; Qt6 apps stay on
   Wayland.** `prestium-viewer-core` now explicitly denies mail/chat data (`~/.claws-mail`,
   `~/.purple`, Gajim's config and data) and `ptrace`, so a crafted image or archive that

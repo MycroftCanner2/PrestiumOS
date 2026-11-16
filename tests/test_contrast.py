@@ -5,7 +5,7 @@ pair on the dark surfaces, read from the files the image ships: the lock screen'
 Connection Assistants, the GNOME passphrase prompt), Qt (Kvantum), KDE (Kleopatra), labwc (titles, menus,
 OSD), waybar, mako and the assistants' error text.
 2.1 (UI pass): also GTK 3 destructive buttons, message bars and section cards, GTK 4 destructive buttons,
-GTK 2 (Prestium-Dark's colour scheme for Pidgin and pinentry-gtk2), /etc/xdg/kdeglobals (as Prestium.colors),
+GTK 2 (Prestium-Dark's colour scheme for pinentry-gtk2), /etc/xdg/kdeglobals (as Prestium.colors),
 the terminal (foot), The Lounge's default theme (Tech Innovation) and the I2P web pages (webconsole, torrents).
 2.1: GTK 3/4 links and visited links #8ab8ff; progress bar text (show-text) on the trough and the fill.
 Targets: text 7:1 (4.5:1 for disabled text and for coloured text on the selection), indicators, rings,
@@ -317,7 +317,7 @@ need(S, "destructive button text (pressed)", d['destructive_fg_color'], col(g4['
 for n in ("window_bg_color", "dialog_bg_color"):
     need(S, "destructive text on %s" % n, d['destructive_color'], d[n], TEXT)
 
-# --- GTK 2 (Pidgin, pinentry-gtk2): Prestium-Dark's colour scheme ---
+# --- GTK 2 (pinentry-gtk2): Prestium-Dark's colour scheme ---
 S = "GTK 2"
 g2 = dict(re.findall(r'(\w+):(#[0-9a-fA-F]{6})', " ".join(re.findall(r'^gtk-color-scheme\s*=\s*"([^"]*)"',
           read("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc"), re.M)).replace("\\n", " ")))
