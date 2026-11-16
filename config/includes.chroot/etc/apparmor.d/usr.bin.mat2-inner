@@ -10,9 +10,9 @@ abi <abi/4.0>,
 include <tunables/global>
 
 profile mat2-inner {
-  include <abstractions/base>,
-  include <abstractions/prestium-no-admin>,
-  include <abstractions/prestium-user-files>,
+  include <abstractions/base>
+  include <abstractions/prestium-no-admin>
+  include <abstractions/prestium-user-files>
   /usr/bin/{ffmpeg,exiftool,perl} mr,
   /usr/bin/perl ix,
   /usr/share/perl5/** r,

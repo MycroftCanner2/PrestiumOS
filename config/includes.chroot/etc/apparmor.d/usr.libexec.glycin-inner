@@ -9,10 +9,10 @@ abi <abi/4.0>,
 include <tunables/global>
 
 profile glycin-inner {
-  include <abstractions/base>,
-  include <abstractions/fonts>,
-  include <abstractions/prestium-no-admin>,
-  include <abstractions/prestium-user-files>,
+  include <abstractions/base>
+  include <abstractions/fonts>
+  include <abstractions/prestium-no-admin>
+  include <abstractions/prestium-user-files>
   /usr/libexec/glycin-loaders/* mr,
   / r,
   /usr/ r,
