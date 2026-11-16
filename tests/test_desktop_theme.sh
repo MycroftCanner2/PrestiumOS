@@ -33,7 +33,7 @@ grep -q 'identifier="\*zenity\*"' "$I/etc/xdg/labwc/rc.xml" && ok "zenity window
 python3 -c "import xml.dom.minidom as m,sys;[m.parse(p) for p in sys.argv[1:]]" "$I/etc/xdg/labwc/rc.xml" "$I/etc/xdg/labwc/menu.xml" && ok "labwc XML parses" || bad "labwc XML broken"
 # Design batch (Tech Innovation): one palette everywhere, wired so it loads
 # 2.1 (contrast review): accent fill #0050c8 behind white text, accent line #3d8bff for edges and rings
-H="$R/config/hooks/live"; ACC='#0050c8'; LINE='#3d8bff'
+H="$R/config/hooks/live"; ACC='#0050c8'
 for pk in papirus-icon-theme adwaita-qt adwaita-qt6 gir1.2-gtklayershell-0.1 fonts-font-awesome fonts-cantarell adwaita-icon-theme; do
   grep -qx "$pk" "$L" && ok "package $pk" || bad "package $pk missing"; done
 ! grep -Eqx 'qt-style-kvantum|qt6-style-kvantum|qt-style-kvantum-themes' "$L" && ok "no Kvantum packages" || bad "Kvantum still installed"
@@ -47,8 +47,7 @@ grep -q 'owner @{HOME}/.config/gtk-4.0/\*\* r,' "$I/etc/apparmor.d/abstractions/
 grep -q "^accent-color='blue'" "$I/etc/dconf/db/local.d/10-prestium-desktop" && ok "dconf accent blue" || bad "dconf accent"
 for v in 3 4; do
   [ ! -e "$I/usr/share/prestium/broker-style/gtk-$v.0/gtk.css" ] && ok "broker-style GTK $v: pure Adwaita, no dark override" || bad "broker-style gtk-$v.0 css override left"
-  [ ! -e "$I/etc/skel/.config/gtk-$v.0/gtk.css" ] && [ ! -e "$I/home/user/.config/gtk-$v.0/gtk.css" ] && ok "no user gtk-$v.0 css shadow" || bad "user gtk-$v.0 css shadow left"
-  grep -qi "$ACC" "$I/usr/share/prestium/theme/gtk$v.css" && ok "GTK $v accent $ACC" || bad "GTK $v accent"
+  [ ! -e "$I/etc/skel/.config/gtk-$v.0/gtk.css" ] && [ ! -e "$I/home/user/.config/gtk-$v.0/gtk.css" ] && ok "no user gtk-$v.0 css shadow (stock Adwaita)" || bad "user gtk-$v.0 css shadow left"
 done
 # broker dialogs: the style directory only, and accessibility still applied last
 B="$I/usr/local/sbin/prestium-wl-broker"

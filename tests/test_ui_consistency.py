@@ -69,7 +69,6 @@ def hexes(s):
     return out
 
 UI = [
-    ("usr/share/prestium/theme/gtk3.css", "css"), ("usr/share/prestium/theme/gtk4.css", "css"),
     ("etc/xdg/waybar/style.css", "css"), ("etc/xdg/mako/config", "ini"),
     ("usr/share/themes/Prestium-Dark/openbox-3/themerc", "ini"),
     ("usr/share/themes/Prestium-Adwaita/openbox-3/themerc", "ini"),
@@ -107,19 +106,9 @@ for sec in cols.sections():
         if g != v: diff.append("[%s] %s=%s (kdeglobals %s)" % (sec, k, v, g))
 check(not diff, "kdeglobals colours are Prestium.colors", "; ".join(diff[:6]))
 
-# links in every toolkit are the palette blue #8ab8ff, not the live-state cyan
-LINK = "8ab8ff"
-g3s, g4s = read("usr/share/prestium/theme/gtk3.css"), read("usr/share/prestium/theme/gtk4.css")
+# links are the toolkit blues: Qt #1c71d8, KDE #1a5fb4, GTK2 engine #8ab8ff (vendored);
+# GTK 3 and 4 are stock Adwaita, whose links resolve from the installed theme, not the repo
 g2s = read("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc")
-check(re.search(r"@define-color\s+link_color\s+#8ab8ff\b", g3s) and re.search(r"@define-color\s+visited_link_color\s+#8ab8ff\b", g3s),
-      "GTK 3: link_color and visited_link_color are #8ab8ff")
-check(re.search(r"@define-color\s+link_color\s+#8ab8ff\b", g4s) and re.search(r"@define-color\s+visited_link_color\s+#8ab8ff\b", g4s),
-      "GTK 4: link_color and visited_link_color are #8ab8ff")
-check(re.search(r"(?m)^\*:link, .*\{ color: #8ab8ff; \}", g3s) and re.search(r"(?m)^\*:visited, .*\{ color: #8ab8ff; \}", g3s),
-      "GTK 3: :link, button.link, label link and :visited use #8ab8ff")
-check(re.search(r"(?m)^link, label link, \.link, button\.link, :link \{ color: #8ab8ff; \}", g4s) and
-      re.search(r"link:visited, :visited, button\.link:visited \{ color: #8ab8ff; \}", g4s),
-      "GTK 4: link, label link, button.link and :visited use #8ab8ff")
 check('link_color:#8ab8ff' in g2s and 'visited_link_color:#8ab8ff' in g2s,
       "GTK 2: link_color and visited_link_color are #8ab8ff")
 check("QT_STYLE_OVERRIDE=Adwaita" in read("usr/local/bin/prestium-session")
@@ -128,8 +117,7 @@ check("QT_STYLE_OVERRIDE=Adwaita" in read("usr/local/bin/prestium-session")
 link_rgb = ["ForegroundLink=26,95,180", "ForegroundVisited=26,95,180"]
 check(all(v in read("usr/share/color-schemes/Prestium.colors") and v in read("etc/xdg/kdeglobals") for v in link_rgb),
       "KDE: ForegroundLink and ForegroundVisited are #1a5fb4")
-for pth, kind in (("usr/share/prestium/theme/gtk3.css", "css"), ("usr/share/prestium/theme/gtk4.css", "css"),
-                  ("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc")):
+for pth, kind in (("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc"),):
     cyan = [h for h in hexes(strip_comments(read(pth), kind)) if h in ("00ffff", "80ffff")]
     check(not cyan, "link styles on-palette and not cyan: %s" % pth.replace("../", "config/"),
           "cyan " + ", ".join("#" + h for h in cyan))
@@ -216,15 +204,15 @@ m = re.search(r"(?m)^max-icon-size=(\d+)$", mk)
 check(m is not None and m.group(1) == "48", "mako: 48 px notification icons", m and m.group(1))
 check(re.search(r"window#waybar\.prestium-top\s+\.module\s*\{", wb) is not None and "border-radius: 999px" in wb, "waybar: 999 px status pills")
 radii = {}
-for p in ("usr/share/prestium/theme/gtk3.css", "usr/share/prestium/theme/gtk4.css", "etc/xdg/waybar/style.css",
+for p in ("etc/xdg/waybar/style.css",
           "var/lib/i2pd/webconsole/style.css", "usr/share/prestium/torrents-theme/prestium-dark.css"):
     s = strip_comments(read(p), "css")
     vals = set(v.strip() for v in re.findall(r"(?:border-radius|--radius)\s*:\s*([^;}!]+)", s))
     radii[p] = sorted(v for v in vals if v not in ("0", "4px", "6px", "8px", "999px", "var(--radius)"))
 check(not any(radii.values()), "CSS radii are 4 px, 6 px, 8 px or 999 px pills", str({k: v for k, v in radii.items() if v}))
-g3 = read("usr/share/prestium/theme/gtk3.css")
-check(re.search(r"tooltip[^{]*\{[^}]*border-radius:\s*8px", g3) is not None, "GTK 3: 8 px tooltips")
-check(re.search(r"frame\.prestium-section > border\s*\{[^}]*border-radius:\s*8px", g3) is not None, "GTK 3: 8 px section cards")
+check(not os.path.exists(os.path.join(I, "usr/share/prestium/theme/gtk3.css"))
+      and not os.path.exists(os.path.join(I, "usr/share/prestium/theme/gtk4.css")),
+      "GTK 3 and 4: stock Adwaita, no dark override files")
 tools = {os.path.basename(f): open(f, encoding="utf-8").read() for f in glob.glob(os.path.join(I, "usr/local/bin/prestium-*"))
          if open(f, "rb").read(64).startswith(b"#!/usr/bin/env python3") or open(f, "rb").read(64).startswith(b"#!/usr/bin/python3")}
 # 12 px around each window's content; 8 px inside a section card
@@ -394,11 +382,8 @@ check('os.environ["XDG_CONFIG_HOME"] = "/usr/share/prestium/broker-style"' in bu
 br = read("usr/local/sbin/prestium-wl-broker")
 check('"ADW_DEBUG_COLOR_SCHEME": "prefer-light"' in br and '"GTK_THEME": "Adwaita"' in br,
       "broker dialogs: libadwaita prefer-light and GTK_THEME=Adwaita")
-check(re.search(r"--window-fg-color: #ffffff;", g4s) and re.search(r"--dialog-fg-color: #ffffff;", g4s),
-      "GTK 4: :root sets --window-fg-color and --dialog-fg-color to white")
-prim = r"button\.suggested-action, button\.default:not\(\.flat\) \{[^}]*background-color: #0050c8;[^}]*color: #ffffff"
-check(re.search(prim, g3s, re.S) and re.search(prim, g4s, re.S),
-      "GTK 3 and 4: primary buttons are #0050c8 behind white text at rest")
+# stock Adwaita paints primary buttons and dialog text itself; the repo pins the
+# pairing in test_contrast.py (white on #3584e4, bold selected-row pairing)
 # tracked files only: running the tests creates (git-ignored) __pycache__ next to imported tools
 import subprocess
 try:

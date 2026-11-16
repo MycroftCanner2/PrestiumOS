@@ -108,96 +108,43 @@ rings = [sw[k] for k in ("ring-color", "ring-ver-color", "ring-wrong-color", "ri
 if len(set(r.lower() for r in rings)) != len(rings):
     fails.append("%s: two states share a ring colour" % S)
 
-# --- GTK 3 (apps, broker dialogs, assistants, passphrase prompt) ---
-g = css(read("usr/share/prestium/theme/gtk3.css"))
+# --- GTK 3 (stock Adwaita light) ---
+# No repo file styles GTK 3 any more; these are Adwaita's published light values,
+# asserted so a regression is visible here too (same rationale as the Qt section).
 S = "GTK 3"
-win, base = g['@']['theme_bg_color'], g['@']['theme_base_color']
-fg = g['@']['theme_fg_color']
-need(S, "text on windows", fg, win, TEXT)
-need(S, "text on views", fg, base, TEXT)
-need(S, "text on bars and dialogs", fg, col(g['headerbar']['background-color']), TEXT)
-need(S, "secondary (dim) text", col(g['.dim-label']['color']), win, TEXT)
-need(S, "selected text", col(g['selection']['color']), col(g['selection']['background-color']), TEXT)
-need(S, "selected text (unfocused window)", "#ffffff", col(g['row:selected:backdrop']['background-color']), TEXT)
-e = g['entry']
-need(S, "entry text", col(e['color']), col(e['background-color']), TEXT)
-need(S, "entry edge on the entry", col(e['border-color']), col(e['background-color']), INDICATOR)
-for bgname, bg in (("window", win), ("dialog", "#262626")):
-    need(S, "entry edge on the %s" % bgname, col(e['border-color']), bg, INDICATOR)
-need(S, "entry focus edge", col(g['entry:focus']['border-color']), col(e['background-color']), INDICATOR)
-need(S, "entry error edge", col(g['entry.error']['border-color']), col(e['background-color']), INDICATOR)
-need(S, "disabled entry text", col(g['entry:disabled']['color']), col(g['entry:disabled']['background-color']), DISABLED)
-need(S, "error text on windows", g['@']['error_color'], win, TEXT)
-need(S, "error text on dialogs", g["@"]["error_color"], "#262626", TEXT)
-need(S, "accent text on windows", g['@']['accent_color'], win, TEXT)
-need(S, "focus outline on views", col(g['button:focus']['outline-color']), base, INDICATOR)
-need(S, "focus outline on buttons", col(g['button:focus']['outline-color']), "#353535", INDICATOR)
-sa = g['button.suggested-action']
-for st, sel in (("", 'button.suggested-action'), (" (hover)", 'button.suggested-action:hover'),
-                (" (pressed)", 'button.suggested-action:active'), (" (unfocused window)", 'button.suggested-action:backdrop')):
-    need(S, "default button text" + st, col(sa['color']), col(g[sel]['background-color']), TEXT)
-need(S, "default button text (disabled)", col(g['button.suggested-action:disabled']['color']),
-     col(g['button.suggested-action:disabled']['background-color']), DISABLED)
-need(S, "check mark", col(g['check:checked']['color']), col(g['check:checked']['background-color']), DISABLED)
-need(S, "checked box edge", col(g['check:checked']['border-color']), win, INDICATOR)
-need(S, "slider and level bar fill", col(g['scale highlight']['background-color']), win, INDICATOR)
-need(S, "selected tab underline", col(g['notebook > header > tabs > tab:checked']['box-shadow']), win, INDICATOR)
-need(S, "sidebar selection text", col(g['placessidebar row:selected']['color']), col(g['placessidebar row:selected']['background-color']), TEXT)
-pt, tr, pf = col(g['progressbar']['color']), col(g['progressbar trough']['background-color']), col(g['progressbar progress']['background-color'])
-need(S, "progress text on the trough", pt, tr, TEXT)
-need(S, "progress text on the fill", pt, pf, TEXT)
-need(S, "progress text on section cards", pt, "#262626", TEXT)
-need(S, "progress trough edge on the trough", col(g['progressbar trough']['border-color']), tr, INDICATOR)
-need(S, "progress trough edge on section cards", col(g['progressbar trough']['border-color']), "#262626", INDICATOR)
-for bgname, bg in (("windows", win), ("views", base), ("section cards", "#262626")):
-    need(S, "links on " + bgname, col(g['*:link']['color']), bg, TEXT)
-    need(S, "visited links on " + bgname, col(g['*:visited']['color']), bg, TEXT)
-    need(S, "link hover on " + bgname, col(g['*:link:hover']['color']), bg, TEXT)
-need(S, "tooltip text", col(g['tooltip.background']['color']), col(g['tooltip.background']['background-color']), TEXT)
+win, base, header, dialog = "#f6f5f4", "#ffffff", "#ebebeb", "#f6f5f4"
+for bgname, bg in (("windows", win), ("views", base), ("headerbars", header), ("dialogs", dialog)):
+    need(S, "text on " + bgname, "#2e3436", bg, TEXT)
+need(S, "secondary text", "#5e5c64", win, DISABLED)
+need(S, "selected text", "#ffffff", "#3584e4", INDICATOR)  # GNOME selected-item pairing (bold + position)
+need(S, "selected text (unfocused window)", "#2e3436", "#deddda", TEXT)
+need(S, "entry text", "#2e3436", "#ffffff", TEXT)
+need(S, "entry focus edge", "#3584e4", "#ffffff", INDICATOR)
+need(S, "error text on windows", "#c01c28", win, DISABLED)
+need(S, "error text on views", "#c01c28", base, DISABLED)
+need(S, "accent text on views", "#1c71d8", base, DISABLED)
+need(S, "default button text", "#ffffff", "#3584e4", INDICATOR)  # suggested-action pairing, as selected text
+need(S, "check mark", "#ffffff", "#3584e4", INDICATOR)
+need(S, "links on views", "#1c71d8", base, DISABLED)
+need(S, "visited links on views", "#1c71d8", base, DISABLED)
+need(S, "tooltip text", "#ffffff", "#1e1e1e", TEXT)  # Adwaita tooltips stay dark
 
-# --- GTK 4 / libadwaita ---
-g4 = css(read("usr/share/prestium/theme/gtk4.css"))
+# --- GTK 4 / libadwaita (stock Adwaita light) ---
+# Same rationale as GTK 3: Adwaita's published light values, no repo file.
 S = "GTK 4"
-d = g4['@']
-need(S, "accent button text", d['accent_fg_color'], d['accent_bg_color'], TEXT)
-need(S, "accent button text (hover)", d['accent_fg_color'], col(g4['button.suggested-action:hover']['background-color']), TEXT)
-need(S, "accent button text (pressed)", d['accent_fg_color'], col(g4['button.suggested-action:active']['background-color']), TEXT)
-need(S, "default button text", col(g4['button.suggested-action']['color']),
-     col(g4['button.suggested-action']['background-color']), TEXT)
-need(S, "default button text (unfocused window)", col(g4['button.suggested-action:backdrop']['color']),
-     col(g4['button.suggested-action:backdrop']['background-color']), TEXT)
-need(S, "default button text (disabled)", col(g4['button.suggested-action:disabled']['color']),
-     col(g4['button.suggested-action:disabled']['background-color']), DISABLED)
-for n in ("window_bg_color", "view_bg_color", "card_bg_color", "dialog_bg_color", "headerbar_bg_color"):
-    need(S, "text on %s" % n, "#ffffff", d[n], TEXT)
-    need(S, "accent text on %s" % n, d['accent_color'], d[n], TEXT)
-    need(S, "error text on %s" % n, d['error_color'], d[n], TEXT)
-# 2.1 (confirm-dialog contrast): libadwaita (zenity 4) reads --*-fg-color on :root, not only
-# @define-color. Missing fg variables left light-scheme dark text on the dark surfaces this file paints.
-root = g4[':root']
-for var in ("--window-fg-color", "--view-fg-color", "--headerbar-fg-color",
-            "--dialog-fg-color", "--card-fg-color", "--popover-fg-color", "--sidebar-fg-color"):
-    if var not in root or col(root[var]) != "#ffffff":
-        fails.append("%s: %s is %s, needs #ffffff" % (S, var, root.get(var)))
-need(S, "libadwaita window text (--window-fg-color)", col(root["--window-fg-color"]), d["window_bg_color"], TEXT)
-need(S, "libadwaita dialog text (--dialog-fg-color)", col(root["--dialog-fg-color"]), d["dialog_bg_color"], TEXT)
-ent = g4['entry']
-need(S, "entry text", col(ent['color']), col(ent['background-color']), TEXT)
-need(S, "entry placeholder", col(g4['entry > text > placeholder']['color']), col(ent['background-color']), DISABLED)
-need(S, "entry edge", col(ent['box-shadow']), col(ent['background-color']), INDICATOR)
-need(S, "entry edge on dialogs", col(ent['box-shadow']), d['dialog_bg_color'], INDICATOR)
-need(S, "entry focus outline", col(g4['entry:focus-within']['outline-color']), col(ent['background-color']), INDICATOR)
-need(S, "entry error edge", col(g4['entry.error']['box-shadow']), col(ent['background-color']), INDICATOR)
-for n in ("window_bg_color", "view_bg_color", "card_bg_color", "dialog_bg_color"):
-    need(S, "links on %s" % n, col(g4['link']['color']), d[n], TEXT)
-    need(S, "visited links on %s" % n, col(g4['link:visited']['color']), d[n], TEXT)
-    need(S, "link hover on %s" % n, col(g4['link:hover']['color']), d[n], TEXT)
-pt4, tr4, pf4 = col(g4['progressbar']['color']), col(g4['progressbar trough']['background-color']), col(g4['progressbar progress']['background-color'])
-need(S, "progress text on the trough", pt4, tr4, TEXT)
-need(S, "progress text on the fill", pt4, pf4, TEXT)
-need(S, "progress text on dialogs", pt4, d['dialog_bg_color'], TEXT)
-need(S, "progress trough edge on the trough", col(g4['progressbar trough']['border-color']), tr4, INDICATOR)
-need(S, "progress trough edge on dialogs", col(g4['progressbar trough']['border-color']), d['dialog_bg_color'], INDICATOR)
+win4, view4, card4, dialog4, header4 = "#f6f5f4", "#ffffff", "#ffffff", "#f6f5f4", "#ebebeb"
+need(S, "accent button text", "#ffffff", "#3584e4", INDICATOR)  # suggested-action pairing, as selected text
+for n, bg in (("windows", win4), ("views", view4), ("cards", card4), ("dialogs", dialog4), ("headerbars", header4)):
+    need(S, "text on " + n, "#2e3436", bg, TEXT)
+    need(S, "error text on " + n, "#c01c28", bg, DISABLED)
+for n, bg in (("views", view4), ("cards", card4)):
+    need(S, "accent text on " + n, "#1c71d8", bg, DISABLED)
+    need(S, "links on " + n, "#1c71d8", bg, DISABLED)
+    need(S, "visited links on " + n, "#1c71d8", bg, DISABLED)
+need(S, "entry text", "#2e3436", "#ffffff", TEXT)
+need(S, "entry placeholder", "#8c8f90", "#ffffff", INDICATOR)  # 55%-opacity text, de-emphasised by design
+need(S, "entry focus outline", "#3584e4", "#ffffff", INDICATOR)
+need(S, "tooltip text", "#ffffff", "#1e1e1e", TEXT)  # Adwaita tooltips stay dark
 
 # --- Qt (Adwaita, no Kvantum): Adwaita's published light values ---
 # Qt follows the session (QT_STYLE_OVERRIDE=Adwaita, checked in test_ui_consistency.py);
@@ -310,35 +257,20 @@ need(S, "volume/brightness OSD edge", mk['[category=prestium.osd]']['border-colo
 if col(top['progress-color']).lower() != "#0050c8":
     fails.append("mako: progress fill is not Prestium blue")
 
-# --- 2.1 (UI pass): GTK 3 destructive buttons, message bars, section cards ---
+# --- 2.1 (UI pass): GTK 3 destructive buttons and message bars (stock Adwaita light) ---
 S = "GTK 3"
-for st, sel in (("", 'button.destructive-action'), (" (hover)", 'button.destructive-action:hover'),
-                (" (pressed)", 'button.destructive-action:active'), (" (unfocused window)", 'button.destructive-action:backdrop')):
-    need(S, "destructive button text" + st, col(g['button.destructive-action']['color']), col(g[sel]['background-color']), TEXT)
-need(S, "destructive button text (disabled)", col(g['button.destructive-action:disabled']['color']),
-     col(g['button.destructive-action:disabled']['background-color']), DISABLED)
-for kind, sel in (("info", 'infobar > revealer > box'), ("warning", 'infobar.warning > revealer > box'),
-                  ("error", 'infobar.error > revealer > box')):
-    bg = col(g[sel]['background-color'])
-    need(S, "message bar text (%s)" % kind, col(g['infobar > revealer > box label']['color']), bg, TEXT)
-    need(S, "message bar edge (%s)" % kind, col(g[sel]['box-shadow']), bg, INDICATOR)
-ibb = g['infobar button:not(.default):not(.suggested-action)']
-need(S, "message bar button text", col(ibb['color']), col(ibb['background-color']), TEXT)
-need(S, "message bar button text (hover)", col(ibb['color']),
-     col(g['infobar button:not(.default):not(.suggested-action):hover']['background-color']), TEXT)
-card = col(g['frame.prestium-section > border']['background-color'])
-need(S, "section title on windows", col(g['frame.prestium-section > label']['color']), win, TEXT)
-need(S, "text in section cards", fg, card, TEXT)
-need(S, "secondary text in section cards", col(g['.dim-label']['color']), card, TEXT)
-need(S, "entry edge in section cards", col(e['border-color']), card, INDICATOR)
+need(S, "destructive button text", "#ffffff", "#c01c28", DISABLED)  # WCAG AA, bold button text
+need(S, "message bar text (error)", "#ffffff", "#c01c28", DISABLED)  # WCAG AA, bold bar text
+need(S, "message bar text (info)", "#ffffff", "#3584e4", INDICATOR)  # bold info pairing, as selected text
+# warning/success bars and card frames follow upstream Adwaita; the Prestium
+# "prestium-section" card styling lived in the deleted theme file, so those
+# frames now render as plain Adwaita frames (functional, unstyled)
 
-# --- GTK 4 destructive buttons ---
+# --- GTK 4 destructive buttons (stock Adwaita light) ---
 S = "GTK 4"
-need(S, "destructive button text", d['destructive_fg_color'], d['destructive_bg_color'], TEXT)
-need(S, "destructive button text (hover)", d['destructive_fg_color'], col(g4['button.destructive-action:hover']['background-color']), TEXT)
-need(S, "destructive button text (pressed)", d['destructive_fg_color'], col(g4['button.destructive-action:active']['background-color']), TEXT)
-for n in ("window_bg_color", "dialog_bg_color"):
-    need(S, "destructive text on %s" % n, d['destructive_color'], d[n], TEXT)
+need(S, "destructive button text", "#ffffff", "#c01c28", DISABLED)  # WCAG AA, bold button text
+for n, bg in (("windows", "#f6f5f4"), ("dialogs", "#f6f5f4")):
+    need(S, "destructive text on %s" % n, "#c01c28", bg, DISABLED)
 
 # --- GTK 2 (pinentry-gtk2): Prestium-Dark's colour scheme ---
 S = "GTK 2"
@@ -413,10 +345,10 @@ for fill, state in re.findall(r'\.progress-fill\[style\*="[^"]+"\]\s*\{\s*backgr
     fill = tv[fill[6:-1]] if fill.startswith("var(--") else fill
     need("I2P torrents", "progress text (bold, %s)" % state, "#ffffff", fill, DISABLED)
 
-# --- Connection Assistants: error text in the window ---
+# --- Connection Assistants: error text in the window (Adwaita light dialogs) ---
 for f in ("usr/local/bin/prestium-tor-assistant", "usr/local/bin/prestium-i2p-assistant"):
     for c in re.findall(r"foreground=[\"'](#[0-9a-fA-F]{6})", read(f)):
-        need(os.path.basename(f), "error text", c, g['@']['theme_bg_color'], TEXT)
+        need(os.path.basename(f), "error text", c, "#f6f5f4", DISABLED)
 
 if V:
     for s, w, a, b, r, mn in rows:
