@@ -6,12 +6,12 @@ adwaita-icon-theme
 gnome-themes-extra
 adwaita-icon-theme-legacy
 # 2.1 (design batch): one complete icon theme (Papirus-Dark; the Prestium theme inherits it first),
-# Kvantum for Qt 5 and 6 (the Prestium Kvantum theme, Tech Innovation colours), Font Awesome for the
+# Adwaita for Qt 5 and 6 (adwaita-qt), Font Awesome for the
 # bar's symbols, librsvg's pixbuf loader for SVG icons in the bar and notifications
 papirus-icon-theme
-qt-style-kvantum
-qt6-style-kvantum
-qt-style-kvantum-themes
+adwaita-qt
+adwaita-qt6
+gir1.2-gtklayershell-0.1
 fonts-font-awesome
 librsvg2-common
 alsa-topology-conf

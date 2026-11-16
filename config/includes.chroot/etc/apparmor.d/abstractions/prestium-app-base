@@ -10,3 +10,9 @@
   deny /run/prestium/logs/** rw,
   deny @{HOME}/Tor\ Browser/** rw,
   deny @{HOME}/**.kdbx rw,
+  # Adwaita light theme, icons and Cantarell (covered by /usr/share/** r in
+  # prestium-app-common; stated here so a future narrowing can't drop them)
+  /usr/share/icons/Adwaita/** r,
+  /usr/share/themes/Adwaita/** r,
+  /usr/share/themes/Prestium-Adwaita/** r,
+  /usr/share/fonts/truetype/cantarell/** r,

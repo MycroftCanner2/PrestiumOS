@@ -6,9 +6,8 @@ export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=labwc:wlroots XDG_SESSION_DE
 export MOZ_ENABLE_WAYLAND=1 GDK_BACKEND=wayland,x11 QT_QPA_PLATFORM='wayland;xcb' \
        SDL_VIDEODRIVER=wayland,x11 CLUTTER_BACKEND=wayland _JAVA_AWT_WM_NONREPARENTING=1 \
        ELECTRON_OZONE_PLATFORM_HINT=wayland QT_WAYLAND_DISABLE_WINDOWDECORATION=1
-# 2.1 (design batch): Qt 5 and 6 apps use Kvantum with the "Prestium" theme (Tech Innovation colours,
-# Adwaita-dark shapes; ~/.config/Kvantum/kvantum.kvconfig). Without Kvantum Qt falls back to Fusion.
-export QT_STYLE_OVERRIDE=kvantum
+# Prestium 2.1 (design batch): Qt 5 and 6 apps use Adwaita (QT_STYLE_OVERRIDE=Adwaita).
+export QT_STYLE_OVERRIDE=Adwaita
 # 2.1: one cursor theme and size for labwc, Qt and GTK
 export XCURSOR_THEME=Adwaita XCURSOR_SIZE=24
 unset DISPLAY

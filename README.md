@@ -21,6 +21,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
   release at build time, no older than a pinned minimum).
 - **Wayland desktop** (labwc, waybar, swaylock, mako) with a restricted Wayland socket for apps:
   no screen capture, input injection or window snooping. A root broker keeps the full socket away from apps.
+  Tails-style shell: Adwaita light windows, a dark top bar with an Applications menu, clock and Tor/I2P
+  pills, and a light bottom window-list taskbar.
 - **Sandboxed browsers:** Tor Browser and LibreWolf (I2P Browser) run in bubblewrap with their own empty
   network namespace. Tor Browser can reach only Tor, and LibreWolf only i2pd's HTTP proxy.
 - **Browser Updater:** install the latest publisher-signed Tor Browser or I2P Browser for this session,

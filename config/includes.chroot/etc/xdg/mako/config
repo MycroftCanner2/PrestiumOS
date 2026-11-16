@@ -1,58 +1,46 @@
-# Prestium 2.0 r10: notifications (mako, replaces notification-daemon)
-# 2.1 (design batch): Tech Innovation colours (dark grey, Electric Blue #0066ff, Neon Cyan #00ffff), rounded
-# like the windows and the floating bar. One look per urgency: low (grey edge, 5 s), normal (blue edge, 8 s),
+# Prestium 2.1 (Tails-style): GNOME-style top-center light notifications (Adwaita).
+# One look per urgency: low (grey edge, 5 s), normal (grey edge, 6 s),
 # critical (red edge, stays until dismissed). The volume and brightness OSD (category prestium.osd) is compact.
-# 2.1 (contrast review): normal edge #3d8bff, progress #0050c8 under white text (7.0:1), low-urgency
-# edge #737373 so the three urgencies stay apart; critical text white on #2b1616 (17:1).
 # mako has no fade or slide animation. Sounds are off unless turned on (System, Notification Sounds).
-# 2.1 (UI pass): 8 px corners, 12 px padding (the spec's radius and spacing steps, as windows, menus and the
-# bar); critical edge #ff6b6b (the palette's danger line, as the lock screen), low-urgency text #c8c8c8
-# (secondary text, 10:1); icons 48 px: every notification icon Prestium sends has a 48 px Papirus file
-# (the 24 px action/panel icons it used were scaled up and soft), and the volume, microphone and
-# brightness display uses Papirus's notification-* icons.
-anchor=top-right
-default-timeout=8000
-font=Cantarell 10
-background-color=#1e1e1eF2
-text-color=#ffffff
-border-color=#3d8bff
+anchor=top-center
+margin=34,0,0,0
+default-timeout=6000
+font=Cantarell 11
+background-color=#ffffff
+text-color=#2e3436
+border-color=#cdc7c2
 border-size=1
-border-radius=8
+border-radius=12
 padding=12
-margin=12
 outer-margin=4
-width=360
+width=380
 max-visible=5
 icons=1
-# 2.1 (verification of 9d289eb): mako looks up named icons only here and in hicolor, without theme
+# mako looks up named icons only here and in hicolor, without theme
 # inheritance, so list the themes Prestium inherits from in the same order
-# 2.1 (design batch): Papirus-Dark first, like the Prestium icon theme
 icon-path=/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:/usr/share/icons/Papirus:/usr/share/icons/AdwaitaLegacy:/usr/share/icons/gnome:/usr/share/icons/Adwaita
 max-icon-size=48
 icon-location=left
 progress-color=over #0050c8
-# 2.1: only identical repeats collapse (same app and summary); critical alerts are never hidden
+# only identical repeats collapse (same app and summary); critical alerts are never hidden
 group-by=app-name,summary
 format=<b>%s</b>\n%b
 on-notify=exec /usr/local/bin/prestium-notify-sound normal
 
 [urgency=low]
 default-timeout=5000
-border-color=#737373
-text-color=#c8c8c8
+border-color=#cdc7c2
+text-color=#5e5c64
 
 [urgency=critical]
 default-timeout=0
-border-color=#ff6b6b
-border-size=2
-background-color=#2b1616F2
-on-notify=exec /usr/local/bin/prestium-notify-sound critical
+border-color=#c01c28
 
 [category=prestium.osd]
 anchor=top-center
 width=260
 max-icon-size=48
-border-color=#00ffff
+border-color=#3584e4
 default-timeout=1500
 group-by=none
 format=<b>%s</b>

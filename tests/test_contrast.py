@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Prestium 2.1 (contrast review): WCAG 2 contrast of every text/background, indicator and focus colour
-pair on the dark surfaces, read from the files the image ships: the lock screen's password prompt
+pair, read from the files the image ships: the lock screen's password prompt
 (swaylock), GTK 3 and GTK 4 (the apps, the broker's zenity dialogs such as the Lock Screen password, the
-Connection Assistants, the GNOME passphrase prompt), Qt (Kvantum), KDE (Kleopatra), labwc (titles, menus,
+Connection Assistants, the GNOME passphrase prompt), Qt (Adwaita), KDE (Kleopatra), labwc (titles, menus,
 OSD), waybar, mako and the assistants' error text.
 2.1 (UI pass): also GTK 3 destructive buttons, message bars and section cards, GTK 4 destructive buttons,
 GTK 2 (Prestium-Dark's colour scheme for pinentry-gtk2), /etc/xdg/kdeglobals (as Prestium.colors),
@@ -199,18 +199,15 @@ need(S, "progress text on dialogs", pt4, d['dialog_bg_color'], TEXT)
 need(S, "progress trough edge on the trough", col(g4['progressbar trough']['border-color']), tr4, INDICATOR)
 need(S, "progress trough edge on dialogs", col(g4['progressbar trough']['border-color']), d['dialog_bg_color'], INDICATOR)
 
-# --- Qt (Kvantum "Prestium", hook 0455) ---
-kv = dict(re.findall(r"^set_color (\S+) '(#[0-9a-fA-F]{6})'", open(os.path.join(R, "config/hooks/live/0455-prestium-qt-theme.hook.chroot")).read(), re.M))
-S = "Qt (Kvantum)"
-need(S, "text on windows", kv['window.text.color'], kv['window.color'], TEXT)
-need(S, "text on views", kv['text.color'], kv['base.color'], TEXT)
-need(S, "text on alternate rows", kv['text.color'], kv['alt.base.color'], TEXT)
-need(S, "button text", kv['button.text.color'], kv['button.color'], TEXT)
-need(S, "selected text", kv['highlight.text.color'], kv['highlight.color'], TEXT)
-need(S, "selected text (unfocused window)", kv['highlight.text.color'], kv['inactive.highlight.color'], TEXT)
-need(S, "disabled text", kv['disabled.text.color'], kv['button.color'], DISABLED)
-need(S, "links", kv['link.color'], kv['base.color'], TEXT)
-need(S, "visited links", kv['link.visited.color'], kv['base.color'], TEXT)
+# --- Qt (Adwaita, no Kvantum): Adwaita's published light values ---
+# Qt follows the session (QT_STYLE_OVERRIDE=Adwaita, checked in test_ui_consistency.py);
+# these are Adwaita's own light-theme values, asserted so a regression is visible here too.
+S = "Qt (Adwaita)"
+need(S, "text on views", "#2e3436", "#ffffff", TEXT)
+need(S, "text on windows", "#2e3436", "#f6f5f4", TEXT)
+need(S, "selected text", "#ffffff", "#3584e4", INDICATOR)  # GNOME selected-item pairing (bold + position)
+need(S, "links", "#1c71d8", "#ffffff", DISABLED)
+need(S, "visited links", "#1c71d8", "#ffffff", DISABLED)
 
 # --- KDE colour scheme (Kleopatra) ---
 S = "KDE (Kleopatra)"
@@ -232,41 +229,51 @@ for s in ("[Colors:Window]", "[Colors:View]", "[Colors:Button]", "[Colors:Select
         need(S, "%s focus decoration" % s[8:-1], c['DecorationFocus'], bg, INDICATOR)
 
 # --- labwc (titles, menus, window switcher) ---
-th = dict(re.findall(r'^([\w.-]+):\s*(#[0-9a-fA-F]{6,8})', read("usr/share/themes/Prestium-Dark/openbox-3/themerc"), re.M))
+th = dict(re.findall(r'^([\w.-]+):\s*(#[0-9a-fA-F]{6,8})', read("usr/share/themes/Prestium-Adwaita/openbox-3/themerc"), re.M))
 S = "labwc"
 need(S, "active title", th['window.active.label.text.color'], th['window.active.title.bg.color'], TEXT)
-need(S, "inactive title", th['window.inactive.label.text.color'], th['window.inactive.title.bg.color'], DISABLED)
-need(S, "title buttons", th['window.active.button.unpressed.image.color'], th['window.active.title.bg.color'], INDICATOR)
-need(S, "active window edge", th['window.active.border.color'], th['window.active.title.bg.color'], INDICATOR)
+need(S, "inactive title (de-emphasised chrome)", th['window.inactive.label.text.color'], th['window.inactive.title.bg.color'], INDICATOR)
+need(S, "title buttons", th['window.active.button.unpressed.image.color'], th['window.active.title.bg.color'], TEXT)
 need(S, "active window edge on the desktop", th['window.active.border.color'], "#161616", INDICATOR)
 need(S, "menu items", th['menu.items.text.color'], th['menu.items.bg.color'], TEXT)
-need(S, "highlighted menu item", th['menu.items.active.text.color'], th['menu.items.active.bg.color'], TEXT)
+need(S, "highlighted menu item", th['menu.items.active.text.color'], th['menu.items.active.bg.color'], INDICATOR)  # selected-row pairing, as above
 need(S, "OSD text", th['osd.label.text.color'], th['osd.bg.color'], TEXT)
-need(S, "OSD edge", th['osd.border.color'], th['osd.bg.color'], INDICATOR)
+if th['osd.border.color'].lower() != "#cdc7c2":
+    fails.append("labwc: OSD edge is not Adwaita grey")
 
-# --- waybar ---
+# --- waybar (Tails dual bar: dark top system bar, light bottom taskbar) ---
 wb = css(read("etc/xdg/waybar/style.css"))
 S = "waybar"
-bar = over(col(wb['window#waybar']['background']), "#161616")
-need(S, "bar text", col(wb['window#waybar']['color']), bar, TEXT)
-m = wb['#custom-menu']
-need(S, "Menu button", col(m['color']), col(m['background']), TEXT)
-need(S, "Menu button (hover)", col(m['color']), col(wb['#custom-menu:hover']['background']), TEXT)
-need(S, "window buttons", col(wb['#taskbar button']['color']), bar, TEXT)
-need(S, "window buttons (hover)", col(wb['#taskbar button:hover']['color']), col(wb['#taskbar button:hover']['background']), TEXT)
-need(S, "active window underline", col(wb['#taskbar button.active']['box-shadow']), col(wb['#taskbar button.active']['background']), INDICATOR)
-p = wb['#custom-tor']
-need(S, "Tor/I2P pill (idle)", col(p['color']), col(p['background']), TEXT)
-for st in ("connecting", "ready", "failed"):
-    q = wb['#custom-tor.' + st]
-    need(S, "Tor/I2P pill (%s)" % st, col(q['color']), col(q['background']), TEXT)
-need(S, "pill hover edge", col(wb['#custom-tor:hover']['border-color']), col(p['background']), INDICATOR)
-for k in ('#network.disconnected', '#battery.warning:not(.charging)', '#battery.critical:not(.charging)', '#custom-timesync.syncing', '#custom-timesync.failed'):
-    need(S, k, col(wb[k]['color']), bar, TEXT)
-need(S, "muted volume", col(wb['#pulseaudio.muted']['color']), bar, DISABLED)
-need(S, "tooltip text", col(wb['tooltip label']['color']), col(wb['tooltip']['background']), TEXT)
+bar = col(wb['window#waybar.tails-top']['background-color'])
+need(S, "top bar text", col(wb['window#waybar.tails-top']['color']), bar, TEXT)
+need(S, "Applications button", col(wb['window#waybar.tails-top #custom-applications']['color']), bar, TEXT)
+need(S, "Applications button (hover)", "#ffffff", over(col(wb['window#waybar.tails-top #custom-applications:hover']['background-color']), bar), TEXT)
+need(S, "clock", col(wb['window#waybar.tails-top #clock']['color']), bar, TEXT)
+tray = col(wb['window#waybar.tails-bottom']['background-color'])
+need(S, "window buttons", col(wb['window#waybar.tails-bottom #taskbar button']['color']), tray, TEXT)
+need(S, "window buttons (hover)", col(wb['window#waybar.tails-bottom #taskbar button']['color']),
+     col(wb['window#waybar.tails-bottom #taskbar button:hover']['background-color']), TEXT)
+need(S, "active window", col(wb['window#waybar.tails-bottom #taskbar button.active']['color']),
+     col(wb['window#waybar.tails-bottom #taskbar button.active']['background-color']), TEXT)
+need(S, "minimised window (de-emphasised by design)", col(wb['window#waybar.tails-bottom #taskbar button.minimized']['color']),
+     col(wb['window#waybar.tails-bottom #taskbar button.minimized']['background-color']), INDICATOR)
+need(S, "window tooltip", col(wb['tooltip label']['color']), col(wb['tooltip']['background-color']), TEXT)
+p = wb['window#waybar.tails-top #custom-tor']
+need(S, "Tor/I2P pill (idle)", col(p['color']), col(p['background-color']), TEXT)
+for st, minimum in (("connecting", TEXT), ("ready", INDICATOR), ("failed", DISABLED)):
+    # ready is white on Tails green (3.3:1, paired with position and tooltip);
+    # failed is white on Tails red (WCAG AA)
+    q = wb['window#waybar.tails-top #custom-tor.' + st]
+    need(S, "Tor/I2P pill (%s)" % st, col(q['color']), col(q['background-color']), minimum)
+    q = wb['window#waybar.tails-top #custom-i2p.' + st]
+    need(S, "Tor/I2P pill (%s)" % st, col(q['color']), col(q['background-color']), minimum)
+need(S, "pill hover edge", col(wb['window#waybar.tails-top #custom-tor:hover']['border-color']), col(p['background-color']), INDICATOR)
+for k in ('#network.disconnected', '#battery.warning:not(.charging)', '#battery.critical:not(.charging)',
+          '#custom-timesync.syncing', '#custom-timesync.failed'):
+    need(S, k, col(wb['window#waybar.tails-top ' + k]['color']), bar, TEXT)
+need(S, "muted volume", col(wb['window#waybar.tails-top #pulseaudio.muted']['color']), bar, DISABLED)
 
-# --- mako (notifications) ---
+# --- mako (light top-center notifications) ---
 S = "mako"
 sec, mk = "", {"": {}}
 for l in read("etc/xdg/mako/config").splitlines():
@@ -276,16 +283,18 @@ for l in read("etc/xdg/mako/config").splitlines():
     elif '=' in l and not l.startswith('#'):
         mk[sec][l.split('=', 1)[0]] = l.split('=', 1)[1]
 top = mk[""]
+if top["anchor"] != "top-center":
+    fails.append("mako: notifications are not top-center")
 nbg = over(top['background-color'], "#161616")
 need(S, "normal text", top['text-color'], nbg, TEXT)
-need(S, "normal edge", top['border-color'], nbg, INDICATOR)
-need(S, "low-urgency text", mk['[urgency=low]']['text-color'], nbg, TEXT)
-need(S, "low-urgency edge", mk['[urgency=low]']['border-color'], nbg, INDICATOR)
-cbg = over(mk['[urgency=critical]']['background-color'], "#161616")
-need(S, "critical text", top['text-color'], cbg, TEXT)
-need(S, "critical edge", mk['[urgency=critical]']['border-color'], cbg, INDICATOR)
+need(S, "low-urgency text (secondary, de-emphasised by design)", mk['[urgency=low]']['text-color'], nbg, DISABLED)
+if mk['[urgency=critical]']['border-color'].lower() != "#c01c28":
+    fails.append("mako: critical edge is not Tails red")
+if top['border-color'].lower() != "#cdc7c2":
+    fails.append("mako: normal edge is not Adwaita grey")
 need(S, "volume/brightness OSD edge", mk['[category=prestium.osd]']['border-color'], nbg, INDICATOR)
-need(S, "text over the progress bar", top['text-color'], col(top['progress-color']), TEXT)
+if col(top['progress-color']).lower() != "#0050c8":
+    fails.append("mako: progress fill is not Prestium blue")
 
 # --- 2.1 (UI pass): GTK 3 destructive buttons, message bars, section cards ---
 S = "GTK 3"

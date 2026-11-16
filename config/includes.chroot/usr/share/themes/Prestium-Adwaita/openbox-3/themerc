@@ -1,0 +1,72 @@
+# Prestium-Adwaita — GNOME Adwaita light window decorations for labwc
+
+# Window borders
+border.width: 1
+window.active.border.color: #cdc7c2
+window.inactive.border.color: #deddda
+window.active.indicator.toggled-keybind.color: #3584e4
+
+# Titlebar geometry & alignment
+window.label.text.justify: Center
+
+# Active titlebar (Adwaita light headerbar)
+window.active.title.bg: Solid
+window.active.title.bg.color: #ebebeb
+window.active.label.text.color: #2e3436
+
+# Inactive titlebar
+window.inactive.title.bg: Solid
+window.inactive.title.bg.color: #f6f5f4
+window.inactive.label.text.color: #77767b
+
+# Titlebar buttons
+window.button.width: 24
+window.button.height: 24
+window.button.spacing: 4
+window.button.hover.bg.color: #80808020
+window.button.hover.bg.corner-radius: 12
+
+window.active.button.unpressed.image.color: #2e3436
+window.active.button.hover.image.color: #000000
+window.active.button.pressed.image.color: #000000
+window.inactive.button.unpressed.image.color: #77767b
+window.inactive.button.hover.image.color: #2e3436
+window.inactive.button.pressed.image.color: #2e3436
+
+# Drop shadows (subtle GNOME-style elevation)
+window.active.shadow.size: 32
+window.active.shadow.color: #00000040
+window.inactive.shadow.size: 16
+window.inactive.shadow.color: #00000020
+
+# Root/context menus
+menu.border.width: 1
+menu.border.color: #cdc7c2
+menu.title.bg: Solid
+menu.title.bg.color: #f6f5f4
+menu.title.text.color: #2e3436
+menu.title.text.justify: Center
+menu.items.bg: Solid
+menu.items.bg.color: #ffffff
+menu.items.text.color: #2e3436
+menu.items.active.bg: Solid
+menu.items.active.bg.color: #3584e4
+menu.items.active.text.color: #ffffff
+menu.items.disabled.text.color: #9a9996
+menu.separator.color: #deddda
+menu.separator.width: 1
+menu.separator.padding.width: 6
+menu.separator.padding.height: 4
+
+# Alt-Tab On-Screen Display (OSD)
+osd.bg: Solid
+osd.bg.color: #f6f5f4
+osd.border.width: 1
+osd.border.color: #cdc7c2
+osd.label.text.color: #2e3436
+osd.window-switcher.style-classic.item.active.bg.color: #3584e4
+osd.window-switcher.style-classic.item.active.border.width: 1
+osd.window-switcher.style-classic.item.active.border.color: #1c71d8
+osd.window-switcher.style-thumbnail.item.active.bg.color: #3584e440
+osd.window-switcher.style-thumbnail.item.active.border.width: 1
+osd.window-switcher.style-thumbnail.item.active.border.color: #1c71d8

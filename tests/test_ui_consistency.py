@@ -43,8 +43,11 @@ PALETTE = {
     "ffd166", "2a2416", "7a5c14", "6ee7a0", "1f7a4a",
     # tinted edges and surfaces of the bar's Tor/I2P state pills (live cyan, warning amber)
     "0a4f5c", "10262b", "5c4a1a",
+    # Tails Adwaita light theme: purple slate, light surfaces, dark text, success green
+    "56347c", "7d4fb2", "1f5c3a", "2ec27e", "26a269", "e5a50a", "c01c28", "3584e4", "1c71d8",
+    "cdc7c2", "deddda", "ebebeb", "f6f5f4", "2e3436", "5e5c64", "77767b", "9a9996", "808080",
 }
-OLD = ["0066ff", "1a75ff", "0a6cff", "0052cc", "1c71d8", "3584e4", "a3a3ff", "7fb2ff", "8fb3ff", "ff7a7a",
+OLD = ["0066ff", "1a75ff", "0a6cff", "0052cc", "a3a3ff", "7fb2ff", "8fb3ff", "ff7a7a",
        "121417", "2a3550", "b3261e"]
 
 def strip_comments(s, kind):
@@ -68,9 +71,11 @@ UI = [
     ("usr/share/prestium/theme/gtk3.css", "css"), ("usr/share/prestium/theme/gtk4.css", "css"),
     ("etc/xdg/waybar/style.css", "css"), ("etc/xdg/mako/config", "ini"),
     ("usr/share/themes/Prestium-Dark/openbox-3/themerc", "ini"),
+    ("usr/share/themes/Prestium-Adwaita/openbox-3/themerc", "ini"),
     ("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc"),
     ("var/lib/i2pd/webconsole/style.css", "css"), ("usr/share/prestium/torrents-theme/prestium-dark.css", "css"),
-    ("../hooks/live/0455-prestium-qt-theme.hook.chroot", "sh"),
+    ("usr/local/bin/prestium-apps-menu", "sh"), ("usr/local/bin/prestium-session", "sh"),
+    ("usr/local/lib/prestium/browser-sandbox.sh", "sh"),
     ("usr/local/bin/prestium-tor-assistant", "sh"), ("usr/local/bin/prestium-i2p-assistant", "sh"),
     ("usr/local/bin/prestium-browser-updater", "sh"), ("usr/local/sbin/prestium-wl-broker", "sh"),
 ]
@@ -105,7 +110,6 @@ check(not diff, "kdeglobals colours are Prestium.colors", "; ".join(diff[:6]))
 LINK = "8ab8ff"
 g3s, g4s = read("usr/share/prestium/theme/gtk3.css"), read("usr/share/prestium/theme/gtk4.css")
 g2s = read("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc")
-qts = read("../hooks/live/0455-prestium-qt-theme.hook.chroot")
 check(re.search(r"@define-color\s+link_color\s+#8ab8ff\b", g3s) and re.search(r"@define-color\s+visited_link_color\s+#8ab8ff\b", g3s),
       "GTK 3: link_color and visited_link_color are #8ab8ff")
 check(re.search(r"@define-color\s+link_color\s+#8ab8ff\b", g4s) and re.search(r"@define-color\s+visited_link_color\s+#8ab8ff\b", g4s),
@@ -117,14 +121,14 @@ check(re.search(r"(?m)^link, label link, \.link, button\.link, :link \{ color: #
       "GTK 4: link, label link, button.link and :visited use #8ab8ff")
 check('link_color:#8ab8ff' in g2s and 'visited_link_color:#8ab8ff' in g2s,
       "GTK 2: link_color and visited_link_color are #8ab8ff")
-check("set_color link.color '#8ab8ff'" in qts and "set_color link.visited.color '#8ab8ff'" in qts,
-      "Qt (Kvantum): link.color and link.visited.color are #8ab8ff")
+check("QT_STYLE_OVERRIDE=Adwaita" in read("usr/local/bin/prestium-session")
+      and "QT_STYLE_OVERRIDE=Adwaita" in read("etc/environment"),
+      "Qt: Adwaita style, no Kvantum")
 link_rgb = ["ForegroundLink=138,184,255", "ForegroundVisited=138,184,255"]
 check(all(v in read("usr/share/color-schemes/Prestium.colors") and v in read("etc/xdg/kdeglobals") for v in link_rgb),
       "KDE: ForegroundLink and ForegroundVisited are #8ab8ff")
 for pth, kind in (("usr/share/prestium/theme/gtk3.css", "css"), ("usr/share/prestium/theme/gtk4.css", "css"),
-                  ("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc"),
-                  ("../hooks/live/0455-prestium-qt-theme.hook.chroot", "sh")):
+                  ("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc")):
     cyan = [h for h in hexes(strip_comments(read(pth), kind)) if h in ("00ffff", "80ffff")]
     check(not cyan, "link styles on-palette and not cyan: %s" % pth.replace("../", "config/"),
           "cyan " + ", ".join("#" + h for h in cyan))
@@ -156,18 +160,22 @@ for f in sorted(set(scan)):
     if hit: olds.append("%s: %s" % (os.path.relpath(f, R), ", ".join(hit)))
 check(not olds, "no retired accent colours (#0066ff, #1c71d8, #a3a3ff, #ff7a7a, ...) outside comments", "; ".join(olds))
 
-# ------------------------------------------------------------------ 2. themes, icons, fonts, cursor
-ICON, FONT, CURSOR = "Prestium", "Cantarell 10", ("Adwaita", "24")
-for p in ("etc/gtk-3.0/settings.ini", "etc/gtk-4.0/settings.ini",
-          "usr/share/prestium/broker-style/gtk-3.0/settings.ini",
+# ---------------------------------------------------------------------------------- 2. themes, icons, fonts, cursor
+ICON, FONT, CURSOR = "Prestium", "Cantarell 11", ("Adwaita", "24")
+for p in ("etc/gtk-3.0/settings.ini", "etc/gtk-4.0/settings.ini"):
+    c = configparser.ConfigParser(interpolation=None); c.read_string(read(p)); s = c["Settings"]
+    got = (s.get("gtk-theme-name"), s.get("gtk-application-prefer-dark-theme"), s.get("gtk-icon-theme-name"),
+           s.get("gtk-font-name"), s.get("gtk-cursor-theme-name"), s.get("gtk-cursor-theme-size"))
+    check(got == ("Adwaita", "0", "Adwaita", "Cantarell 11", "Adwaita", "24"), "%s: Adwaita light, Adwaita icons, Cantarell 11, Adwaita 24 cursor" % p, str(got))
+for p in ("usr/share/prestium/broker-style/gtk-3.0/settings.ini",
           "usr/share/prestium/broker-style/gtk-4.0/settings.ini"):
     c = configparser.ConfigParser(interpolation=None); c.read_string(read(p)); s = c["Settings"]
     got = (s.get("gtk-theme-name"), s.get("gtk-application-prefer-dark-theme"), s.get("gtk-icon-theme-name"),
            s.get("gtk-font-name"), s.get("gtk-cursor-theme-name"), s.get("gtk-cursor-theme-size"))
-    check(got == ("Adwaita", "1", ICON, FONT) + CURSOR, "%s: Adwaita dark, Prestium icons, Cantarell 10, Adwaita 24 cursor" % p, str(got))
+    check(got == ("Adwaita", "1", "Prestium", "Cantarell 10", "Adwaita", "24"), "%s: broker dialogs stay dark" % p, str(got))
 d = read("etc/dconf/db/local.d/10-prestium-desktop")
-want = {"gtk-theme": "'Adwaita'", "color-scheme": "'prefer-dark'", "icon-theme": "'Prestium'",
-        "font-name": "'Cantarell 10'", "cursor-theme": "'Adwaita'", "cursor-size": "24"}
+want = {"gtk-theme": "'Adwaita'", "color-scheme": "'prefer-light'", "icon-theme": "'Prestium'",
+        "font-name": "'Cantarell 11'", "cursor-theme": "'Adwaita'", "cursor-size": "24"}
 got = {k: (re.search(r"(?m)^%s=(.*)$" % k, d) or [None, None])[1] for k in want}
 check(got == want, "dconf: same theme, colour scheme, icons, font and cursor", str(got))
 g2 = read("etc/gtk-2.0/gtkrc")
@@ -181,14 +189,17 @@ check(kg.get("Icons", "Theme", fallback=None) == ICON and kg.get("General", "fon
       "KDE: Prestium icons, Cantarell 10", "%s %s" % (kg.get("Icons", "Theme", fallback=None), kg.get("General", "font", fallback=None)))
 check(kg.get("General", "ColorScheme", fallback="Prestium") == "Prestium", "KDE: Prestium colour scheme")
 lw = read("etc/xdg/labwc/rc.xml")
-check("<name>Prestium-Dark</name>" in lw and "<icon>%s</icon>" % ICON in lw, "labwc: Prestium-Dark window theme, Prestium icons")
+check("<name>Prestium-Adwaita</name>" in lw and "<icon>%s</icon>" % ICON in lw, "labwc: Prestium-Adwaita window theme, Prestium icons")
 lf = re.findall(r'<font place="\w+"><name>([^<]+)</name><size>(\d+)</size>', lw)
-check(lf and all(f == ("Cantarell", "10") for f in lf), "labwc: Cantarell 10 in titles, menus and the OSD", str(lf))
-check(re.search(r"theme=Prestium\b", read("etc/xdg/Kvantum/kvantum.kvconfig")) is not None, "Qt: Kvantum theme Prestium")
+check(lf and all(f == ("Cantarell", "11") for f in lf), "labwc: Cantarell 11 in titles, menus and the OSD", str(lf))
 sess = read("usr/local/bin/prestium-session")
-check("QT_STYLE_OVERRIDE=kvantum" in sess and "XCURSOR_THEME=Adwaita XCURSOR_SIZE=24" in sess, "session: Kvantum for Qt, Adwaita 24 cursor everywhere")
+check("QT_STYLE_OVERRIDE=Adwaita" in sess and "QT_WAYLAND_DISABLE_WINDOWDECORATION=1" in sess
+      and "XCURSOR_THEME=Adwaita XCURSOR_SIZE=24" in sess, "session: Adwaita for Qt, no Qt CSD, Adwaita 24 cursor everywhere")
+env = read("etc/environment")
+check("QT_STYLE_OVERRIDE=Adwaita" in env and "QT_WAYLAND_DISABLE_WINDOWDECORATION=1" in env,
+      "environment: Adwaita for Qt, no Qt CSD")
 mk = read("etc/xdg/mako/config")
-check(re.search(r"(?m)^font=Cantarell 10$", mk) is not None, "mako: Cantarell 10")
+check(re.search(r"(?m)^font=Cantarell 11$", mk) is not None, "mako: Cantarell 11")
 check(re.search(r"(?m)^icon-path=.*|^icons=1", mk) is None or True, "mako: icons from the session theme")
 wb = read("etc/xdg/waybar/style.css")
 check(re.search(r"font-family:\s*Cantarell", wb) is not None, "waybar: Cantarell")
@@ -197,19 +208,19 @@ check("Inherits=Papirus-Dark,Papirus,Adwaita,AdwaitaLegacy,gnome,hicolor" in tra
 
 # --------------------------------------------------------------------------------------- 3. shapes
 check("<cornerRadius>8</cornerRadius>" in lw, "labwc: 8 px window corners")
-check("window.button.hover.bg.corner-radius: 6" in read("usr/share/themes/Prestium-Dark/openbox-3/themerc"), "labwc: 6 px titlebar button hover")
-check(re.search(r"(?m)^border-radius=8$", mk) is not None, "mako: 8 px notifications")
+check("window.button.hover.bg.corner-radius: 12" in read("usr/share/themes/Prestium-Adwaita/openbox-3/themerc"), "labwc: 12 px titlebar button hover")
+check(re.search(r"(?m)^border-radius=12$", mk) is not None, "mako: 12 px notifications")
 check(re.search(r"(?m)^padding=12$", mk) is not None, "mako: 12 px padding")
 m = re.search(r"(?m)^max-icon-size=(\d+)$", mk)
 check(m is not None and m.group(1) == "48", "mako: 48 px notification icons", m and m.group(1))
-check(re.search(r"window#waybar\s*\{[^}]*border-radius:\s*8px", wb) is not None, "waybar: 8 px bar")
+check(re.search(r"window#waybar\.tails-top\s+\.module\s*\{", wb) is not None and "border-radius: 999px" in wb, "waybar: 999 px status pills")
 radii = {}
 for p in ("usr/share/prestium/theme/gtk3.css", "usr/share/prestium/theme/gtk4.css", "etc/xdg/waybar/style.css",
           "var/lib/i2pd/webconsole/style.css", "usr/share/prestium/torrents-theme/prestium-dark.css"):
     s = strip_comments(read(p), "css")
     vals = set(v.strip() for v in re.findall(r"(?:border-radius|--radius)\s*:\s*([^;}!]+)", s))
-    radii[p] = sorted(v for v in vals if v not in ("0", "6px", "8px", "999px", "var(--radius)"))
-check(not any(radii.values()), "CSS radii are 6 px, 8 px or 999 px pills", str({k: v for k, v in radii.items() if v}))
+    radii[p] = sorted(v for v in vals if v not in ("0", "4px", "6px", "8px", "999px", "var(--radius)"))
+check(not any(radii.values()), "CSS radii are 4 px, 6 px, 8 px or 999 px pills", str({k: v for k, v in radii.items() if v}))
 g3 = read("usr/share/prestium/theme/gtk3.css")
 check(re.search(r"tooltip[^{]*\{[^}]*border-radius:\s*8px", g3) is not None, "GTK 3: 8 px tooltips")
 check(re.search(r"frame\.prestium-section > border\s*\{[^}]*border-radius:\s*8px", g3) is not None, "GTK 3: 8 px section cards")

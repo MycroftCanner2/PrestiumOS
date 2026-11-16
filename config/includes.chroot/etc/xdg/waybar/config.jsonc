@@ -1,99 +1,102 @@
-// Prestium 2.0 r10: panel (replaces tint2): windows, tray, volume, battery, clock.
-// Menu: the "Menu" button at the left, right-click the desktop, or Super+Space.
-// The button asks the Wayland broker (prestium-wl menu) to press Super+Space, which labwc answers
-// with its root menu at the bottom-left, above this button; labwc has no command to open a menu directly.
-{
-  // 2.1 (design batch): a floating, rounded bar (margins; style.css draws the rounded body), symbol icons
-  // (Font Awesome 4.7), and Tor and I2P status pills fed by prestium-netstatus (connecting, ready, failed).
-  "layer": "top",
-  "position": "bottom",
-  "height": 36,
-  "margin-bottom": 8,
-  "margin-left": 8,
-  "margin-right": 8,
-  "spacing": 4,
-  "modules-left": ["custom/menu", "wlr/taskbar"],
-  "modules-center": [],
-  "modules-right": ["custom/tor", "custom/i2p", "custom/timesync", "tray", "network", "pulseaudio", "battery", "clock"],
-  "custom/menu": {
-    "format": "\uf0c9  Menu",
-    "tooltip-format": "Applications and settings (Super+Space)",
-    // 2.0 r20: waybar's children only get the restricted Wayland socket, where labwc offers no
-    // virtual keyboard, so wtype run from here did nothing. The broker presses Super+Space on a
-    // full-socket connection instead. The short wait lets the click finish first (labwc closes a
-    // menu on a button release outside it).
-    "on-click": "sleep 0.3; exec /usr/local/bin/prestium-wl menu",
-    "on-click-right": "sleep 0.3; exec /usr/local/bin/prestium-wl menu"
+// Prestium 2.1 (Tails-style dual bar): a dark top system bar (Applications menu,
+// clock, Tor/I2P pills, tray) and a light bottom window-list taskbar.
+// The Applications button opens prestium-apps-menu (a categorized dropdown);
+// Super+Space and right-click still open labwc's root menu (system actions).
+[
+  {
+    // 2.1 (design batch): Tor and I2P pills. Root-free and read-only: prestium-netstatus.service
+    // writes the state every 5 seconds; a click opens the matching Connection Assistant (Network menu).
+    "name": "tails-top",
+    "layer": "top",
+    "position": "top",
+    "height": 28,
+    "spacing": 4,
+    "modules-left": ["custom/applications"],
+    "modules-center": ["clock"],
+    "modules-right": ["custom/tor", "custom/i2p", "custom/timesync", "tray", "network", "pulseaudio", "battery"],
+    "custom/applications": {
+      "format": "Applications",
+      "on-click": "/usr/local/bin/prestium-apps-menu",
+      "tooltip": false
+    },
+    "clock": {
+      "format": "{:%a %b %d  %H:%M}",
+      "tooltip-format": "<tt>{calendar}</tt>",
+      "timezone": "Etc/UTC"
+    },
+    "custom/tor": {
+      "exec": "cat /run/prestium/netstatus/tor.json",
+      "return-type": "json",
+      "interval": 5,
+      "format": "\uf111  {}",
+      "on-click": "prestium-run /usr/local/bin/prestium-tor-assistant"
+    },
+    "custom/i2p": {
+      "exec": "cat /run/prestium/netstatus/i2p.json",
+      "return-type": "json",
+      "interval": 5,
+      "format": "\uf111  {}",
+      "on-click": "prestium-run /usr/local/bin/prestium-i2p-assistant"
+    },
+    // clock sync over Tor (prestium-timesync). Hidden once the time is set; a clock symbol in amber
+    // while it waits or syncs, red when it refused a time it could not trust.
+    "custom/timesync": {
+      "exec": "cat /run/prestium/timesync/waybar.json",
+      "return-type": "json",
+      "interval": 10,
+      "format": "{}"
+    },
+    "tray": { "icon-size": 18, "spacing": 8 },
+    "network": {
+      "format-wifi": "\uf1eb",
+      "format-ethernet": "\uf0e8",
+      "format-linked": "\uf0e8",
+      "format-disconnected": "\uf127",
+      "tooltip-format-wifi": "Wi-Fi {essid} ({signalStrength} %)",
+      "tooltip-format-ethernet": "Wired: {ifname}",
+      "tooltip-format-disconnected": "No network",
+      "interval": 10
+    },
+    "pulseaudio": {
+      // icon only, like a system tray; the level shows on hover
+      "format": "{icon}",
+      "format-muted": "\uf026",
+      "format-icons": { "default": ["\uf026", "\uf027", "\uf028"] },
+      "tooltip-format": "Volume {volume} % (click: mixer, right-click: mute)",
+      "scroll-step": 5,
+      "max-volume": 100,
+      "on-click": "prestium-run pavucontrol --tab=1",
+      "on-click-right": "/usr/local/bin/prestium-media-key mute"
+    },
+    "battery": {
+      "states": { "warning": 20, "critical": 10 },
+      "format": "{icon}",
+      "format-charging": "\uf0e7 {icon}",
+      "format-plugged": "\uf1e6",
+      "format-icons": ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"],
+      "tooltip-format": "Battery {capacity} %. {timeTo}"
+    }
   },
-  "wlr/taskbar": {
-    // 2.0 r20: icons only, so many open windows no longer push the tray, volume and clock off screen.
-    // The title shows on hover; Alt+Tab lists every window with its title.
-    "format": "{icon}",
-    "icon-size": 20,
-    "tooltip-format": "{title}",
-    "on-click": "activate",
-    "on-click-middle": "close",
-    "ignore-list": ["wvkbd"]
-  },
-  // 2.1 (design batch): Tor and I2P pills. Root-free and read-only: prestium-netstatus.service writes the
-  // state every 5 seconds; a click opens the matching Connection Assistant (Network menu).
-  "custom/tor": {
-    "exec": "cat /run/prestium/netstatus/tor.json",
-    "return-type": "json",
-    "interval": 5,
-    "format": "\uf111  {}",
-    "on-click": "prestium-run /usr/local/bin/prestium-tor-assistant"
-  },
-  "custom/i2p": {
-    "exec": "cat /run/prestium/netstatus/i2p.json",
-    "return-type": "json",
-    "interval": 5,
-    "format": "\uf111  {}",
-    "on-click": "prestium-run /usr/local/bin/prestium-i2p-assistant"
-  },
-  // 2.1: clock sync over Tor (prestium-timesync). Hidden once the time is set; a clock symbol in amber
-  // while it waits or syncs, red when it refused a time it could not trust.
-  "custom/timesync": {
-    "exec": "cat /run/prestium/timesync/waybar.json",
-    "return-type": "json",
-    "interval": 10,
-    "format": "{}"
-  },
-  "tray": { "icon-size": 18, "spacing": 8 },
-  "network": {
-    "format-wifi": "\uf1eb",
-    "format-ethernet": "\uf0e8",
-    "format-linked": "\uf0e8",
-    "format-disconnected": "\uf127",
-    "tooltip-format-wifi": "Wi-Fi {essid} ({signalStrength} %)",
-    "tooltip-format-ethernet": "Wired: {ifname}",
-    "tooltip-format-disconnected": "No network",
-    "interval": 10
-  },
-  "pulseaudio": {
-    // 2.1 (design batch): icon only, like a system tray; the level shows on hover
-    "format": "{icon}",
-    "format-muted": "\uf026",
-    "format-icons": { "default": ["\uf026", "\uf027", "\uf028"] },
-    "tooltip-format": "Volume {volume} % (click: mixer, right-click: mute)",
-    "scroll-step": 5,
-    "max-volume": 100,
-    "on-click": "prestium-run pavucontrol --tab=1",
-    "on-click-right": "/usr/local/bin/prestium-media-key mute"
-  },
-  "battery": {
-    "states": { "warning": 20, "critical": 10 },
-    "format": "{icon}",
-    "format-charging": "\uf0e7 {icon}",
-    "format-plugged": "\uf1e6",
-    "format-icons": ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"],
-    "tooltip-format": "Battery {capacity} %. {timeTo}"
-  },
-  "clock": {
-    // 2.1 (design batch): time over date, right-aligned, no tooltip (Prestium keeps the clock in UTC)
-    "format": "{:%H:%M UTC\n%Y-%m-%d}",
-    "justify": "right",
-    "tooltip": false,
-    "timezone": "Etc/UTC"
+  {
+    // Tails bottom window-list taskbar: titled buttons (raise/minimise/close)
+    "name": "tails-bottom",
+    "layer": "top",
+    "position": "bottom",
+    "height": 30,
+    "spacing": 4,
+    "modules-left": ["wlr/taskbar"],
+    "modules-center": [],
+    "modules-right": [],
+    "wlr/taskbar": {
+      "format": "{icon}  {title:.28}",
+      "icon-size": 16,
+      "icon-theme": "Adwaita",
+      "tooltip-format": "{title} ({app_id})",
+      "sort-by-app-id": true,
+      "all-outputs": true,
+      "on-click": "minimize-raise",
+      "on-click-middle": "close",
+      "ignore-list": ["waybar"]
+    }
   }
-}
+]

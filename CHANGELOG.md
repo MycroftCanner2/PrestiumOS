@@ -76,6 +76,12 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   Tor launcher, OMEMO plugin build (lurch), OTR and XMPP extras, proxy prefs and menu entry;
   Gajim stays as the messenger, with Tor and I2P proxies ready. GIMP and Xarchiver are removed
   with their profiles and settings (Loupe views images, File Roller manages archives).
+- **Tails-style Adwaita light desktop.** The shell is a dark top bar (Applications menu, clock,
+  Tor/I2P pills) plus a light bottom window-list taskbar, with client-side decorations and a
+  `Prestium-Adwaita` labwc theme; Qt uses Adwaita instead of Kvantum (packages and theme
+  overrides removed). A categorized Applications dropdown (`prestium-apps-menu`) replaces the
+  panel Menu button; per-app server-side frames stay for the terminal, XWayland, Qt and media
+  apps. The broker, its swaylock palette and the Wayland security boundary are unchanged.
 - **Viewers can't see mail or chat, trace each other, or reach the session bus; Qt6 apps stay on
   Wayland.** `prestium-viewer-core` now explicitly denies mail/chat data (`~/.claws-mail`,
   `~/.purple`, Gajim's config and data) and `ptrace`, so a crafted image or archive that

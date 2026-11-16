@@ -1,48 +1,207 @@
-/* Prestium 2.1 (design batch): floating, rounded bar in the Tech Innovation colours (dark grey,
-   Electric Blue #0066ff, Neon Cyan #00ffff), the same palette as the window titlebars (labwc theme
-   Prestium-Dark), GTK, Qt and mako. Symbols come from Font Awesome 4.7 (fonts-font-awesome).
-   Only colour transitions on hover: labwc and waybar have no window animations.
-   2.1 (contrast review): Menu button #0050c8, hover darker #0047b3 (white text 7.0:1 and 8.2:1; the old
-   hover #0a6cff was 4.6:1); grey pill text #c8c8c8 (9:1), red #ff9494 (8:1), hover edges #3d8bff.
-   2.1 (UI pass): the spec's shapes: the bar and its tooltips 8 px like windows, menus and notifications;
-   buttons and hover areas inside it 6 px; status pills fully round. Padding on the 4 px grid (8 / 12). */
-* { font-family: Cantarell, FontAwesome, sans-serif; font-size: 13px; min-height: 0; }
-window#waybar { background: rgba(22, 22, 22, 0.94); color: #ffffff; border: 1px solid #333333; border-radius: 8px; }
-tooltip { background: #262626; border: 1px solid #333333; border-radius: 8px; }
-tooltip label { color: #ffffff; padding: 2px 4px; }
+/* Prestium 2.1 (Tails-style dual bar): dark top system bar (#1e1e1e, white text)
+   and light bottom window-list taskbar (#f6f5f4, dark text), Cantarell 11.
+   Symbol icons (pills, tray, battery) come from Font Awesome. */
 
-/* menu button */
-#custom-menu { padding: 0 12px; margin: 4px; background: #0050c8; color: #ffffff; border-radius: 6px; font-weight: bold;
-  transition: background-color 150ms ease-in-out; }
-#custom-menu:hover { background: #0047b3; }
+* {
+    font-family: Cantarell, FontAwesome, sans-serif;
+    font-size: 11pt;
+    border: none;
+    border-radius: 0;
+    min-height: 0;
+}
 
-/* windows */
-#taskbar button { padding: 0 8px; margin: 4px 2px; min-width: 0; color: #a8a8a8; border-radius: 6px; border: none;
-  transition: background-color 150ms ease-in-out, box-shadow 150ms ease-in-out; }
-#taskbar button:hover { background: #262626; color: #ffffff; }
-#taskbar button.active { background: #262626; color: #ffffff; box-shadow: inset 0 -2px #00ffff; }
+/* ============================================================
+   TOP BAR — GNOME / Tails Dark System Panel (#1e1e1e)
+   ============================================================ */
+window#waybar.tails-top {
+    background-color: #1e1e1e;
+    color: #ffffff;
+    border-bottom: 1px solid #000000;
+}
 
-/* status area */
-/* icons only, evenly spaced, like a system tray; the clock is two small lines, time over date */
-#network, #pulseaudio, #battery { font-size: 15px; }
-#tray, #network, #pulseaudio, #battery, #clock { padding: 0 8px; margin: 4px 0; border-radius: 6px;
-  transition: background-color 150ms ease-in-out; }
-#network:hover, #pulseaudio:hover, #battery:hover { background: #262626; }
-#clock { font-size: 11px; font-weight: normal; margin-right: 4px; padding: 0 8px; }
-#network.disconnected { color: #ff9494; }
-#pulseaudio.muted { color: #a8a8a8; }
-#battery.warning:not(.charging) { color: #ffd166; }
-#battery.critical:not(.charging) { color: #ff9494; font-weight: bold; }
+window#waybar.tails-top #custom-applications {
+    font-weight: 700;
+    color: #ffffff;
+    padding: 0 12px;
+    margin: 2px 4px;
+    border-radius: 999px;
+}
 
-/* Tor and I2P pills: connecting (amber), ready (cyan), failed (red) */
-#custom-tor, #custom-i2p { padding: 0 12px; margin: 6px 2px; border-radius: 999px; font-size: 12px; font-weight: bold;
-  background: #262626; color: #c8c8c8; border: 1px solid #4d4d4d;
-  transition: background-color 300ms ease-in-out, color 300ms ease-in-out, border-color 300ms ease-in-out; }
-#custom-tor.connecting, #custom-i2p.connecting { color: #ffd166; border-color: #5c4a1a; background: #2a2416; }
-#custom-tor.ready, #custom-i2p.ready { color: #00ffff; border-color: #0a4f5c; background: #10262b; }
-#custom-tor.failed, #custom-i2p.failed { color: #ff9494; border-color: #5c2424; background: #2b1616; }
-#custom-tor:hover, #custom-i2p:hover { border-color: #3d8bff; }
-/* 2.1: clock-sync symbol, only shown until the time is set over Tor */
-#custom-timesync { padding: 0 8px; margin: 6px 2px; font-size: 13px; }
-#custom-timesync.syncing { color: #ffd166; }
-#custom-timesync.failed { color: #ff9494; }
+window#waybar.tails-top #custom-applications:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+window#waybar.tails-top #clock {
+    font-weight: 700;
+    color: #ffffff;
+    padding: 0 12px;
+    margin: 2px 0;
+    border-radius: 999px;
+}
+
+window#waybar.tails-top #clock:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+/* Custom Prestium Status Pills (Tor / I2P / Network) */
+window#waybar.tails-top .module {
+    margin: 3px 3px;
+    padding: 0 10px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 10pt;
+}
+
+window#waybar.tails-top #custom-tor,
+window#waybar.tails-top #custom-netstatus-tor,
+window#waybar.tails-top .tor {
+    background-color: #56347c;
+    color: #ffffff;
+    border: 1px solid #7d4fb2;
+}
+
+window#waybar.tails-top #custom-i2p,
+window#waybar.tails-top #custom-netstatus-i2p,
+window#waybar.tails-top .i2p {
+    background-color: #1f5c3a;
+    color: #ffffff;
+    border: 1px solid #2ec27e;
+}
+
+window#waybar.tails-top .connected,
+window#waybar.tails-top .ready {
+    background-color: #26a269;
+    color: #ffffff;
+}
+
+window#waybar.tails-top .bootstrapping,
+window#waybar.tails-top .warning {
+    background-color: #e5a50a;
+    color: #1e1e1e;
+}
+
+window#waybar.tails-top .offline,
+window#waybar.tails-top .disconnected,
+window#waybar.tails-top .error {
+    background-color: #c01c28;
+    color: #ffffff;
+}
+
+window#waybar.tails-top #custom-tor.connecting,
+window#waybar.tails-top #custom-i2p.connecting {
+    background-color: #e5a50a;
+    color: #1e1e1e;
+    border-color: #e5a50a;
+}
+
+window#waybar.tails-top #custom-tor.ready,
+window#waybar.tails-top #custom-i2p.ready {
+    background-color: #26a269;
+    color: #ffffff;
+    border-color: #26a269;
+}
+
+window#waybar.tails-top #custom-tor.failed,
+window#waybar.tails-top #custom-i2p.failed {
+    background-color: #c01c28;
+    color: #ffffff;
+    border-color: #c01c28;
+}
+
+window#waybar.tails-top #custom-tor:hover,
+window#waybar.tails-top #custom-i2p:hover {
+    border-color: #ffffff;
+}
+
+window#waybar.tails-top #custom-timesync.syncing {
+    color: #e5a50a;
+}
+
+window#waybar.tails-top #custom-timesync.failed {
+    color: #ff9494;
+}
+
+window#waybar.tails-top #pulseaudio,
+window#waybar.tails-top #battery,
+window#waybar.tails-top #tray,
+window#waybar.tails-top #custom-power {
+    color: #ffffff;
+    padding: 0 8px;
+}
+
+window#waybar.tails-top #pulseaudio:hover,
+window#waybar.tails-top #battery:hover,
+window#waybar.tails-top #custom-power:hover {
+    background-color: rgba(255, 255, 255, 0.14);
+}
+
+window#waybar.tails-top #network.disconnected {
+    color: #ff9494;
+}
+
+window#waybar.tails-top #pulseaudio.muted {
+    color: #a8a8a8;
+}
+
+window#waybar.tails-top #battery.warning:not(.charging) {
+    color: #ffd166;
+}
+
+window#waybar.tails-top #battery.critical:not(.charging) {
+    color: #ff9494;
+    font-weight: bold;
+}
+
+/* ============================================================
+   BOTTOM BAR — Tails Classic Window-List Taskbar (#f6f5f4)
+   ============================================================ */
+window#waybar.tails-bottom {
+    background-color: #f6f5f4;
+    color: #2e3436;
+    border-top: 1px solid #cdc7c2;
+}
+
+window#waybar.tails-bottom #taskbar {
+    padding: 2px 4px;
+}
+
+window#waybar.tails-bottom #taskbar button {
+    background-color: #ebebeb;
+    color: #2e3436;
+    border: 1px solid #cdc7c2;
+    border-radius: 4px;
+    margin: 1px 3px;
+    padding: 0 10px;
+    font-weight: 500;
+    font-size: 10pt;
+}
+
+window#waybar.tails-bottom #taskbar button:hover {
+    background-color: #deddda;
+}
+
+window#waybar.tails-bottom #taskbar button.active {
+    background-color: #ffffff;
+    color: #000000;
+    font-weight: 700;
+    border-color: #9a9996;
+    border-bottom: 2px solid #3584e4;
+}
+
+window#waybar.tails-bottom #taskbar button.minimized {
+    background-color: #f6f5f4;
+    color: #5e5c64;
+    border-color: #deddda;
+}
+
+/* Tooltips (Adwaita Light) */
+tooltip {
+    background-color: #ffffff;
+    color: #2e3436;
+    border: 1px solid #cdc7c2;
+    border-radius: 6px;
+}
+
+tooltip label {
+    color: #2e3436;
+}
