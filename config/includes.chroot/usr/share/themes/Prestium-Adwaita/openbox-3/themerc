@@ -27,11 +27,13 @@ window.button.hover.bg.color: #80808020
 window.button.hover.bg.corner-radius: 12
 
 window.active.button.unpressed.image.color: #2e3436
-window.active.button.hover.image.color: #000000
-window.active.button.pressed.image.color: #000000
+window.active.button.hover.image.color: #2e3436
+window.active.button.pressed.image.color: #2e3436
+window.active.button.disabled.image.color: #9a9996
 window.inactive.button.unpressed.image.color: #77767b
 window.inactive.button.hover.image.color: #2e3436
 window.inactive.button.pressed.image.color: #2e3436
+window.inactive.button.disabled.image.color: #9a9996
 
 # Drop shadows (subtle GNOME-style elevation)
 window.active.shadow.size: 32

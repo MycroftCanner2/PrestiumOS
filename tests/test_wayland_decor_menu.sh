@@ -18,6 +18,9 @@ grep -q '<windowRule identifier="prestium-apps-menu" serverDecoration="no">' "$R
   || { echo "FAIL: rc.xml has no prestium-apps-menu fallback rule"; exit 1; }
 # no app gets the compositor's forced frame any more (that rule drew a second titlebar)
 ! grep -q 'sandboxEngine=' "$RC" || { echo "FAIL: rc.xml still forces a frame by security context"; exit 1; }
+# GNOME button layout: icon left, close only right (minimize/maximize stay on the taskbar and Alt+Space menu)
+grep -q '<titleLayout>icon,label:close</titleLayout>' "$RC" \
+  || { echo "FAIL: rc.xml titlebar is not GNOME close-only"; exit 1; }
 # Super+Space opens the root menu, and the panel button opens the Applications dropdown
 python3 - "$RC" <<'PY'
 import sys, xml.etree.ElementTree as ET

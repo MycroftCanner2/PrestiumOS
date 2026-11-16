@@ -21,7 +21,7 @@
     <dropShadows>yes</dropShadows>
     <!-- 2.1: icon theme for menu and titlebar icons (unset, labwc would look for a "Prestium-Adwaita" icon theme) -->
     <icon>Prestium</icon>
-    <titleLayout>icon,label:iconify,maximize,close</titleLayout>
+    <titleLayout>icon,label:close</titleLayout>
     <font place="ActiveWindow"><name>Cantarell</name><size>11</size><weight>bold</weight></font>
     <font place="InactiveWindow"><name>Cantarell</name><size>11</size><weight>bold</weight></font>
     <font place="MenuItem"><name>Cantarell</name><size>11</size></font>
