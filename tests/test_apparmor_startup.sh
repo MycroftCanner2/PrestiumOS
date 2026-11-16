@@ -259,6 +259,7 @@ allow libreoffice $H/.config/ w
 allow libreoffice $H/.config/libreoffice/ rw
 allow libreoffice $H/.cache/ w
 allow libreoffice $H/.cache/libreoffice/ rw
+allow libreoffice $H/.local/ w
 allow libreoffice $H/.local/share/ w
 allow libreoffice $H/.local/share/libreoffice/ rw
 allow libreoffice $H/.config/libreoffice/4/user/registrymodifications.xcu mrw
