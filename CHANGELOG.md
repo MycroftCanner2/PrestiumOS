@@ -76,7 +76,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   Tor launcher, OMEMO plugin build (lurch), OTR and XMPP extras, proxy prefs and menu entry;
   Gajim stays as the messenger, with Tor and I2P proxies ready. GIMP and Xarchiver are removed
   with their profiles and settings (Loupe views images, File Roller manages archives).
-- **Tails-style Adwaita light desktop.** The shell is a dark top bar (Applications menu, clock,
+- **Adwaita light desktop.** The shell is a dark top bar (Applications menu, clock,
   Tor/I2P pills) plus a light bottom window-list taskbar, with client-side decorations and a
   `Prestium-Adwaita` labwc theme; Qt uses Adwaita instead of Kvantum (packages and theme
   overrides removed). A categorized Applications dropdown (`prestium-apps-menu`) replaces the
@@ -247,7 +247,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   `tests/test_boot_cmdline_guard.sh` tests all of this. The existence checks at the top of the
   initramfs hook and of hook 9030 are plain `if`/`then` blocks now (shellcheck 0.10 flagged the
   `A && B || C` form, SC2015, which made the test fail); they refuse exactly the same cases.
-- **Secure Boot uses Debian's signed boot chain, as Tails does, and the build proves it.** The UEFI
+- **Secure Boot uses Debian's signed boot chain, and the build proves it.** The UEFI
   path was already firmware → Debian's shim (`EFI/boot/bootx64.efi`, signed by Microsoft) → Debian's
   signed GRUB for removable media (`EFI/boot/grubx64.efi`, `gcdx64.efi.signed` from
   `grub-efi-amd64-signed`) → Debian's signed kernel (`linux-image-amd64` from `linux-signed-amd64`),
@@ -600,7 +600,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   apparmor.service isn't active, or when one of Prestium's profiles isn't in enforce mode. A bug that
   could raise ten false alerts at every login (the profiles file looks readable to the user but only
   root may open it) is fixed.
-- **Prestium tells you when it runs in a virtual machine**, the way Tails does: a notification at
+- **Prestium tells you when it runs in a virtual machine**: a notification at
   login says the host and the virtualization software can see and record everything done in Prestium.
 - **If Tor or I2P hasn't connected in a VM after 10 minutes, the desktop says why** (no route,
   user-mode networking, a VM clock set to local time, or a host firewall blocking I2P). The diagnosis
@@ -906,8 +906,8 @@ This is one combined list of everything that changed since the last release, 1.9
   (no system DNS).
 
 ### Base system, hardware and audio
-- Debian 13 trixie with updates and security fixes, kernel from the 6.12 line (Tails' line), firmware
-  from trixie-backports (the Tails 7.15 set or newer) plus extra network, TV tuner, Qualcomm and Samsung firmware.
+- Debian 13 trixie with updates and security fixes, kernel from the 6.12 line, firmware
+  from trixie-backports plus extra network, TV tuner, Qualcomm and Samsung firmware.
 - Tor Browser 16.0, Firefox 159.0.1 (local pages only), Node.js 24.22.2, The Lounge 4.5.2, Feather 2.9.1,
   and current LibreWolf, i2pd and Tor. uBlock Origin 1.75.4 and NoScript 13.6.37.
 - Secure Boot (shim + GRUB), BIOS boot and the hybrid ISO are kept.

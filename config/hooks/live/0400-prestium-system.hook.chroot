@@ -61,7 +61,7 @@ update-alternatives --set editor /bin/nano >/dev/null 2>&1 || true
 update-alternatives --set pinentry /usr/bin/pinentry-gnome3 >/dev/null 2>&1 || true
 update-alternatives --set pinentry-x11 /usr/bin/pinentry-gnome3 >/dev/null 2>&1 || true
 
-## CA certificates: eMudhra/emSign roots distrusted (as Tails 7.15.1), /etc/ca-certificates.conf
+## CA certificates: eMudhra/emSign roots distrusted, /etc/ca-certificates.conf
 update-ca-certificates --fresh >/dev/null 2>&1 || update-ca-certificates >/dev/null
 
 ## dconf system db (Diodon settings + locks), plymouth theme, locale

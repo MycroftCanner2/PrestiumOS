@@ -2,8 +2,7 @@
 # Prestium: official Tor Browser (/opt/tor-browser), using the system Tor
 # (tor@default, SOCKS 127.0.0.1:9050) instead of its own tor, so the ferm rule
 # "only debian-tor and i2pd reach the network" still holds.
-# Tails-style:
-#  - /opt/tor-browser is root-owned and read-only ("is-packaged-app" mode); the
+# root-owned and read-only (packaged-app mode); the
 #    profile lives in ~/.tor-browser/profile.default and the browser runs under
 #    the enforced AppArmor profile "torbrowser_firefox".
 #  - Downloads/uploads: ~/Tor Browser (the only place in your home the browser
@@ -43,7 +42,7 @@ if [ ! -e "$P/cert9.db" ]; then
 fi
 # Prestium prefs (download folder etc.), rewritten at every start
 sed "s#@DOWNLOADS@#$D#g" /usr/local/share/prestium-tor-browser/user.js > "$P/user.js"
-# 2.0 r9: Tor Browser runs in a bubblewrap sandbox (Tails runs it in its own network namespace and
+# 2.0 r9: Tor Browser runs in a bubblewrap sandbox (its own network namespace and
 # a Flatpak sandbox); 2.0 r10: Wayland only, in its own security context. The sandbox is described
 # in /usr/local/lib/prestium/browser-sandbox.sh. Its only ways out are Tor's SOCKS Unix socket and
 # the onion-grater control filter.

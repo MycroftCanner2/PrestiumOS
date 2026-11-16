@@ -6,13 +6,13 @@ customised files, the setup hooks and the pinned third-party downloads.
 
 - Base: Debian 13 "trixie", amd64. Archive areas `main contrib non-free-firmware`, plus
   `trixie-updates`, `trixie-security` and `trixie-backports`.
-- Kernel: Debian's trixie `linux-image-amd64` (the 6.12 line, the same line Tails 7.x uses).
-- Firmware: the full Tails 7.15 set, with `firmware-*` pinned to trixie-backports
+- Kernel: Debian's trixie `linux-image-amd64` (the 6.12 line).
+- Firmware: the full set, with `firmware-*` pinned to trixie-backports
   (`config/archives/prestium-firmware.pref.chroot`, priority 990), so `firmware-linux` is
-  20260916 or newer. Extra firmware beyond Tails (network cards, TV tuners, Qualcomm, Samsung) is
+  20260916 or newer. Extra firmware beyond the base set (network cards, TV tuners, Qualcomm, Samsung) is
   installed when the archive has it (`optional-packages.txt`).
-- Boot: hybrid ISO, BIOS (isolinux) and UEFI, with **Secure Boot** through Debian's signed boot chain,
-  as Tails does: `EFI/boot/bootx64.efi` is Debian's shim (signed by Microsoft), which loads
+- Boot: hybrid ISO, BIOS (isolinux) and UEFI, with **Secure Boot** through Debian's signed boot chain:
+  `EFI/boot/bootx64.efi` is Debian's shim (signed by Microsoft), which loads
   `EFI/boot/grubx64.efi`, Debian's signed GRUB for removable media (`gcdx64.efi.signed` from
   `grub-efi-amd64-signed`), which loads Debian's signed kernel (`linux-image-amd64` from
   `linux-signed-amd64`). live-build sets this up (`--uefi-secure-boot enable`); hook 9040 stops the
@@ -53,8 +53,8 @@ which works but is several times slower.
 2. runs `lb config` (options in `auto/config`);
 3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-amd64.iso`, `Prestium-2.1-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
 
-**Secure Boot.** The UEFI boot chain is Debian's signed one, the same as Debian's live images and
-Tails: firmware → shim → GRUB → kernel. live-build installs `shim-signed` and `grub-efi-amd64-signed`
+**Secure Boot.** The UEFI boot chain is Debian's signed one, the same as Debian's live images:
+firmware → shim → GRUB → kernel. live-build installs `shim-signed` and `grub-efi-amd64-signed`
 only for the binary stage (they are not in the live system) and copies `shimx64.efi.signed` to
 `EFI/boot/bootx64.efi` and `gcdx64.efi.signed` to `EFI/boot/grubx64.efi`, in the ISO tree and in
 `boot/grub/efi.img`. Hook 9040 checks the result with `sbverify` (sbsigntool) against the CA
@@ -68,7 +68,7 @@ includes `lockdown=integrity`, so the kernel is locked down (integrity) even wit
 unsigned modules, `/dev/mem`, kexec of unsigned kernels and hibernation are refused (Prestium needs
 none of them; `module.sig_enforce=1` already refused unsigned modules). Not signed and not checked by
 the firmware: the initramfs, the GRUB configs (menu, root hash, password hash) and so the kernel
-command line, the same as in Tails. A signed unified kernel image (UKI) would cover them; it is future
+command line, as on Debian live images. A signed unified kernel image (UKI) would cover them; it is future
 work. Booting with Secure Boot off still works (shim then checks nothing; the kernel is still locked
 down from the command line). The BIOS path (isolinux) is unchanged.
 
@@ -111,7 +111,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | --- | --- |
 | `auto/config` | the `lb config` options (distribution, archive areas, boot loaders, Secure Boot, kernel command line, squashfs compression) |
 | `config/package-lists/prestium.list.chroot` | the packages installed by hand in earlier Prestium releases (derived from their dpkg selections, build-only packages removed) |
-| `config/package-lists/prestium-firmware.list.chroot` | firmware and CPU microcode (Tails parity) |
+| `config/package-lists/prestium-firmware.list.chroot` | firmware and CPU microcode (full coverage) |
 | `config/package-lists/prestium-2.0.list.chroot` | 2.0 additions: PipeWire/WirePlumber audio, pasystray, the assistant's GTK bindings |
 | `config/package-lists/live.list.chroot` | live-boot (no live-config: Prestium sets up its user itself) |
 | `config/archives/` | build-time apt sources and keys: Tor Project, PurpleI2P (i2pd), LibreWolf, each `signed-by` its own key (live-build installs `<name>.key.chroot` as `/etc/apt/trusted.gpg.d/<name>.key.chroot.gpg`); origin pins limiting each repo to its own packages; firmware pin to backports |

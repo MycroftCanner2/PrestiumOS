@@ -1,4 +1,4 @@
-/* Prestium 2.1 (Tails-style dual bar): dark top system bar (#1e1e1e, white text)
+/* Prestium 2.1 (dual bar): dark top system bar (#1e1e1e, white text)
    and light bottom window-list taskbar (#f6f5f4, dark text), Cantarell 11.
    Symbol icons (pills, tray, battery) come from Font Awesome. */
 
@@ -11,15 +11,15 @@
 }
 
 /* ============================================================
-   TOP BAR — GNOME / Tails Dark System Panel (#1e1e1e)
+   TOP BAR — dark system panel (#1e1e1e)
    ============================================================ */
-window#waybar.tails-top {
+window#waybar.prestium-top {
     background-color: #1e1e1e;
     color: #ffffff;
     border-bottom: 1px solid #000000;
 }
 
-window#waybar.tails-top #custom-applications {
+window#waybar.prestium-top #custom-applications {
     font-weight: 700;
     color: #ffffff;
     padding: 0 12px;
@@ -27,11 +27,11 @@ window#waybar.tails-top #custom-applications {
     border-radius: 999px;
 }
 
-window#waybar.tails-top #custom-applications:hover {
+window#waybar.prestium-top #custom-applications:hover {
     background-color: rgba(255, 255, 255, 0.14);
 }
 
-window#waybar.tails-top #clock {
+window#waybar.prestium-top #clock {
     font-weight: 700;
     color: #ffffff;
     padding: 0 12px;
@@ -39,12 +39,12 @@ window#waybar.tails-top #clock {
     border-radius: 999px;
 }
 
-window#waybar.tails-top #clock:hover {
+window#waybar.prestium-top #clock:hover {
     background-color: rgba(255, 255, 255, 0.14);
 }
 
 /* Custom Prestium Status Pills (Tor / I2P / Network) */
-window#waybar.tails-top .module {
+window#waybar.prestium-top .module {
     margin: 3px 3px;
     padding: 0 10px;
     border-radius: 999px;
@@ -52,120 +52,120 @@ window#waybar.tails-top .module {
     font-size: 10pt;
 }
 
-window#waybar.tails-top #custom-tor,
-window#waybar.tails-top #custom-netstatus-tor,
-window#waybar.tails-top .tor {
+window#waybar.prestium-top #custom-tor,
+window#waybar.prestium-top #custom-netstatus-tor,
+window#waybar.prestium-top .tor {
     background-color: #56347c;
     color: #ffffff;
     border: 1px solid #7d4fb2;
 }
 
-window#waybar.tails-top #custom-i2p,
-window#waybar.tails-top #custom-netstatus-i2p,
-window#waybar.tails-top .i2p {
+window#waybar.prestium-top #custom-i2p,
+window#waybar.prestium-top #custom-netstatus-i2p,
+window#waybar.prestium-top .i2p {
     background-color: #1f5c3a;
     color: #ffffff;
     border: 1px solid #2ec27e;
 }
 
-window#waybar.tails-top .connected,
-window#waybar.tails-top .ready {
+window#waybar.prestium-top .connected,
+window#waybar.prestium-top .ready {
     background-color: #26a269;
     color: #ffffff;
 }
 
-window#waybar.tails-top .bootstrapping,
-window#waybar.tails-top .warning {
+window#waybar.prestium-top .bootstrapping,
+window#waybar.prestium-top .warning {
     background-color: #e5a50a;
     color: #1e1e1e;
 }
 
-window#waybar.tails-top .offline,
-window#waybar.tails-top .disconnected,
-window#waybar.tails-top .error {
+window#waybar.prestium-top .offline,
+window#waybar.prestium-top .disconnected,
+window#waybar.prestium-top .error {
     background-color: #c01c28;
     color: #ffffff;
 }
 
-window#waybar.tails-top #custom-tor.connecting,
-window#waybar.tails-top #custom-i2p.connecting {
+window#waybar.prestium-top #custom-tor.connecting,
+window#waybar.prestium-top #custom-i2p.connecting {
     background-color: #e5a50a;
     color: #1e1e1e;
     border-color: #e5a50a;
 }
 
-window#waybar.tails-top #custom-tor.ready,
-window#waybar.tails-top #custom-i2p.ready {
+window#waybar.prestium-top #custom-tor.ready,
+window#waybar.prestium-top #custom-i2p.ready {
     background-color: #26a269;
     color: #ffffff;
     border-color: #26a269;
 }
 
-window#waybar.tails-top #custom-tor.failed,
-window#waybar.tails-top #custom-i2p.failed {
+window#waybar.prestium-top #custom-tor.failed,
+window#waybar.prestium-top #custom-i2p.failed {
     background-color: #c01c28;
     color: #ffffff;
     border-color: #c01c28;
 }
 
-window#waybar.tails-top #custom-tor:hover,
-window#waybar.tails-top #custom-i2p:hover {
+window#waybar.prestium-top #custom-tor:hover,
+window#waybar.prestium-top #custom-i2p:hover {
     border-color: #ffffff;
 }
 
-window#waybar.tails-top #custom-timesync.syncing {
+window#waybar.prestium-top #custom-timesync.syncing {
     color: #e5a50a;
 }
 
-window#waybar.tails-top #custom-timesync.failed {
+window#waybar.prestium-top #custom-timesync.failed {
     color: #ff9494;
 }
 
-window#waybar.tails-top #pulseaudio,
-window#waybar.tails-top #battery,
-window#waybar.tails-top #tray,
-window#waybar.tails-top #custom-power {
+window#waybar.prestium-top #pulseaudio,
+window#waybar.prestium-top #battery,
+window#waybar.prestium-top #tray,
+window#waybar.prestium-top #custom-power {
     color: #ffffff;
     padding: 0 8px;
 }
 
-window#waybar.tails-top #pulseaudio:hover,
-window#waybar.tails-top #battery:hover,
-window#waybar.tails-top #custom-power:hover {
+window#waybar.prestium-top #pulseaudio:hover,
+window#waybar.prestium-top #battery:hover,
+window#waybar.prestium-top #custom-power:hover {
     background-color: rgba(255, 255, 255, 0.14);
 }
 
-window#waybar.tails-top #network.disconnected {
+window#waybar.prestium-top #network.disconnected {
     color: #ff9494;
 }
 
-window#waybar.tails-top #pulseaudio.muted {
+window#waybar.prestium-top #pulseaudio.muted {
     color: #a8a8a8;
 }
 
-window#waybar.tails-top #battery.warning:not(.charging) {
+window#waybar.prestium-top #battery.warning:not(.charging) {
     color: #ffd166;
 }
 
-window#waybar.tails-top #battery.critical:not(.charging) {
+window#waybar.prestium-top #battery.critical:not(.charging) {
     color: #ff9494;
     font-weight: bold;
 }
 
 /* ============================================================
-   BOTTOM BAR — Tails Classic Window-List Taskbar (#f6f5f4)
+   BOTTOM BAR — light window-list taskbar (#f6f5f4)
    ============================================================ */
-window#waybar.tails-bottom {
+window#waybar.prestium-bottom {
     background-color: #f6f5f4;
     color: #2e3436;
     border-top: 1px solid #cdc7c2;
 }
 
-window#waybar.tails-bottom #taskbar {
+window#waybar.prestium-bottom #taskbar {
     padding: 2px 4px;
 }
 
-window#waybar.tails-bottom #taskbar button {
+window#waybar.prestium-bottom #taskbar button {
     background-color: #ebebeb;
     color: #2e3436;
     border: 1px solid #cdc7c2;
@@ -176,11 +176,11 @@ window#waybar.tails-bottom #taskbar button {
     font-size: 10pt;
 }
 
-window#waybar.tails-bottom #taskbar button:hover {
+window#waybar.prestium-bottom #taskbar button:hover {
     background-color: #deddda;
 }
 
-window#waybar.tails-bottom #taskbar button.active {
+window#waybar.prestium-bottom #taskbar button.active {
     background-color: #ffffff;
     color: #000000;
     font-weight: 700;
@@ -188,7 +188,7 @@ window#waybar.tails-bottom #taskbar button.active {
     border-bottom: 2px solid #3584e4;
 }
 
-window#waybar.tails-bottom #taskbar button.minimized {
+window#waybar.prestium-bottom #taskbar button.minimized {
     background-color: #f6f5f4;
     color: #5e5c64;
     border-color: #deddda;

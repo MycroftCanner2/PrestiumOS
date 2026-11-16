@@ -10,7 +10,7 @@ application/x-compressed-tar=org.gnome.FileRoller.desktop
 application/x-xz-compressed-tar=org.gnome.FileRoller.desktop
 application/x-bzip-compressed-tar=org.gnome.FileRoller.desktop
 application/gzip=org.gnome.FileRoller.desktop
-# Prestium: Image Viewer (Loupe, as in Tails 7).
+# Prestium: Image Viewer (Loupe).
 image/jpeg=org.gnome.Loupe.desktop;
 image/png=org.gnome.Loupe.desktop;
 image/gif=org.gnome.Loupe.desktop;

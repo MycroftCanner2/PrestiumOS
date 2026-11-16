@@ -43,7 +43,7 @@ PALETTE = {
     "ffd166", "2a2416", "7a5c14", "6ee7a0", "1f7a4a",
     # tinted edges and surfaces of the bar's Tor/I2P state pills (live cyan, warning amber)
     "0a4f5c", "10262b", "5c4a1a",
-    # Tails Adwaita light theme: purple slate, light surfaces, dark text, success green
+    # Adwaita light theme: purple slate, light surfaces, dark text, success green
     "56347c", "7d4fb2", "1f5c3a", "2ec27e", "26a269", "e5a50a", "c01c28", "3584e4", "1c71d8",
     "cdc7c2", "deddda", "ebebeb", "f6f5f4", "2e3436", "5e5c64", "77767b", "9a9996", "808080",
 }
@@ -213,7 +213,7 @@ check(re.search(r"(?m)^border-radius=12$", mk) is not None, "mako: 12 px notific
 check(re.search(r"(?m)^padding=12$", mk) is not None, "mako: 12 px padding")
 m = re.search(r"(?m)^max-icon-size=(\d+)$", mk)
 check(m is not None and m.group(1) == "48", "mako: 48 px notification icons", m and m.group(1))
-check(re.search(r"window#waybar\.tails-top\s+\.module\s*\{", wb) is not None and "border-radius: 999px" in wb, "waybar: 999 px status pills")
+check(re.search(r"window#waybar\.prestium-top\s+\.module\s*\{", wb) is not None and "border-radius: 999px" in wb, "waybar: 999 px status pills")
 radii = {}
 for p in ("usr/share/prestium/theme/gtk3.css", "usr/share/prestium/theme/gtk4.css", "etc/xdg/waybar/style.css",
           "var/lib/i2pd/webconsole/style.css", "usr/share/prestium/torrents-theme/prestium-dark.css"):

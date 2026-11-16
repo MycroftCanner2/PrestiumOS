@@ -3,8 +3,8 @@ Disclaimer: This project and all associated materials (including software, repos
 # PrestiumOS
 
 PrestiumOS is a privacy-focused live operating system for USB sticks, with Tor and I2P built in. It
-is built with Debian's **live-build** on Debian 13 "trixie" (amd64), and it follows Tails for hardware
-support: the same Debian release, kernel line and firmware set, with Secure Boot through shim and GRUB.
+is built with Debian's **live-build** on Debian 13 "trixie" (amd64), with broad hardware
+support: the current Debian release, kernel line and firmware set, with Secure Boot through shim and GRUB.
 
 **Status:** Prestium **2.1** is the current release. It builds on **Prestium 2.0**, a full
 modernization of the 2023 Prestium build, with tighter security and new features.
@@ -21,7 +21,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   release at build time, no older than a pinned minimum).
 - **Wayland desktop** (labwc, waybar, swaylock, mako) with a restricted Wayland socket for apps:
   no screen capture, input injection or window snooping. A root broker keeps the full socket away from apps.
-  Tails-style shell: Adwaita light windows, a dark top bar with an Applications menu, clock and Tor/I2P
+  dual-bar shell: Adwaita light windows, a dark top bar with an Applications menu, clock and Tor/I2P
   pills, and a light bottom window-list taskbar.
 - **Sandboxed browsers:** Tor Browser and LibreWolf (I2P Browser) run in bubblewrap with their own empty
   network namespace. Tor Browser can reach only Tor, and LibreWolf only i2pd's HTTP proxy.
@@ -68,11 +68,11 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Verified live image:** the root filesystem is mounted through dm-verity, and Prestium refuses to
   boot when it doesn't match the root hash in the boot menu (the kernel, initramfs and boot menu
   themselves are not covered yet; see the CHANGELOG's Known security limits).
-- **UEFI Secure Boot:** boots with Secure Boot on, through Debian's signed boot chain as Tails does:
+- **UEFI Secure Boot:** boots with Secure Boot on, through Debian's signed boot chain:
   Debian's shim (signed by Microsoft), Debian's signed GRUB and Debian's signed kernel. The kernel
   command line includes `lockdown=integrity`, so the kernel is locked down even with Secure Boot off
   or on BIOS. The build stops if any of the signed boot files isn't Debian's signed file. The
-  initramfs and the boot menus (and so the kernel command line) are not signed, as in Tails; a signed
+  initramfs and the boot menus (and so the kernel command line) are not signed, as on Debian live images; a signed
   unified kernel image is future work. Booting with Secure Boot off, or on BIOS, works as before, and
   Prestium tells you when Secure Boot is off.
 - **Fail-closed safety alerts** when the USB watchdog, MAC guard, Wayland broker, ptrace protection or
@@ -110,7 +110,7 @@ network's lobby says what's missing.
 - **Someone who can write to the USB stick can change the next boot.** dm-verity checks the root
   filesystem and the boot menu is password-locked, but both checks live in unsigned files on the stick:
   the boot menus (`grub.cfg`, with the root hash and the password hash), the initramfs and live-boot in
-  it, and the initramfs check that refuses any kernel command line other than the image's own. Secure Boot covers only shim, GRUB and the kernel (Debian's signed files, as in Tails); GRUB doesn't check the initramfs. Replacing those files together with the image
+  it, and the initramfs check that refuses any kernel command line other than the image's own. Secure Boot covers only shim, GRUB and the kernel (Debian's signed files); GRUB doesn't check the initramfs. Replacing those files together with the image
   defeats both checks. The future fix is a signed unified kernel image (UKI: kernel, initramfs and
   command line in one Secure Boot-signed file); it isn't implemented. Keep the stick with you, and
   check it against a signed release from another computer (see Verify a download).

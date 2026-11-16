@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.1 (Secure Boot): the UEFI boot chain is Debian's signed one, as in Tails and Debian's own
+# Prestium 2.1 (Secure Boot): the UEFI boot chain is Debian's signed one, as in Debian's own
 # live images: firmware -> shim (signed by Microsoft) -> GRUB (signed by Debian) -> the kernel (signed
 # by Debian). live-build sets it up (auto/config --uefi-secure-boot enable: binary_grub-efi installs
 # shim-signed and grub-efi-amd64-signed for the binary stage, copies shimx64.efi.signed to

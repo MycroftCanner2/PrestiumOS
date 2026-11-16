@@ -241,37 +241,37 @@ need(S, "OSD text", th['osd.label.text.color'], th['osd.bg.color'], TEXT)
 if th['osd.border.color'].lower() != "#cdc7c2":
     fails.append("labwc: OSD edge is not Adwaita grey")
 
-# --- waybar (Tails dual bar: dark top system bar, light bottom taskbar) ---
+# --- waybar (dual bar: dark top system bar, light bottom taskbar) ---
 wb = css(read("etc/xdg/waybar/style.css"))
 S = "waybar"
-bar = col(wb['window#waybar.tails-top']['background-color'])
-need(S, "top bar text", col(wb['window#waybar.tails-top']['color']), bar, TEXT)
-need(S, "Applications button", col(wb['window#waybar.tails-top #custom-applications']['color']), bar, TEXT)
-need(S, "Applications button (hover)", "#ffffff", over(col(wb['window#waybar.tails-top #custom-applications:hover']['background-color']), bar), TEXT)
-need(S, "clock", col(wb['window#waybar.tails-top #clock']['color']), bar, TEXT)
-tray = col(wb['window#waybar.tails-bottom']['background-color'])
-need(S, "window buttons", col(wb['window#waybar.tails-bottom #taskbar button']['color']), tray, TEXT)
-need(S, "window buttons (hover)", col(wb['window#waybar.tails-bottom #taskbar button']['color']),
-     col(wb['window#waybar.tails-bottom #taskbar button:hover']['background-color']), TEXT)
-need(S, "active window", col(wb['window#waybar.tails-bottom #taskbar button.active']['color']),
-     col(wb['window#waybar.tails-bottom #taskbar button.active']['background-color']), TEXT)
-need(S, "minimised window (de-emphasised by design)", col(wb['window#waybar.tails-bottom #taskbar button.minimized']['color']),
-     col(wb['window#waybar.tails-bottom #taskbar button.minimized']['background-color']), INDICATOR)
+bar = col(wb['window#waybar.prestium-top']['background-color'])
+need(S, "top bar text", col(wb['window#waybar.prestium-top']['color']), bar, TEXT)
+need(S, "Applications button", col(wb['window#waybar.prestium-top #custom-applications']['color']), bar, TEXT)
+need(S, "Applications button (hover)", "#ffffff", over(col(wb['window#waybar.prestium-top #custom-applications:hover']['background-color']), bar), TEXT)
+need(S, "clock", col(wb['window#waybar.prestium-top #clock']['color']), bar, TEXT)
+tray = col(wb['window#waybar.prestium-bottom']['background-color'])
+need(S, "window buttons", col(wb['window#waybar.prestium-bottom #taskbar button']['color']), tray, TEXT)
+need(S, "window buttons (hover)", col(wb['window#waybar.prestium-bottom #taskbar button']['color']),
+     col(wb['window#waybar.prestium-bottom #taskbar button:hover']['background-color']), TEXT)
+need(S, "active window", col(wb['window#waybar.prestium-bottom #taskbar button.active']['color']),
+     col(wb['window#waybar.prestium-bottom #taskbar button.active']['background-color']), TEXT)
+need(S, "minimised window (de-emphasised by design)", col(wb['window#waybar.prestium-bottom #taskbar button.minimized']['color']),
+     col(wb['window#waybar.prestium-bottom #taskbar button.minimized']['background-color']), INDICATOR)
 need(S, "window tooltip", col(wb['tooltip label']['color']), col(wb['tooltip']['background-color']), TEXT)
-p = wb['window#waybar.tails-top #custom-tor']
+p = wb['window#waybar.prestium-top #custom-tor']
 need(S, "Tor/I2P pill (idle)", col(p['color']), col(p['background-color']), TEXT)
 for st, minimum in (("connecting", TEXT), ("ready", INDICATOR), ("failed", DISABLED)):
-    # ready is white on Tails green (3.3:1, paired with position and tooltip);
-    # failed is white on Tails red (WCAG AA)
-    q = wb['window#waybar.tails-top #custom-tor.' + st]
+    # ready is white on success green (3.3:1, paired with position and tooltip);
+    # failed is white on danger red (WCAG AA)
+    q = wb['window#waybar.prestium-top #custom-tor.' + st]
     need(S, "Tor/I2P pill (%s)" % st, col(q['color']), col(q['background-color']), minimum)
-    q = wb['window#waybar.tails-top #custom-i2p.' + st]
+    q = wb['window#waybar.prestium-top #custom-i2p.' + st]
     need(S, "Tor/I2P pill (%s)" % st, col(q['color']), col(q['background-color']), minimum)
-need(S, "pill hover edge", col(wb['window#waybar.tails-top #custom-tor:hover']['border-color']), col(p['background-color']), INDICATOR)
+need(S, "pill hover edge", col(wb['window#waybar.prestium-top #custom-tor:hover']['border-color']), col(p['background-color']), INDICATOR)
 for k in ('#network.disconnected', '#battery.warning:not(.charging)', '#battery.critical:not(.charging)',
           '#custom-timesync.syncing', '#custom-timesync.failed'):
-    need(S, k, col(wb['window#waybar.tails-top ' + k]['color']), bar, TEXT)
-need(S, "muted volume", col(wb['window#waybar.tails-top #pulseaudio.muted']['color']), bar, DISABLED)
+    need(S, k, col(wb['window#waybar.prestium-top ' + k]['color']), bar, TEXT)
+need(S, "muted volume", col(wb['window#waybar.prestium-top #pulseaudio.muted']['color']), bar, DISABLED)
 
 # --- mako (light top-center notifications) ---
 S = "mako"
@@ -289,7 +289,7 @@ nbg = over(top['background-color'], "#161616")
 need(S, "normal text", top['text-color'], nbg, TEXT)
 need(S, "low-urgency text (secondary, de-emphasised by design)", mk['[urgency=low]']['text-color'], nbg, DISABLED)
 if mk['[urgency=critical]']['border-color'].lower() != "#c01c28":
-    fails.append("mako: critical edge is not Tails red")
+    fails.append("mako: critical edge is not danger red")
 if top['border-color'].lower() != "#cdc7c2":
     fails.append("mako: normal edge is not Adwaita grey")
 need(S, "volume/brightness OSD edge", mk['[category=prestium.osd]']['border-color'], nbg, INDICATOR)

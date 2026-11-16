@@ -1,9 +1,9 @@
 #!/bin/bash
-# Prestium: emergency shutdown when the boot medium is removed (Tails-style).
+# Prestium: emergency shutdown when the boot medium is removed.
 # Pulling the USB stick (or ejecting the DVD) powers the machine off at once.
 # "systemctl --force poweroff" kills every process without running the normal
 # shutdown units; the freed RAM is zeroed by the kernel (init_on_free=1 on the
-# boot line), which is the same memory-erasure mechanism Tails relies on.
+# boot line), which is the same memory-erasure mechanism.
 # Only bash builtins run in the polling loop, and memlockd keeps bash,
 # systemctl locked in RAM, so this still works once the medium is gone.
 # Not armed when booted with "toram" (the medium may then be removed safely).

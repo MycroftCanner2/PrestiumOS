@@ -1,11 +1,11 @@
 #!/bin/sh
-# Prestium: pre-bootstrap clock fix (Tails approach, no clearnet).
+# Prestium: pre-bootstrap clock fix (no clearnet).
 # Real PCs often keep the hardware clock in local time (Windows dual boot) or
 # simply wrong. prestium-timesync only works once Tor is up, so if Tor can't
 # bootstrap because of the clock, nothing would ever fix it. Tor still
 # downloads the consensus; when our clock is outside the consensus validity
 # window and Tor still hasn't bootstrapped 2 minutes later, set the clock to
-# valid-after + 90 min (as Tails does) and restart Tor. If Tor copes with the
+# valid-after + 90 min and restart Tor. If Tor copes with the
 # skew on its own, the clock is left alone here.
 # prestium-timesync (After=prestium-clockfix) then sets the exact time over Tor once
 # bootstrap has succeeded; the two units are ordered so they do not fight.

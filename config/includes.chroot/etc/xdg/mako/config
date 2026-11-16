@@ -1,4 +1,4 @@
-# Prestium 2.1 (Tails-style): GNOME-style top-center light notifications (Adwaita).
+# Prestium 2.1: GNOME-style top-center light notifications (Adwaita).
 # One look per urgency: low (grey edge, 5 s), normal (grey edge, 6 s),
 # critical (red edge, stays until dismissed). The volume and brightness OSD (category prestium.osd) is compact.
 # mako has no fade or slide animation. Sounds are off unless turned on (System, Notification Sounds).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tails-style categorized Applications dropdown menu for labwc + Waybar."""
+"""Categorized Applications dropdown menu for labwc + Waybar."""
 
 import os
 import re

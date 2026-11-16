@@ -1,6 +1,6 @@
 #!/bin/bash
 # 2.1 (Secure Boot): the UEFI path is Debian's signed boot chain (shim -> signed GRUB -> signed kernel),
-# as in Tails, and the build proves it (hook 9040).
+# and the build proves it (hook 9040).
 #   - auto/config / config/binary: --uefi-secure-boot enable, grub-efi + syslinux, the trixie
 #     linux-image-amd64 (Debian's signed kernel); no package list or pin brings another kernel, an
 #     -unsigned one, headers or DKMS modules; no hook builds a kernel module

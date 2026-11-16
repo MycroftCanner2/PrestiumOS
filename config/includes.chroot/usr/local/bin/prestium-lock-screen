@@ -3,7 +3,7 @@
 # itself blanks every output, nothing else can draw or read input while locked). Started by
 # swayidle (10 minutes idle, logind lock request, before suspend), the "Lock Screen" menu item
 # and Super+L. The live user has no password at boot (autologin), so the first
-# time we ask for one, as Tails does; without a password the screen isn't
+# time we ask for one; without a password the screen isn't
 # locked (an empty password would unlock it).
 pgrep -x swaylock >/dev/null && exit 0
 st=$(sudo -n /usr/local/sbin/prestium-session-password status 2>/dev/null)

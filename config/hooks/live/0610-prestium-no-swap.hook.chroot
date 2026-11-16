@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.0 r9 (Tails: config/chroot_local-hooks/05-disable_swapon): never use swap. Memory
+# Prestium 2.0 r9: never use swap. Memory
 # written to a swap partition or file on the computer's disk would survive shutdown. swapon is
 # replaced by a no-op (dpkg-divert keeps the replacement through package upgrades), so neither
 # systemd's swap units nor anything else can enable swap. The kernel command line also has

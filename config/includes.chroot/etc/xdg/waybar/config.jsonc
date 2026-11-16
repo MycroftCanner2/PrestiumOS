@@ -1,4 +1,4 @@
-// Prestium 2.1 (Tails-style dual bar): a dark top system bar (Applications menu,
+// Prestium 2.1 (dual bar): a dark top system bar (Applications menu,
 // clock, Tor/I2P pills, tray) and a light bottom window-list taskbar.
 // The Applications button opens prestium-apps-menu (a categorized dropdown);
 // Super+Space and right-click still open labwc's root menu (system actions).
@@ -6,7 +6,7 @@
   {
     // 2.1 (design batch): Tor and I2P pills. Root-free and read-only: prestium-netstatus.service
     // writes the state every 5 seconds; a click opens the matching Connection Assistant (Network menu).
-    "name": "tails-top",
+    "name": "prestium-top",
     "layer": "top",
     "position": "top",
     "height": 28,
@@ -78,8 +78,8 @@
     }
   },
   {
-    // Tails bottom window-list taskbar: titled buttons (raise/minimise/close)
-    "name": "tails-bottom",
+    // Bottom window-list taskbar: titled buttons (raise/minimise/close)
+    "name": "prestium-bottom",
     "layer": "top",
     "position": "bottom",
     "height": 30,

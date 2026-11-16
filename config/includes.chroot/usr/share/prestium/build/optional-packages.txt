@@ -1,5 +1,5 @@
 # Installed by hook 0010 when available: packages earlier releases had as dependencies/recommends (parity),
-# plus extra firmware beyond Tails 7.15 (network cards, TV tuners, Qualcomm, Samsung, AMD SEV).
+# plus extra firmware beyond the base set (network cards, TV tuners, Qualcomm, Samsung, AMD SEV).
 akonadi-mime-data
 audacity-data
 coinor-libcbc3.1

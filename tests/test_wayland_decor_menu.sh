@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.1 (Tails-style): client-side decorations by default (no double titlebars
+# Prestium 2.1: client-side decorations by default (no double titlebars
 # on GTK/Firefox), with a Prestium-Adwaita server-side titlebar only for terminal,
 # XWayland and Qt apps; the Applications menu button opens prestium-apps-menu.
 set -e
@@ -31,7 +31,7 @@ W=$R/etc/xdg/waybar/config.jsonc
 sed 's#//.*##' "$W" | python3 -c '
 import json, sys
 c = json.load(sys.stdin)
-assert isinstance(c, list) and [b["name"] for b in c] == ["tails-top", "tails-bottom"], c
+assert isinstance(c, list) and [b["name"] for b in c] == ["prestium-top", "prestium-bottom"], c
 top = c[0]
 assert top["modules-left"][0] == "custom/applications", top["modules-left"]
 m = top["custom/applications"]

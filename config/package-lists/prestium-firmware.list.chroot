@@ -1,4 +1,4 @@
-# Prestium 2.0: firmware and microcode (Tails parity; firmware-* from trixie-backports, see config/archives).
+# Prestium 2.0: firmware and microcode (full coverage; firmware-* from trixie-backports, see config/archives).
 amd64-microcode
 atmel-firmware
 firmware-amd-graphics

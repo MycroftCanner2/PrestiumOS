@@ -4,7 +4,7 @@
 # Replaces the VeraCrypt app, which needed a passwordless root (sudo) rule that
 # any program could abuse to become root and turn off the firewall.
 # Unlocking goes through udisks2 + cryptsetup (TCRYPT/VeraCrypt support), the
-# same approach Tails uses. udisks always mounts under /media/user with
+# same approach. udisks always mounts under /media/user with
 # nosuid,nodev, so a volume can never be used to gain root.
 #
 #   prestium-unlock-veracrypt            choose file or drive, then unlock

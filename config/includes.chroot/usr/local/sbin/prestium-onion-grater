@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# Prestium: Tor control-port filter (in the spirit of Tails' onion-grater).
+# Prestium: Tor control-port filter.
 #
 # "user" is no longer in group debian-tor, so it can't open Tor's real control
 # socket (/run/tor/control). Apps talk to this filter instead:
@@ -243,7 +243,7 @@ def identify(conn):
 def split_args(rest):
     return rest.split() if rest else []
 
-# 2.0 r4 (audit hardening, as Tails' onionshare profile): an onion service may only forward its
+# 2.0 r4 (audit hardening, as the OnionShare profile does): an onion service may only forward its
 # virtual port 80 to OnionShare's own local port range 127.0.0.1:17600-17650. "Port=1" (virtual
 # and target port 1) is OnionShare's probe for client-auth support, which it removes at once.
 PORT_RE = re.compile(r"^Port=(80,(127\.0\.0\.1:)?(176[0-4][0-9]|17650)|1|1,(127\.0\.0\.1:)?1)$", re.I | re.A)

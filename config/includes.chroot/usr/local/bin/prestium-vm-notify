@@ -1,5 +1,5 @@
 #!/bin/bash
-# Prestium 2.1: warn when Prestium runs in a virtual machine (as Tails does), and show the network
+# Prestium: warn when Prestium runs in a virtual machine, and show the network
 # diagnosis prestium-vm-netcheck (root, boot) writes to /run/prestium/vm when Tor or I2P can't connect.
 # Started from the session autostart. On real hardware the service never runs and this exits.
 D=${PRESTIUM_VM_OUT:-/run/prestium/vm}

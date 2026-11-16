@@ -1,4 +1,4 @@
-# Prestium (Tails: initramfs-shutdown.service): prepare the memory-wipe
+# Prestium: prepare the memory-wipe
 # shutdown environment in /run/initramfs
 [Unit]
 Description=Prestium memory wipe at shutdown (unpack initramfs to /run/initramfs)

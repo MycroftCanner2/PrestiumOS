@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # Prestium: unpack this kernel's initramfs into a tmpfs on /run/initramfs
-# (Tails design), so systemd-shutdown can switch to it at the end of shutdown and
+# (shutdown design), so systemd-shutdown can switch to it at the end of shutdown and
 # run /shutdown (memory wipe). Firmware and kernel modules are left out (not
 # needed at shutdown) to keep the RAM cost small.
 import os, subprocess, sys

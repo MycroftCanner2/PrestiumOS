@@ -93,7 +93,7 @@ profile torbrowser_firefox @{torbrowser_firefox_executable} {
   deny @{PROC}/pressure/memory r,
   deny /dev/udmabuf rw,
 
-  # Tails: the only user folder the browser can read or write
+  # the only user folder the browser can read or write
   owner "@{HOME}/Tor Browser/" rw,
   owner "@{HOME}/Tor Browser/**" rwk,
 

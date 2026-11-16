@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.1: Tails-style dual bar — Applications dropdown on the top bar,
+# Prestium 2.1: dual bar — Applications dropdown on the top bar,
 # titled window-list taskbar on the bottom bar.
 set -eu
 R=$(dirname "$0")/../config/includes.chroot

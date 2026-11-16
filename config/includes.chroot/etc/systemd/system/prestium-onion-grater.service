@@ -1,4 +1,4 @@
-# Prestium: Tor control-port filter (Tails onion-grater style)
+# Prestium: Tor control-port filter
 [Unit]
 Description=Prestium Tor control port filter (onion-grater)
 After=tor@default.service

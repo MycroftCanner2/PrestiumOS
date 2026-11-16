@@ -1,4 +1,4 @@
-// Prestium (Tails-style): Tor Browser downloads and uploads use ~/Tor Browser,
+// Prestium: Tor Browser downloads and uploads use ~/Tor Browser,
 // the only folder of your home the browser may access (AppArmor).
 user_pref("browser.download.dir", "@DOWNLOADS@");
 user_pref("browser.download.folderList", 2);
