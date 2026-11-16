@@ -1,0 +1,62 @@
+# Prestium 2.1 (bwrap split): mat2's helpers (ffmpeg, exiftool), ENFORCED in their
+# own profile. mat2 runs them in bubblewrap when it is installed (and directly
+# otherwise); either way they transition here (Px): no user namespaces of their
+# own, no capabilities, no mounts, no network. They read the input file in the
+# file folders and write only "<name>.cleaned.<ext>" in the "Remove metadata"
+# work folder, so a crafted file that exploits one cannot escape, open a socket
+# or change any other file. exiftool is a perl script: perl inherits this
+# profile (ix). No attachment: entered only by explicit Px from mat2.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile mat2-inner {
+  include <abstractions/base>,
+  include <abstractions/prestium-no-admin>,
+  include <abstractions/prestium-user-files>,
+  /usr/bin/{ffmpeg,exiftool,perl} mr,
+  /usr/bin/perl ix,
+  /usr/share/perl5/** r,
+  /usr/share/perl/** r,
+  /usr/lib/@{multiarch}/perl*/** mr,
+  / r,
+  /usr/ r,
+  /usr/** mr,
+  /etc/ r,
+  /etc/** r,
+  /sys/** r,
+  /var/ r,
+  /var/lib/ r,
+  @{HOME}/ r,
+  @{PROC}/ r,
+  @{PROC}/sys/** r,
+  owner @{PROC}/@{pid}/** r,
+  /dev/ r,
+  /dev/{null,zero,full,random,urandom} rw,
+  owner /dev/shm/** rwk,
+  owner /tmp/** rwlk,
+  owner "@{HOME}/Documents/.remove-metadata*/**.cleaned.*" w,
+  deny network inet,
+  deny network inet6,
+  deny userns,
+  deny capability sys_admin,
+  deny capability sys_chroot,
+  deny capability setpcap,
+  deny capability net_admin,
+  deny capability setuid,
+  deny capability setgid,
+  deny capability dac_override,
+  deny capability dac_read_search,
+  deny capability chown,
+  deny capability fowner,
+  deny capability fsetid,
+  deny capability kill,
+  deny capability sys_ptrace,
+  deny ptrace,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/**.kdbx rw,
+  deny @{HOME}/.claws-mail/** rw,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.local/share/gajim/** rw,
+  deny @{HOME}/.config/gajim/** rw,
+  include if exists <local/usr.bin.mat2-inner>
+}

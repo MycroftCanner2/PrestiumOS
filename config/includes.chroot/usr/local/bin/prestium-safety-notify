@@ -23,7 +23,7 @@ alert() {   # $1 key, $2 text
 toram=; grep -qw toram /proc/cmdline && toram=1
 AA_ENABLED=${PRESTIUM_AA_ENABLED:-/sys/module/apparmor/parameters/enabled}
 AA_PROFILES=${PRESTIUM_AA_PROFILES:-/sys/kernel/security/apparmor/profiles}
-AA_PRESTIUM_PROFILES="torbrowser_firefox librewolf prestium-localfox claws-mail gajim onionshare feather libreoffice thelounge thelounge-tor loupe vlc file-roller featherpad mat2 metadata-cleaner audacity keepassxc kleopatra"
+AA_PRESTIUM_PROFILES="torbrowser_firefox librewolf prestium-localfox claws-mail gajim onionshare feather libreoffice thelounge thelounge-tor loupe vlc file-roller featherpad mat2 metadata-cleaner glycin-inner mat2-inner metadata-cleaner-inner audacity keepassxc kleopatra"
 CMDLINE_CHECK=${PRESTIUM_CMDLINE_CHECK:-/usr/local/sbin/prestium-cmdline-check}
 EFI_DIR=${PRESTIUM_EFI_DIR:-/sys/firmware/efi}
 LOCKDOWN=${PRESTIUM_LOCKDOWN:-/sys/kernel/security/lockdown}

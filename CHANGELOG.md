@@ -85,6 +85,13 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   service caps file descriptors (`LimitNOFILE=256`). `qt6-wayland` is installed alongside
   `qtwayland5` (`--apt-recommends` is off, as with the Qt5 multimedia plugins): without it Qt6
   apps fall back to XWayland, bypassing the broker's security context.
+- **Bubblewrap payloads run in capability-stripped inner profiles.** Loupe's glycin decoders and
+  mat2's helpers (ffmpeg, exiftool) no longer inherit the sandbox-building profile (`ix`): they
+  transition (`Px`) into `glycin-inner`, `mat2-inner` and `metadata-cleaner-inner`, which grant
+  only the binaries, libraries, input files and the one cleaned-copy name each may write, and
+  explicitly deny user namespaces, all sandbox capabilities, mounts, the network, `ptrace` and
+  any other home write. The browsers already confined their payloads this way (their sandboxed
+  `firefox.real` and `librewolf` run in their own profiles); the viewers now match them.
 - **LibreOffice opens again.** Its profile now allows the XDG data dir
   (`~/.local/share/libreoffice`), the cache directory itself, link (`l`) permission for its
   lock files, and exec of `senddoc`; without a writable user profile the first run showed

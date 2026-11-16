@@ -16,7 +16,7 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
   /usr/lib/python3/** mr,
   /usr/lib/python3.*/** mr,
   # mat2's helpers (videos, other formats), each run by mat2 in bubblewrap when it is installed
-  /usr/bin/{ffmpeg,exiftool,perl} mrix,
+  /usr/bin/{ffmpeg,exiftool,perl} mrPx -> metadata-cleaner-inner,
   /usr/share/perl5/** r,
   /usr/share/perl/** r,
   /usr/lib/@{multiarch}/perl*/** mr,
@@ -43,7 +43,7 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
     # without this the helpers got "Permission denied" for every file in
     # Documents. Only that cleaned name, only in ~/Documents.
     owner "@{HOME}/Documents/**.cleaned.*" w,
-    /usr/bin/{ffmpeg,exiftool,perl} mrix,
+    /usr/bin/{ffmpeg,exiftool,perl} mrPx -> metadata-cleaner-inner,
     /usr/share/perl5/** r,
     /usr/lib/@{multiarch}/perl*/** mr,
   }

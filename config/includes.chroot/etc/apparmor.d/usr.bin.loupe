@@ -20,7 +20,7 @@ profile loupe /usr/bin/loupe {
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
-    /usr/libexec/glycin-loaders/** mrix,
+    /usr/libexec/glycin-loaders/** mrPx -> glycin-inner,
     deny @{HOME}/** w,
     # the SVG decoder's fontconfig: the font caches glycin binds in, read-only
     /var/cache/fontconfig/ r,

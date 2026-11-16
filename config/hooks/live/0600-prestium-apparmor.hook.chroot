@@ -25,7 +25,7 @@ for p in usr.share.librewolf.librewolf torbrowser.Browser.firefox system_tor usr
 	usr.bin.gajim usr.bin.onionshare usr.local.bin.feather usr.lib.libreoffice.program prestium.thelounge prestium.thelounge-tor \
 	opt.firefox.firefox usr.bin.claws-mail usr.local.sbin.prestium-onion-grater \
 	prestium.browser-launcher prestium.pinentry \
-	usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra; do
+	usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-inner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra; do
 	f=/etc/apparmor.d/$p
 	[ -e "$f" ] || { echo "W: no profile $p"; continue; }
 	sed -i 's/ flags=(complain)//; s/flags=(complain) //' "$f"
@@ -38,7 +38,7 @@ touch /etc/apparmor.d/local/usr.share.librewolf.librewolf
 for p in usr.share.librewolf.librewolf usr.bin.gajim usr.bin.onionshare usr.local.bin.feather \
 	usr.lib.libreoffice.program prestium.thelounge prestium.thelounge-tor opt.firefox.firefox local/torbrowser.Browser.firefox \
 	usr.bin.claws-mail prestium.pinentry \
-	usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra; do
+	usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-inner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra; do
 	grep -q 'prestium-no-admin\|prestium-app-base\|prestium-app-common\|prestium-viewer' "/etc/apparmor.d/$p" || { echo "E: $p does not deny sudo"; exit 1; }
 done
 # 2.1: the whole set as apparmor.service loads it at boot: every file in /etc/apparmor.d compiles (one that
@@ -47,5 +47,5 @@ python3 -I /usr/share/prestium/build/aa-attach-check.py /etc/apparmor.d usr.shar
 	usr.bin.gajim usr.bin.onionshare usr.local.bin.feather usr.lib.libreoffice.program prestium.thelounge \
 	prestium.thelounge-tor opt.firefox.firefox usr.bin.claws-mail usr.local.sbin.prestium-onion-grater prestium.browser-launcher \
 	prestium.pinentry usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad \
-	usr.bin.mat2 usr.bin.metadata-cleaner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra \
+	usr.bin.mat2 usr.bin.metadata-cleaner usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-inner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra \
 	|| { echo "E: the AppArmor profile set would not load cleanly at boot"; exit 1; }

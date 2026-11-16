@@ -118,8 +118,8 @@ allow loupe / r
 allow loupe /proc/meminfo r
 allow loupe /usr/bin/bwrap x:C
 $(bw loupe//bwrap)
-allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-image-rs x:i
-allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-svg x:i
+allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-image-rs x:P
+allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-svg x:P
 allow loupe//bwrap /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 mr
 allow loupe//bwrap /var/cache/fontconfig/abc-le64.cache-9 mr
 allow loupe//bwrap $H/.cache/fontconfig/abc-le64.cache-9 r
@@ -145,8 +145,8 @@ deny mat2 /media/user/STICK/clip.cleaned.mp4 w
 deny mat2 $H/Torrents/clip.mp4 w
 deny mat2 $H/Downloads/clip.mp4 w
 $(bw mat2//bwrap)
-allow mat2//bwrap /usr/bin/ffmpeg x:i
-allow mat2//bwrap /usr/bin/exiftool x:i
+allow mat2//bwrap /usr/bin/ffmpeg x:P
+allow mat2//bwrap /usr/bin/exiftool x:P
 allow mat2//bwrap $H/Downloads/clip.mp4 r
 allow mat2//bwrap "$H/Documents/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
 allow mat2//bwrap "$H/Documents/.remove-metadata.Ab12Cd/1/photo.cleaned.heic_exiftool_tmp" w
@@ -172,6 +172,28 @@ allow metadata-cleaner "$H/Documents/clip.mp4" rw
 allow metadata-cleaner $H/Downloads/clip.mp4 r
 deny metadata-cleaner $H/Downloads/clip.mp4 w
 deny metadata-cleaner "$H/I2P Browser/clip.mp4" w
+EOT
+
+echo "== inner payloads: decoders and helpers, no namespaces, capabilities, mounts, network or writes"
+run usr.libexec.glycin-inner <<EOT
+allow glycin-inner $H/Pictures/a.png r
+deny glycin-inner $H/Pictures/a.png w
+deny glycin-inner $H/Documents/notes.txt w
+deny glycin-inner $G/pubring.kbx r
+EOT
+run usr.bin.mat2-inner <<EOT
+allow mat2-inner $H/Downloads/clip.mp4 r
+allow mat2-inner "$H/Documents/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
+deny mat2-inner "$H/Documents/.remove-metadata.Ab12Cd/1/clip.mp4" w
+deny mat2-inner $H/Downloads/clip.cleaned.mp4 w
+deny mat2-inner $G/pubring.kbx r
+EOT
+run usr.bin.metadata-cleaner-inner <<EOT
+allow metadata-cleaner-inner "$H/Documents/clip.mp4" r
+allow metadata-cleaner-inner "$H/Documents/clip.cleaned.mp4" w
+deny metadata-cleaner-inner "$H/Documents/clip.mp4" w
+deny metadata-cleaner-inner $H/Downloads/clip.cleaned.mp4 w
+deny metadata-cleaner-inner $G/pubring.kbx r
 EOT
 
 echo "== Audacity (audio through PipeWire; started in its own network namespace by prestium-audacity)"

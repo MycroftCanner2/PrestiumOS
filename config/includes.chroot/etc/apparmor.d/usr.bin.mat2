@@ -16,7 +16,7 @@ profile mat2 /usr/bin/mat2 {
   /usr/lib/python3/** mr,
   /usr/lib/python3.*/** mr,
   # mat2's helpers (videos, other formats), each run by mat2 in bubblewrap when it is installed
-  /usr/bin/{ffmpeg,exiftool,perl} mrix,
+  /usr/bin/{ffmpeg,exiftool,perl} mrPx -> mat2-inner,
   /usr/share/perl5/** r,
   /usr/share/perl/** r,
   /usr/lib/@{multiarch}/perl*/** mr,
@@ -27,7 +27,7 @@ profile mat2 /usr/bin/mat2 {
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
-    /usr/bin/{ffmpeg,exiftool,perl} mrix,
+    /usr/bin/{ffmpeg,exiftool,perl} mrPx -> mat2-inner,
     /usr/share/perl5/** r,
     /usr/lib/@{multiarch}/perl*/** mr,
     # 2.1 (review of 7242e00): mat2 mounts an empty temporary directory over the file's folder and

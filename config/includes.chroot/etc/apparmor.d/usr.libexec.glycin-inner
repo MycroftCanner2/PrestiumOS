@@ -1,0 +1,61 @@
+# Prestium 2.1 (bwrap split): Loupe's glycin image decoders, ENFORCED in their own
+# profile. The bwrap child (prestium-viewer-bwrap) builds the user, mount and PID
+# namespaces, then each decoder transitions here (Px): no user namespaces of its
+# own, no capabilities, no mounts, no network, no writes anywhere. A decoder reads
+# only the image, its libraries and fontconfig, so a crafted image that exploits
+# one cannot escape the sandbox, open a socket or inspect other processes.
+# No attachment: entered only by explicit Px from the bwrap child.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile glycin-inner {
+  include <abstractions/base>,
+  include <abstractions/fonts>,
+  include <abstractions/prestium-no-admin>,
+  include <abstractions/prestium-user-files>,
+  /usr/libexec/glycin-loaders/* mr,
+  / r,
+  /usr/ r,
+  /usr/** mr,
+  /etc/ r,
+  /etc/** r,
+  /sys/** r,
+  /var/ r,
+  /var/lib/ r,
+  @{HOME}/ r,
+  @{PROC}/ r,
+  @{PROC}/sys/** r,
+  owner @{PROC}/@{pid}/** r,
+  /dev/ r,
+  /dev/{null,zero,full,random,urandom} rw,
+  owner /dev/shm/** rwk,
+  owner @{HOME}/.cache/fontconfig/** mr,
+  /var/cache/fontconfig/ r,
+  /var/cache/fontconfig/** mr,
+  owner /tmp/** rwlk,
+  deny network inet,
+  deny network inet6,
+  deny userns,
+  deny capability sys_admin,
+  deny capability sys_chroot,
+  deny capability setpcap,
+  deny capability net_admin,
+  deny capability setuid,
+  deny capability setgid,
+  deny capability dac_override,
+  deny capability dac_read_search,
+  deny capability chown,
+  deny capability fowner,
+  deny capability fsetid,
+  deny capability kill,
+  deny capability sys_ptrace,
+  deny ptrace,
+  deny @{HOME}/** w,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/**.kdbx rw,
+  deny @{HOME}/.claws-mail/** rw,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.local/share/gajim/** rw,
+  deny @{HOME}/.config/gajim/** rw,
+  include if exists <local/usr.libexec.glycin-inner>
+}

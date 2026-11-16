@@ -45,6 +45,21 @@ done <<<"$TABLE"
 grep -q '^rm -f /etc/apparmor.d/loupe /etc/apparmor.d/local/loupe$' "$H" && ok "hook drops Debian's unconfined loupe profile" || bad "Debian loupe profile kept"
 for d in .claws-mail .purple .local/share/gajim .config/gajim; do grep -q "deny @{HOME}/$d/" "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny $d" || bad "viewer-core may read $d"; done
 grep -qx '  deny ptrace,' "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny ptrace" || bad "viewer-core may ptrace"
+# 2.1 (bwrap split): the decoders and helpers run in capability-stripped inner profiles
+for f in usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-inner; do
+  [ -f "$A/$f" ] && ok "$f exists" || { bad "no $f"; continue; }
+  grep -q '^  deny userns,$' "$A/$f" && grep -q '^  deny capability sys_admin,$' "$A/$f" \
+    && ! grep -Eq '^  (userns|capability |mount|remount|umount|pivot_root)' "$A/$f" \
+    && ok "$f: no namespaces, capabilities or mounts of its own" || bad "$f keeps namespace/capability rights"
+  case $f in
+    usr.libexec.glycin-inner) s=usr.bin.loupe; t=glycin-inner;;
+    usr.bin.mat2-inner) s=usr.bin.mat2; t=mat2-inner;;
+    usr.bin.metadata-cleaner-inner) s=usr.bin.metadata-cleaner; t=metadata-cleaner-inner;;
+  esac
+  grep -q "mrPx -> $t," "$A/$s" && ok "$s transitions to $t" || bad "$s: no Px to $t"
+  n=$(grep -c "$f" "$H"); [ "$n" -ge 2 ] && ok "hook enforces and checks $f" || bad "hook lists $f $n times (want 2)"
+  grep -qx "0644 root root /etc/apparmor.d/$f" "$PM" && ok "perms: $f" || bad "perms: $f"
+done
 for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-viewer prestium-viewer-core prestium-viewer-write prestium-viewer-bwrap; do
   grep -qx "0644 root root /etc/apparmor.d/abstractions/$a" "$PM" || bad "perms: abstraction $a"; done
 if command -v apparmor_parser >/dev/null; then
