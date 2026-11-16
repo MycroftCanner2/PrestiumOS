@@ -27,12 +27,4 @@ Context=Applications
 Type=Scalable
 EOT
 gtk-update-icon-cache -f -q "$P"
-mkdir -p /etc/gtk-3.0
-if [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^gtk-icon-theme-name' /etc/gtk-3.0/settings.ini; then
-	sed -i 's/^gtk-icon-theme-name.*/gtk-icon-theme-name=Adwaita/' /etc/gtk-3.0/settings.ini
-elif [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^\[Settings\]' /etc/gtk-3.0/settings.ini; then
-	sed -i '/^\[Settings\]/a gtk-icon-theme-name=Adwaita' /etc/gtk-3.0/settings.ini
-else
-	printf '[Settings]\ngtk-icon-theme-name=Adwaita\n' >> /etc/gtk-3.0/settings.ini
-fi
-echo "P: Prestium icon theme (logo, inherits Adwaita); GTK 3 default icon theme set"
+echo "P: Prestium icon theme (logo, inherits Adwaita) installed"
