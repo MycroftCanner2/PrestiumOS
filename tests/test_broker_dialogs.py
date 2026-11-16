@@ -23,8 +23,8 @@ env = g["DIALOG_ENV"]
 (ok if env.get("GTK_A11Y") == "none" and env.get("NO_AT_BRIDGE") == "1" else bad)("dialogs: GTK_A11Y=none, NO_AT_BRIDGE=1")
 style = g["DIALOG_STYLE"]
 (ok if style.get("XDG_CONFIG_HOME") == "/usr/share/prestium/broker-style"
-    and style.get("ADW_DEBUG_COLOR_SCHEME") == "prefer-dark"
-    and style.get("GTK_THEME") == "Adwaita:dark" else bad)("dialogs: prefer-dark style (%r)" % style)
+    and style.get("ADW_DEBUG_COLOR_SCHEME") == "prefer-light"
+    and style.get("GTK_THEME") == "Adwaita" else bad)("dialogs: prefer-light style (%r)" % style)
 
 S = g["Session"]
 def fake():
@@ -43,8 +43,8 @@ s = fake()
 r = s.i2p_apply('{"hops": 3, "share": "low", "outproxy": "acetone"}', os.getpid())
 c = [e for a, e in calls if a[0] == "zenity"]
 (ok if r == "error cancelled" and c and c[0].get("GTK_A11Y") == "none"
-    and c[0].get("ADW_DEBUG_COLOR_SCHEME") == "prefer-dark"
-    and c[0].get("GTK_THEME") == "Adwaita:dark"
+    and c[0].get("ADW_DEBUG_COLOR_SCHEME") == "prefer-light"
+    and c[0].get("GTK_THEME") == "Adwaita"
     and c[0].get("XDG_CONFIG_HOME") == "/usr/share/prestium/broker-style"
     else bad)("I2P dialog env (%r, %r)" % (r, c))
 text = calls[-1][0][calls[-1][0].index("--text") + 1] if calls else ""

@@ -95,7 +95,7 @@
          window (undecorated by itself); pin it top-left below the bar. Layer-shell
          surfaces never match windowRules, so this only affects the fallback. -->
     <windowRule identifier="prestium-apps-menu" serverDecoration="no">
-      <action name="MoveTo" x="0" y="0" />
+      <action name="MoveTo" x="4" y="0" />
     </windowRule>
     <!-- Default to client-side decorations (prevents double titlebars on GTK/Firefox) -->
     <windowRule identifier="*" serverDecoration="no" />
@@ -107,8 +107,16 @@
     <!-- XWayland programs (GTK2: no client decorations of their own). Identifier is the
          WM_CLASS class; confirm with lswt on the live ISO if a window opens bare. -->
     <windowRule identifier="Pcmanfm" serverDecoration="yes" />
+    <windowRule identifier="pcmanfm" serverDecoration="yes" />
     <windowRule identifier="Claws-mail" serverDecoration="yes" />
     <windowRule identifier="Galculator" serverDecoration="yes" />
+    <windowRule identifier="galculator" serverDecoration="yes" />
+    <!-- pavucontrol and qtqr draw no client decorations of their own -->
+    <windowRule identifier="pavucontrol" serverDecoration="yes" />
+    <windowRule identifier="qtqr" serverDecoration="yes" />
+    <!-- Feather Wallet (thirdparty). Identifier from its desktop file; confirm with lswt on the live ISO. -->
+    <windowRule identifier="feather" serverDecoration="yes" />
+    <windowRule identifier="org.featherwallet.feather" serverDecoration="yes" />
     <windowRule identifier="Audacity" serverDecoration="yes" />
     <windowRule identifier="org.keepassxc.KeePassXC" serverDecoration="yes" />
     <windowRule identifier="org.kde.kleopatra" serverDecoration="yes" />

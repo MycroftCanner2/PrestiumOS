@@ -209,7 +209,9 @@ need(S, "selected text", "#ffffff", "#3584e4", INDICATOR)  # GNOME selected-item
 need(S, "links", "#1c71d8", "#ffffff", DISABLED)
 need(S, "visited links", "#1c71d8", "#ffffff", DISABLED)
 
-# --- KDE colour scheme (Kleopatra) ---
+# --- KDE colour scheme (Kleopatra, Adwaita light) ---
+# Text and decoration thresholds mirror the Qt section: Adwaita's own light values,
+# asserted so a regression is visible here too. Tooltips stay dark, as Adwaita's are.
 S = "KDE (Kleopatra)"
 sec, kd = None, {}
 for l in read("usr/share/color-schemes/Prestium.colors").splitlines():
@@ -217,16 +219,28 @@ for l in read("usr/share/color-schemes/Prestium.colors").splitlines():
         sec = l
     elif '=' in l and sec:
         kd.setdefault(sec, {})[l.split('=', 1)[0]] = l.split('=', 1)[1]
-for s in ("[Colors:Window]", "[Colors:View]", "[Colors:Button]", "[Colors:Selection]", "[Colors:Tooltip]", "[Colors:Header]"):
+LIGHT = ("[Colors:Window]", "[Colors:View]", "[Colors:Button]", "[Colors:Header]")
+for s in LIGHT:
     c = kd[s]
     bg = c['BackgroundNormal']
-    sel = s == "[Colors:Selection]"
     need(S, "%s text" % s[8:-1], c['ForegroundNormal'], bg, TEXT)
     need(S, "%s inactive text" % s[8:-1], c['ForegroundInactive'], bg, DISABLED)
     for k in ('ForegroundActive', 'ForegroundLink', 'ForegroundVisited', 'ForegroundNegative', 'ForegroundNeutral', 'ForegroundPositive'):
-        need(S, "%s %s" % (s[8:-1], k[10:].lower()), c[k], bg, DISABLED if sel else TEXT)
-    if not sel:
-        need(S, "%s focus decoration" % s[8:-1], c['DecorationFocus'], bg, INDICATOR)
+        need(S, "%s %s" % (s[8:-1], k[10:].lower()), c[k], bg, DISABLED)
+    need(S, "%s focus decoration" % s[8:-1], c['DecorationFocus'], bg, INDICATOR)
+c = kd["[Colors:Selection]"]
+bg = c['BackgroundNormal']
+need(S, "Selection text", c['ForegroundNormal'], bg, INDICATOR)  # white on accent, bold selected-row pairing as GTK/Qt
+need(S, "Selection inactive text", c['ForegroundInactive'], bg, INDICATOR)
+for k in ('ForegroundActive', 'ForegroundLink', 'ForegroundVisited', 'ForegroundNegative', 'ForegroundNeutral', 'ForegroundPositive'):
+    need(S, "Selection %s" % k[10:].lower(), c[k], bg, INDICATOR)
+c = kd["[Colors:Tooltip]"]
+bg = c['BackgroundNormal']
+need(S, "Tooltip text", c['ForegroundNormal'], bg, TEXT)
+need(S, "Tooltip inactive text", c['ForegroundInactive'], bg, DISABLED)
+for k in ('ForegroundActive', 'ForegroundLink', 'ForegroundVisited', 'ForegroundNegative', 'ForegroundNeutral', 'ForegroundPositive'):
+    need(S, "Tooltip %s" % k[10:].lower(), c[k], bg, TEXT)
+need(S, "Tooltip focus decoration", c['DecorationFocus'], bg, INDICATOR)
 
 # --- labwc (titles, menus, window switcher) ---
 th = dict(re.findall(r'^([\w.-]+):\s*(#[0-9a-fA-F]{6,8})', read("usr/share/themes/Prestium-Adwaita/openbox-3/themerc"), re.M))
@@ -348,13 +362,19 @@ for l in read("etc/xdg/kdeglobals").splitlines():
         sec = l
     elif '=' in l and sec:
         kg.setdefault(sec, {})[l.split('=', 1)[0]] = l.split('=', 1)[1]
-for s_ in ("[Colors:Window]", "[Colors:View]", "[Colors:Button]", "[Colors:Selection]", "[Colors:Tooltip]", "[Colors:Header]"):
-    c = kg[s_]; bg = c['BackgroundNormal']; sel = s_ == "[Colors:Selection]"
+for s_ in ("[Colors:Window]", "[Colors:View]", "[Colors:Button]", "[Colors:Header]"):
+    c = kg[s_]; bg = c['BackgroundNormal']
     need(S, "%s text" % s_[8:-1], c['ForegroundNormal'], bg, TEXT)
     for k in ('ForegroundActive', 'ForegroundLink', 'ForegroundVisited', 'ForegroundNegative'):
-        need(S, "%s %s" % (s_[8:-1], k[10:].lower()), c[k], bg, DISABLED if sel else TEXT)
-    if not sel:
-        need(S, "%s focus decoration" % s_[8:-1], c['DecorationFocus'], bg, INDICATOR)
+        need(S, "%s %s" % (s_[8:-1], k[10:].lower()), c[k], bg, DISABLED)
+    need(S, "%s focus decoration" % s_[8:-1], c['DecorationFocus'], bg, INDICATOR)
+c = kg["[Colors:Selection]"]; bg = c['BackgroundNormal']
+need(S, "Selection text", c['ForegroundNormal'], bg, INDICATOR)
+for k in ('ForegroundActive', 'ForegroundLink', 'ForegroundVisited', 'ForegroundNegative'):
+    need(S, "Selection %s" % k[10:].lower(), c[k], bg, INDICATOR)
+c = kg["[Colors:Tooltip]"]; bg = c['BackgroundNormal']
+need(S, "Tooltip text", c['ForegroundNormal'], bg, TEXT)
+need(S, "Tooltip focus decoration", c['DecorationFocus'], bg, INDICATOR)
 
 # --- terminal (foot) ---
 S = "terminal (foot)"

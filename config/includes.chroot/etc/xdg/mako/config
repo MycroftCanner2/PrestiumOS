@@ -18,7 +18,7 @@ max-visible=5
 icons=1
 # mako looks up named icons only here and in hicolor, without theme
 # inheritance, so list the themes Prestium inherits from in the same order
-icon-path=/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:/usr/share/icons/Papirus:/usr/share/icons/AdwaitaLegacy:/usr/share/icons/gnome:/usr/share/icons/Adwaita
+icon-path=/usr/share/icons/Adwaita:/usr/share/icons/Papirus:/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:/usr/share/icons/AdwaitaLegacy:/usr/share/icons/gnome
 max-icon-size=48
 icon-location=left
 progress-color=over #0050c8

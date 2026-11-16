@@ -37,7 +37,7 @@ H="$R/config/hooks/live"; ACC='#0050c8'; LINE='#3d8bff'
 for pk in papirus-icon-theme adwaita-qt adwaita-qt6 gir1.2-gtklayershell-0.1 fonts-font-awesome fonts-cantarell adwaita-icon-theme; do
   grep -qx "$pk" "$L" && ok "package $pk" || bad "package $pk missing"; done
 ! grep -Eqx 'qt-style-kvantum|qt6-style-kvantum|qt-style-kvantum-themes' "$L" && ok "no Kvantum packages" || bad "Kvantum still installed"
-grep -q '^Inherits=Papirus-Dark,' "$H/0450-prestium-tray-icons.hook.chroot" && ok "Prestium icon theme inherits Papirus-Dark first" || bad "icon theme not on Papirus-Dark"
+grep -q '^Inherits=Adwaita,' "$H/0450-prestium-tray-icons.hook.chroot" && ok "Prestium icon theme inherits Adwaita first" || bad "icon theme not on Adwaita"
 grep -q 'prestium-logo.svg' "$H/0450-prestium-tray-icons.hook.chroot" && [ -f "$I/usr/share/prestium/branding/prestium-logo.svg" ] && ok "logo in the icon theme" || bad "logo missing"
 grep -qx 'export QT_STYLE_OVERRIDE=Adwaita' "$I/usr/local/bin/prestium-session" && ok "Qt style Adwaita" || bad "Qt style not Adwaita"
 grep -q 'QT_WAYLAND_DISABLE_WINDOWDECORATION=1' "$I/usr/local/bin/prestium-session" && ok "no Qt client-side decorations" || bad "Qt draws its own decorations"
@@ -46,30 +46,30 @@ for kd in etc/skel/.config etc/xdg home/user/.config; do [ ! -e "$I/$kd/Kvantum"
 grep -q 'owner @{HOME}/.config/gtk-4.0/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-common" && grep -q '/usr/share/themes/Adwaita/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-base" && grep -q '/usr/share/fonts/truetype/cantarell/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-base" && ok "AppArmor: confined apps read GTK 4 colours, Adwaita and Cantarell" || bad "AppArmor misses theme reads"
 grep -q "^accent-color='blue'" "$I/etc/dconf/db/local.d/10-prestium-desktop" && ok "dconf accent blue" || bad "dconf accent"
 for v in 3 4; do
-  [ "$(readlink "$I/usr/share/prestium/broker-style/gtk-$v.0/gtk.css")" = "/usr/share/prestium/theme/gtk$v.css" ] && ok "broker-style gtk-$v.0 css" || bad "broker-style gtk-$v.0 css"
+  [ ! -e "$I/usr/share/prestium/broker-style/gtk-$v.0/gtk.css" ] && ok "broker-style GTK $v: pure Adwaita, no dark override" || bad "broker-style gtk-$v.0 css override left"
   [ ! -e "$I/etc/skel/.config/gtk-$v.0/gtk.css" ] && [ ! -e "$I/home/user/.config/gtk-$v.0/gtk.css" ] && ok "no user gtk-$v.0 css shadow" || bad "user gtk-$v.0 css shadow left"
   grep -qi "$ACC" "$I/usr/share/prestium/theme/gtk$v.css" && ok "GTK $v accent $ACC" || bad "GTK $v accent"
 done
 # broker dialogs: the style directory only, and accessibility still applied last
 B="$I/usr/local/sbin/prestium-wl-broker"
 grep -q 'extra_env=dict(DIALOG_STYLE, \*\*DIALOG_ENV)' "$B" && grep -q '        e.update(DIALOG_ENV)   # last' "$B" && ok "broker dialogs styled, accessibility off last" || bad "broker dialog env order"
-grep -q 'ADW_DEBUG_COLOR_SCHEME": "prefer-dark"' "$B" && grep -q 'GTK_THEME": "Adwaita:dark"' "$B" && ok "broker dialogs prefer libadwaita dark" || bad "broker dialogs missing prefer-dark"
+grep -q 'ADW_DEBUG_COLOR_SCHEME": "prefer-light"' "$B" && grep -q 'GTK_THEME": "Adwaita"' "$B" && ok "broker dialogs prefer libadwaita light" || bad "broker dialogs missing prefer-light"
 for v in 3 4; do
-  grep -qx 'gtk-application-prefer-dark-theme=1' "$I/usr/share/prestium/broker-style/gtk-$v.0/settings.ini" \
-    && ok "broker-style GTK $v prefers dark" || bad "broker-style GTK $v not dark"
+  grep -qx 'gtk-application-prefer-dark-theme=0' "$I/usr/share/prestium/broker-style/gtk-$v.0/settings.ini" \
+    && ok "broker-style GTK $v prefers light" || bad "broker-style GTK $v not light"
 done
 # 2.1 (UI pass): the Browser Updater uses Prestium's stylesheet like the Connection Assistants, from the
 # root-owned broker-style directory (never the user's ~/.config)
 grep -q '^os.environ\["XDG_CONFIG_HOME"\] = "/usr/share/prestium/broker-style"' "$I/usr/local/bin/prestium-browser-updater" && ok "Browser Updater in Prestium's GTK 3 style (root-owned)" || bad "Browser Updater style directory"
 # Kleopatra: Prestium colour scheme by default (not Breeze Dark)
 grep -qx 'ColorScheme=Prestium' "$I/etc/xdg/kleopatrarc" && grep -qx 'Name=Prestium' "$I/usr/share/color-schemes/Prestium.colors" && ok "Kleopatra defaults to the Prestium colour scheme" || bad "Kleopatra colour scheme"
-grep -q '^BackgroundNormal=0,80,200$' "$I/usr/share/color-schemes/Prestium.colors" && ok "KDE selection $ACC" || bad "KDE selection colour"
+grep -q '^BackgroundNormal=53,132,228$' "$I/usr/share/color-schemes/Prestium.colors" && ok "KDE selection $ACC" || bad "KDE selection colour"
 # labwc, swaylock, mako, waybar
 grep -q '^window.active.border.color: #cdc7c2$' "$T" && grep -q '^menu.items.active.bg.color: #3584e4$' "$T" && grep -q '<dropShadows>yes</dropShadows>' "$I/etc/xdg/labwc/rc.xml" && grep -q '<cornerRadius>' "$I/etc/xdg/labwc/rc.xml" && ok "labwc accent, shadows, corners" || bad "labwc theme"
 grep -q '^ring-color=3d8bffff' "$I/usr/share/prestium/swaylock.conf" && grep -qx 'indicator-idle-visible' "$I/usr/share/prestium/swaylock.conf" && ok "swaylock accent ring, prompt always shown" || bad "swaylock accent"
 M="$I/etc/xdg/mako/config"
 grep -q '^\[category=prestium.osd\]' "$M" && grep -q -- '-c prestium.osd' "$I/usr/local/bin/prestium-media-key" && ok "OSD category styled" || bad "OSD category"
-grep -q '^icon-path=/usr/share/icons/Prestium:/usr/share/icons/Papirus-Dark:' "$M" && ok "mako icons from Papirus-Dark" || bad "mako icon-path"
+grep -q '^icon-path=/usr/share/icons/Adwaita:/usr/share/icons/Papirus:' "$M" && ok "mako icons from Adwaita" || bad "mako icon-path"
 grep -q '\[ -f "\$FLAG" \] || exit 0' "$I/usr/local/bin/prestium-notify-sound" && ok "notification sounds off unless turned on" || bad "sounds not opt-in"
 W="$I/etc/xdg/waybar"
 python3 - "$W/config.jsonc" <<'PY' && ok "waybar: dual bar, Tor and I2P pills from prestium-netstatus" || bad "waybar config"

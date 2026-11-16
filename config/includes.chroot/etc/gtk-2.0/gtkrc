@@ -1,6 +1,5 @@
-# Prestium 2.1: GTK 2 apps (pinentry-gtk2) in the dark Adwaita theme from gnome-themes-extra
-# 2.1 (UI pass): through Prestium-Dark, which is Adwaita-dark's GTK 2 theme with Prestium's colours
-# (/usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc)
-gtk-theme-name="Prestium-Dark"
-gtk-icon-theme-name="Prestium"
+# Prestium 2.1: GTK 2 apps (Claws Mail, pcmanfm, galculator, pinentry-gtk2) in the
+# stock Adwaita GTK 2 theme (gnome-themes-extra), matching the light desktop.
+gtk-theme-name="Adwaita"
+gtk-icon-theme-name="Adwaita"
 gtk-font-name="Cantarell 10"

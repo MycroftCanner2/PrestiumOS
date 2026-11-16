@@ -1,18 +1,17 @@
-# Prestium 2.1 (design batch): KDE colour scheme in the Tech Innovation colours (dark grey,
-# Electric Blue #0066ff selection, Neon Cyan #00ffff links), the same palette as GTK, Kvantum and labwc.
-# 2.1 (contrast review): selection #0050c8 (white text 7.0:1), focus #3d8bff, accent text #8ab8ff and
-# error text #ff9494 (both 7:1 or more), coloured text on the selection 4.5:1 or more (test_contrast.py).
+# Prestium 2.1 (design batch): KDE colour scheme in Adwaita light colours (light grey windows,
+# white views, dark text, Electric Blue #3584e4 selection), matching GTK, Qt and labwc.
+# 2.1 (contrast review): normal text 11:1 or more, links #1a5fb4 (4.5:1 or more), selection white
+# text 3.7:1 (bold selected-row pairing, as GTK and Qt), errors #c01c28 (test_contrast.py).
 # Kleopatra picks it by default (/etc/xdg/kleopatrarc); its Settings, Color Scheme menu lists it as "Prestium".
-# 2.1 (UI pass): visited links #8ab8ff, the accent text colour, as GTK and Kvantum. /etc/xdg/kdeglobals carries
+# 2.1 (UI pass): tooltips stay dark, as Adwaita's are. /etc/xdg/kdeglobals carries
 # the same [Colors:*] sections (tests/test_ui_consistency.py keeps the two identical).
-# 2.1: links (ForegroundLink) are also #8ab8ff, not the live-state cyan, matching GTK and Qt.
-# On the selection (#0050c8), ForegroundLink is white (7.0:1); #8ab8ff would be only 3.5:1 there.
+# 2.1: links (ForegroundLink) are #1a5fb4, Adwaita's blue, matching GTK and Qt.
 [General]
 ColorScheme=Prestium
 Name=Prestium
 
 [ColorEffects:Disabled]
-Color=30,30,30
+Color=246,245,244
 ColorAmount=0
 ColorEffect=0
 ContrastAmount=0.65
@@ -25,60 +24,60 @@ ChangeSelectionColor=true
 Enable=false
 
 [Colors:Window]
-BackgroundNormal=30,30,30
-BackgroundAlternate=38,38,38
-ForegroundNormal=255,255,255
-ForegroundInactive=168,168,168
-ForegroundActive=138,184,255
-ForegroundLink=138,184,255
-ForegroundVisited=138,184,255
-ForegroundNegative=255,148,148
-ForegroundNeutral=255,209,102
-ForegroundPositive=110,231,160
-DecorationFocus=61,139,255
-DecorationHover=61,139,255
+BackgroundNormal=246,245,244
+BackgroundAlternate=255,255,255
+ForegroundNormal=46,52,54
+ForegroundInactive=94,92,100
+ForegroundActive=26,95,180
+ForegroundLink=26,95,180
+ForegroundVisited=26,95,180
+ForegroundNegative=192,28,40
+ForegroundNeutral=122,86,0
+ForegroundPositive=30,123,68
+DecorationFocus=53,132,228
+DecorationHover=53,132,228
 
 [Colors:View]
-BackgroundNormal=22,22,22
-BackgroundAlternate=30,30,30
-ForegroundNormal=255,255,255
-ForegroundInactive=168,168,168
-ForegroundActive=138,184,255
-ForegroundLink=138,184,255
-ForegroundVisited=138,184,255
-ForegroundNegative=255,148,148
-ForegroundNeutral=255,209,102
-ForegroundPositive=110,231,160
-DecorationFocus=61,139,255
-DecorationHover=61,139,255
+BackgroundNormal=255,255,255
+BackgroundAlternate=246,245,244
+ForegroundNormal=46,52,54
+ForegroundInactive=94,92,100
+ForegroundActive=26,95,180
+ForegroundLink=26,95,180
+ForegroundVisited=26,95,180
+ForegroundNegative=192,28,40
+ForegroundNeutral=122,86,0
+ForegroundPositive=30,123,68
+DecorationFocus=53,132,228
+DecorationHover=53,132,228
 
 [Colors:Button]
-BackgroundNormal=38,38,38
-BackgroundAlternate=30,30,30
-ForegroundNormal=255,255,255
-ForegroundInactive=168,168,168
-ForegroundActive=138,184,255
-ForegroundLink=138,184,255
-ForegroundVisited=138,184,255
-ForegroundNegative=255,148,148
-ForegroundNeutral=255,209,102
-ForegroundPositive=110,231,160
-DecorationFocus=61,139,255
-DecorationHover=61,139,255
+BackgroundNormal=246,245,244
+BackgroundAlternate=255,255,255
+ForegroundNormal=46,52,54
+ForegroundInactive=94,92,100
+ForegroundActive=26,95,180
+ForegroundLink=26,95,180
+ForegroundVisited=26,95,180
+ForegroundNegative=192,28,40
+ForegroundNeutral=122,86,0
+ForegroundPositive=30,123,68
+DecorationFocus=53,132,228
+DecorationHover=53,132,228
 
 [Colors:Selection]
-BackgroundNormal=0,80,200
-BackgroundAlternate=0,71,179
+BackgroundNormal=53,132,228
+BackgroundAlternate=26,95,180
 ForegroundNormal=255,255,255
-ForegroundInactive=214,230,255
+ForegroundInactive=255,255,255
 ForegroundActive=255,255,255
 ForegroundLink=255,255,255
-ForegroundVisited=214,230,255
-ForegroundNegative=255,214,214
-ForegroundNeutral=255,226,163
-ForegroundPositive=184,245,208
-DecorationFocus=61,139,255
-DecorationHover=61,139,255
+ForegroundVisited=255,255,255
+ForegroundNegative=255,255,255
+ForegroundNeutral=255,255,255
+ForegroundPositive=255,255,255
+DecorationFocus=255,255,255
+DecorationHover=255,255,255
 
 [Colors:Tooltip]
 BackgroundNormal=38,38,38
@@ -95,49 +94,49 @@ DecorationFocus=61,139,255
 DecorationHover=61,139,255
 
 [Colors:Complementary]
-BackgroundNormal=22,22,22
-BackgroundAlternate=30,30,30
-ForegroundNormal=255,255,255
-ForegroundInactive=168,168,168
-ForegroundActive=138,184,255
-ForegroundLink=138,184,255
-ForegroundVisited=138,184,255
-ForegroundNegative=255,148,148
-ForegroundNeutral=255,209,102
-ForegroundPositive=110,231,160
-DecorationFocus=61,139,255
-DecorationHover=61,139,255
+BackgroundNormal=246,245,244
+BackgroundAlternate=255,255,255
+ForegroundNormal=46,52,54
+ForegroundInactive=94,92,100
+ForegroundActive=26,95,180
+ForegroundLink=26,95,180
+ForegroundVisited=26,95,180
+ForegroundNegative=192,28,40
+ForegroundNeutral=122,86,0
+ForegroundPositive=30,123,68
+DecorationFocus=53,132,228
+DecorationHover=53,132,228
 
 [Colors:Header]
-BackgroundNormal=38,38,38
-BackgroundAlternate=30,30,30
-ForegroundNormal=255,255,255
-ForegroundInactive=168,168,168
-ForegroundActive=138,184,255
-ForegroundLink=138,184,255
-ForegroundVisited=138,184,255
-ForegroundNegative=255,148,148
-ForegroundNeutral=255,209,102
-ForegroundPositive=110,231,160
-DecorationFocus=61,139,255
-DecorationHover=61,139,255
+BackgroundNormal=246,245,244
+BackgroundAlternate=255,255,255
+ForegroundNormal=46,52,54
+ForegroundInactive=94,92,100
+ForegroundActive=26,95,180
+ForegroundLink=26,95,180
+ForegroundVisited=26,95,180
+ForegroundNegative=192,28,40
+ForegroundNeutral=122,86,0
+ForegroundPositive=30,123,68
+DecorationFocus=53,132,228
+DecorationHover=53,132,228
 
 [Colors:Header][Inactive]
-BackgroundNormal=30,30,30
-BackgroundAlternate=30,30,30
-ForegroundNormal=255,255,255
-ForegroundInactive=168,168,168
-ForegroundActive=138,184,255
-ForegroundLink=138,184,255
-ForegroundVisited=138,184,255
-ForegroundNegative=255,148,148
-ForegroundNeutral=255,209,102
-ForegroundPositive=110,231,160
-DecorationFocus=61,139,255
-DecorationHover=61,139,255
+BackgroundNormal=246,245,244
+BackgroundAlternate=255,255,255
+ForegroundNormal=46,52,54
+ForegroundInactive=94,92,100
+ForegroundActive=26,95,180
+ForegroundLink=26,95,180
+ForegroundVisited=26,95,180
+ForegroundNegative=192,28,40
+ForegroundNeutral=122,86,0
+ForegroundPositive=30,123,68
+DecorationFocus=53,132,228
+DecorationHover=53,132,228
 
 [WM]
-activeBackground=38,38,38
-activeForeground=255,255,255
-inactiveBackground=30,30,30
-inactiveForeground=168,168,168
+activeBackground=246,245,244
+activeForeground=46,52,54
+inactiveBackground=255,255,255
+inactiveForeground=94,92,100

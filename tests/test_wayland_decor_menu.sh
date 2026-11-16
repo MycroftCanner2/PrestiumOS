@@ -9,7 +9,7 @@ grep -q '<core>' "$RC" && grep -q '<decoration>client</decoration>' "$RC" \
   || { echo "FAIL: rc.xml does not default to client-side decorations"; exit 1; }
 grep -q '<windowRule identifier="\*" serverDecoration="no" />' "$RC" \
   || { echo "FAIL: rc.xml has no default serverDecoration=no rule"; exit 1; }
-for id in foot prestium-nyx Pcmanfm Claws-mail Galculator Audacity org.keepassxc.KeePassXC org.kde.kleopatra featherpad onionshare vlc; do
+for id in foot prestium-nyx Pcmanfm pcmanfm Claws-mail Galculator galculator Audacity org.keepassxc.KeePassXC org.kde.kleopatra featherpad feather org.featherwallet.feather qtqr pavucontrol onionshare vlc; do
   grep -q "<windowRule identifier=\"$id\" serverDecoration=\"yes\" />" "$RC" \
     || { echo "FAIL: rc.xml gives no server-side titlebar to $id"; exit 1; }
 done

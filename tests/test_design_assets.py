@@ -87,7 +87,7 @@ for f in ("usr/local/bin/prestium-media-key", "usr/local/bin/prestium-notify-sou
 used.discard("audio-input")
 sorted(used) == sorted(OSD) and ok("OSD icon names are the checked list") or bad("OSD icon names changed: %s (update OSD in this test)" % sorted(used ^ set(OSD)))
 mk = open(os.path.join(I, "etc/xdg/mako/config")).read()
-"/usr/share/icons/Papirus-Dark:/usr/share/icons/Papirus" in mk and ok("mako looks in Papirus-Dark, then Papirus") or bad("mako icon-path lost Papirus-Dark")
+"/usr/share/icons/Adwaita:/usr/share/icons/Papirus" in mk and ok("mako looks in Adwaita, then Papirus") or bad("mako icon-path lost Adwaita")
 PR = os.environ.get("PAPIRUS_ROOT")
 if PR:
     D = os.path.join(PR, "usr/share/icons/Papirus-Dark")

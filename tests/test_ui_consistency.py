@@ -45,6 +45,7 @@ PALETTE = {
     "0a4f5c", "10262b", "5c4a1a",
     # Adwaita light theme: purple slate, light surfaces, dark text, success green
     "56347c", "7d4fb2", "1f5c3a", "2ec27e", "26a269", "e5a50a", "c01c28", "3584e4", "1c71d8",
+    "1a5fb4", "7a5600", "1e7b44",
     "cdc7c2", "deddda", "ebebeb", "f6f5f4", "2e3436", "5e5c64", "77767b", "9a9996", "808080",
 }
 OLD = ["0066ff", "1a75ff", "0a6cff", "0052cc", "a3a3ff", "7fb2ff", "8fb3ff", "ff7a7a",
@@ -95,7 +96,7 @@ for sec in cols.sections():
     for k, v in cols[sec].items():
         if re.fullmatch(r"\d+,\d+,\d+", v.strip()):
             h = rgbhex(v)
-            # Selection-on-accent tints (light text on #0050c8) are listed in the scheme itself
+            # Selection tints (white text on #3584e4) are listed in the scheme itself
             if h not in PALETTE and not sec.startswith("Colors:Selection"): kde_off.add("%s %s %s" % (sec, k, v))
 check(not kde_off, "palette only: Prestium.colors (outside the selection tints)", "; ".join(sorted(kde_off)))
 diff = []
@@ -124,9 +125,9 @@ check('link_color:#8ab8ff' in g2s and 'visited_link_color:#8ab8ff' in g2s,
 check("QT_STYLE_OVERRIDE=Adwaita" in read("usr/local/bin/prestium-session")
       and "QT_STYLE_OVERRIDE=Adwaita" in read("etc/environment"),
       "Qt: Adwaita style, no Kvantum")
-link_rgb = ["ForegroundLink=138,184,255", "ForegroundVisited=138,184,255"]
+link_rgb = ["ForegroundLink=26,95,180", "ForegroundVisited=26,95,180"]
 check(all(v in read("usr/share/color-schemes/Prestium.colors") and v in read("etc/xdg/kdeglobals") for v in link_rgb),
-      "KDE: ForegroundLink and ForegroundVisited are #8ab8ff")
+      "KDE: ForegroundLink and ForegroundVisited are #1a5fb4")
 for pth, kind in (("usr/share/prestium/theme/gtk3.css", "css"), ("usr/share/prestium/theme/gtk4.css", "css"),
                   ("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc")):
     cyan = [h for h in hexes(strip_comments(read(pth), kind)) if h in ("00ffff", "80ffff")]
@@ -172,15 +173,15 @@ for p in ("usr/share/prestium/broker-style/gtk-3.0/settings.ini",
     c = configparser.ConfigParser(interpolation=None); c.read_string(read(p)); s = c["Settings"]
     got = (s.get("gtk-theme-name"), s.get("gtk-application-prefer-dark-theme"), s.get("gtk-icon-theme-name"),
            s.get("gtk-font-name"), s.get("gtk-cursor-theme-name"), s.get("gtk-cursor-theme-size"))
-    check(got == ("Adwaita", "1", "Prestium", "Cantarell 10", "Adwaita", "24"), "%s: broker dialogs stay dark" % p, str(got))
+    check(got == ("Adwaita", "0", "Adwaita", "Cantarell 10", "Adwaita", "24"), "%s: broker dialogs follow the light session" % p, str(got))
 d = read("etc/dconf/db/local.d/10-prestium-desktop")
-want = {"gtk-theme": "'Adwaita'", "color-scheme": "'default'", "icon-theme": "'Prestium'",
+want = {"gtk-theme": "'Adwaita'", "color-scheme": "'default'", "icon-theme": "'Adwaita'",
         "font-name": "'Cantarell 11'", "cursor-theme": "'Adwaita'", "cursor-size": "24"}
 got = {k: (re.search(r"(?m)^%s=(.*)$" % k, d) or [None, None])[1] for k in want}
 check(got == want, "dconf: same theme, colour scheme, icons, font and cursor", str(got))
 g2 = read("etc/gtk-2.0/gtkrc")
-check('gtk-theme-name="Prestium-Dark"' in g2 and 'gtk-icon-theme-name="Prestium"' in g2 and 'gtk-font-name="Cantarell 10"' in g2,
-      "GTK 2: Prestium-Dark theme, Prestium icons, Cantarell 10")
+check('gtk-theme-name="Adwaita"' in g2 and 'gtk-icon-theme-name="Adwaita"' in g2 and 'gtk-font-name="Cantarell 10"' in g2,
+      "GTK 2: Adwaita theme and icons, Cantarell 10")
 g2t = read("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc")
 check(all('include "/usr/share/themes/Adwaita-dark/gtk-2.0/%s"' % f in g2t for f in ("main.rc", "apps.rc", "hacks.rc")),
       "GTK 2: Prestium-Dark is Adwaita-dark's engine with Prestium's colour scheme")
@@ -204,7 +205,7 @@ check(re.search(r"(?m)^icon-path=.*|^icons=1", mk) is None or True, "mako: icons
 wb = read("etc/xdg/waybar/style.css")
 check(re.search(r"font-family:\s*Cantarell", wb) is not None, "waybar: Cantarell")
 tray = read("../hooks/live/0450-prestium-tray-icons.hook.chroot")
-check("Inherits=Papirus-Dark,Papirus,Adwaita,AdwaitaLegacy,gnome,hicolor" in tray, "icon chain: Prestium, Papirus-Dark, Papirus, Adwaita, AdwaitaLegacy, gnome, hicolor")
+check("Inherits=Adwaita,Papirus,Papirus-Dark,AdwaitaLegacy,gnome,hicolor" in tray, "icon chain: Prestium, Adwaita, Papirus, Papirus-Dark, AdwaitaLegacy, gnome, hicolor")
 
 # --------------------------------------------------------------------------------------- 3. shapes
 check("<cornerRadius>8</cornerRadius>" in lw, "labwc: 8 px window corners")
@@ -388,11 +389,11 @@ src = lounge or (open(lt[0], encoding="utf-8").read() if lt else "")
 check(re.search(r'theme:\s*"thelounge-theme-tech-innovation"', src) is not None, "The Lounge: Tech Innovation is the default theme")
 bu = read("usr/local/bin/prestium-browser-updater")
 check('os.environ["XDG_CONFIG_HOME"] = "/usr/share/prestium/broker-style"' in bu, "Browser Updater: Prestium's GTK style from the root-owned directory")
-# 2.1 (confirm-dialog contrast): broker zenity 4 (libadwaita) must force a dark color-scheme, because
-# XDG_CONFIG_HOME=broker-style has no session dconf and libadwaita ignores settings.ini prefer-dark.
+# 2.1 (confirm-dialog contrast): broker zenity 4 (libadwaita) follows the light session,
+# forced through the broker env because XDG_CONFIG_HOME=broker-style has no session dconf.
 br = read("usr/local/sbin/prestium-wl-broker")
-check('"ADW_DEBUG_COLOR_SCHEME": "prefer-dark"' in br and '"GTK_THEME": "Adwaita:dark"' in br,
-      "broker dialogs: libadwaita prefer-dark and GTK_THEME=Adwaita:dark")
+check('"ADW_DEBUG_COLOR_SCHEME": "prefer-light"' in br and '"GTK_THEME": "Adwaita"' in br,
+      "broker dialogs: libadwaita prefer-light and GTK_THEME=Adwaita")
 check(re.search(r"--window-fg-color: #ffffff;", g4s) and re.search(r"--dialog-fg-color: #ffffff;", g4s),
       "GTK 4: :root sets --window-fg-color and --dialog-fg-color to white")
 prim = r"button\.suggested-action, button\.default:not\(\.flat\) \{[^}]*background-color: #0050c8;[^}]*color: #ffffff"

@@ -1,8 +1,8 @@
 #!/bin/sh
 # Prestium 2.1 (design batch): the "Prestium" icon theme. It holds Prestium's own logo mark and inherits
-# Papirus-Dark first, so apps, menus, the tray and notifications draw from one complete, modern set
-# (Papirus-Dark's panel icons are light, so tray icons stay visible on the dark bar). Adwaita,
-# AdwaitaLegacy and gnome follow only for names Papirus lacks.
+# Adwaita first, so light headerbars, menus and notifications never get white-on-light symbolic icons
+# (Adwaita's panel icons suit the light bottom taskbar). Papirus-Dark stays in the chain for the dark
+# top bar's tray icons. AdwaitaLegacy and gnome follow only for names the earlier themes lack.
 # (2.0 to 2.1 r1: this theme held GNOME's full-colour audio icons, since Adwaita's were dark symbolic only.)
 # Papirus folders are blue by default, which matches the Tech Innovation accent; nothing is recoloured.
 set -e
@@ -15,8 +15,8 @@ install -m 644 "$L" "$P/scalable/apps/prestium.svg"
 cat > "$P/index.theme" <<EOT
 [Icon Theme]
 Name=Prestium
-Comment=Prestium's logo, then Papirus-Dark for everything else
-Inherits=Papirus-Dark,Papirus,Adwaita,AdwaitaLegacy,gnome,hicolor
+Comment=Prestium's logo, then Adwaita for everything else
+Inherits=Adwaita,Papirus,Papirus-Dark,AdwaitaLegacy,gnome,hicolor
 Directories=scalable/apps
 
 [scalable/apps]
@@ -29,10 +29,10 @@ EOT
 gtk-update-icon-cache -f -q "$P"
 mkdir -p /etc/gtk-3.0
 if [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^gtk-icon-theme-name' /etc/gtk-3.0/settings.ini; then
-	sed -i 's/^gtk-icon-theme-name.*/gtk-icon-theme-name=Prestium/' /etc/gtk-3.0/settings.ini
+	sed -i 's/^gtk-icon-theme-name.*/gtk-icon-theme-name=Adwaita/' /etc/gtk-3.0/settings.ini
 elif [ -f /etc/gtk-3.0/settings.ini ] && grep -q '^\[Settings\]' /etc/gtk-3.0/settings.ini; then
-	sed -i '/^\[Settings\]/a gtk-icon-theme-name=Prestium' /etc/gtk-3.0/settings.ini
+	sed -i '/^\[Settings\]/a gtk-icon-theme-name=Adwaita' /etc/gtk-3.0/settings.ini
 else
-	printf '[Settings]\ngtk-icon-theme-name=Prestium\n' >> /etc/gtk-3.0/settings.ini
+	printf '[Settings]\ngtk-icon-theme-name=Adwaita\n' >> /etc/gtk-3.0/settings.ini
 fi
-echo "P: Prestium icon theme (logo, inherits Papirus-Dark); GTK 3 default icon theme set"
+echo "P: Prestium icon theme (logo, inherits Adwaita); GTK 3 default icon theme set"

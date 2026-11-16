@@ -133,7 +133,7 @@ DIALOG_ENV = {"GTK_A11Y": "none", "NO_AT_BRIDGE": "1"}
 WALLPAPERS = ("horizon", "circuit", "mark")
 WALLPAPER_DIR = "/usr/share/backgrounds/prestium"
 DIALOG_STYLE = {"XDG_CONFIG_HOME": "/usr/share/prestium/broker-style",
-                "ADW_DEBUG_COLOR_SCHEME": "prefer-dark", "GTK_THEME": "Adwaita:dark"}
+                "ADW_DEBUG_COLOR_SCHEME": "prefer-light", "GTK_THEME": "Adwaita"}
 INTERPRETER_RE = re.compile(r"\A(python[0-9.]*|perl[0-9.]*|ruby[0-9.]*|node|(ba|da|z|k)?sh)\Z")
 
 # characters Python counts as printable that still show as blank (verification of e574474, N-6)
@@ -532,7 +532,7 @@ class Session:
         return val if val in WALLPAPERS else WALLPAPERS[0]
 
     def swaybg_argv(self):
-        return ["swaybg", "-c", "#161616", "-i", os.path.join(WALLPAPER_DIR, self.wallpaper_name() + ".png"), "-m", "fill"]
+        return ["swaybg", "-c", "#56347c"]
 
     def wallpaper(self):
         p = self.kids.get("swaybg")
