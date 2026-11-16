@@ -9,7 +9,6 @@ ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }
 H=$R/config/hooks/live/0600-prestium-apparmor.hook.chroot; PM=$I/usr/share/prestium/build/perms.txt
 # desktop id or package -> binary -> profile file
 TABLE="org.gnome.Loupe.desktop /usr/bin/loupe usr.bin.loupe
-org.xfce.ristretto.desktop /usr/bin/ristretto usr.bin.ristretto
 org.gnome.FileRoller.desktop /usr/bin/file-roller usr.bin.file-roller
 vlc /usr/bin/vlc usr.bin.vlc
 xarchiver /usr/bin/xarchiver usr.bin.xarchiver
@@ -25,7 +24,7 @@ for d in $(grep -v '^\s*[#[]' "$I/etc/xdg/mimeapps.list" | cut -d= -f2 | tr ';' 
   grep -q "^$d " <<<"$TABLE" && ok "default handler $d has a profile" || bad "default handler $d: no profile"; done
 # every package in the table that the image installs
 pk=$(cat "$R"/config/package-lists/*.list.chroot | sed 's/#.*//' | tr -s ' \t' '\n')
-for p in vlc xarchiver featherpad mat2 metadata-cleaner gimp audacity keepassxc kleopatra loupe ristretto file-roller; do
+for p in vlc xarchiver featherpad mat2 metadata-cleaner gimp audacity keepassxc kleopatra loupe file-roller; do
   grep -qx "$p" <<<"$pk" || bad "package $p is no longer installed: update this test"; done
 attach(){ # does profile file $1 attach binary $2? (expands one {a,b} group in the header)
   python3 - "$A/$1" "$2" <<'PY'
@@ -139,7 +138,7 @@ ini() { python3 -c 'import configparser,sys; c=configparser.ConfigParser(interpo
 [ "$(ini config thumbnail_local)" = 1 ] && [ "$(ini config thumbnail_max)" = 2048 ] && ok "libfm: thumbnails local-only and capped" || bad "libfm: thumbnail_local/thumbnail_max widened"
 [ -n "$(ini config terminal)" ] && ok "libfm: terminal set" || bad "libfm: no terminal"
 grep -qx 'mount_removable=0' "$P" && grep -qx 'mount_on_startup=0' "$P" && ok "pcmanfm: no automount" || bad "pcmanfm automounts"
-for f in "$A"/usr.bin.{loupe,ristretto,file-roller,xarchiver,featherpad,mat2,metadata-cleaner,gimp,keepassxc,kleopatra}; do
+for f in "$A"/usr.bin.{loupe,file-roller,xarchiver,featherpad,mat2,metadata-cleaner,gimp,keepassxc,kleopatra}; do
   grep -q 'abstractions/audio' "$f" && bad "$(basename "$f"): sound access" || ok "$(basename "$f"): no sound access"; done
 grep -q 'abstractions/audio' "$R/config/includes.chroot/etc/apparmor.d/abstractions/prestium-app-common" && bad "app-common gives sound" || ok "app-common: no sound"
 exit $fail

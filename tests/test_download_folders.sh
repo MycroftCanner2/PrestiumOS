@@ -226,7 +226,7 @@ allow featherpad $H/.config/QtProject.conf r
 deny featherpad $H/.config/QtProject.conf w
 EOT
 echo "== viewers write nothing in the file folders"
-for pair in "usr.bin.loupe loupe" "usr.bin.ristretto ristretto" "usr.bin.vlc vlc"; do
+for pair in "usr.bin.loupe loupe" "usr.bin.vlc vlc"; do
   set -- $pair
   run "$1" <<EOT
 allow $2 $H/Downloads/f.png r

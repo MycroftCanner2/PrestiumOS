@@ -439,7 +439,6 @@
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer-write
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer-bwrap
 0644 root root /etc/apparmor.d/usr.bin.loupe
-0644 root root /etc/apparmor.d/usr.bin.ristretto
 0644 root root /etc/apparmor.d/usr.bin.vlc
 0644 root root /etc/apparmor.d/usr.bin.file-roller
 0644 root root /etc/apparmor.d/usr.bin.xarchiver
@@ -527,7 +526,6 @@
 0644 root root /usr/share/applications/prestium-audacity.desktop
 0644 root root /etc/gnupg/gpg-agent.conf
 0644 root root /usr/local/share/applications/org.gnome.Zenity.desktop
-0644 root root /usr/local/share/applications/org.xfce.ristretto.desktop
 # 2.1 (design batch): theme, branding, panel network status, wallpaper and notification sound tools
 0644 root root /etc/systemd/system/prestium-netstatus.service
 0755 root root /usr/local/sbin/prestium-netstatus
