@@ -174,7 +174,7 @@ for p in ("usr/share/prestium/broker-style/gtk-3.0/settings.ini",
            s.get("gtk-font-name"), s.get("gtk-cursor-theme-name"), s.get("gtk-cursor-theme-size"))
     check(got == ("Adwaita", "1", "Prestium", "Cantarell 10", "Adwaita", "24"), "%s: broker dialogs stay dark" % p, str(got))
 d = read("etc/dconf/db/local.d/10-prestium-desktop")
-want = {"gtk-theme": "'Adwaita'", "color-scheme": "'prefer-light'", "icon-theme": "'Prestium'",
+want = {"gtk-theme": "'Adwaita'", "color-scheme": "'default'", "icon-theme": "'Prestium'",
         "font-name": "'Cantarell 11'", "cursor-theme": "'Adwaita'", "cursor-size": "24"}
 got = {k: (re.search(r"(?m)^%s=(.*)$" % k, d) or [None, None])[1] for k in want}
 check(got == want, "dconf: same theme, colour scheme, icons, font and cursor", str(got))

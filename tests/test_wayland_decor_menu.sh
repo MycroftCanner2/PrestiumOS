@@ -9,16 +9,26 @@ grep -q '<core>' "$RC" && grep -q '<decoration>client</decoration>' "$RC" \
   || { echo "FAIL: rc.xml does not default to client-side decorations"; exit 1; }
 grep -q '<windowRule identifier="\*" serverDecoration="no" />' "$RC" \
   || { echo "FAIL: rc.xml has no default serverDecoration=no rule"; exit 1; }
-for id in foot Audacity org.keepassxc.KeePassXC org.kde.kleopatra featherpad onionshare vlc; do
+for id in foot prestium-nyx Pcmanfm Claws-mail Galculator Audacity org.keepassxc.KeePassXC org.kde.kleopatra featherpad onionshare vlc; do
   grep -q "<windowRule identifier=\"$id\" serverDecoration=\"yes\" />" "$RC" \
     || { echo "FAIL: rc.xml gives no server-side titlebar to $id"; exit 1; }
 done
+# Applications menu fallback (no layer-shell): undecorated, pinned top-left below the bar
+grep -q '<windowRule identifier="prestium-apps-menu" serverDecoration="no">' "$RC" \
+  || { echo "FAIL: rc.xml has no prestium-apps-menu fallback rule"; exit 1; }
 # no app gets the compositor's forced frame any more (that rule drew a second titlebar)
 ! grep -q 'sandboxEngine=' "$RC" || { echo "FAIL: rc.xml still forces a frame by security context"; exit 1; }
 # Super+Space opens the root menu, and the panel button opens the Applications dropdown
 python3 - "$RC" <<'PY'
 import sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
+rules = [(k.get("identifier"), k.get("serverDecoration")) for k in root.iter() if k.tag.endswith("windowRule")]
+ids = [i for i, _ in rules]
+assert "prestium-nyx" in ids and "Pcmanfm" in ids, "nyx + XWayland SSD rules present"
+am = [k for k in root.iter() if k.tag.endswith("windowRule") and k.get("identifier") == "prestium-apps-menu"]
+assert len(am) == 1 and am[0].get("serverDecoration") == "no", "apps-menu fallback rule"
+mv = [x for x in am[0] if x.tag.endswith("action")]
+assert any(x.get("name") == "MoveTo" for x in mv), "apps-menu fallback is pinned, not centred"
 kb = [k for k in root.iter() if k.tag.endswith("keybind") and k.get("key") == "W-space"]
 assert len(kb) == 1, "one W-space keybind"
 a = [x for x in kb[0] if x.tag.endswith("action")][0]
