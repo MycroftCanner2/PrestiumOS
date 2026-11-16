@@ -1,0 +1,11 @@
+#!/bin/sh
+# Prestium: power menu for the top-bar power button. Lock, log out, restart or
+# shut down, reusing prestium-power's confirmations (labwc has no prompt).
+pick=$(prestium-run zenity --list --title="Power" --text="What next?" \
+  --column="Action" "Lock screen" "Log out" "Restart" "Shut down" 2>/dev/null) || exit 0
+case "$pick" in
+  "Lock screen") exec /usr/local/bin/prestium-wl lock ;;
+  "Log out") exec /usr/local/bin/prestium-power logout ;;
+  Restart) exec /usr/local/bin/prestium-power reboot ;;
+  "Shut down") exec /usr/local/bin/prestium-power poweroff ;;
+esac

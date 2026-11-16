@@ -45,7 +45,7 @@ PALETTE = {
     "0a4f5c", "10262b", "5c4a1a",
     # Adwaita light theme: purple slate, light surfaces, dark text, success green
     "56347c", "7d4fb2", "1f5c3a", "2ec27e", "26a269", "e5a50a", "c01c28", "3584e4", "1c71d8",
-    "1a5fb4", "7a5600", "1e7b44", "929595", "fafafa", "dc8add",
+    "1a5fb4", "7a5600", "1e7b44", "929595", "fafafa", "dc8add", "282828", "454545", "241f31",
     "cdc7c2", "deddda", "ebebeb", "f6f5f4", "2e3436", "5e5c64", "77767b", "9a9996", "808080",
 }
 OLD = ["0066ff", "1a75ff", "0a6cff", "0052cc", "a3a3ff", "7fb2ff", "8fb3ff", "ff7a7a",
@@ -156,6 +156,8 @@ for p in ("etc/gtk-3.0/settings.ini", "etc/gtk-4.0/settings.ini"):
     got = (s.get("gtk-theme-name"), s.get("gtk-application-prefer-dark-theme"), s.get("gtk-icon-theme-name"),
            s.get("gtk-font-name"), s.get("gtk-cursor-theme-name"), s.get("gtk-cursor-theme-size"))
     check(got == ("Adwaita", "0", "Adwaita", "Cantarell 11", "Adwaita", "24"), "%s: Adwaita light, Adwaita icons, Cantarell 11, Adwaita 24 cursor" % p, str(got))
+    check(all(s.get(k) == v for k, v in (("gtk-xft-antialias", "1"), ("gtk-xft-hinting", "1"),
+           ("gtk-xft-hintstyle", "hintslight"), ("gtk-xft-rgba", "rgb"))), "%s: Xft antialiasing, hinting, rgb" % p)
 for p in ("usr/share/prestium/broker-style/gtk-3.0/settings.ini",
           "usr/share/prestium/broker-style/gtk-4.0/settings.ini"):
     c = configparser.ConfigParser(interpolation=None); c.read_string(read(p)); s = c["Settings"]
@@ -164,7 +166,8 @@ for p in ("usr/share/prestium/broker-style/gtk-3.0/settings.ini",
     check(got == ("Adwaita", "0", "Adwaita", "Cantarell 10", "Adwaita", "24"), "%s: broker dialogs follow the light session" % p, str(got))
 d = read("etc/dconf/db/local.d/10-prestium-desktop")
 want = {"gtk-theme": "'Adwaita'", "color-scheme": "'default'", "icon-theme": "'Adwaita'",
-        "font-name": "'Cantarell 11'", "cursor-theme": "'Adwaita'", "cursor-size": "24"}
+        "font-name": "'Cantarell 11'", "monospace-font-name": "'Monospace 10'",
+        "cursor-theme": "'Adwaita'", "cursor-size": "24"}
 got = {k: (re.search(r"(?m)^%s=(.*)$" % k, d) or [None, None])[1] for k in want}
 check(got == want, "dconf: same theme, colour scheme, icons, font and cursor", str(got))
 g2 = read("etc/gtk-2.0/gtkrc")
@@ -174,8 +177,9 @@ g2t = read("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc")
 check(all('include "/usr/share/themes/Adwaita-dark/gtk-2.0/%s"' % f in g2t for f in ("main.rc", "apps.rc", "hacks.rc")),
       "GTK 2: Prestium-Dark is Adwaita-dark's engine with Prestium's colour scheme")
 kg = kde("etc/xdg/kdeglobals")
-check(kg.get("Icons", "Theme", fallback=None) == ICON and kg.get("General", "font", fallback="").startswith("Cantarell,10"),
-      "KDE: Prestium icons, Cantarell 10", "%s %s" % (kg.get("Icons", "Theme", fallback=None), kg.get("General", "font", fallback=None)))
+check(kg.get("Icons", "Theme", fallback=None) == ICON and kg.get("Icons", "ColorScheme", fallback=None) == "Adwaita" and kg.get("Icons", "Name", fallback=None) == "Adwaita"
+      and kg.get("General", "font", fallback="").startswith("Cantarell,10"),
+      "KDE: Prestium icons, Adwaita colour scheme name, Cantarell 10", "%s %s" % (kg.get("Icons", "Theme", fallback=None), kg.get("General", "font", fallback=None)))
 check(kg.get("General", "ColorScheme", fallback="Prestium") == "Prestium", "KDE: Prestium colour scheme")
 lw = read("etc/xdg/labwc/rc.xml")
 check("<name>Prestium-Adwaita</name>" in lw and "<icon>%s</icon>" % ICON in lw, "labwc: Prestium-Adwaita window theme, Prestium icons")
@@ -199,16 +203,16 @@ check("Inherits=Adwaita,Papirus,Papirus-Dark,AdwaitaLegacy,gnome,hicolor" in tra
 check("<cornerRadius>8</cornerRadius>" in lw, "labwc: 8 px window corners")
 check("window.button.hover.bg.corner-radius: 12" in read("usr/share/themes/Prestium-Adwaita/openbox-3/themerc"), "labwc: 12 px titlebar button hover")
 check(re.search(r"(?m)^border-radius=12$", mk) is not None, "mako: 12 px notifications")
-check(re.search(r"(?m)^padding=12$", mk) is not None, "mako: 12 px padding")
+check(re.search(r"(?m)^padding=12,16$", mk) is not None, "mako: 12 px vertical, 16 px horizontal padding")
 m = re.search(r"(?m)^max-icon-size=(\d+)$", mk)
 check(m is not None and m.group(1) == "48", "mako: 48 px notification icons", m and m.group(1))
-check(re.search(r"window#waybar\.prestium-top\s+\.module\s*\{", wb) is not None and "border-radius: 999px" in wb, "waybar: 999 px status pills")
+check(re.search(r"window#waybar\.prestium-top\s*\{", wb) is not None and "background-color: #000000" in wb and "border-radius: 99px" in wb, "waybar: black top bar, 99 px module hover")
 radii = {}
 for p in ("etc/xdg/waybar/style.css",
           "var/lib/i2pd/webconsole/style.css", "usr/share/prestium/torrents-theme/prestium-dark.css"):
     s = strip_comments(read(p), "css")
     vals = set(v.strip() for v in re.findall(r"(?:border-radius|--radius)\s*:\s*([^;}!]+)", s))
-    radii[p] = sorted(v for v in vals if v not in ("0", "4px", "6px", "8px", "999px", "var(--radius)"))
+    radii[p] = sorted(v for v in vals if v not in ("0", "4px", "6px", "8px", "99px", "999px", "var(--radius)"))
 check(not any(radii.values()), "CSS radii are 4 px, 6 px, 8 px or 999 px pills", str({k: v for k, v in radii.items() if v}))
 check(not os.path.exists(os.path.join(I, "usr/share/prestium/theme/gtk3.css"))
       and not os.path.exists(os.path.join(I, "usr/share/prestium/theme/gtk4.css")),
@@ -218,6 +222,10 @@ tools = {os.path.basename(f): open(f, encoding="utf-8").read() for f in glob.glo
 # 12 px around each window's content; 8 px inside a section card
 borders = {n: sorted(set(re.findall(r"set_border_width\((\d+)\)", s))) for n, s in tools.items() if "set_border_width(" in s}
 check(borders and all("12" in v and set(v) <= {"8", "12"} for v in borders.values()), "GTK tools: 12 px window borders (8 px inside cards)", str(borders))
+prestium_css = ".suggested-action { background: #0050c8; color: #ffffff; border-radius: 6px; }"
+check(all(prestium_css in tools[n] and "progressbar progress { background-color: #0050c8; }" in tools[n]
+          for n in ("prestium-tor-assistant", "prestium-i2p-assistant")),
+      "assistants: Prestium-blue primary buttons and progress bars")
 widths = []
 for f in glob.glob(os.path.join(I, "usr/local/bin/*")) + glob.glob(os.path.join(I, "usr/local/sbin/*")):
     if os.path.basename(f) == "prestium-vm-notify": continue
@@ -382,6 +390,9 @@ check('os.environ["XDG_CONFIG_HOME"] = "/usr/share/prestium/broker-style"' in bu
 br = read("usr/local/sbin/prestium-wl-broker")
 check('"ADW_DEBUG_COLOR_SCHEME": "prefer-light"' in br and '"GTK_THEME": "Adwaita"' in br,
       "broker dialogs: libadwaita prefer-light and GTK_THEME=Adwaita")
+check(all(f in br for f in ('"--color", "241f31"', '"--ring-color", "0050c8"', '"--key-hl-color", "3584e4"',
+      '"--indicator-radius", "56"', '"--indicator-thickness", "6"')),
+      "lock screen: dark-shield swaylock flags in the broker")
 # stock Adwaita paints primary buttons and dialog text itself; the repo pins the
 # pairing in test_contrast.py (white on #3584e4, bold selected-row pairing)
 # tracked files only: running the tests creates (git-ignored) __pycache__ next to imported tools

@@ -3,6 +3,7 @@
 gtk-theme='Adwaita'
 icon-theme='Adwaita'
 font-name='Cantarell 11'
+monospace-font-name='Monospace 10'
 font-antialiasing='grayscale'
 font-hinting='slight'
 cursor-theme='Adwaita'

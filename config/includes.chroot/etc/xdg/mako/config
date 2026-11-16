@@ -1,17 +1,17 @@
-# Prestium 2.1: GNOME-style top-center light notifications (Adwaita).
-# One look per urgency: low (grey edge, 5 s), normal (grey edge, 6 s),
+# Prestium 2.1: dark notifications under the black top bar (Adwaita dark values).
+# One look per urgency: low (grey text, 5 s), normal (grey edge, 5 s),
 # critical (red edge, stays until dismissed). The volume and brightness OSD (category prestium.osd) is compact.
 # mako has no fade or slide animation. Sounds are off unless turned on (System, Notification Sounds).
 anchor=top-center
-margin=34,0,0,0
-default-timeout=6000
+margin=8
+default-timeout=5000
 font=Cantarell 11
-background-color=#ffffff
-text-color=#2e3436
-border-color=#cdc7c2
+background-color=#282828
+text-color=#ffffff
+border-color=#454545
 border-size=1
 border-radius=12
-padding=12
+padding=12,16
 outer-margin=4
 width=380
 max-visible=5
@@ -29,8 +29,8 @@ on-notify=exec /usr/local/bin/prestium-notify-sound normal
 
 [urgency=low]
 default-timeout=5000
-border-color=#cdc7c2
-text-color=#5e5c64
+border-color=#454545
+text-color=#c8c8c8
 
 [urgency=critical]
 default-timeout=0

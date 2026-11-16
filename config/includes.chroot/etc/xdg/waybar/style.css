@@ -1,155 +1,48 @@
-/* Prestium 2.1 (dual bar): dark top system bar (#1e1e1e, white text)
-   and light bottom window-list taskbar (#f6f5f4, dark text), Cantarell 11.
-   Symbol icons (pills, tray, battery) come from Font Awesome. */
-
+/* Prestium 2.1: solid black top system bar (#000000, white text) and light
+   bottom window-list taskbar (#f6f5f4, dark text), Cantarell 11.
+   Status glyphs fall back through fontconfig to the installed icon fonts. */
 * {
-    font-family: Cantarell, FontAwesome, sans-serif;
+    font-family: Cantarell, sans-serif;
     font-size: 11pt;
+    font-weight: 700;
     border: none;
     border-radius: 0;
     min-height: 0;
 }
 
 /* ============================================================
-   TOP BAR — dark system panel (#1e1e1e)
+   TOP BAR — solid black system panel (#000000)
    ============================================================ */
 window#waybar.prestium-top {
-    background-color: #1e1e1e;
-    color: #ffffff;
-    border-bottom: 1px solid #000000;
-}
-
-window#waybar.prestium-top #custom-applications {
-    font-weight: 700;
-    color: #ffffff;
-    padding: 0 12px;
-    margin: 2px 4px;
-    border-radius: 999px;
-}
-
-window#waybar.prestium-top #custom-applications:hover {
-    background-color: rgba(255, 255, 255, 0.14);
-}
-
-window#waybar.prestium-top #clock {
-    font-weight: 700;
-    color: #ffffff;
-    padding: 0 12px;
-    margin: 2px 0;
-    border-radius: 999px;
-}
-
-window#waybar.prestium-top #clock:hover {
-    background-color: rgba(255, 255, 255, 0.14);
-}
-
-/* Custom Prestium Status Pills (Tor / I2P / Network) */
-window#waybar.prestium-top .module {
-    margin: 3px 3px;
-    padding: 0 10px;
-    border-radius: 999px;
-    font-weight: 600;
-    font-size: 10pt;
-}
-
-window#waybar.prestium-top #custom-tor,
-window#waybar.prestium-top #custom-netstatus-tor,
-window#waybar.prestium-top .tor {
-    background-color: #56347c;
-    color: #ffffff;
-    border: 1px solid #7d4fb2;
-}
-
-window#waybar.prestium-top #custom-i2p,
-window#waybar.prestium-top #custom-netstatus-i2p,
-window#waybar.prestium-top .i2p {
-    background-color: #1f5c3a;
-    color: #ffffff;
-    border: 1px solid #2ec27e;
-}
-
-window#waybar.prestium-top .connected,
-window#waybar.prestium-top .ready {
-    background-color: #26a269;
+    background-color: #000000;
     color: #ffffff;
 }
 
-window#waybar.prestium-top .bootstrapping,
-window#waybar.prestium-top .warning {
-    background-color: #e5a50a;
-    color: #1e1e1e;
-}
-
-window#waybar.prestium-top .offline,
-window#waybar.prestium-top .disconnected,
-window#waybar.prestium-top .error {
-    background-color: #c01c28;
-    color: #ffffff;
-}
-
-window#waybar.prestium-top #custom-tor.connecting,
-window#waybar.prestium-top #custom-i2p.connecting {
-    background-color: #e5a50a;
-    color: #1e1e1e;
-    border-color: #e5a50a;
-}
-
-window#waybar.prestium-top #custom-tor.ready,
-window#waybar.prestium-top #custom-i2p.ready {
-    background-color: #26a269;
-    color: #ffffff;
-    border-color: #26a269;
-}
-
-window#waybar.prestium-top #custom-tor.failed,
-window#waybar.prestium-top #custom-i2p.failed {
-    background-color: #c01c28;
-    color: #ffffff;
-    border-color: #c01c28;
-}
-
-window#waybar.prestium-top #custom-tor:hover,
-window#waybar.prestium-top #custom-i2p:hover {
-    border-color: #ffffff;
-}
-
-window#waybar.prestium-top #custom-timesync.syncing {
-    color: #e5a50a;
-}
-
-window#waybar.prestium-top #custom-timesync.failed {
-    color: #ff9494;
-}
-
-window#waybar.prestium-top #pulseaudio,
-window#waybar.prestium-top #battery,
+window#waybar.prestium-top #custom-applications,
+window#waybar.prestium-top #custom-places,
+window#waybar.prestium-top #clock,
 window#waybar.prestium-top #tray,
+window#waybar.prestium-top #custom-tor-status,
+window#waybar.prestium-top #custom-i2p-status,
+window#waybar.prestium-top #pulseaudio,
+window#waybar.prestium-top #network,
+window#waybar.prestium-top #battery,
 window#waybar.prestium-top #custom-power {
     color: #ffffff;
-    padding: 0 8px;
+    background-color: transparent;
+    padding: 0 10px;
+    margin: 3px 2px;
+    border-radius: 99px;
 }
 
+window#waybar.prestium-top #custom-applications:hover,
+window#waybar.prestium-top #custom-places:hover,
+window#waybar.prestium-top #clock:hover,
 window#waybar.prestium-top #pulseaudio:hover,
+window#waybar.prestium-top #network:hover,
 window#waybar.prestium-top #battery:hover,
 window#waybar.prestium-top #custom-power:hover {
-    background-color: rgba(255, 255, 255, 0.14);
-}
-
-window#waybar.prestium-top #network.disconnected {
-    color: #ff9494;
-}
-
-window#waybar.prestium-top #pulseaudio.muted {
-    color: #a8a8a8;
-}
-
-window#waybar.prestium-top #battery.warning:not(.charging) {
-    color: #ffd166;
-}
-
-window#waybar.prestium-top #battery.critical:not(.charging) {
-    color: #ff9494;
-    font-weight: bold;
+    background-color: rgba(255, 255, 255, 0.16);
 }
 
 /* ============================================================

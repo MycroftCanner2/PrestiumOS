@@ -1,50 +1,49 @@
-// Prestium 2.1 (dual bar): a dark top system bar (Applications menu,
-// clock, Tor/I2P pills, tray) and a light bottom window-list taskbar.
+// Prestium 2.1: solid black top system bar (Applications + Places, clock, Tor/I2P
+// status, tray) and a light bottom window-list taskbar.
 // The Applications button opens prestium-apps-menu (a categorized dropdown);
-// Super+Space and right-click still open labwc's root menu (system actions).
+// Places opens a folder picker; Super+Space and right-click still open labwc's
+// root menu (system actions).
 [
   {
-    // 2.1 (design batch): Tor and I2P pills. Root-free and read-only: prestium-netstatus.service
+    // 2.1: Tor and I2P status. Root-free and read-only: prestium-netstatus.service
     // writes the state every 5 seconds; a click opens the matching Connection Assistant (Network menu).
     "name": "prestium-top",
     "layer": "top",
     "position": "top",
     "height": 28,
-    "spacing": 4,
-    "modules-left": ["custom/applications"],
+    "margin": "0 0 0 0",
+    "spacing": 0,
+    "modules-left": ["custom/applications", "custom/places"],
     "modules-center": ["clock"],
-    "modules-right": ["custom/tor", "custom/i2p", "custom/timesync", "tray", "network", "pulseaudio", "battery"],
+    "modules-right": ["tray", "custom/tor-status", "custom/i2p-status", "pulseaudio", "network", "battery", "custom/power"],
     "custom/applications": {
       "format": "Applications",
       "on-click": "/usr/local/bin/prestium-apps-menu",
       "tooltip": false
     },
+    "custom/places": {
+      "format": "Places",
+      "on-click": "/usr/local/bin/prestium-places",
+      "tooltip": false
+    },
     "clock": {
-      "format": "{:%a %b %d  %H:%M}",
+      "format": "{:%a %b %d, %H:%M}",
       "tooltip-format": "<tt>{calendar}</tt>",
       "timezone": "Etc/UTC"
     },
-    "custom/tor": {
+    "custom/tor-status": {
       "exec": "cat /run/prestium/netstatus/tor.json",
       "return-type": "json",
       "interval": 5,
       "format": "\uf111  {}",
       "on-click": "prestium-run /usr/local/bin/prestium-tor-assistant"
     },
-    "custom/i2p": {
+    "custom/i2p-status": {
       "exec": "cat /run/prestium/netstatus/i2p.json",
       "return-type": "json",
       "interval": 5,
       "format": "\uf111  {}",
       "on-click": "prestium-run /usr/local/bin/prestium-i2p-assistant"
-    },
-    // clock sync over Tor (prestium-timesync). Hidden once the time is set; a clock symbol in amber
-    // while it waits or syncs, red when it refused a time it could not trust.
-    "custom/timesync": {
-      "exec": "cat /run/prestium/timesync/waybar.json",
-      "return-type": "json",
-      "interval": 10,
-      "format": "{}"
     },
     "tray": { "icon-size": 18, "spacing": 8 },
     "network": {
@@ -75,6 +74,11 @@
       "format-plugged": "\uf1e6",
       "format-icons": ["\uf244", "\uf243", "\uf242", "\uf241", "\uf240"],
       "tooltip-format": "Battery {capacity} %. {timeTo}"
+    },
+    "custom/power": {
+      "format": "\uf011",
+      "on-click": "/usr/local/bin/prestium-power-menu",
+      "tooltip-format": "Power"
     }
   },
   {

@@ -238,6 +238,12 @@ class Assistant(Gtk.ApplicationWindow):
         self.connect("realize", lambda *_: self.fit_screen())
         self.get_screen().connect("monitors-changed", lambda *_: self.fit_screen())
         self.set_border_width(12)
+        # Prestium-blue primary buttons and progress bars on the light dialogs.
+        _prestium_css = Gtk.CssProvider()
+        _prestium_css.load_from_data(b".suggested-action { background: #0050c8; color: #ffffff; border-radius: 6px; }\n"
+                                      b"progressbar progress { background-color: #0050c8; }\n")
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), _prestium_css,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.phase = "idle"            # idle | applying | connecting | cancelling
         self.last_request = None
         self.texts = {}

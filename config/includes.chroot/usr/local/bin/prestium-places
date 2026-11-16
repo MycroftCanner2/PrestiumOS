@@ -1,0 +1,15 @@
+#!/bin/sh
+# Prestium: Places picker for the top bar (Home, Desktop, Documents, Downloads,
+# Tor Browser downloads). A zenity list; the folder opens in pcmanfm.
+pick=$(prestium-run zenity --list --title="Places" --text="Open a folder:" \
+  --column="Place" Home Desktop Documents Downloads "Tor Browser" 2>/dev/null) || exit 0
+case "$pick" in
+  Home) d="$HOME" ;;
+  Desktop) d="$HOME/Desktop" ;;
+  Documents) d="$HOME/Documents" ;;
+  Downloads) d="$HOME/Downloads" ;;
+  "Tor Browser") d="$HOME/Tor Browser" ;;
+  *) exit 0 ;;
+esac
+[ -d "$d" ] || d="$HOME"
+exec prestium-run pcmanfm "$d"

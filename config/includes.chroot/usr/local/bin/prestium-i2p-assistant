@@ -77,6 +77,12 @@ class Assistant(Gtk.ApplicationWindow):
         super().__init__(application=app, title="I2P Connection Assistant")
         self.set_icon_name("i2pd")   # 2.1 (UI pass): the menu's and the .desktop file's icon
         self.set_position(Gtk.WindowPosition.CENTER)
+        # Prestium-blue primary buttons and progress bars on the light dialogs.
+        _prestium_css = Gtk.CssProvider()
+        _prestium_css.load_from_data(b".suggested-action { background: #0050c8; color: #ffffff; border-radius: 6px; }\n"
+                                      b"progressbar progress { background-color: #0050c8; }\n")
+        Gtk.StyleContext.add_provider_for_screen(Gdk.Screen.get_default(), _prestium_css,
+                                                 Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
         self.current = None; self.busy = False
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8, margin=16)
         # 2.1: always fits the screen. The content scrolls when the work area (screen minus the

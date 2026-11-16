@@ -71,17 +71,20 @@ grep -q '^\[category=prestium.osd\]' "$M" && grep -q -- '-c prestium.osd' "$I/us
 grep -q '^icon-path=/usr/share/icons/Adwaita:/usr/share/icons/Papirus:' "$M" && ok "mako icons from Adwaita" || bad "mako icon-path"
 grep -q '\[ -f "\$FLAG" \] || exit 0' "$I/usr/local/bin/prestium-notify-sound" && ok "notification sounds off unless turned on" || bad "sounds not opt-in"
 W="$I/etc/xdg/waybar"
-python3 - "$W/config.jsonc" <<'PY' && ok "waybar: dual bar, Tor and I2P pills from prestium-netstatus" || bad "waybar config"
+python3 - "$W/config.jsonc" <<'PY' && ok "waybar: black top bar, Places, Tor/I2P status, power" || bad "waybar config"
 import json, re, sys
 c = json.loads(re.sub(r'^\s*//.*$', '', open(sys.argv[1]).read(), flags=re.M))
 assert isinstance(c, list) and [b["name"] for b in c] == ["prestium-top", "prestium-bottom"], c
 top, bottom = c
-assert top["position"] == "top" and top["height"] == 28 and bottom["position"] == "bottom" and bottom["height"] == 30
-assert top["modules-left"] == ["custom/applications"] and top["modules-center"] == ["clock"]
-assert {"custom/tor", "custom/i2p", "network"} <= set(top["modules-right"]) and "custom/menu" not in top["modules-left"]
+assert top["position"] == "top" and top["height"] == 28 and top["spacing"] == 0 and bottom["position"] == "bottom" and bottom["height"] == 30
+assert top["modules-left"] == ["custom/applications", "custom/places"] and top["modules-center"] == ["clock"]
+assert top["modules-right"] == ["tray", "custom/tor-status", "custom/i2p-status", "pulseaudio", "network", "battery", "custom/power"]
 assert top["custom/applications"]["on-click"] == "/usr/local/bin/prestium-apps-menu"
-for k in ("tor", "i2p"):
-    assert top["custom/" + k]["exec"] == "cat /run/prestium/netstatus/%s.json" % k and top["custom/" + k]["return-type"] == "json"
+assert top["custom/places"]["on-click"] == "/usr/local/bin/prestium-places"
+assert top["custom/power"]["on-click"] == "/usr/local/bin/prestium-power-menu"
+assert top["clock"]["format"] == "{:%a %b %d, %H:%M}"
+for k in ("tor-status", "i2p-status"):
+    assert top["custom/" + k]["exec"] == "cat /run/prestium/netstatus/%s.json" % k.split("-")[0] and top["custom/" + k]["return-type"] == "json"
 assert bottom["modules-left"] == ["wlr/taskbar"] and bottom["wlr/taskbar"]["on-click"] == "minimize-raise"
 PY
 python3 - "$W/config.jsonc" <<'PY' && ok "waybar: labeled taskbar, centered clock with calendar tooltip" || bad "waybar status area"
@@ -89,12 +92,11 @@ import json, re, sys
 c = json.loads(re.sub(r'^\s*//.*$', '', open(sys.argv[1]).read(), flags=re.M))
 top, bottom = c
 assert bottom["wlr/taskbar"]["format"] == "{icon}  {title:.28}" and bottom["wlr/taskbar"]["icon-size"] == 16
-assert "custom/timesync" in top["modules-right"] and top["custom/timesync"]["exec"] == "cat /run/prestium/timesync/waybar.json"
 assert top["clock"]["tooltip-format"] == "<tt>{calendar}</tt>" and top["clock"].get("tooltip", True) is not False
 PY
-for cl in connecting ready failed; do grep -q "#custom-tor.$cl" "$W/style.css" && grep -q "#custom-i2p.$cl" "$W/style.css" && ok "pill colour: $cl" || bad "pill colour $cl"; done
-# 2.1 (UI pass): pill, tooltip and button radii (the spec in test_ui_consistency.py)
-grep -q 'window#waybar.prestium-top .module {' "$W/style.css" && grep -q 'border-radius: 999px;' "$W/style.css" && ok "rounded pills" || bad "pills not round"
+grep -q 'window#waybar.prestium-top {$' "$W/style.css" && grep -q 'background-color: #000000;' "$W/style.css" && ok "top bar is solid black" || bad "top bar not black"
+grep -q 'border-radius: 99px;' "$W/style.css" && ok "rounded top-bar modules" || bad "top-bar modules not round"
+grep -q 'background-color: rgba(255, 255, 255, 0.16);' "$W/style.css" && ok "top-bar hover glow" || bad "top-bar hover missing"
 grep -q '^tooltip {' "$W/style.css" && grep -q 'border-radius: 6px;' "$W/style.css" && ok "rounded tooltips" || bad "tooltips not round"
 # panel status service: not root, read-only, sandboxed
 U="$I/etc/systemd/system/prestium-netstatus.service"

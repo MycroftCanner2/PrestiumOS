@@ -139,8 +139,6 @@ w = open(I + "/usr/share/prestium/build/systemd-wants.txt").read()
 p = open(I + "/usr/share/prestium/build/perms.txt").read()
 for f in ("/usr/local/sbin/prestium-bootclock", "/etc/systemd/system/prestium-bootclock.service", "/usr/share/prestium/timesync/pools.conf"):
     (ok if f in p else bad)("perms: " + f)
-
-# panel: a clock dot that only shows while not synced
-c = open(I + "/etc/xdg/waybar/config.jsonc").read()
-(ok if '"custom/timesync"' in c and "/run/prestium/timesync/waybar.json" in c else bad)("waybar: clock-sync dot")
+# panel: the clock-sync dot was removed with the status pills; the service still
+# writes /run/prestium/timesync/waybar.json for prestium-vm-check
 sys.exit(fail)

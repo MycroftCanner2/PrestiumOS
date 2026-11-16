@@ -9,6 +9,8 @@ font=Cantarell,10,-1,5,50,0,0,0,0,0
 
 [Icons]
 Theme=Prestium
+ColorScheme=Adwaita
+Name=Adwaita
 
 [ColorEffects:Disabled]
 Color=246,245,244
