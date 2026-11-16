@@ -74,7 +74,7 @@ UI = [
     ("usr/share/themes/Prestium-Adwaita/openbox-3/themerc", "ini"),
     ("usr/share/themes/Prestium-Dark/gtk-2.0/gtkrc", "rc"),
     ("var/lib/i2pd/webconsole/style.css", "css"), ("usr/share/prestium/torrents-theme/prestium-dark.css", "css"),
-    ("usr/local/bin/prestium-apps-menu", "sh"), ("usr/local/bin/prestium-session", "sh"),
+    ("usr/local/bin/prestium-session", "sh"),
     ("usr/local/lib/prestium/browser-sandbox.sh", "sh"),
     ("usr/local/bin/prestium-tor-assistant", "sh"), ("usr/local/bin/prestium-i2p-assistant", "sh"),
     ("usr/local/bin/prestium-browser-updater", "sh"), ("usr/local/sbin/prestium-wl-broker", "sh"),

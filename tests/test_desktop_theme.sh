@@ -42,7 +42,7 @@ grep -q 'prestium-logo.svg' "$H/0450-prestium-tray-icons.hook.chroot" && [ -f "$
 grep -qx 'export QT_STYLE_OVERRIDE=Adwaita' "$I/usr/local/bin/prestium-session" && ok "Qt style Adwaita" || bad "Qt style not Adwaita"
 grep -q 'QT_WAYLAND_DISABLE_WINDOWDECORATION=1' "$I/usr/local/bin/prestium-session" && ok "no Qt client-side decorations" || bad "Qt draws its own decorations"
 for kd in etc/skel/.config etc/xdg home/user/.config; do [ ! -e "$I/$kd/Kvantum" ] && ok "no Kvantum config ($kd)" || bad "Kvantum config left ($kd)"; done
-[ -x "$I/usr/local/bin/prestium-apps-menu" ] && python3 -m py_compile "$I/usr/local/bin/prestium-apps-menu" && ok "Applications menu runs" || bad "Applications menu missing or broken"
+[ ! -e "$I/usr/local/bin/prestium-apps-menu" ] && [ ! -e "$I/usr/local/bin/prestium-places" ] && grep -q 'def menu(self)' "$I/usr/local/sbin/prestium-wl-broker" && ok "Applications opens the root menu, no panel menu left" || bad "panel menu left or broker menu missing"
 grep -q 'owner @{HOME}/.config/gtk-4.0/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-common" && grep -q '/usr/share/themes/Adwaita/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-base" && grep -q '/usr/share/fonts/truetype/cantarell/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-base" && ok "AppArmor: confined apps read GTK 4 colours, Adwaita and Cantarell" || bad "AppArmor misses theme reads"
 grep -q "^accent-color='blue'" "$I/etc/dconf/db/local.d/10-prestium-desktop" && ok "dconf accent blue" || bad "dconf accent"
 for v in 3 4; do
@@ -71,33 +71,33 @@ grep -q '^\[category=prestium.osd\]' "$M" && grep -q -- '-c prestium.osd' "$I/us
 grep -q '^icon-path=/usr/share/icons/Adwaita:/usr/share/icons/Papirus:' "$M" && ok "mako icons from Adwaita" || bad "mako icon-path"
 grep -q '\[ -f "\$FLAG" \] || exit 0' "$I/usr/local/bin/prestium-notify-sound" && ok "notification sounds off unless turned on" || bad "sounds not opt-in"
 W="$I/etc/xdg/waybar"
-python3 - "$W/config.jsonc" <<'PY' && ok "waybar: black top bar, Places, Tor/I2P status, power" || bad "waybar config"
+python3 - "$W/config.jsonc" <<'PY' && ok "waybar: black bars, root-menu Applications, Tor/I2P status, power" || bad "waybar config"
 import json, re, sys
 c = json.loads(re.sub(r'^\s*//.*$', '', open(sys.argv[1]).read(), flags=re.M))
 assert isinstance(c, list) and [b["name"] for b in c] == ["prestium-top", "prestium-bottom"], c
 top, bottom = c
 assert top["position"] == "top" and top["height"] == 28 and top["spacing"] == 0 and bottom["position"] == "bottom" and bottom["height"] == 30
-assert top["modules-left"] == ["custom/applications", "custom/places"] and top["modules-center"] == ["clock"]
+assert top["modules-left"] == ["custom/applications"] and top["modules-center"] == ["clock"]
 assert top["modules-right"] == ["tray", "custom/tor-status", "custom/i2p-status", "pulseaudio", "network", "battery", "custom/power"]
-assert top["custom/applications"]["on-click"] == "/usr/local/bin/prestium-apps-menu"
-assert top["custom/places"]["on-click"] == "/usr/local/bin/prestium-places"
+assert top["custom/applications"]["on-click"] == "/usr/local/bin/prestium-wl menu"
 assert top["custom/power"]["on-click"] == "/usr/local/bin/prestium-power-menu"
 assert top["clock"]["format"] == "{:%a %b %d, %H:%M}"
 for k in ("tor-status", "i2p-status"):
     assert top["custom/" + k]["exec"] == "cat /run/prestium/netstatus/%s.json" % k.split("-")[0] and top["custom/" + k]["return-type"] == "json"
 assert bottom["modules-left"] == ["wlr/taskbar"] and bottom["wlr/taskbar"]["on-click"] == "minimize-raise"
 PY
-python3 - "$W/config.jsonc" <<'PY' && ok "waybar: labeled taskbar, centered clock with calendar tooltip" || bad "waybar status area"
+python3 - "$W/config.jsonc" <<'PY' && ok "waybar: icon-only taskbar, centered clock with calendar tooltip" || bad "waybar status area"
 import json, re, sys
 c = json.loads(re.sub(r'^\s*//.*$', '', open(sys.argv[1]).read(), flags=re.M))
 top, bottom = c
-assert bottom["wlr/taskbar"]["format"] == "{icon}  {title:.28}" and bottom["wlr/taskbar"]["icon-size"] == 16
+assert bottom["wlr/taskbar"]["format"] == "{icon}" and bottom["wlr/taskbar"]["icon-size"] == 24
 assert top["clock"]["tooltip-format"] == "<tt>{calendar}</tt>" and top["clock"].get("tooltip", True) is not False
 PY
 grep -q 'window#waybar.prestium-top {$' "$W/style.css" && grep -q 'background-color: #000000;' "$W/style.css" && ok "top bar is solid black" || bad "top bar not black"
 grep -q 'border-radius: 99px;' "$W/style.css" && ok "rounded top-bar modules" || bad "top-bar modules not round"
 grep -q 'background-color: rgba(255, 255, 255, 0.16);' "$W/style.css" && ok "top-bar hover glow" || bad "top-bar hover missing"
 grep -q '^tooltip {' "$W/style.css" && grep -q 'border-radius: 6px;' "$W/style.css" && ok "rounded tooltips" || bad "tooltips not round"
+grep -q '#custom-tor-status.ready' "$W/style.css" && grep -q 'background-color: #26a269;' "$W/style.css" && grep -q 'background-color: #e5a50a;' "$W/style.css" && grep -q 'background-color: #c01c28;' "$W/style.css" && ok "Tor/I2P pills change colour" || bad "pill colours missing"
 # panel status service: not root, read-only, sandboxed
 U="$I/etc/systemd/system/prestium-netstatus.service"
 for k in User=prestium-netstatus NoNewPrivileges=yes ProtectSystem=strict ReadWritePaths=/run/prestium/netstatus IPAddressDeny=any CapabilityBoundingSet=; do

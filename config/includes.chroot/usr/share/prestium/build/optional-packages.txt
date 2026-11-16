@@ -12,7 +12,6 @@ cpp
 cpp-14
 cpp-14-x86-64-linux-gnu
 cpp-x86-64-linux-gnu
-diodon
 dracut-install
 fonts-dejavu-mono
 gcr4
@@ -166,7 +165,6 @@ libdee-1.0-4
 libdeflate0
 libdevmapper1.02.1
 libdialog15
-libdiodon0
 libdouble-conversion3
 libdpkg-perl
 libdrm-amdgpu1
@@ -587,7 +585,6 @@ libproxy1v5
 libpsl5t64
 libpulse-mainloop-glib0
 libpulse0
-libpurple0t64
 libpyside6-py3-6.8
 libpython3-stdlib
 libpython3.13

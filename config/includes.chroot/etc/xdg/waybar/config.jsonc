@@ -1,8 +1,7 @@
-// Prestium 2.1: solid black top system bar (Applications + Places, clock, Tor/I2P
-// status, tray) and a light bottom window-list taskbar.
-// The Applications button opens prestium-apps-menu (a categorized dropdown);
-// Places opens a folder picker; Super+Space and right-click still open labwc's
-// root menu (system actions).
+// Prestium 2.1: solid black top system bar (Applications, clock, Tor/I2P
+// status, tray) and a black bottom icon-only window-list taskbar.
+// The Applications button opens labwc's root menu through the broker;
+// Super+Space and right-click open the same menu.
 [
   {
     // 2.1: Tor and I2P status. Root-free and read-only: prestium-netstatus.service
@@ -13,17 +12,12 @@
     "height": 28,
     "margin": "0 0 0 0",
     "spacing": 0,
-    "modules-left": ["custom/applications", "custom/places"],
+    "modules-left": ["custom/applications"],
     "modules-center": ["clock"],
     "modules-right": ["tray", "custom/tor-status", "custom/i2p-status", "pulseaudio", "network", "battery", "custom/power"],
     "custom/applications": {
       "format": "Applications",
-      "on-click": "/usr/local/bin/prestium-apps-menu",
-      "tooltip": false
-    },
-    "custom/places": {
-      "format": "Places",
-      "on-click": "/usr/local/bin/prestium-places",
+      "on-click": "/usr/local/bin/prestium-wl menu",
       "tooltip": false
     },
     "clock": {
@@ -82,7 +76,7 @@
     }
   },
   {
-    // Bottom window-list taskbar: titled buttons (raise/minimise/close)
+    // Bottom window-list taskbar: icon-only buttons (raise on click, close on middle-click)
     "name": "prestium-bottom",
     "layer": "top",
     "position": "bottom",
@@ -92,8 +86,8 @@
     "modules-center": [],
     "modules-right": [],
     "wlr/taskbar": {
-      "format": "{icon}  {title:.28}",
-      "icon-size": 16,
+      "format": "{icon}",
+      "icon-size": 24,
       "icon-theme": "Adwaita",
       "tooltip-format": "{title} ({app_id})",
       "sort-by-app-id": true,

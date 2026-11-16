@@ -91,16 +91,11 @@
     <windowRule identifier="*zenity*" serverDecoration="yes">
       <action name="AutoPlace" policy="center" />
     </windowRule>
-    <!-- Applications menu fallback: when layer-shell is unavailable it opens as a plain
-         window (undecorated by itself); pin it top-left below the bar. Layer-shell
-         surfaces never match windowRules, so this only affects the fallback. -->
-    <windowRule identifier="prestium-apps-menu" serverDecoration="no">
-      <action name="MoveTo" x="4" y="0" />
-    </windowRule>
     <!-- Default to client-side decorations (prevents double titlebars on GTK/Firefox) -->
     <windowRule identifier="*" serverDecoration="no" />
 
-    <!-- Give a single Prestium-Adwaita titlebar to terminal, XWayland, and Qt apps -->
+    <!-- Give a single Prestium-Adwaita titlebar to terminal, XWayland, Qt and
+         Firefox-based apps (and OnionShare, all of which draw none of their own) -->
     <windowRule identifier="foot" serverDecoration="yes" />
     <!-- foot with app-id prestium-nyx (Tor Monitor) is a different app_id, not covered by "foot" -->
     <windowRule identifier="prestium-nyx" serverDecoration="yes" />
@@ -117,11 +112,17 @@
     <!-- Feather Wallet (thirdparty). Identifier from its desktop file; confirm with lswt on the live ISO. -->
     <windowRule identifier="feather" serverDecoration="yes" />
     <windowRule identifier="org.featherwallet.feather" serverDecoration="yes" />
-    <windowRule identifier="Audacity" serverDecoration="yes" />
     <windowRule identifier="org.keepassxc.KeePassXC" serverDecoration="yes" />
     <windowRule identifier="org.kde.kleopatra" serverDecoration="yes" />
     <windowRule identifier="featherpad" serverDecoration="yes" />
     <windowRule identifier="onionshare" serverDecoration="yes" />
     <windowRule identifier="vlc" serverDecoration="yes" />
+    <!-- Firefox-based browsers use the compositor frame (no tabs in the title bar)
+         and OnionShare draws no frame of its own; without these they open bare. -->
+    <windowRule identifier="Tor Browser" serverDecoration="yes" />
+    <windowRule identifier="librewolf" serverDecoration="yes" />
+    <windowRule identifier="PrestiumLocalFirefox" serverDecoration="yes" />
+    <windowRule identifier="firefox" serverDecoration="yes" />
+    <windowRule identifier="OnionShare" serverDecoration="yes" />
   </windowRules>
 </labwc_config>

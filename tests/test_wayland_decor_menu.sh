@@ -9,29 +9,28 @@ grep -q '<core>' "$RC" && grep -q '<decoration>client</decoration>' "$RC" \
   || { echo "FAIL: rc.xml does not default to client-side decorations"; exit 1; }
 grep -q '<windowRule identifier="\*" serverDecoration="no" />' "$RC" \
   || { echo "FAIL: rc.xml has no default serverDecoration=no rule"; exit 1; }
-for id in foot prestium-nyx Pcmanfm pcmanfm Claws-mail Galculator galculator Audacity org.keepassxc.KeePassXC org.kde.kleopatra featherpad feather org.featherwallet.feather qtqr pavucontrol onionshare vlc; do
+for id in foot prestium-nyx Pcmanfm pcmanfm Claws-mail Galculator galculator org.keepassxc.KeePassXC org.kde.kleopatra featherpad feather org.featherwallet.feather qtqr pavucontrol onionshare OnionShare vlc librewolf PrestiumLocalFirefox firefox; do
   grep -q "<windowRule identifier=\"$id\" serverDecoration=\"yes\" />" "$RC" \
     || { echo "FAIL: rc.xml gives no server-side titlebar to $id"; exit 1; }
 done
-# Applications menu fallback (no layer-shell): undecorated, pinned top-left below the bar
-grep -q '<windowRule identifier="prestium-apps-menu" serverDecoration="no">' "$RC" \
-  || { echo "FAIL: rc.xml has no prestium-apps-menu fallback rule"; exit 1; }
+# multi-word identifier (spaces break the loop above)
+grep -q '<windowRule identifier="Tor Browser" serverDecoration="yes" />' "$RC" \
+  || { echo "FAIL: rc.xml gives no server-side titlebar to Tor Browser"; exit 1; }
+# the panel menu is gone: nothing by that name anywhere in the compositor config
+! grep -q 'prestium-apps-menu' "$RC" \
+  || { echo "FAIL: rc.xml still mentions prestium-apps-menu"; exit 1; }
 # no app gets the compositor's forced frame any more (that rule drew a second titlebar)
 ! grep -q 'sandboxEngine=' "$RC" || { echo "FAIL: rc.xml still forces a frame by security context"; exit 1; }
 # GNOME button layout: icon left, close only right (minimize/maximize stay on the taskbar and Alt+Space menu)
 grep -q '<titleLayout>icon,label:close</titleLayout>' "$RC" \
   || { echo "FAIL: rc.xml titlebar is not GNOME close-only"; exit 1; }
-# Super+Space opens the root menu, and the panel button opens the Applications dropdown
+# Super+Space opens the root menu (the panel Applications button presses it through the broker)
 python3 - "$RC" <<'PY'
 import sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 rules = [(k.get("identifier"), k.get("serverDecoration")) for k in root.iter() if k.tag.endswith("windowRule")]
 ids = [i for i, _ in rules]
 assert "prestium-nyx" in ids and "Pcmanfm" in ids, "nyx + XWayland SSD rules present"
-am = [k for k in root.iter() if k.tag.endswith("windowRule") and k.get("identifier") == "prestium-apps-menu"]
-assert len(am) == 1 and am[0].get("serverDecoration") == "no", "apps-menu fallback rule"
-mv = [x for x in am[0] if x.tag.endswith("action")]
-assert any(x.get("name") == "MoveTo" for x in mv), "apps-menu fallback is pinned, not centred"
 kb = [k for k in root.iter() if k.tag.endswith("keybind") and k.get("key") == "W-space"]
 assert len(kb) == 1, "one W-space keybind"
 a = [x for x in kb[0] if x.tag.endswith("action")][0]
@@ -48,7 +47,7 @@ assert isinstance(c, list) and [b["name"] for b in c] == ["prestium-top", "prest
 top = c[0]
 assert top["modules-left"][0] == "custom/applications", top["modules-left"]
 m = top["custom/applications"]
-assert m["on-click"] == "/usr/local/bin/prestium-apps-menu", m
+assert m["on-click"] == "/usr/local/bin/prestium-wl menu", m
 '
 grep -qx wtype "$R/../package-lists/prestium-2.0.list.chroot"
 # Firefox-based browsers: no tabs in the title bar

@@ -538,6 +538,10 @@ class Session:
         return val if val in WALLPAPERS else WALLPAPERS[0]
 
     def swaybg_argv(self):
+        # the chosen Prestium wallpaper; the solid colour is only the fallback
+        img = os.path.join(WALLPAPER_DIR, self.wallpaper_name() + ".png")
+        if os.path.isfile(img):
+            return ["swaybg", "-m", "fill", "-i", img]
         return ["swaybg", "-c", "#56347c"]
 
     def wallpaper(self):

@@ -76,9 +76,17 @@ PY
 if [ "$MODE" = download ]; then
   step "Checking that Tor is connected"
   why=$(tor_ready) || die 3 "Tor is not connected yet ($why). Wait until Tor has connected (Network > Tor Connection Assistant), then try again."
-  # the firewall must let $TORUID reach Tor's SOCKS port (a refused connect fails fast)
-  runuser -u "$TORUID" -- timeout 10 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9050' 2>/dev/null \
-    || die 3 "uid $TORUID cannot reach Tor's SOCKS port 127.0.0.1:9050 (firewall or Tor not listening)"
+  # the firewall must let $TORUID reach Tor's SOCKS port. Tor restarts (a new
+  # connection method, new bridges) keep the control port answering while the SOCKS
+  # listener is briefly gone, so retry before failing.
+  socks_ok=0
+  for _ in 1 2 3; do
+    if runuser -u "$TORUID" -- timeout 10 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9050' 2>/dev/null; then
+      socks_ok=1; break
+    fi
+    sleep 5
+  done
+  [ "$socks_ok" = 1 ] || die 3 "uid $TORUID cannot reach Tor's SOCKS port 127.0.0.1:9050 after 3 tries (firewall or Tor not listening; Tor's log: Network > Network Logs)"
   ok=0
   for s in "${SOURCES[@]}"; do
     url=${s%% *}; signers=${s#* }; host=${url#https://}; host=${host%%/*}

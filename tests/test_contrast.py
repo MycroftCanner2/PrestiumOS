@@ -205,15 +205,15 @@ need(S, "OSD text", th['osd.label.text.color'], th['osd.bg.color'], TEXT)
 if th['osd.border.color'].lower() != "#cdc7c2":
     fails.append("labwc: OSD edge is not Adwaita grey")
 
-# --- waybar (black top system bar, light bottom taskbar) ---
+# --- waybar (black top system bar, black bottom taskbar) ---
 wb = css(read("etc/xdg/waybar/style.css"))
 S = "waybar"
 bar = col(wb['window#waybar.prestium-top']['background-color'])
 need(S, "top bar text", col(wb['window#waybar.prestium-top']['color']), bar, TEXT)
-for mod in ("#custom-applications", "#custom-places", "#clock", "#custom-tor-status",
+for mod in ("#custom-applications", "#clock", "#custom-tor-status",
             "#custom-i2p-status", "#pulseaudio", "#network", "#battery", "#custom-power"):
     need(S, "%s text" % mod, col(wb['window#waybar.prestium-top ' + mod]['color']), bar, TEXT)
-for mod in ("#custom-applications", "#custom-places", "#clock", "#pulseaudio",
+for mod in ("#custom-applications", "#clock", "#pulseaudio",
             "#network", "#battery", "#custom-power"):
     need(S, "%s (hover)" % mod, "#ffffff",
          over(col(wb['window#waybar.prestium-top ' + mod + ':hover']['background-color']), bar), TEXT)
