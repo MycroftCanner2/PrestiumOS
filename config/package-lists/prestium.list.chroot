@@ -294,6 +294,10 @@ qtqr
 # (libqt5multimedia5-plugins), which --apt-recommends false left out, so "Decode from webcam" found no camera.
 libqt5multimedia5-plugins
 qttranslations5-l10n
+# 2.1: Qt6 apps (Kleopatra KF6 and others) need their Wayland backend too, for the same
+# --apt-recommends reason as the Qt5 multimedia plugins above; without it they fall back to
+# XWayland, bypassing the broker's security context for input and output.
+qt6-wayland
 qtwayland5
 readline-common
 runit-helper

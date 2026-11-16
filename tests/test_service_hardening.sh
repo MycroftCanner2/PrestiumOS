@@ -19,7 +19,7 @@ for c in CAP_CHOWN CAP_FOWNER CAP_DAC_OVERRIDE CAP_SETUID CAP_SETGID CAP_KILL CA
 grep -qx 'NoNewPrivileges=yes' "$U/prestium-wl-broker.service" && bad "wl-broker: NoNewPrivileges would break swaylock's PAM helper" || ok "wl-broker: no NoNewPrivileges (its tools use setuid helpers)"
 grep -q '^SystemCallFilter' "$U/prestium-wl-broker.service" && bad "wl-broker: a syscall filter would bind the session tools too" || ok "wl-broker: no syscall filter"
 # 2.1 (audit L-4): the rest of the sandbox the broker's tools can live with, and no system uids
-for k in ProtectSystem=yes 'RestrictAddressFamilies=AF_UNIX AF_NETLINK' RestrictNamespaces=yes ProtectKernelLogs=yes ProtectControlGroups=yes SystemCallArchitectures=native RestrictSUIDSGID=yes; do
+for k in ProtectSystem=yes 'RestrictAddressFamilies=AF_UNIX AF_NETLINK' RestrictNamespaces=yes ProtectKernelLogs=yes ProtectControlGroups=yes SystemCallArchitectures=native RestrictSUIDSGID=yes LimitNOFILE=256; do
   grep -qx "$k" "$U/prestium-wl-broker.service" && ok "wl-broker: $k" || bad "wl-broker: no $k"; done
 grep -qx 'ProtectSystem=strict' "$U/prestium-wl-broker.service" && bad "wl-broker: strict would block chpasswd and screenshots" || ok "wl-broker: /etc and home stay writable"
 B=$R/config/includes.chroot/usr/local/sbin/prestium-wl-broker

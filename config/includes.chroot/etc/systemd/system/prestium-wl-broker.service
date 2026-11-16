@@ -10,6 +10,8 @@ NotifyAccess=all
 ExecStart=/usr/local/sbin/prestium-wl-broker
 Restart=always
 RestartSec=1
+# the broker holds a handful of fds (the context pipe per session); cap them
+LimitNOFILE=256
 # the trusted tools it starts as the user live in this unit; a broker restart must not kill them
 KillMode=process
 # 2.1 (security audit): only the root powers the broker uses: chown/chmod the compositor's socket

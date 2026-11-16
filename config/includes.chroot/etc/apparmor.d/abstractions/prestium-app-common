@@ -70,4 +70,7 @@
   @{run}/prestium-wl/[0-9]*/apps rw,
   deny @{run}/user/[0-9]*/wayland-[0-9]* rw,
   deny @{run}/prestium-wl/broker rw,
+  # the session bus: no confined app gets it (nothing allows the socket file,
+  # so this only documents the boundary and survives future abstraction edits)
+  deny @{run}/user/[0-9]*/bus rw,
   deny @{run}/user/[0-9]*/prestium-sandbox/** rw,

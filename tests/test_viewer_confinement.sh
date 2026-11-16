@@ -45,6 +45,8 @@ while read -r id bin f; do
   grep -qx "0644 root root /etc/apparmor.d/$f" "$PM" && ok "perms: $f" || bad "perms: $f"
 done <<<"$TABLE"
 grep -q '^rm -f /etc/apparmor.d/loupe /etc/apparmor.d/local/loupe$' "$H" && ok "hook drops Debian's unconfined loupe profile" || bad "Debian loupe profile kept"
+for d in .claws-mail .purple .local/share/gajim .config/gajim; do grep -q "deny @{HOME}/$d/" "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny $d" || bad "viewer-core may read $d"; done
+grep -qx '  deny ptrace,' "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny ptrace" || bad "viewer-core may ptrace"
 for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-viewer prestium-viewer-core prestium-viewer-write prestium-viewer-bwrap; do
   grep -qx "0644 root root /etc/apparmor.d/abstractions/$a" "$PM" || bad "perms: abstraction $a"; done
 if command -v apparmor_parser >/dev/null; then

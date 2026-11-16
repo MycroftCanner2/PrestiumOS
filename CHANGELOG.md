@@ -72,6 +72,15 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   ~/Documents. The local Firefox used to deny all read in ~/Torrents (`deny ... rw`); it now
   reads there and is denied only writes, so I2P Torrents' file picker and Firefox can open
   `.torrent` files there.
+- **Viewers can't see mail or chat, trace each other, or reach the session bus; Qt6 apps stay on
+  Wayland.** `prestium-viewer-core` now explicitly denies mail/chat data (`~/.claws-mail`,
+  `~/.purple`, Gajim's config and data) and `ptrace`, so a crafted image or archive that
+  exploits a viewer can neither read another app's messages nor inspect other processes (the
+  expanded-profile test already asserted the absence; the denies now state it). `prestium-app-common`
+  denies the session-bus socket file, documenting that no confined app gets D-Bus. The broker
+  service caps file descriptors (`LimitNOFILE=256`). `qt6-wayland` is installed alongside
+  `qtwayland5` (`--apt-recommends` is off, as with the Qt5 multimedia plugins): without it Qt6
+  apps fall back to XWayland, bypassing the broker's security context.
 - **LibreOffice opens again.** Its profile now allows the XDG data dir
   (`~/.local/share/libreoffice`), the cache directory itself, link (`l`) permission for its
   lock files, and exec of `senddoc`; without a writable user profile the first run showed

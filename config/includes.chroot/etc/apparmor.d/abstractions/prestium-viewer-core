@@ -12,6 +12,13 @@
   deny /run/prestium/logs/** rw,   # 2.1: the desktop user's Tor/I2P logs
   deny @{HOME}/**.kdbx rw,
   deny @{HOME}/**.{key,keyx} rw,
+  # mail and chat are another app's data (see the oth check in test_viewer_confinement.sh);
+  # ptrace would let an exploited decoder inspect its neighbours
+  deny @{HOME}/.claws-mail/** rw,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.local/share/gajim/** rw,
+  deny @{HOME}/.config/gajim/** rw,
+  deny ptrace,
   # base and gnome allow writes and ix there (ecryptfs, ~/tmp); not for a file viewer
   deny @{HOME}/.Private/** wx,
   deny @{HOME}/tmp/** wx,
