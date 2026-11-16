@@ -4,7 +4,9 @@
 #   scripts/fetch-thirdparty.sh            verify signature + pinned SHA-256 (fails on any mismatch)
 #   scripts/fetch-thirdparty.sh --repin    verify signature only, print the SHA-256 values to pin
 #   2.1: Tor Browser is the newest signed release unless pinned (thirdparty/versions.sh, scripts/tb-latest.sh)
-#   It also stages a signature-checked I2P reseed file (StormyCloud su3; a verified download under 24 h old is reused) into config/includes.chroot/var/lib/i2pd/.
+#   It also stages a signature-checked I2P reseed file into config/includes.chroot/var/lib/i2pd/: the
+#   repo-shipped i2pseeds.su3 is used first (signature-checked; age only warns, refresh it in git when it
+#   gets old); without it, a StormyCloud download (a verified download under 24 h old is reused) is the fallback.
 # Needs: curl gpg gpgv git sha256sum unzip npm python3 openssl (the host's npm only runs "npm ci --ignore-scripts": pure JS,
 # architecture-independent). Every registry tarball is checked against the lockfile's sha512 integrity; the one git
 # dependency (irc-framework, pinned to a commit, no integrity in the lockfile) is installed from a "git archive" tarball
@@ -179,23 +181,34 @@ echo "OK LURCH $LURCH_COMMIT"
 
 [ "$REPIN" = 1 ] && exit 0
 
-# I2P reseed file, checked every time before use: SU3 format, StormyCloud signer, RSA-4096/SHA-512
-# signature against i2pd's reseed certificate (thirdparty/keys/reseed/), routerInfo entries in the zip,
+# I2P reseed file, checked every time before use: SU3 format, allowed signer (StormyCloud or echelon3),
+# RSA-4096/SHA-512 signature against i2pd's reseed certificates (thirdparty/keys/reseed/), routerInfo entries in the zip,
 # and an age limit on the signed version timestamp. i2pd.conf [reseed] file= points at it; owner i2pd
 # (2000) comes from perms.txt.
+# 2.1: the repo ships its own copy (i2pseeds.su3, currently echelon3@mail.i2p; certificate in
+# thirdparty/keys/reseed/). Builds prefer it, so they no longer depend on StormyCloud being up:
+# the shipped file is signature-checked with its age only warned (refresh it in git when it gets old).
 # 2.0 r14: the server rate-limits per IP (HTTP 429), so rebuilds and --resume runs kept failing. The last
 # verified download is kept in the cache and reused, re-verified, when it was downloaded less than
 # PRESTIUM_RESEED_REUSE_HOURS ago (default 24; 0 always downloads). If a download fails, a cached copy is
 # used only if its signed version is at most 3 days old. Otherwise the build stops, as before.
 SU3=$TOP/config/includes.chroot/var/lib/i2pd/stormycloud-i2pseeds.su3
+SU3LOCAL=$TOP/i2pseeds.su3
 SU3URL=https://reseed.stormycloud.org/i2pseeds.su3
 SU3C=$C/reseed/stormycloud-i2pseeds.su3; mkdir -p "$C/reseed"
 SU3V="$TOP/config/includes.chroot/usr/local/lib/prestium/verify-su3"
-su3ok(){ python3 "$SU3V" "$1" --max-age "$2" --signers admin@stormycloud.org,idk@stormycloud.org "$TOP/thirdparty/keys/reseed"; }
+SU3SIGNERS=admin@stormycloud.org,idk@stormycloud.org,echelon3@mail.i2p
+su3ok(){ python3 "$SU3V" "$1" --max-age "$2" --signers "$SU3SIGNERS" "$TOP/thirdparty/keys/reseed"; }
+su3okw(){ python3 "$SU3V" "$1" --warn-only-age --signers "$SU3SIGNERS" "$TOP/thirdparty/keys/reseed"; }
 REUSE_H=${PRESTIUM_RESEED_REUSE_HOURS:-24}
 case "$REUSE_H" in ''|*[!0-9]*) echo "ERROR: PRESTIUM_RESEED_REUSE_HOURS must be a whole number"; exit 1;; esac
 rm -f "$SU3" "$SU3.part"
-if [ "$REUSE_H" -gt 0 ] && [ -s "$SU3C" ] && [ -n "$(find "$SU3C" -mmin -$((REUSE_H * 60)))" ] && su3ok "$SU3C" 14; then
+SU3STRICT=1
+if [ -s "$SU3LOCAL" ]; then
+  echo "OK RESEED using the repo-shipped i2pseeds.su3"
+  cp "$SU3LOCAL" "$SU3.part"
+  SU3STRICT=0
+elif [ "$REUSE_H" -gt 0 ] && [ -s "$SU3C" ] && [ -n "$(find "$SU3C" -mmin -$((REUSE_H * 60)))" ] && su3ok "$SU3C" 14; then
   echo "OK RESEED reusing the copy verified $(date -u -r "$SU3C" +%FT%TZ) (under ${REUSE_H}h old)"
   cp "$SU3C" "$SU3.part"
 else
@@ -214,7 +227,11 @@ else
     fi
   fi
 fi
-su3ok "$SU3.part" 14 || { rm -f "$SU3.part"; echo "ERROR: I2P reseed file failed verification"; exit 1; }
+if [ "$SU3STRICT" = 1 ]; then
+  su3ok "$SU3.part" 14 || { rm -f "$SU3.part"; echo "ERROR: I2P reseed file failed verification"; exit 1; }
+else
+  su3okw "$SU3.part" || { rm -f "$SU3.part"; echo "ERROR: repo-shipped i2pseeds.su3 failed verification"; exit 1; }
+fi
 chmod 644 "$SU3.part"; mv -f "$SU3.part" "$SU3"
 
 # stage for the hooks

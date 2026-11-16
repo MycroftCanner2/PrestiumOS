@@ -43,9 +43,9 @@ which works but is several times slower.
    (npm) and the lurch source, checks each one against its publisher's OpenPGP signature
    (`thirdparty/keys/`) **and** the SHA-256 pinned in `thirdparty/versions.sh`, and stages them in
    `config/includes.chroot/usr/src/prestium-thirdparty/` (not committed; removed from the image by
-   the last hook); it also stages a StormyCloud I2P reseed file (a verified download under 24 h old is reused, see CHANGELOG r14), checks it with
+   the last hook); it also stages an I2P reseed file — the repo-shipped `i2pseeds.su3` first (see CHANGELOG), checks it with
    `config/includes.chroot/usr/local/lib/prestium/verify-su3` (SU3 format, RSA-4096/SHA-512 signature against `thirdparty/keys/reseed/`,
-   at most 14 days old) and puts it at `config/includes.chroot/var/lib/i2pd/stormycloud-i2pseeds.su3`;
+   at most 14 days old for downloads; the repo-shipped `i2pseeds.su3` is the primary source and its age only warns) and puts it at `config/includes.chroot/var/lib/i2pd/stormycloud-i2pseeds.su3`;
    (2.1: the image also ships copies of `thirdparty/keys/torbrowser.asc` and `mozilla.asc` in
    `/usr/share/prestium/keys/` and of `scripts/sigcheck.sh` in `/usr/local/lib/prestium/` for the
    Browser Updater, and keeps `/usr/share/prestium/opt-overlay`; when a key or `sigcheck.sh` changes,

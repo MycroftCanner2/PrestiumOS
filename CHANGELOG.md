@@ -124,6 +124,12 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   Python 3.13 loads frozen, so the hook failed the image build. It now installs a `sitecustomize`
   that turns the user site off, and sessions also get `PYTHONNOUSERSITE=1` so a `.pth` can't run
   first.
+- **The I2P reseed file now ships with the repo.** `scripts/fetch-thirdparty.sh` uses the committed
+  `i2pseeds.su3` (currently echelon3@mail.i2p, whose certificate is in `thirdparty/keys/reseed/`) and
+  signature-checks it with its age only warned, so a build no longer fails when StormyCloud is down
+  or rate-limiting. The StormyCloud download (verify 14 days, reuse a verified copy under 24 h,
+  fall back to a cached copy under 3 days) stays as a fallback when the shipped file is missing.
+  Refresh `i2pseeds.su3` in git when the build warns it is old.
 - **Release files.** `build.sh` writes `SHA256SUMS` (the ISO, its manifest and its package list) and
   `Prestium-2.1-amd64.manifest`: image SHA-256 and size, build date, source commit, Debian package
   count, and the Tor Browser, Firefox, Node.js, The Lounge, Feather, Tor, i2pd and LibreWolf versions
