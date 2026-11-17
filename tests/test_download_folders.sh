@@ -202,7 +202,7 @@ deny mat2//bwrap $H/Downloads/f.cleaned.pdf w
 deny mat2//bwrap /media/user/STICK/f.cleaned.pdf w
 deny mat2 $H/Downloads/f.pdf w
 EOT
-echo "== evince: a shared ~/Documents app; reads the shared folders, not the app-specific ones"
+echo "== evince: a shared ~/Documents app; reads the browsers' and torrents' folders, read-only"
 run prestium.evince <<EOT
 allow evince "$H/Documents/f.pdf" rw
 allow evince "$H/Documents/sub/f.pdf" rw
@@ -211,15 +211,40 @@ allow evince $H/Downloads/f.pdf r
 deny evince $H/Downloads/f.pdf w
 allow evince /media/user/STICK/f.pdf r
 deny evince /media/user/STICK/f.pdf w
-deny evince "$H/Tor Browser/f.pdf" rw
-deny evince "$H/I2P Browser/f.pdf" rw
-deny evince $H/Torrents/f.pdf rw
+allow evince "$H/Tor Browser/" r
+allow evince "$H/Tor Browser/f.pdf" r
+allow evince "$H/Tor Browser/sub/f.pdf" r
+allow evince "$H/I2P Browser/f.pdf" r
+allow evince $H/Torrents/f.pdf r
+allow evince $H/Torrents/sub/f.djvu r
+$(for d in "Tor Browser" "I2P Browser" Torrents; do for x in "" sub/; do printf 'deny evince "%s/%s/%sf.pdf" w\ndeny evince "%s/%s/%sf.pdf" l\n' "$H" "$d" "$x" "$H" "$d" "$x"; done; printf 'deny evince "%s/%s/new.pdf" w\n' "$H" "$d"; done)
 deny evince $H/Desktop/f.pdf w
 deny evince $H/Pictures/f.pdf w
-deny evince-previewer "$H/Tor Browser/f.pdf" r
+allow evince-previewer "$H/Tor Browser/f.pdf" r
+deny evince-previewer "$H/Tor Browser/f.pdf" w
 deny evince-previewer $H/Documents/f.pdf w
-deny evince-thumbnailer $H/Torrents/f.pdf r
+allow evince-thumbnailer $H/Torrents/f.pdf r
+deny evince-thumbnailer $H/Torrents/f.pdf w
 deny evince-thumbnailer $H/Documents/f.pdf w
+EOT
+echo "== the browsers can't read Evince's settings, cache or recent documents"
+for pair in "torbrowser.Browser.firefox torbrowser_firefox" "usr.share.librewolf.librewolf librewolf" "opt.firefox.firefox prestium-localfox"; do
+  set -- $pair
+  run "$1" <<EOT
+deny $2 $H/.config/evince/accels r
+deny $2 $H/.local/share/evince/metadata r
+deny $2 $H/.cache/evince/x r
+deny $2 $H/Documents/f.pdf r
+deny $2 /usr/bin/evince x
+EOT
+done
+run prestium.browser-launcher <<EOT
+deny prestium_tor_browser_launcher//bwrap $H/.config/evince/accels r
+deny prestium_librewolf_launcher//bwrap $H/.config/evince/accels r
+deny prestium_tor_browser_launcher//bwrap $H/Documents/f.pdf r
+deny prestium_librewolf_launcher//bwrap $H/Documents/f.pdf r
+deny prestium_tor_browser_launcher//bwrap $H/.local/share/recently-used.xbel r
+deny prestium_librewolf_launcher//bwrap $H/.local/share/recently-used.xbel r
 EOT
 echo "== FeatherPad reads Qt's dialog settings, can't change them"
 run usr.bin.featherpad <<EOT

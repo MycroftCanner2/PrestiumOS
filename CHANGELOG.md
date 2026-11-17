@@ -195,10 +195,13 @@ done in).
   (`evince`, plus `evince-previewer` for print preview and `evince-thumbnailer`); hook 0600 removes
   Debian's `usr.bin.evince`, which attached to the same programs and whose helper children may start
   browsers and mail apps. Evince has no network, sound or camera and only the restricted Wayland
-  socket. It is a `~/Documents` app: it reads and saves there ("Save a Copy", annotations), reads
-  `~/Downloads`, the other shared file folders and unlocked volumes read-only, and can't read
-  `~/Tor Browser`, `~/I2P Browser` or `~/Torrents`, the keys, KeePassXC databases or other apps' data.
-  Links in a document open nothing. It draws one header bar with minimise, maximise and close, like
+  socket. It is a `~/Documents` app: it reads and saves there ("Save a Copy", annotations). Like the
+  other viewers it opens files read-only (no write, no hard link) in `~/Downloads`, `~/Tor Browser`,
+  `~/I2P Browser`, `~/Torrents`, the other file folders and unlocked volumes, so a PDF a browser or
+  I2P Torrents downloaded opens in place from the file manager (the browsers can't start other
+  programs; they show PDFs in their own viewer). It can't read the keys, KeePassXC databases or other
+  apps' data, and the browsers' profiles and sandboxes can't read Evince's settings, cache or
+  documents. Links in a document open nothing. It draws one header bar with minimise, maximise and close, like
   the other header-bar apps.
 - **KeePassXC and Kleopatra are confined.** KeePassXC has no network or browser integration and saves
   `*.kdbx` (with its lock and safe-save files) in the home, `~/Documents` and unlocked volumes.

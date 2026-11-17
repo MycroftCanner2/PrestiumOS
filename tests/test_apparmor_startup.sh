@@ -147,9 +147,13 @@ deny evince $H/.claws-mail/accountrc r
 deny evince $H/.tor-browser/profile/key4.db r
 deny evince $H/.bashrc w
 deny evince $H/Downloads/f.pdf w
-deny evince "$H/Tor Browser/f.pdf" r
-deny evince "$H/I2P Browser/f.pdf" r
-deny evince $H/Torrents/f.pdf r
+allow evince "$H/Tor Browser/f.pdf" r
+allow evince "$H/I2P Browser/f.pdf" r
+allow evince $H/Torrents/f.pdf r
+deny evince "$H/Tor Browser/f.pdf" w
+deny evince "$H/I2P Browser/f.pdf" w
+deny evince $H/Torrents/f.pdf w
+deny evince $H/Torrents/f.pdf l
 deny evince /dev/video0 r
 deny evince /dev/snd/pcmC0D0p w
 allow evince-previewer /tmp/evince-1234/print.pdf r

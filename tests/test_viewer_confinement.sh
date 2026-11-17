@@ -47,6 +47,10 @@ while read -r id bin f; do
 done <<<"$TABLE"
 grep -q '^rm -f /etc/apparmor.d/loupe /etc/apparmor.d/local/loupe$' "$H" && ok "hook drops Debian's unconfined loupe profile" || bad "Debian loupe profile kept"
 grep -q '^rm -f /etc/apparmor.d/usr.bin.evince /etc/apparmor.d/local/usr.bin.evince$' "$H" && ok "hook drops Debian's evince profiles" || bad "Debian evince profile kept"
+# Evince reads the browsers' and torrents' folders like the other viewers (prestium-user-files), never writes or links there
+grep -q 'include <abstractions/prestium-viewer>' "$A/prestium.evince" && ! grep -Eq 'deny .*(Tor Browser|I2P Browser|Torrents)/.* [a-z]*r' "$A/prestium.evince" \
+  && [ "$(grep -Ec '^  deny "?@\{HOME\}/(Tor Browser|I2P Browser|Torrents)/\*\*"? wl,$' "$A/prestium.evince")" = 9 ] \
+  && ok "prestium.evince: reads ~/Tor Browser, ~/I2P Browser, ~/Torrents; no write or link there (all three profiles)" || bad "prestium.evince: app-specific folder rules"
 for d in .claws-mail .purple .local/share/gajim .config/gajim; do grep -q "deny @{HOME}/$d/" "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny $d" || bad "viewer-core may read $d"; done
 grep -qx '  deny ptrace,' "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny ptrace" || bad "viewer-core may ptrace"
 # 2.1 (bwrap split): the decoders and helpers run in capability-stripped inner profiles

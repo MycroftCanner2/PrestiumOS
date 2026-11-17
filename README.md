@@ -41,8 +41,9 @@ modernization of the 2023 Prestium build, with tighter security and new features
   and Gajim) and `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity,
   Kleopatra, Metadata Cleaner and Feather). Only three folders are app-specific: the I2P Browser's
   (`~/I2P Browser`), I2P Torrents' (`~/Torrents`) and Tor Browser's
-  (`~/Tor Browser`); the shared apps can't write in those three, and Evince can't read them either
-  (move a PDF into `~/Documents` first). The file manager pins exactly those
+  (`~/Tor Browser`); the shared apps can't write in those three, but the viewers (Evince, Loupe, VLC
+  and the others) can open files there read-only, so a PDF from a browser or I2P Torrents opens in
+  place from the file manager. The file manager pins exactly those
   five, labelled i2P Browser, Torrents, Tor Browser, Documents and Downloads. To attach a document
   you made, copy it from `~/Documents` to `~/Downloads` first: mail and chat can't read `~/Documents`.
   Volumes under `/media` are read-only for the apps (KeePassXC may save its `.kdbx` there); move files
