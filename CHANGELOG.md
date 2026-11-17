@@ -10,6 +10,8 @@ in 2.0. It is still built with live-build on Debian 13 "trixie".
 This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
 
 ### Fixes: viewers, media, metadata, LibreOffice, sharing, volume, logs and menu
+- **The pinned file list labels ~/Torrents as Torrents.** The folder is unchanged;
+  only the name in the file manager list changed, from i2P Torrents.
 - **Clicking an open app on the bottom bar selects it.** Left-click on the
   desktop used to open the root menu (labwc's default mouse bind), so a click
   that missed a window button opened the menu instead of that application.
@@ -362,7 +364,7 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   the I2P Browser's `~/I2P Browser` and I2P Torrents' `~/Torrents`, and the shared apps can't
   write in those three (the local Firefox may still read `*.torrent` files in the I2P Browser's folder,
   for I2P Torrents' Add .torrent). The file manager's pinned list is exactly those five, labelled
-  i2P Browser, i2P Torrents, Tor Browser, Documents and Downloads. mat2 writes its `name.cleaned.ext`
+  i2P Browser, Torrents, Tor Browser, Documents and Downloads. mat2 writes its `name.cleaned.ext`
   copy only in the "Remove metadata" work folder, `~/Documents/.remove-metadata.XXXXXX`; "Remove
   metadata" in the file manager copies the file there, runs mat2 and moves the cleaned copy back next
   to the original (never over an existing file; if that fails, the copy is left in `~/Documents`).
