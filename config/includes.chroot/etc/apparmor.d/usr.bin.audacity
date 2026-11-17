@@ -25,6 +25,7 @@ profile audacity /usr/libexec/prestium-audacity {
   # port, I2P's proxies) and no other address. No exec of bwrap, nsenter, the wrapper or the shim.
   include <abstractions/audio>
   include <abstractions/prestium-viewer-core>
+  include <abstractions/prestium-viewer-home-read>
   network inet stream,
   include <abstractions/prestium-viewer-write>
   # 2.1 (L-5): the shared ~/Documents folder is the only folder in the home it may write

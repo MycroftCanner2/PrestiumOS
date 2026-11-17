@@ -8,7 +8,19 @@ abi <abi/4.0>,
 include <tunables/global>
 
 profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
-  include <abstractions/prestium-app-base>
+  # 2.1: prestium-app-base without its "no ~/Tor Browser" deny, so documents open from anywhere in the
+  # home (prestium-viewer-home-read, read-only); the rest of app-base is here unchanged
+  include <abstractions/audio>
+  include <abstractions/prestium-app-common>
+  include <abstractions/prestium-app-secrets>
+  deny @{HOME}/.gnupg/** rw,
+  deny /run/prestium/logs/** rw,
+  deny @{HOME}/**.kdbx rw,
+  /usr/share/icons/Adwaita/** r,
+  /usr/share/themes/Adwaita/** r,
+  /usr/share/themes/Prestium-Adwaita/** r,
+  /usr/share/fonts/truetype/cantarell/** r,
+  include <abstractions/prestium-viewer-home-read>
   include if exists <abstractions/enchant>
   include if exists <abstractions/aspell>
   include <abstractions/cups-client>

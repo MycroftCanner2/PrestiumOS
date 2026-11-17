@@ -14,6 +14,7 @@ profile glycin-inner {
   include <abstractions/fonts>
   include <abstractions/prestium-no-admin>
   include <abstractions/prestium-user-files>
+  include <abstractions/prestium-viewer-home-read>
   /usr/libexec/glycin-loaders/* mr,
   / r,
   /usr/ r,

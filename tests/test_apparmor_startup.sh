@@ -358,6 +358,57 @@ grep -q '^ *include <abstractions/nameservice-strict>' "$L" || { echo "FAIL Libr
 grep -q '^ *include <abstractions/nameservice>' "$L" && { echo "FAIL LibreOffice includes the full nameservice abstraction"; fail=1; }
 grep -q '^ *deny network inet,' "$L" && grep -q '^ *deny network inet6,' "$L" || { echo "FAIL LibreOffice lost its network deny"; fail=1; }
 
+echo "== the viewers, players and editors read anywhere in the home, read-only, secrets denied"
+# 2.1: prestium-viewer-home-read. Loupe's decoder gets the file as a descriptor, which AppArmor checks
+# against loupe//bwrap and glycin-inner too (the decoder runs as glycin-inner stacked on loupe//bwrap).
+hr() { for p in "$@"; do cat <<EOR
+allow $p $H/Pictures/x.png r
+allow $p $H/.local/share/y.jpg r
+allow $p $H/Mail/inbox/1 r
+allow $p "$H/Tor Browser/a.pdf" r
+allow $p "$H/I2P Browser/b.png" r
+allow $p $H/Torrents/t.mkv r
+allow $p $H/Downloads/sub/dir/c.ogg r
+deny $p $H/Pictures/x.png l
+deny $p $H/.local/share/y.jpg w
+deny $p $H/.ssh/id_ed25519 r
+deny $p $G/pubring.kbx r
+deny $p $H/Documents/Passwords.kdbx r
+deny $p $H/.local/share/keyrings/login.keyring r
+deny $p $H/.mozilla/firefox/profiles.ini r
+deny $p $H/.tor-browser/profile.default/key4.db r
+deny $p $H/.librewolf/x/logins.json r
+deny $p $H/.claws-mail/accountrc r
+deny $p $H/.purple/accounts.xml r
+deny $p $H/.config/gajim/x r
+deny $p $H/Monero/wallets/w.keys r
+deny $p $H/.config/onionshare/onionshare.json r
+deny $p $H/.config/keepassxc/keepassxc.ini r
+deny $p $H/.bash_history r
+EOR
+done; }
+run usr.bin.loupe <<EOT
+$(hr loupe loupe//bwrap)
+EOT
+run usr.libexec.glycin-inner <<EOT
+$(hr glycin-inner)
+EOT
+run usr.bin.vlc <<EOT
+$(hr vlc)
+EOT
+run prestium.evince <<EOT
+$(hr evince evince-previewer evince-thumbnailer)
+EOT
+run usr.lib.libreoffice.program <<EOT
+$(hr libreoffice)
+EOT
+run usr.bin.featherpad <<EOT
+$(hr featherpad)
+EOT
+run usr.bin.audacity <<EOT
+$(hr audacity)
+EOT
+
 echo "== KeePassXC (directory write, and link for Qt 6 linkat commit; files stay .kdbx-only), VLC, the others: no ~/.gnupg, offline"
 run usr.bin.keepassxc <<EOT
 allow keepassxc $H/ w

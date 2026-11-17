@@ -74,7 +74,7 @@ done
 # 2.1 (boot fix): Loupe may stop a decoder's bwrap with SIGKILL, and only that
 grep -qx '  signal (send) set=(kill) peer=loupe//bwrap,' "$A/usr.bin.loupe" && grep -qx '    signal (receive) set=(kill) peer=loupe,' "$A/usr.bin.loupe" \
   && ok "loupe: may kill its decoders' bwrap" || bad "loupe: no kill rule for its bwrap"
-for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-viewer prestium-viewer-core prestium-viewer-write prestium-viewer-bwrap; do
+for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-viewer prestium-viewer-core prestium-viewer-write prestium-viewer-bwrap prestium-viewer-home-read; do
   grep -qx "0644 root root /etc/apparmor.d/abstractions/$a" "$PM" || bad "perms: abstraction $a"; done
 if command -v apparmor_parser >/dev/null; then
   W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
@@ -145,7 +145,22 @@ if command -v apparmor_parser >/dev/null; then
     for d in '@{HOME}/.Private/** wx' '@{HOME}/tmp/** wx'; do
       grep -qF "deny $d," <<<"$x" && ok "$f: deny $d" || bad "$f: no deny $d"; done
     grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* [a-z]*w' <<<"$al" && bad "$f: write anywhere in the home"
-    grep -Eq '^\S* \s*(owner\s+)?(@\{HOME\}/\*\*|/\*\*) r' <<<"$al" && bad "$f: read anywhere"
+    grep -Eq '^\S* \s*(owner\s+)?/\*\* r' <<<"$al" && bad "$f: reads the whole filesystem"
+    # 2.1: the viewers, players and editors read anywhere in the home (prestium-viewer-home-read), read
+    # only, with the secret stores denied; the others (archives, metadata cleaners, keys) still don't
+    if grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* r' <<<"$al"; then
+      case $f in
+        usr.bin.loupe|usr.bin.vlc|usr.bin.featherpad|usr.bin.audacity|prestium.evince)
+          grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* r,$' <<<"$al" && ! grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* [a-z]*[wl]' <<<"$al" \
+            && ok "$f: reads anywhere in the home, read-only" || bad "$f: home-wide rule is not read-only"
+          for d in '@{HOME}/.ssh/** rw' '@{HOME}/.gnupg/** rw' '@{HOME}/**.kdbx rw' '@{HOME}/.local/share/keyrings/** rw' \
+            '@{HOME}/.tor-browser/** rw' '@{HOME}/.librewolf/** rw' '@{HOME}/.mozilla/** rw' '@{HOME}/.claws-mail/** rw' \
+            '@{HOME}/.purple/** rw' '@{HOME}/.config/gajim/** rw' '@{HOME}/Monero/** rw' '@{HOME}/.config/onionshare/** rw' \
+            '@{HOME}/.config/keepassxc/** rw' '@{HOME}/.*_history rw'; do
+            grep -qF "deny $d," <<<"$x" || bad "$f: reads anywhere but no deny $d"; done ;;
+        *) bad "$f: read anywhere" ;;
+      esac
+    fi
     # 2.1 (review of db6601c): no unconfined or environment-keeping exec; only ix, Cx, Px, Pix
     ux=$(grep -vE '^\S* \s*(signal|unix|dbus|ptrace)' <<<"$al" | grep -E '\s[a-zA-Z]*(Ux|ux|Ix)[a-zA-Z]*( -> \S+)?,\s*$')
     [ -z "$ux" ] && ok "$f: no unconfined exec" || bad "$f: $ux"

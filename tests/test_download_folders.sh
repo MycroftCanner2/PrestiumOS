@@ -11,7 +11,7 @@
 #   /media:   read-only for all of them (2.1, review of 6bf1234)
 # The apps' settings point at the shared folders (where the app has a setting), /etc/skel matches the
 # live user's home, and every file there is in perms.txt. The file manager's pinned list is exactly
-# the five folders, labelled i2P Browser, Torrents, Tor Browser, Documents, Downloads.
+# the six folders, labelled i2P Browser, Torrents, Tor Browser, Documents, Downloads, Mail.
 # Mail and chat read and write files directly in ~/Downloads (attachments), never in the three
 # app-specific folders; the editors read every file folder (to open downloads) but write only
 # ~/Documents. The local Firefox may also read *.torrent in ~/I2P Browser and files in ~/Torrents, for I2P Torrents.
@@ -33,15 +33,22 @@ for f in "$I/home/user/.librewolf/librewolf.overrides.cfg" "$I/home/user/.config
     grep -qF "pref(\"$k\", \"/home/user/I2P Browser\");" "$f" && ok "$k in ${f#"$I/"}" || bad "$k missing in ${f#"$I/"}"; done; done
 cmp -s "$I/home/user/.librewolf/librewolf.overrides.cfg" "$I/home/user/.config/librewolf/librewolf/librewolf.overrides.cfg" \
   && ok "both LibreWolf overrides files identical" || bad "LibreWolf overrides files differ"
-echo "== pinned file list: exactly five, labelled i2P Browser, Torrents, Tor Browser, Documents, Downloads"
+echo "== pinned file list: exactly six, labelled i2P Browser, Torrents, Tor Browser, Documents, Downloads, Mail"
 exp="file:///home/user/I2P%20Browser i2P Browser
 file:///home/user/Torrents Torrents
 file:///home/user/Tor%20Browser Tor Browser
 file:///home/user/Documents Documents
-file:///home/user/Downloads Downloads"
+file:///home/user/Downloads Downloads
+file:///home/user/Mail Mail"
 for h in home/user etc/skel; do
   for b in .config/gtk-3.0/bookmarks .gtk-bookmarks; do
-    [ "$(tr -d '\r' < "$I/$h/$b")" = "$exp" ] && ok "$h/$b: the five pinned folders, in order" || bad "$h/$b: pinned list is not the five folders"; done; done
+    [ "$(tr -d '\r' < "$I/$h/$b")" = "$exp" ] && ok "$h/$b: the six pinned folders, in order" || bad "$h/$b: pinned list is not the six folders"; done; done
+# 2.1: "Mail" is Claws Mail's MH mailbox (folderlist.xml path="Mail"), which hook 0100 makes with its folders
+grep -q '<folder type="mh" name="Mailbox" path="Mail"' "$I/etc/skel/.claws-mail/folderlist.xml" \
+  && ok "Claws Mail's mailbox is ~/Mail (the pinned Mail folder)" || bad "Claws Mail's mailbox is not ~/Mail"
+grep -qF 'for d in inbox sent queue draft trash; do mkdir -p "/home/user/Mail/$d"; done' "$R/config/hooks/live/0100-prestium-users.hook.chroot" \
+  && ok "hook 0100 makes ~/Mail and its folders" || bad "hook 0100 doesn't make ~/Mail"
+grep -qF 'owner @{HOME}/Mail/** rwkl,' "$A/usr.bin.claws-mail" && ok "Claws Mail writes ~/Mail" || bad "Claws Mail can't write ~/Mail"
 echo "== editors' settings"
 X=$I/usr/lib/libreoffice/share/registry/prestium.xcd
 python3 -I - "$X" <<'PY' && ok "LibreOffice: Work path ~/Documents, UseLocking=false" || bad "LibreOffice prestium.xcd"

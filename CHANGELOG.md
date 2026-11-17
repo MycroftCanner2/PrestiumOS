@@ -217,10 +217,21 @@ done in).
   `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity, Kleopatra, Metadata Cleaner,
   Feather);
   only `~/I2P Browser`, `~/Torrents` and `~/Tor Browser` are app-specific, and the shared apps can't
-  write there. The file manager pins exactly those five. Mail and chat read only files directly in
+  write there. The file manager pins those five and Claws Mail's mailbox (`~/Mail`, labelled Mail,
+  made with its folders at build time). Mail and chat read only files directly in
   `~/Downloads`. Volumes under `/media` are read-only for the apps (except KeePassXC databases).
   LibreOffice can't save over a document opened from elsewhere (Save As) and writes no `.~lock` files.
   mat2 writes only in a work folder under `~/Documents`.
+- **The viewers, players and editors open files anywhere in the home, read-only.** Loupe (and its
+  glycin decoders, which get the file as a descriptor checked against their stacked profiles too),
+  Evince (with its previewer and thumbnailer), VLC, LibreOffice, FeatherPad and Audacity read every
+  folder of the home, hidden ones and `~/Tor Browser`, `~/I2P Browser` and `~/Torrents` included
+  (shared abstraction `prestium-viewer-home-read`); Loupe's next/previous works in any folder. No write
+  or link comes with it, each app saves only where it did before, and none has network. Denied
+  whatever the folder: `~/.gnupg`, `~/.ssh`, `*.kdbx`, key files, keyrings, `~/.pki`, the password
+  store, KeePassXC's, Kleopatra's and Feather's settings, Monero wallets, OnionShare's onion keys, the
+  browser profiles, Claws Mail's and Gajim's/Pidgin's account data and shell histories. LibreOffice no
+  longer takes app-base's "no `~/Tor Browser`" deny, so a document downloaded there opens in place.
 - **Browser launchers and sandboxes.** Browsers started from mail and chat stay confined: the
   launchers have their own profiles, run as `bash -p` with a fixed PATH and ignore the caller's
   environment. The bubblewrap child reads a read-only system, the browser in `/opt` and only the

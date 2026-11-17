@@ -61,6 +61,9 @@ gpasswd -a i2pd i2ptorrents >/dev/null
 mkdir -p /home/user
 cp -an /etc/skel/. /home/user/
 for d in Downloads Torrents Desktop Documents; do mkdir -p "/home/user/$d"; done
+# 2.1: Claws Mail's MH mailbox (~/Mail, folderlist.xml) made up front with its folders, as Claws would
+# on first start, so the file manager's "Mail" bookmark opens from the first login
+for d in inbox sent queue draft trash; do mkdir -p "/home/user/Mail/$d"; done
 chown -R user:user /home/user; chmod 700 /home/user
 
 # root: locked (1.8+); no root login at all

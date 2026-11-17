@@ -1,0 +1,41 @@
+# Prestium 2.1: the viewers, players and editors may open files anywhere in the home, read-only:
+# every subfolder, hidden ones and the browsers' and torrents' own folders (~/Tor Browser,
+# ~/I2P Browser, ~/Torrents) included, so a file opens wherever it is and Loupe's next/previous
+# works in any folder. Included by Loupe (and its bwrap child and glycin-inner: glycin hands the
+# open file to the decoder as a file descriptor, and AppArmor checks a received descriptor against
+# every profile of the receiver, glycin-inner stacked on loupe//bwrap), VLC, Evince (all three
+# profiles), LibreOffice, FeatherPad and Audacity. Each keeps its own write folders.
+# Read only: no write and no link come with it. The secret stores below stay denied (a deny wins).
+  owner @{HOME}/ r,
+  owner @{HOME}/** r,
+  # ~/Torrents files belong to i2pd (uid 2000), so "owner" never matches them (prestium-user-files)
+  @{HOME}/Torrents/ r,
+  @{HOME}/Torrents/** r,
+  # keys, passwords and wallets
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/.ssh/** rw,
+  deny @{HOME}/**.kdbx rw,
+  deny @{HOME}/**.{key,keyx} rw,
+  deny @{HOME}/.local/share/keyrings/** rw,
+  deny @{HOME}/.pki/** rw,
+  deny @{HOME}/.password-store/** rw,
+  deny @{HOME}/.config/keepassxc/** rw,
+  deny @{HOME}/.cache/keepassxc/** rw,
+  deny @{HOME}/.config/kleopatra/** rw,
+  deny @{HOME}/.local/share/kleopatra/** rw,
+  deny @{HOME}/Monero/** rw,
+  deny @{HOME}/.config/feather/** rw,
+  deny @{HOME}/.local/share/feather/** rw,
+  # the onion service keys of OnionShare
+  deny @{HOME}/.config/onionshare/** rw,
+  # browser profiles (cookies, saved logins), mail and chat
+  deny @{HOME}/.tor-browser/** rw,
+  deny @{HOME}/.librewolf/** rw,
+  deny @{HOME}/.mozilla/** rw,
+  deny @{HOME}/.claws-mail/** rw,
+  deny @{HOME}/.purple/** rw,
+  deny @{HOME}/.local/share/gajim/** rw,
+  deny @{HOME}/.config/gajim/** rw,
+  # shell histories (a typed password ends up there)
+  deny @{HOME}/.*_history rw,
+  deny @{HOME}/.local/share/*_history rw,

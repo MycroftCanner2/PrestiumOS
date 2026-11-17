@@ -8,6 +8,7 @@ include <tunables/global>
 profile vlc /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} {
   include <abstractions/audio>
   include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-home-read>
   /{,usr/}bin/{sh,dash,bash} ix,
   /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} mr,
   /usr/lib/@{multiarch}/vlc/** mr,

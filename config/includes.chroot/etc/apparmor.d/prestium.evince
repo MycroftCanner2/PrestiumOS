@@ -13,6 +13,7 @@ include <tunables/global>
 
 profile evince /usr/bin/evince {
   include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-home-read>
   include <abstractions/prestium-viewer-write>
   # the shared ~/Documents folder is the only folder in the home it may write
   owner @{HOME}/Documents/ rw,
@@ -42,6 +43,7 @@ profile evince /usr/bin/evince {
 # Print preview (Evince hands it a temporary copy of the document)
 profile evince-previewer /usr/bin/evince-previewer {
   include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-home-read>
   /usr/bin/evince-previewer mr,
   /usr/lib/@{multiarch}/evince/** mr,
   deny "@{HOME}/Tor Browser/**" wl,
@@ -53,6 +55,7 @@ profile evince-previewer /usr/bin/evince-previewer {
 # The thumbnailer (the file manager makes no thumbnails, /etc/xdg/libfm/libfm.conf; confined anyway)
 profile evince-thumbnailer /usr/bin/evince-thumbnailer {
   include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-home-read>
   /usr/bin/evince-thumbnailer mr,
   /usr/lib/@{multiarch}/evince/** mr,
   deny "@{HOME}/Tor Browser/**" wl,

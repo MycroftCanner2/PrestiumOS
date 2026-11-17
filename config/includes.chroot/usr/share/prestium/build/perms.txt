@@ -425,6 +425,7 @@
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer-core
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer-write
 0644 root root /etc/apparmor.d/abstractions/prestium-viewer-bwrap
+0644 root root /etc/apparmor.d/abstractions/prestium-viewer-home-read
 0644 root root /etc/apparmor.d/usr.bin.loupe
 0644 root root /etc/apparmor.d/usr.bin.vlc
 0644 root root /etc/apparmor.d/usr.bin.file-roller
