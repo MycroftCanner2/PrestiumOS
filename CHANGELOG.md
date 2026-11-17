@@ -238,6 +238,10 @@ done in).
   still `.kdbx` only, and the secret folders stay denied. Its window state in `~/.cache/keepassxc`
   is saved again too. Found in the kernel's AppArmor log on a Debian 13 VM (KeePassXC 2.7.10, the GUI
   and `keepassxc-cli`); `test_apparmor_startup.sh` checks those names.
+- **KeePassXC's file dialog remembers its last folder.** It may write `~/.config/QtProject.conf`
+  (with Qt's `.lock` and `QtProject.conf.XXXXXX` save files), and nothing else in `~/.config`.
+  Creating, editing and reopening new databases in `~/Documents` and `~` was tested on an overlay
+  home like the live system's, with no saving denials.
 - **LibreOffice starts again.** Its first start stopped with "Fatal Error: User installation could not
   be completed" (exit 77) because the profile denied `/etc/passwd` and `/etc/nsswitch.conf`: LibreOffice
   finds the home folder through the user database, not `$HOME`, so it never got as far as creating

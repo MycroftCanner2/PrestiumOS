@@ -63,6 +63,15 @@ profile keepassxc /usr/bin/keepassxc {
   # so the ~/.cache/, ~/.local/ and ~/.local/share/ parents are granted too (same as LibreOffice).
   owner @{HOME}/.config/keepassxc/ rw,
   owner @{HOME}/.config/keepassxc/** rwkl,
+  # 2.1: the Qt file dialog's settings (last folder, sidebar) in ~/.config/QtProject.conf, and
+  # nothing else in ~/.config. Qt saves it like a database: its .lock file, an O_TMPFILE
+  # ("#<inode>", the rule above) linked to "QtProject.conf.XXXXXX" and renamed onto the name.
+  # Without these: mknod ".config/QtProject.conf.lock" and link ".config/QtProject.conf.DEteDY"
+  # (target ".config/#108") were denied on the overlay home and the dialog forgot its folder.
+  # The same rules as Debian's qt5-settings-write abstraction, the links bound to the temp name.
+  owner @{HOME}/.config/QtProject.conf rwl -> @{HOME}/.config/#[0-9]*[0-9],
+  owner @{HOME}/.config/QtProject.conf.?????? rwl -> @{HOME}/.config/#[0-9]*[0-9],
+  owner @{HOME}/.config/QtProject.conf.lock rwk,
   owner @{HOME}/.cache/ rw,
   owner @{HOME}/.cache/keepassxc/ rw,
   # 2.1 (boot fix): KeePassXC keeps its window state in ~/.cache/keepassxc/keepassxc.ini and saves it

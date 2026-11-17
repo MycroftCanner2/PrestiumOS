@@ -385,6 +385,20 @@ deny keepassxc $H/.ssh/#135221 w
 deny keepassxc $H/.gnupg/#135221 w
 deny keepassxc $H/.config/autostart/#135221 w
 deny keepassxc $H/Documents/#notes w
+# 2.1: the Qt file dialog's QtProject.conf (it remembers the last folder), saved with a .lock and
+# an O_TMPFILE linked to "QtProject.conf.XXXXXX" and renamed onto it (overlay home on a Debian 13 VM:
+# mknod ".config/QtProject.conf.lock" and link ".config/QtProject.conf.DEteDY" denied without these)
+allow keepassxc $H/.config/QtProject.conf rwl
+allow keepassxc $H/.config/QtProject.conf.DEteDY rwl
+allow keepassxc $H/.config/QtProject.conf.lock rwk
+allow keepassxc $H/.config/#108 rwk
+# and nothing else in ~/.config
+deny keepassxc $H/.config/QtProject.confX w
+deny keepassxc $H/.config/QtProject.conf.toolong w
+deny keepassxc $H/.config/kdeglobals w
+deny keepassxc $H/.config/gajim/settings.sqlite w
+deny keepassxc $H/.config/librewolf/prefs.js w
+deny keepassxc $H/.config/autostart/x.desktop w
 allow keepassxc $H/.config/keepassxc/keepassxc.ini rwk
 allow keepassxc $H/.cache/ w
 allow keepassxc $H/.cache/keepassxc/ rw
