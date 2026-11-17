@@ -48,7 +48,7 @@
     <keybind key="A-space"><action name="ShowMenu" menu="client-menu" /></keybind>
     <!-- 2.1: the root menu always opens at the top-left, just under the Applications
          button, wherever the pointer is (the panel button presses Super+Space after a short wait,
-         so "at the pointer" moved with the mouse). Right-click on the desktop still opens it at the pointer.
+         so "at the pointer" moved with the mouse). No mouse click on the desktop opens it (mouse below).
          Positions count inside the usable area, which already starts under the top bar, so y=0 is
          that bar's bottom edge. -->
     <keybind key="W-space">
@@ -78,13 +78,18 @@
 
   <mouse>
     <default />
-    <!-- Left-click on the desktop must not open the root menu. The default
-         bind does, so a click that misses a bottom-bar window button opens
-         the menu instead of selecting that window. Right-click on the desktop
-         still opens the menu at the pointer. A later bind for the same
-         context, button and event replaces the default. -->
+    <!-- 2.1: the root menu opens only from the Applications button (and Super+Space): no
+         mouse button on the desktop opens it. labwc's defaults open it on a Left, Right or
+         Middle press on the desktop; a later bind for the same context, button and event
+         replaces the default, so each is cleared here. Scrolling on the desktop keeps its default. -->
     <context name="Root">
       <mousebind button="Left" action="Press">
+        <action name="None" />
+      </mousebind>
+      <mousebind button="Right" action="Press">
+        <action name="None" />
+      </mousebind>
+      <mousebind button="Middle" action="Press">
         <action name="None" />
       </mousebind>
     </context>

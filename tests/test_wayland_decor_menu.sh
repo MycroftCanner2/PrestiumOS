@@ -42,10 +42,20 @@ mouse = [m for m in root.iter() if m.tag.endswith("mouse")][0]
 assert any(c.tag.endswith("default") for c in list(mouse))
 ctx = [c for c in list(mouse) if c.tag.endswith("context") and c.get("name") == "Root"]
 assert len(ctx) == 1
-mb = [b for b in list(ctx[0]) if b.tag.endswith("mousebind") and b.get("button") == "Left" and b.get("action") == "Press"]
-assert len(mb) == 1
-act = [a for a in list(mb[0]) if a.tag.endswith("action")][0]
-assert act.get("name") == "None", "left-click on the desktop must not open the root menu"
+# 2.1: no mouse button on the desktop opens the root menu (labwc's defaults do on Left, Right and
+# Middle press), and no mousebind anywhere shows it: only Applications and Super+Space open it
+for btn in ("Left", "Right", "Middle"):
+    mb = [b for b in list(ctx[0]) if b.tag.endswith("mousebind") and b.get("button") == btn and b.get("action") == "Press"]
+    assert len(mb) == 1, btn
+    acts = [a for a in list(mb[0]) if a.tag.endswith("action")]
+    assert [a.get("name") for a in acts] == ["None"], "%s-click on the desktop must not open the root menu" % btn
+for b in mouse.iter():
+    if b.tag.endswith("mousebind"):
+        for a in b.iter():
+            assert not (a.tag.endswith("action") and a.get("name") == "ShowMenu"), "a mouse binding shows a menu"
+shows = [k.get("key") for k in root.iter() if k.tag.endswith("keybind")
+         for a in k if a.tag.endswith("action") and a.get("menu") == "root-menu"]
+assert shows == ["W-space"], shows
 PY
 # Evince (Document Viewer) is a GTK 3 header-bar app: it draws its one bar itself (title and the window
 # buttons from dconf's button-layout, minimise, maximise, close, as File Roller and Loupe do), and
@@ -65,7 +75,16 @@ assert isinstance(c, list) and [b["name"] for b in c] == ["prestium-top", "prest
 top = c[0]
 assert top["modules-left"][0] == "custom/applications", top["modules-left"]
 m = top["custom/applications"]
-assert m["on-click"] == "/usr/local/bin/prestium-wl menu", m
+# 2.1: on release: a menu opened on the press took the pointer before the release reached waybar, and
+# GTK then sent the next click in either bar (a pill, a taskbar icon) to Applications again
+assert m["on-click-release"] == "/usr/local/bin/prestium-wl menu" and "on-click" not in m, m
+# nothing else in either bar opens the menu
+for bar in c:
+    for k, v in bar.items():
+        if isinstance(v, dict) and k != "custom/applications":
+            for e, cmd in v.items():
+                if e.startswith("on-") and isinstance(cmd, str):
+                    assert "prestium-wl menu" not in cmd and "wtype" not in cmd, (k, e, cmd)
 '
 grep -qx wtype "$R/../package-lists/prestium-2.0.list.chroot"
 # Firefox-based browsers: no tabs in the title bar (the compositor draws the frame)

@@ -78,9 +78,13 @@ done in).
   it is right in the default boot, where Tor keeps no log.
 - **The menu is grouped by task.** Top level: I2P Browser, Tor Browser, I2P Router Console, Text
   Editor, File Manager; then Office (LibreOffice, Document Viewer), Multimedia, Accessories, Security, Communication, Sharing,
-  Network and System; then Restart… and Shut Down… (Log Out is gone). Super+Space opens it under the
-  Applications button, a right-click on the desktop at the pointer; a left-click on the desktop does
-  nothing. Networked apps name their network ("Claws Mail (Email, I2P)", "IRC (Tor)", "Feather
+  Network and System; then Restart… and Shut Down… (Log Out is gone). The Applications button and
+  Super+Space open it, under the button; nothing else does, no click on the desktop either (labwc's
+  left, right and middle-click menus there are cleared). Clicking a Tor/I2P pill or a taskbar icon
+  could open the menu instead: the button opened it on the press, labwc then took the pointer before
+  the release reached waybar, and GTK sent the next click in either bar to Applications again (until
+  the mouse moved away or a few more clicks). It now opens on the release; reproduced and checked
+  with labwc 0.8.3 and waybar 0.12 on a headless output. Networked apps name their network ("Claws Mail (Email, I2P)", "IRC (Tor)", "Feather
   (Monero Wallet, I2P)"); Gajim is plain *Gajim*.
 - **Icons, logo and wallpapers.** A `Prestium` icon theme holds the final logo mark and falls back to
   Adwaita, then Papirus. Three wallpapers (Horizon, Circuit, Mark) are picked in *System >

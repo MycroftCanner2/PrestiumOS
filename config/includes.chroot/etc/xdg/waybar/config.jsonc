@@ -1,7 +1,7 @@
 // Prestium 2.1: solid black top system bar (Applications, clock, Tor/I2P
 // status, clock-sync symbol, tray) and a black bottom icon-only window-list taskbar.
 // The Applications button opens labwc's root menu through the broker;
-// Super+Space and right-click open the same menu.
+// Super+Space opens the same menu. Nothing else in the bars, or on the desktop, opens it.
 [
   {
     // 2.1: Tor and I2P status. Root-free and read-only: prestium-netstatus.service
@@ -17,7 +17,11 @@
     "modules-right": ["tray", "custom/tor-status", "custom/i2p-status", "custom/timesync", "pulseaudio", "network", "battery", "custom/power"],
     "custom/applications": {
       "format": "Applications",
-      "on-click": "/usr/local/bin/prestium-wl menu",
+      // 2.1: on the button's release, not its press. labwc opens the menu at once and takes the
+      // pointer from the bar, so a press-started menu kept the release from ever reaching waybar:
+      // GTK then held the click on Applications, and the next click anywhere in either bar (a
+      // Tor/I2P pill, a taskbar icon) went to Applications and opened the menu again.
+      "on-click-release": "/usr/local/bin/prestium-wl menu",
       "tooltip": false
     },
     "clock": {
