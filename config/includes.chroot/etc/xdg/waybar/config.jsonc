@@ -1,5 +1,5 @@
 // Prestium 2.1: solid black top system bar (Applications, clock, Tor/I2P
-// status, tray) and a black bottom icon-only window-list taskbar.
+// status, clock-sync symbol, tray) and a black bottom icon-only window-list taskbar.
 // The Applications button opens labwc's root menu through the broker;
 // Super+Space and right-click open the same menu.
 [
@@ -14,7 +14,7 @@
     "spacing": 0,
     "modules-left": ["custom/applications"],
     "modules-center": ["clock"],
-    "modules-right": ["tray", "custom/tor-status", "custom/i2p-status", "pulseaudio", "network", "battery", "custom/power"],
+    "modules-right": ["tray", "custom/tor-status", "custom/i2p-status", "custom/timesync", "pulseaudio", "network", "battery", "custom/power"],
     "custom/applications": {
       "format": "Applications",
       "on-click": "/usr/local/bin/prestium-wl menu",
@@ -38,6 +38,14 @@
       "interval": 5,
       "format": "\uf111  {}",
       "on-click": "prestium-run /usr/local/bin/prestium-i2p-assistant"
+    },
+    // clock sync over Tor (prestium-timesync). Hidden once the time is set; a clock
+    // symbol in amber while it waits or syncs, red when it refused a time it could not trust.
+    "custom/timesync": {
+      "exec": "cat /run/prestium/timesync/waybar.json",
+      "return-type": "json",
+      "interval": 10,
+      "format": "{}"
     },
     "tray": { "icon-size": 18, "spacing": 8 },
     "network": {

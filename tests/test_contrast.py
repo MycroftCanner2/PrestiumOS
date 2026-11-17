@@ -225,6 +225,8 @@ need(S, "active window", col(wb['window#waybar.prestium-bottom #taskbar button.a
      col(wb['window#waybar.prestium-bottom #taskbar button.active']['background-color']), TEXT)
 need(S, "minimised window (de-emphasised by design)", col(wb['window#waybar.prestium-bottom #taskbar button.minimized']['color']),
      col(wb['window#waybar.prestium-bottom #taskbar button.minimized']['background-color']), INDICATOR)
+need(S, "clock sync waiting", col(wb['window#waybar.prestium-top #custom-timesync.syncing']['color']), bar, TEXT)
+need(S, "clock sync refused", col(wb['window#waybar.prestium-top #custom-timesync.failed']['color']), bar, TEXT)
 need(S, "window tooltip", col(wb['tooltip label']['color']), col(wb['tooltip']['background-color']), TEXT)
 
 # --- mako (dark notifications under the black top bar) ---

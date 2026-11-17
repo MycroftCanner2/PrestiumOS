@@ -10,6 +10,9 @@ in 2.0. It is still built with live-build on Debian 13 "trixie".
 This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
 
 ### Fixes: viewers, media, metadata, LibreOffice, sharing, volume, logs and menu
+- **The clock-sync symbol is back on the bar.** An amber clock shows until the time is
+  set over Tor, and a red one if the sync refused a time it could not trust. It
+  disappears once the clock is synced. The sync itself was never removed.
 - **I2P reseed refresh asks Tor through the onion-grater.** Refresh reseed (via Tor)
   used to read Tor's own control socket and reported "not connected" while Tor was up.
   It now asks the same filter the panel uses.

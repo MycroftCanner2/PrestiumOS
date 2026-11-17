@@ -78,7 +78,8 @@ assert isinstance(c, list) and [b["name"] for b in c] == ["prestium-top", "prest
 top, bottom = c
 assert top["position"] == "top" and top["height"] == 28 and top["spacing"] == 0 and bottom["position"] == "bottom" and bottom["height"] == 30
 assert top["modules-left"] == ["custom/applications"] and top["modules-center"] == ["clock"]
-assert top["modules-right"] == ["tray", "custom/tor-status", "custom/i2p-status", "pulseaudio", "network", "battery", "custom/power"]
+assert top["modules-right"] == ["tray", "custom/tor-status", "custom/i2p-status", "custom/timesync", "pulseaudio", "network", "battery", "custom/power"]
+assert top["custom/timesync"]["exec"] == "cat /run/prestium/timesync/waybar.json" and top["custom/timesync"]["return-type"] == "json" and top["custom/timesync"]["format"] == "{}"
 assert top["custom/applications"]["on-click"] == "/usr/local/bin/prestium-wl menu"
 assert top["custom/power"]["on-click"] == "/usr/local/bin/prestium-power-menu"
 assert top["clock"]["format"] == "{:%a %b %d, %H:%M}"

@@ -62,6 +62,25 @@ window#waybar.prestium-top #custom-i2p-status.failed {
     color: #ffffff;
 }
 
+/* Clock sync over Tor: nothing once synced (empty text, no padding). Amber while
+   waiting or syncing, red if the sync refused a time it could not trust. */
+window#waybar.prestium-top #custom-timesync {
+    padding: 0;
+    margin: 0;
+    background-color: transparent;
+}
+window#waybar.prestium-top #custom-timesync.syncing,
+window#waybar.prestium-top #custom-timesync.failed {
+    padding: 0 10px;
+    margin: 3px 2px;
+}
+window#waybar.prestium-top #custom-timesync.syncing {
+    color: #e5a50a;
+}
+window#waybar.prestium-top #custom-timesync.failed {
+    color: #ff9494;
+}
+
 /* ============================================================
    BOTTOM BAR — black icon-only window-list taskbar (#000000)
    ============================================================ */
