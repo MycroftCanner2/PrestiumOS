@@ -26,4 +26,11 @@ grep -Eq '^\s*/\*\*|/usr/bin/\*\* +[A-Za-z]*x|/usr/local/bin/\*\*' <<<"$parent" 
 grep -Eq '\bUx,' "$P" && no "Ux in the profile" || ok "no Ux"
 grep -q '^  /usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,' "$P" && grep -q '^  /usr/local/bin/librewolf-i2p Px -> prestium_librewolf_launcher,' "$P" && ok "browsers: Px into the launcher profiles" || no "browser launchers not Px"
 grep -q '^    /usr/bin/pinentry\* Px -> prestium_pinentry,' "$P" && ok "pinentry: Px into prestium_pinentry" || no "pinentry not Px"
+# 2.1 (review: Claws can leave its profile): the gpg child can't write or link GnuPG's *.conf, which a
+# socket-started agent outside the profile would read (helper programs); same deny as Kleopatra's
+child=$(sed -n '/^  profile gpg {/,/^  }/p' "$P")
+grep -qF '    deny @{HOME}/.gnupg/*.conf{,.*} wl,' <<<"$child" && grep -qF '    deny @{HOME}/.gnupg/common.conf wl,' <<<"$child" \
+  && ok "gpg child: no write or link on ~/.gnupg/*.conf" || no "gpg child may write ~/.gnupg/*.conf"
+grep -qF 'deny @{HOME}/.gnupg/*.conf{,.*} w' "$A/usr.bin.kleopatra" && ok "same deny as Kleopatra" || no "Kleopatra's deny changed"
+grep -qF '    owner @{HOME}/.gnupg/** rwkl,' <<<"$child" && ok "gpg child keeps the keyring (keygen, sign)" || no "gpg child lost ~/.gnupg"
 exit $fail

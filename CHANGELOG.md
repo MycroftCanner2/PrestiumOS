@@ -346,6 +346,14 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   press Reset to shipped copy.
 
 ### App confinement and sandboxes
+- **Claws Mail's GnuPG can't write GnuPG's configuration files.** The child profile Claws runs gpg,
+  gpgconf and gpg-connect-agent in could write every file in `~/.gnupg`, `gpg-agent.conf` included. A
+  gpg-agent started by the user's systemd socket runs outside that profile and runs the helper programs
+  that file names (`pinentry-program` and the other `*-program` options), so code running in Claws
+  could get out of its profile as the desktop user. The child now has Kleopatra's deny on writing
+  `~/.gnupg/*.conf` and `common.conf`, and on hard links to those names. Keys, signing and the
+  passphrase prompt (still in `prestium_pinentry`) are unchanged. `prestium-gnupg-check` still raises
+  its flag for such options written from outside Claws. Test: `test_apparmor_claws.sh`.
 - **LibreOffice runs under its AppArmor profile, and the whole profile set is checked as the boot loads
   it.** Debian's libreoffice-common ships complain-mode profiles for `oosplash` and `soffice.bin` that
   attach to the same two programs as Prestium's enforced `libreoffice` profile and match them just as

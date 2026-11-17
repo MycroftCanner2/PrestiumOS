@@ -94,6 +94,15 @@ profile claws-mail /usr/bin/claws-mail {
     owner @{PROC}/@{pid}/fd/ r,
     owner @{PROC}/@{pid}/** r,
 
+    # 2.1 (review: Claws can leave its profile): never the GnuPG configuration files, as in
+    # usr.bin.kleopatra. They can name helper programs (pinentry-program, *-program) that a
+    # socket-started gpg-agent or dirmngr, outside this profile, would run as the desktop user.
+    # gpgconf --change-options and gpg-connect-agent can't change them from here either;
+    # prestium-gnupg-check still flags such options written from outside Claws. Link is denied too:
+    # with only w denied, a hard link made under a .conf name to a file this profile can write would
+    # hand the same content to the agent.
+    deny @{HOME}/.gnupg/*.conf{,.*} wl,
+    deny @{HOME}/.gnupg/common.conf wl,
     owner @{HOME}/.gnupg/ rw,
     owner @{HOME}/.gnupg/** rwkl,
     owner @{run}/user/[0-9]*/gnupg/ rw,
