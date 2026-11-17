@@ -31,17 +31,18 @@ modernization of the 2023 Prestium build, with tighter security and new features
   over Tor or the I2P outproxy, and reset to the copy on the image.
 - **Enforced AppArmor profiles** for the browsers and their launchers, Claws Mail, Gajim, OnionShare,
   Feather, LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra, the
-  passphrase prompt, Tor's control-port filter and the programs that open downloaded files (Loupe, VLC,
-  File Roller, FeatherPad, mat2, Metadata Cleaner, Audacity); the helpers those viewers start in
+  passphrase prompt, Tor's control-port filter and the programs that open downloaded files (Loupe,
+  Evince, VLC, File Roller, FeatherPad, mat2, Metadata Cleaner, Audacity); the helpers those viewers start in
   bubblewrap run in stricter inner profiles. The build fails if another profile could attach to a
   program a Prestium profile confines, and the boot checks the loaded set again. Neither Claws Mail's
   GnuPG nor Kleopatra may write or hard-link GnuPG's `*.conf` files, which can name helper programs.
   Audacity runs in an empty network namespace.
 - **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail
-  and Gajim) and `~/Documents` (LibreOffice, FeatherPad, File Roller, Audacity,
+  and Gajim) and `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity,
   Kleopatra, Metadata Cleaner and Feather). Only three folders are app-specific: the I2P Browser's
   (`~/I2P Browser`), I2P Torrents' (`~/Torrents`) and Tor Browser's
-  (`~/Tor Browser`); the shared apps can't write in those three. The file manager pins exactly those
+  (`~/Tor Browser`); the shared apps can't write in those three, and Evince can't read them either
+  (move a PDF into `~/Documents` first). The file manager pins exactly those
   five, labelled i2P Browser, Torrents, Tor Browser, Documents and Downloads. To attach a document
   you made, copy it from `~/Documents` to `~/Downloads` first: mail and chat can't read `~/Documents`.
   Volumes under `/media` are read-only for the apps (KeePassXC may save its `.kdbx` there); move files
@@ -106,8 +107,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Network Logs, only when you ask:** in the default boot Tor and i2pd keep no logs. The boot menu
   entry *Prestium 2.1 (Network Logs)* turns on their logs and *Network > Network Logs*, a read-only
   view of the Tor, I2P and control-port filter logs of that boot.
-- **Apps:** besides the above, OnionShare, KeePassXC, Kleopatra, LibreOffice, Audacity, VLC, Loupe,
-  Metadata Cleaner, Feather (Monero, on I2P) and *Unlock Encrypted Volume* for LUKS, VeraCrypt,
+- **Apps:** besides the above, OnionShare, KeePassXC, Kleopatra, LibreOffice, Evince (Document Viewer,
+  the default for PDF, PostScript, DjVu, XPS and comic books), Audacity, VLC, Loupe, Metadata Cleaner, Feather (Monero, on I2P) and *Unlock Encrypted Volume* for LUKS, VeraCrypt,
   TrueCrypt and BitLocker volumes and file containers, without root.
 - **Only its own boot settings:** Prestium refuses to start, and restarts the computer, when the
   kernel command line isn't exactly the one in its boot menu. The initramfs checks first, then a

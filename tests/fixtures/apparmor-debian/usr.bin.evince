@@ -1,0 +1,13 @@
+# Test fixture (not Debian's file): the headers of the evince package's profiles, which attach to the
+# same programs as Prestium's prestium.evince (tests/test_apparmor_boot_load.sh; hook 0600 removes it)
+abi <abi/3.0>,
+include <tunables/global>
+/usr/bin/evince {
+  include <abstractions/base>
+}
+/usr/bin/evince-previewer {
+  include <abstractions/base>
+}
+/usr/bin/evince-thumbnailer {
+  include <abstractions/base>
+}

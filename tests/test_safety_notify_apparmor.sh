@@ -43,7 +43,7 @@ rm -f "$T/enabled"; o=$(env -i PATH="$T/bin:/usr/bin:/bin" HOME="$T" ALERTS="$T/
   timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null)
 case "$o" in *"kernel module not loaded"*) ok "no apparmor module: alert";; *) bad "no alert without module: $o";; esac
 P=$T/profiles
-for p in torbrowser_firefox librewolf prestium-localfox claws-mail gajim onionshare feather libreoffice thelounge thelounge-tor loupe vlc file-roller featherpad mat2 metadata-cleaner glycin-inner mat2-inner metadata-cleaner-inner audacity keepassxc kleopatra; do echo "$p (enforce)"; done > "$P"
+for p in torbrowser_firefox librewolf prestium-localfox claws-mail gajim onionshare feather libreoffice thelounge thelounge-tor loupe vlc file-roller featherpad mat2 metadata-cleaner glycin-inner mat2-inner metadata-cleaner-inner audacity keepassxc kleopatra evince evince-previewer evince-thumbnailer; do echo "$p (enforce)"; done > "$P"
 o=$(run Y active "$P"); [ -z "$o" ] && ok "all Prestium profiles enforced: no alert" || bad "false profile alert: $o"
 sed -i 's/^gajim (enforce)$/gajim (complain)/; /^feather /d' "$P"
 o=$(run Y active "$P"); case "$o" in *'"gajim" is not loaded in enforce mode'*'"feather"'*|*'"feather"'*'"gajim" is not loaded'*) ok "complain/missing profile: alert";; *) bad "no profile alert: $o";; esac

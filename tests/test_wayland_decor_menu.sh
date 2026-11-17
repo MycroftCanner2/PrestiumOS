@@ -2,7 +2,8 @@
 # Prestium 2.1: one compositor title bar (minimise, maximise, close) for every
 # window, outside the client surface. Apps that used to draw their own bar
 # (Galculator, LibreWolf) are told not to, so labwc does not paint a second bar
-# over the top. The Applications button opens the root menu under itself.
+# over the top. Header-bar apps (Evince, File Roller, Loupe) keep their own single bar with the same
+# three buttons. The Applications button opens the root menu under itself.
 set -e
 R=$(cd "$(dirname "$0")/.." && pwd)/config/includes.chroot
 RC=$R/etc/xdg/labwc/rc.xml
@@ -46,6 +47,16 @@ assert len(mb) == 1
 act = [a for a in list(mb[0]) if a.tag.endswith("action")][0]
 assert act.get("name") == "None", "left-click on the desktop must not open the root menu"
 PY
+# Evince (Document Viewer) is a GTK 3 header-bar app: it draws its one bar itself (title and the window
+# buttons from dconf's button-layout, minimise, maximise, close, as File Roller and Loupe do), and
+# labwc adds none, since no window rule forces a frame on it. Its launcher sets no decoration override.
+grep -q 'command="prestium-run evince"' "$R/etc/xdg/labwc/menu.xml" \
+  || { echo "FAIL: Document Viewer is not started through prestium-run"; exit 1; }
+! grep -qi 'evince' "$RC" || { echo "FAIL: rc.xml has a window rule for Evince (would paint a second bar)"; exit 1; }
+grep -qx "button-layout='appmenu:minimize,maximize,close'" "$R/etc/dconf/db/local.d/10-prestium-desktop" \
+  || { echo "FAIL: header bars (Evince) have no minimise/maximise/close"; exit 1; }
+! grep -rqs 'GTK_CSD=1' "$R/usr/local/bin" "$R/etc/environment" \
+  || { echo "FAIL: something turns GTK client-side decorations on for every window"; exit 1; }
 W=$R/etc/xdg/waybar/config.jsonc
 sed 's#//.*##' "$W" | python3 -c '
 import json, sys

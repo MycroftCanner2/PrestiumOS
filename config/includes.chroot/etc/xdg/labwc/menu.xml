@@ -42,6 +42,9 @@
     <item label="LibreOffice Draw" icon="libreoffice-draw">
       <action name="Execute" command="prestium-run libreoffice --draw" />
     </item>
+    <item label="Document Viewer" icon="org.gnome.Evince">
+      <action name="Execute" command="prestium-run evince" />
+    </item>
   </menu>
   <menu id="/Multimedia" label="Multimedia" icon="applications-multimedia">
     <item label="Volume Control" icon="multimedia-volume-control">

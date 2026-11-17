@@ -16,13 +16,16 @@ mat2 /usr/bin/mat2 usr.bin.mat2
 metadata-cleaner /usr/bin/metadata-cleaner usr.bin.metadata-cleaner
 audacity /usr/libexec/prestium-audacity usr.bin.audacity
 keepassxc /usr/bin/keepassxc usr.bin.keepassxc
-kleopatra /usr/bin/kleopatra usr.bin.kleopatra"
+kleopatra /usr/bin/kleopatra usr.bin.kleopatra
+org.gnome.Evince.desktop /usr/bin/evince prestium.evince
+evince-previewer /usr/bin/evince-previewer prestium.evince
+evince-thumbnailer /usr/bin/evince-thumbnailer prestium.evince"
 # every default handler in mimeapps.list is in the table
 for d in $(grep -v '^\s*[#[]' "$I/etc/xdg/mimeapps.list" | cut -d= -f2 | tr ';' '\n' | grep . | sort -u); do
   grep -q "^$d " <<<"$TABLE" && ok "default handler $d has a profile" || bad "default handler $d: no profile"; done
 # every package in the table that the image installs
 pk=$(cat "$R"/config/package-lists/*.list.chroot | sed 's/#.*//' | tr -s ' \t' '\n')
-for p in vlc featherpad mat2 metadata-cleaner audacity keepassxc kleopatra loupe file-roller; do
+for p in vlc featherpad mat2 metadata-cleaner audacity keepassxc kleopatra loupe file-roller evince; do
   grep -qx "$p" <<<"$pk" || bad "package $p is no longer installed: update this test"; done
 attach(){ # does profile file $1 attach binary $2? (expands one {a,b} group in the header)
   python3 - "$A/$1" "$2" <<'PY'
@@ -43,6 +46,7 @@ while read -r id bin f; do
   grep -qx "0644 root root /etc/apparmor.d/$f" "$PM" && ok "perms: $f" || bad "perms: $f"
 done <<<"$TABLE"
 grep -q '^rm -f /etc/apparmor.d/loupe /etc/apparmor.d/local/loupe$' "$H" && ok "hook drops Debian's unconfined loupe profile" || bad "Debian loupe profile kept"
+grep -q '^rm -f /etc/apparmor.d/usr.bin.evince /etc/apparmor.d/local/usr.bin.evince$' "$H" && ok "hook drops Debian's evince profiles" || bad "Debian evince profile kept"
 for d in .claws-mail .purple .local/share/gajim .config/gajim; do grep -q "deny @{HOME}/$d/" "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny $d" || bad "viewer-core may read $d"; done
 grep -qx '  deny ptrace,' "$A/abstractions/prestium-viewer-core" && ok "viewer-core: deny ptrace" || bad "viewer-core may ptrace"
 # 2.1 (bwrap split): the decoders and helpers run in capability-stripped inner profiles
@@ -64,7 +68,7 @@ for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-v
   grep -qx "0644 root root /etc/apparmor.d/abstractions/$a" "$PM" || bad "perms: abstraction $a"; done
 if command -v apparmor_parser >/dev/null; then
   W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
-  cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; rm -f "$W/loupe"; cp -r "$A"/. "$W"/
+  cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; rm -f "$W/loupe" "$W/usr.bin.evince"; cp -r "$A"/. "$W"/
   while read -r id bin f; do
     x=$(apparmor_parser -p -b "$W" "$W/$f" 2>"$W/.err") || { bad "$f does not compile: $(grep -v 'Cache' "$W/.err" | head -2)"; continue; }
     ok "$f compiles"
@@ -143,7 +147,7 @@ if command -v apparmor_parser >/dev/null; then
       fi
     fi
   done <<<"$TABLE"
-  grep -q 'deny @{HOME}/.gnupg/\*.conf{,.\*} w,' "$A/usr.bin.kleopatra" && ok "kleopatra: GnuPG configs read-only" || bad "kleopatra may write GnuPG configs"
+  grep -q 'deny @{HOME}/.gnupg/\*.conf{,.\*} wl,' "$A/usr.bin.kleopatra" && ok "kleopatra: GnuPG configs read-only (no write, no hard link)" || bad "kleopatra may write GnuPG configs"
 else echo "SKIP apparmor_parser missing (compile, expanded checks)"; fi
 # 2.1 (audit of a5fd1fb, L-7): the unconfined file manager makes no thumbnails and mounts nothing by itself
 L="$R/config/includes.chroot/etc/xdg/libfm/libfm.conf" P="$R/config/includes.chroot/etc/xdg/pcmanfm/default/pcmanfm.conf"
@@ -153,7 +157,7 @@ ini() { python3 -c 'import configparser,sys; c=configparser.ConfigParser(interpo
 [ "$(ini config thumbnail_local)" = 1 ] && [ "$(ini config thumbnail_max)" = 2048 ] && ok "libfm: thumbnails local-only and capped" || bad "libfm: thumbnail_local/thumbnail_max widened"
 [ -n "$(ini config terminal)" ] && ok "libfm: terminal set" || bad "libfm: no terminal"
 grep -qx 'mount_removable=0' "$P" && grep -qx 'mount_on_startup=0' "$P" && ok "pcmanfm: no automount" || bad "pcmanfm automounts"
-for f in "$A"/usr.bin.{loupe,file-roller,featherpad,mat2,metadata-cleaner,keepassxc,kleopatra}; do
+for f in "$A"/usr.bin.{loupe,file-roller,featherpad,mat2,metadata-cleaner,keepassxc,kleopatra} "$A"/prestium.evince; do
   grep -q 'abstractions/audio' "$f" && bad "$(basename "$f"): sound access" || ok "$(basename "$f"): no sound access"; done
 grep -q 'abstractions/audio' "$R/config/includes.chroot/etc/apparmor.d/abstractions/prestium-app-common" && bad "app-common gives sound" || ok "app-common: no sound"
 exit $fail

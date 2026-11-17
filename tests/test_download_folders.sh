@@ -1,7 +1,7 @@
 #!/bin/bash
 # 2.1 (L-5, revised): the apps share two folders and three stay app-specific.
 #   shared:   ~/Downloads (local Firefox, Claws Mail, Gajim),
-#             ~/Documents (LibreOffice, FeatherPad, File Roller, Audacity,
+#             ~/Documents (LibreOffice, FeatherPad, Evince, File Roller, Audacity,
 #             Kleopatra, Metadata Cleaner, Feather)
 #   specific: ~/I2P Browser (I2P Browser), ~/Torrents (I2P Torrents),
 #             ~/Tor Browser (Tor Browser)
@@ -112,7 +112,7 @@ rm -rf "$T"
 command -v apparmor_parser >/dev/null || PATH=$PATH:/usr/sbin
 command -v apparmor_parser >/dev/null || { echo "SKIP apparmor_parser missing"; exit $fail; }
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
-cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; rm -f "$W/loupe"; cp -r "$A"/. "$W"/
+cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; rm -f "$W/loupe" "$W/usr.bin.evince"; cp -r "$A"/. "$W"/
 run() { apparmor_parser -p -b "$W" "$W/$1" > "$W/.exp" 2>"$W/.err" || { bad "$1 does not compile"; cat > /dev/null; return; }
   python3 -B "$R/tests/aa_eval.py" "$W/.exp" || fail=1; }
 # the three app-specific folders, which no shared app may write
@@ -201,6 +201,25 @@ deny mat2 /media/user/STICK/f.cleaned.pdf w
 deny mat2//bwrap $H/Downloads/f.cleaned.pdf w
 deny mat2//bwrap /media/user/STICK/f.cleaned.pdf w
 deny mat2 $H/Downloads/f.pdf w
+EOT
+echo "== evince: a shared ~/Documents app; reads the shared folders, not the app-specific ones"
+run prestium.evince <<EOT
+allow evince "$H/Documents/f.pdf" rw
+allow evince "$H/Documents/sub/f.pdf" rw
+allow evince "$H/Documents/f (copy).pdf" rw
+allow evince $H/Downloads/f.pdf r
+deny evince $H/Downloads/f.pdf w
+allow evince /media/user/STICK/f.pdf r
+deny evince /media/user/STICK/f.pdf w
+deny evince "$H/Tor Browser/f.pdf" rw
+deny evince "$H/I2P Browser/f.pdf" rw
+deny evince $H/Torrents/f.pdf rw
+deny evince $H/Desktop/f.pdf w
+deny evince $H/Pictures/f.pdf w
+deny evince-previewer "$H/Tor Browser/f.pdf" r
+deny evince-previewer $H/Documents/f.pdf w
+deny evince-thumbnailer $H/Torrents/f.pdf r
+deny evince-thumbnailer $H/Documents/f.pdf w
 EOT
 echo "== FeatherPad reads Qt's dialog settings, can't change them"
 run usr.bin.featherpad <<EOT

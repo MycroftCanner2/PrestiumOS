@@ -77,7 +77,7 @@ done in).
   `/run/prestium/netstatus`), which asks Tor's bootstrap state through the control-port filter, so
   it is right in the default boot, where Tor keeps no log.
 - **The menu is grouped by task.** Top level: I2P Browser, Tor Browser, I2P Router Console, Text
-  Editor, File Manager; then Office, Multimedia, Accessories, Security, Communication, Sharing,
+  Editor, File Manager; then Office (LibreOffice, Document Viewer), Multimedia, Accessories, Security, Communication, Sharing,
   Network and System; then Restart… and Shut Down… (Log Out is gone). Super+Space opens it under the
   Applications button, a right-click on the desktop at the pointer; a left-click on the desktop does
   nothing. Networked apps name their network ("Claws Mail (Email, I2P)", "IRC (Tor)", "Feather
@@ -183,13 +183,23 @@ done in).
   0600 removes the four known Debian conflicts and runs `aa-attach-check.py`, which fails the build if
   any other profile attaches to a program a Prestium profile confines, or if another file defines a
   Prestium profile's name; apparmor.service runs it again at boot, and every profile must compile.
-- **Programs that open downloaded files are confined:** Loupe, VLC, File Roller, FeatherPad, mat2,
-  Metadata Cleaner and Audacity (no network, camera, admin tools, other apps' mail, chat or browser
+- **Programs that open downloaded files are confined:** Loupe, Evince, VLC, File Roller, FeatherPad,
+  mat2, Metadata Cleaner and Audacity (no network, camera, admin tools, other apps' mail, chat or browser
   data, OpenPGP keys or KeePassXC databases; they read the file folders and save only in
   `~/Documents`). VLC plays local files only. The bubblewrap helpers of Loupe (glycin) and mat2/Metadata
   Cleaner run in capability-stripped inner profiles (`glycin-inner`, `mat2-inner`,
   `metadata-cleaner-inner`) that may write only the one cleaned-copy name. Viewers can't ptrace or reach
   the session bus.
+- **New: Evince (Document Viewer)**, in *Office*, the default for PDF, PostScript, DjVu, DVI, XPS and
+  comic books (TIFF stays with Loupe). It runs under Prestium's enforced `prestium.evince` profile
+  (`evince`, plus `evince-previewer` for print preview and `evince-thumbnailer`); hook 0600 removes
+  Debian's `usr.bin.evince`, which attached to the same programs and whose helper children may start
+  browsers and mail apps. Evince has no network, sound or camera and only the restricted Wayland
+  socket. It is a `~/Documents` app: it reads and saves there ("Save a Copy", annotations), reads
+  `~/Downloads`, the other shared file folders and unlocked volumes read-only, and can't read
+  `~/Tor Browser`, `~/I2P Browser` or `~/Torrents`, the keys, KeePassXC databases or other apps' data.
+  Links in a document open nothing. It draws one header bar with minimise, maximise and close, like
+  the other header-bar apps.
 - **KeePassXC and Kleopatra are confined.** KeePassXC has no network or browser integration and saves
   `*.kdbx` (with its lock and safe-save files) in the home, `~/Documents` and unlocked volumes.
   Kleopatra and its GnuPG tools use `~/.gnupg`, read the file folders and save in `~/Documents`; only
@@ -200,7 +210,8 @@ done in).
   programs that a socket-started gpg-agent would run outside the profile. `prestium-gnupg-check` (a
   root timer) flags such options written by anything else.
 - **Shared folders.** Apps share `~/Downloads` (the local Firefox, Claws Mail, Gajim) and
-  `~/Documents` (LibreOffice, FeatherPad, File Roller, Audacity, Kleopatra, Metadata Cleaner, Feather);
+  `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity, Kleopatra, Metadata Cleaner,
+  Feather);
   only `~/I2P Browser`, `~/Torrents` and `~/Tor Browser` are app-specific, and the shared apps can't
   write there. The file manager pins exactly those five. Mail and chat read only files directly in
   `~/Downloads`. Volumes under `/media` are read-only for the apps (except KeePassXC databases).

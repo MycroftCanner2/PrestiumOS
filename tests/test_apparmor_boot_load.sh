@@ -68,10 +68,13 @@ mk
 out=$(python3 -I "$CHK" "$T/aa" $OURS 2>&1); rc=$?
 [ $rc -ne 0 ] && echo "$out" | grep -q 'soffice.bin: Prestium profile libreoffice' && echo "$out" | grep -q 'oosplash: Prestium profile libreoffice' \
   && ok "check finds the LibreOffice conflict (without hook 0600's removals)" || { bad "check misses the LibreOffice conflict"; echo "$out"; }
+echo "$out" | grep -q 'usr.bin.evince.*Prestium profile evince' && echo "$out" | grep -q 'usr.bin.evince.*Prestium profile evince-thumbnailer' \
+  && ok "check finds Debian's evince conflict (without hook 0600's removals)" || { bad "check misses the evince conflict"; echo "$out"; }
 # hook 0600's removals, applied to the tree
 grep -E '^rm -f /etc/apparmor.d/' "$H" | sed 's#^rm -f ##' | tr ' ' '\n' | sed -n 's#^/etc/apparmor.d/##p' | while read -r f; do rm -f "$T/aa/$f"; done
 [ ! -e "$T/aa/usr.lib.libreoffice.program.soffice.bin" ] && [ ! -e "$T/aa/usr.lib.libreoffice.program.oosplash" ] \
   && [ -e "$T/aa/usr.lib.libreoffice.program.xpdfimport" ] && ok "hook 0600 removes Debian's oosplash and soffice.bin profiles only" || bad "hook 0600 removals"
+[ ! -e "$T/aa/usr.bin.evince" ] && [ -e "$T/aa/prestium.evince" ] && ok "hook 0600 removes Debian's usr.bin.evince, keeps prestium.evince" || bad "hook 0600: evince profiles"
 # shellcheck disable=SC2086
 out=$(python3 -I "$CHK" "$T/aa" $OURS 2>&1) && ok "after hook 0600: ${out#P: }" || { bad "profile set after hook 0600"; echo "$out"; }
 # a profile that doesn't compile is reported (apparmor.service would fail)

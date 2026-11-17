@@ -11,7 +11,7 @@ set -u; R=$(cd "$(dirname "$0")/.." && pwd); A=$R/config/includes.chroot/etc/app
 command -v apparmor_parser >/dev/null || PATH=$PATH:/usr/sbin
 command -v apparmor_parser >/dev/null || { echo "SKIP apparmor_parser missing"; exit 0; }
 W=$(mktemp -d); trap 'rm -rf "$W"' EXIT
-cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; rm -f "$W/loupe"; cp -r "$A"/. "$W"/
+cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$W"/ 2>/dev/null; rm -f "$W/loupe" "$W/usr.bin.evince"; cp -r "$A"/. "$W"/
 run() { # profile file, then check lines on stdin
   apparmor_parser -p -b "$W" "$W/$1" > "$W/.exp" 2>"$W/.err" || { echo "FAIL $1 does not compile"; fail=1; cat > /dev/null; return; }
   python3 -B "$R/tests/aa_eval.py" "$W/.exp" || fail=1
@@ -122,6 +122,42 @@ rw:/proc/4242/setgroups r:/proc/sys/kernel/overflowuid"
 bw() { for e in $BW; do echo "allow $1 ${e#*:} ${e%%:*}"; done; }
 
 echo "== Loupe (glycin decoders in bubblewrap)"
+echo "== Evince (document backends, settings, print preview; no secrets, no other app's folders)"
+run prestium.evince <<EOT
+allow evince /usr/bin/evince x:i
+allow evince /usr/lib/x86_64-linux-gnu/evince/4/backends/libpdfdocument.so mr
+allow evince /usr/lib/x86_64-linux-gnu/evince/4/backends/pdfdocument.evince-backend r
+allow evince /usr/lib/x86_64-linux-gnu/libevdocument3.so.4 mr
+allow evince /usr/share/poppler/cMap/Adobe-Japan1/H r
+allow evince /usr/bin/evince-previewer x:P
+allow evince $H/.config/evince/accels rw
+allow evince $H/.local/share/recently-used.xbel rw
+allow evince /tmp/evince-1234/print.pdf rw
+allow evince /run/prestium-wl/1000/apps rw
+deny evince /run/user/1000/wayland-0 rw
+deny evince /run/user/1000/bus rw
+deny evince /usr/bin/librewolf x
+deny evince /usr/local/bin/tor-browser x
+deny evince /usr/bin/xdg-open x
+deny evince /usr/bin/sudo x
+deny evince $G/pubring.kbx r
+deny evince $H/Documents/db.kdbx r
+deny evince $H/.ssh/id_ed25519 r
+deny evince $H/.claws-mail/accountrc r
+deny evince $H/.tor-browser/profile/key4.db r
+deny evince $H/.bashrc w
+deny evince $H/Downloads/f.pdf w
+deny evince "$H/Tor Browser/f.pdf" r
+deny evince "$H/I2P Browser/f.pdf" r
+deny evince $H/Torrents/f.pdf r
+deny evince /dev/video0 r
+deny evince /dev/snd/pcmC0D0p w
+allow evince-previewer /tmp/evince-1234/print.pdf r
+allow evince-previewer /usr/lib/x86_64-linux-gnu/evince/4/backends/libpdfdocument.so mr
+deny evince-previewer $G/pubring.kbx r
+allow evince-thumbnailer $H/.cache/thumbnails/large/x.png w
+deny evince-thumbnailer $G/pubring.kbx r
+EOT
 run usr.bin.loupe <<EOT
 allow loupe / r
 allow loupe /proc/meminfo r

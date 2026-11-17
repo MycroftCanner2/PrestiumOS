@@ -1,0 +1,61 @@
+# Prestium 2.1: Evince (Document Viewer), the default PDF and document viewer, ENFORCED. PDF, PostScript,
+# DjVu, XPS, DVI and comic-book files are a common exploit vector: a crafted document gets no network, no
+# camera or sound, no other app's data (mail, chat, browser profiles), no OpenPGP keys and no KeePassXC
+# databases. It is one of the shared ~/Documents apps: it opens files in ~/Documents (and the other shared
+# file folders and unlocked volumes, read-only) and saves only in ~/Documents ("Save a Copy", annotations).
+# It can't read the app-specific folders (~/Tor Browser, ~/I2P Browser, ~/Torrents): move a file into
+# ~/Documents with the file manager first.
+# Named prestium.evince, not usr.bin.evince: that is Debian's own file (evince package), which hook 0600
+# removes because it attaches to the same programs. Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile evince /usr/bin/evince {
+  include <abstractions/prestium-viewer>
+  include <abstractions/prestium-viewer-write>
+  # the shared ~/Documents folder is the only folder in the home it may write
+  owner @{HOME}/Documents/ rw,
+  owner @{HOME}/Documents/** rwkl,
+  # the app-specific folders belong to the browsers and I2P Torrents (prestium-user-files lets the
+  # other viewers read them; Evince, as a ~/Documents app, doesn't)
+  deny "@{HOME}/Tor Browser/" rw,
+  deny "@{HOME}/Tor Browser/**" rw,
+  deny "@{HOME}/I2P Browser/" rw,
+  deny "@{HOME}/I2P Browser/**" rw,
+  deny @{HOME}/Torrents/ rw,
+  deny @{HOME}/Torrents/** rw,
+  /usr/bin/evince mrix,
+  # the document backends (PDF through poppler, PostScript, DjVu, DVI, TIFF, XPS, comics)
+  /usr/lib/@{multiarch}/evince/** mr,
+  # print preview runs in its own profile below; links in a document open nothing (no browser exec)
+  /usr/bin/evince-previewer mrPx -> evince-previewer,
+  owner @{HOME}/.config/evince/ rw,
+  owner @{HOME}/.config/evince/** rwk,
+  owner @{HOME}/.local/share/evince/ rw,
+  owner @{HOME}/.local/share/evince/** rwk,
+  owner @{HOME}/.cache/evince/ rw,
+  owner @{HOME}/.cache/evince/** rwk,
+  include if exists <local/prestium.evince>
+}
+
+# Print preview (Evince hands it a temporary copy of the document)
+profile evince-previewer /usr/bin/evince-previewer {
+  include <abstractions/prestium-viewer>
+  /usr/bin/evince-previewer mr,
+  /usr/lib/@{multiarch}/evince/** mr,
+  deny "@{HOME}/Tor Browser/**" rw,
+  deny "@{HOME}/I2P Browser/**" rw,
+  deny @{HOME}/Torrents/** rw,
+  include if exists <local/prestium.evince-previewer>
+}
+
+# The thumbnailer (the file manager makes no thumbnails, /etc/xdg/libfm/libfm.conf; confined anyway)
+profile evince-thumbnailer /usr/bin/evince-thumbnailer {
+  include <abstractions/prestium-viewer>
+  /usr/bin/evince-thumbnailer mr,
+  /usr/lib/@{multiarch}/evince/** mr,
+  deny "@{HOME}/Tor Browser/**" rw,
+  deny "@{HOME}/I2P Browser/**" rw,
+  deny @{HOME}/Torrents/** rw,
+  include if exists <local/prestium.evince-thumbnailer>
+}

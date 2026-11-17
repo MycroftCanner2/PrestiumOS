@@ -2,8 +2,8 @@
 # Prestium 2.1: design assets. The 256 px logo is rendered from the final SVG (checked pixel by pixel
 # when rsvg-convert is installed), the three wallpapers are 2560x1440 PNGs of a sane size, every
 # icon name the volume/microphone/brightness OSD and the notification-sound toggle use exists in
-# Papirus-Dark (checked against an unpacked papirus-icon-theme when PAPIRUS_ROOT is set), and no
-# adwaita-qt is left in the tree.
+# Papirus-Dark (checked against an unpacked papirus-icon-theme when PAPIRUS_ROOT is set), and Qt
+# uses adwaita-qt (the light desktop's Qt style).
 import os, re, shutil, struct, subprocess, sys, tempfile, zlib
 
 R = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -98,14 +98,11 @@ if PR:
 else:
     skip("PAPIRUS_ROOT not set: icon names not checked against papirus-icon-theme")
 
-# adwaita-qt
-g = subprocess.run(["git", "-C", R, "grep", "-n", "-i", "adwaita-qt", "--", ".", ":!tests/test_design_assets.py"],
-                   capture_output=True, text=True)
-if g.returncode > 1:  # not a git checkout
-    g = subprocess.run(["grep", "-rniI", "--exclude=test_design_assets.py", "--exclude-dir=.git", "--exclude-dir=cache",
-                        "adwaita-qt", R], capture_output=True, text=True)
-out = g.stdout
-left = [l for l in out.splitlines() if not re.search(r"2\.0 r\d+", l)]
-not left and ok("no adwaita-qt mentions (outside 2.0 rN history)") or bad("adwaita-qt still mentioned: %s" % left)
+# adwaita-qt: the dark pass removed it; the Adwaita light desktop ships it again as the Qt style
+# (test_desktop_theme.sh checks the packages too), so it must be installed and selected
+pk = open(os.path.join(R, "config/package-lists/prestium.list.chroot")).read().split()
+env = open(os.path.join(I, "etc/environment")).read()
+("adwaita-qt" in pk and "adwaita-qt6" in pk and "QT_STYLE_OVERRIDE=Adwaita" in env) and ok("Qt uses adwaita-qt (packages installed, QT_STYLE_OVERRIDE=Adwaita)") \
+    or bad("adwaita-qt not installed or not selected")
 
 sys.exit(1 if fails else 0)

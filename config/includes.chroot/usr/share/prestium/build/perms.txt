@@ -437,6 +437,7 @@
 0644 root root /etc/apparmor.d/usr.bin.audacity
 0644 root root /etc/apparmor.d/usr.bin.keepassxc
 0644 root root /etc/apparmor.d/usr.bin.kleopatra
+0644 root root /etc/apparmor.d/prestium.evince
 0644 root root /etc/apparmor.d/local/torbrowser.Browser.firefox
 0644 root root /etc/apparmor.d/usr.bin.gajim
 0644 root root /etc/apparmor.d/usr.bin.onionshare
