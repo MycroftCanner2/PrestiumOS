@@ -230,6 +230,14 @@ done in).
   host working.
 - **LibreOffice, KeePassXC and the viewers work under their profiles** on a fresh home (first start,
   headless conversion, saving, recent files).
+- **KeePassXC saves databases again,** in `~/Documents`, the home folder and on unlocked volumes.
+  Every save failed with "Writing the database failed: Permission denied": Qt's safe save writes an
+  unnamed temporary file, which AppArmor names `<folder>/#<number>`, so none of the `.kdbx` rules
+  matched it, and the link that puts it in place needs the lock permission on it too. The temporary
+  name now gets read, write and lock in the places a database may be saved; files written there are
+  still `.kdbx` only, and the secret folders stay denied. Its window state in `~/.cache/keepassxc`
+  is saved again too. Found in the kernel's AppArmor log on a Debian 13 VM (KeePassXC 2.7.10, the GUI
+  and `keepassxc-cli`); `test_apparmor_startup.sh` checks those names.
 - **LibreOffice starts again.** Its first start stopped with "Fatal Error: User installation could not
   be completed" (exit 77) because the profile denied `/etc/passwd` and `/etc/nsswitch.conf`: LibreOffice
   finds the home folder through the user database, not `$HOME`, so it never got as far as creating

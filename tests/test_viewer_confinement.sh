@@ -110,6 +110,9 @@ if command -v apparmor_parser >/dev/null; then
       # on the containing directory. File writes stay *.kdbx-only (the next
       # checks), so only the two directory rules are excused here.
       hw=$(grep -vE '@\{HOME\}/(\*\*/)? rw,$' <<<"$hw")
+      # 2.1 (boot fix): and the safe save's unnamed temporary file, which AppArmor names
+      # "<dir>/#<inode>": only that "#[0-9]*[0-9]" rule is excused
+      hw=$(grep -vE '@\{HOME\}/(\*\*/)?#\[0-9\]\*\[0-9\] rwk,$' <<<"$hw")
     fi
     if [ "$f" = usr.lib.libreoffice.program ]; then
       # First start creates ~/.cache and ~/.local (neither is in /etc/skel),
@@ -129,6 +132,7 @@ if command -v apparmor_parser >/dev/null; then
       # (new database, .lock sidecar, atomic-save temporary file); files
       # there stay *.kdbx-only.
       mw=$(grep -vE '\s/media/(\*\*/)? rw,$' <<<"$mw")
+      mw=$(grep -vE '\s/media/\*\*/#\[0-9\]\*\[0-9\] rwk,$' <<<"$mw")
     fi
     [ -z "$mw" ] && ok "$f: no write under /media (but KeePassXC's .kdbx)" || bad "$f /media writes: $mw"
     # base and gnome grant ix and w under ~/.Private (ecryptfs) and ~/tmp: denied by prestium-viewer

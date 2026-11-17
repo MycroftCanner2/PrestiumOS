@@ -369,6 +369,22 @@ allow keepassxc /media/user/STICK/Passwords.kdbxAbC123 w
 allow keepassxc /media/user/STICK/Passwords.kdbx l
 allow keepassxc /media/user/STICK/Passwords.kdbx.AbC123 l
 deny keepassxc /media/user/STICK/notes.txt w
+# 2.1 (boot fix): Qt's safe save opens an unnamed O_TMPFILE, which AppArmor names "<dir>/#<inode>"
+# (kernel log on a Debian 13 VM: name="/home/user/Documents/#135221" denied_mask="w"), then links it
+# onto the .kdbx name; the link may not carry more than the temp has, so the temp needs "k" too
+# (denied_mask="k" on the link without it). Without these, every save failed: "Permission denied".
+allow keepassxc $H/Documents/#135221 rwk
+allow keepassxc $H/#135221 rwk
+allow keepassxc /media/user/STICK/#135221 rwk
+# its window state (~/.cache/keepassxc/keepassxc.ini) is saved the same way: link onto the name
+allow keepassxc $H/.cache/keepassxc/#135222 rwk
+allow keepassxc $H/.cache/keepassxc/keepassxc.ini l
+allow keepassxc $H/.local/share/keepassxc/#135223 rwk
+# the temp name opens no secret folder or startup file
+deny keepassxc $H/.ssh/#135221 w
+deny keepassxc $H/.gnupg/#135221 w
+deny keepassxc $H/.config/autostart/#135221 w
+deny keepassxc $H/Documents/#notes w
 allow keepassxc $H/.config/keepassxc/keepassxc.ini rwk
 allow keepassxc $H/.cache/ w
 allow keepassxc $H/.cache/keepassxc/ rw

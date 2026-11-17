@@ -6,7 +6,7 @@
 # (~/.ssh, ~/.gnupg, autostart) still win over it.
 # Off here: icon downloads and breach checks (no network), browser integration (it may not write the
 # browsers' directories) and opening URLs (no other programs).
-# Not yet tested on a booted ISO.
+# Saving tested under this profile on a Debian 13 VM with AppArmor enabled; not yet on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
 
@@ -26,12 +26,21 @@ profile keepassxc /usr/bin/keepassxc {
 
   /usr/bin/keepassxc mr,
   /usr/lib/@{multiarch}/keepassxc/** mr,
-  # Qt 6 (Debian 13) commits the default safe save with linkat: QSaveFile opens
-  # an unnamed O_TMPFILE in the destination directory and linkat()s it onto
-  # the .kdbx name. "l" is that link. "rwk" alone left every save failing
-  # with Permission denied, in the home and on a volume. The named fallback
-  # (Qt appends ".XXXXXX", so "<name>.kdbx.<random>") and the ".kdbx.lock"
-  # sidecar are the "**.kdbx*" rule.
+  # Qt (Qt 5 in Debian 13's KeePassXC 2.7.10) commits the default safe save with linkat: QSaveFile
+  # opens an unnamed O_TMPFILE in the destination directory and linkat()s it onto the .kdbx name.
+  # "l" is that link. The named fallback (Qt appends ".XXXXXX", so "<name>.kdbx.<random>") and the
+  # ".kdbx.lock" sidecar are the "**.kdbx*" rule.
+  # 2.1 (boot fix, root cause of "Writing the database failed: Permission denied"): AppArmor names
+  # an unnamed O_TMPFILE "<directory>/#<inode number>", not "<name>.kdbx...", so no .kdbx rule
+  # matched it. Kernel log on a Debian 13 VM with this profile, saving ~/Documents/x.kdbx:
+  #   operation="open" name="/home/user/Documents/#135221" requested_mask="w" denied_mask="w"
+  # and with only "rw" on it, the commit failed on the link (a link may not carry more than its
+  # source has, and the .kdbx name has "k"):
+  #   operation="link" name="/home/user/Documents/x.kdbx" denied_mask="k" target=".../#135221"
+  # So the temp name gets "rwk", only in the places a database may be saved (the home and /media);
+  # it is the same "#[0-9]*[0-9]" form Debian's qt5-settings-write abstraction uses.
+  owner @{HOME}/#[0-9]*[0-9] rwk,
+  owner @{HOME}/**/#[0-9]*[0-9] rwk,
   owner @{HOME}/**.kdbx rwkl,
   owner @{HOME}/**.kdbx* rwkl,
   # Saving a new database, its .lock sidecar on open, and an atomic-save
@@ -42,6 +51,7 @@ profile keepassxc /usr/bin/keepassxc {
   # and their sidecars by the two rules above.
   owner @{HOME}/ rw,
   owner @{HOME}/**/ rw,
+  /media/**/#[0-9]*[0-9] rwk,
   /media/**.kdbx rwkl,
   /media/**.kdbx* rwkl,
   # Same for a database kept on an unlocked volume (see prestium-user-files:
@@ -55,11 +65,14 @@ profile keepassxc /usr/bin/keepassxc {
   owner @{HOME}/.config/keepassxc/** rwkl,
   owner @{HOME}/.cache/ rw,
   owner @{HOME}/.cache/keepassxc/ rw,
-  owner @{HOME}/.cache/keepassxc/** rwk,
+  # 2.1 (boot fix): KeePassXC keeps its window state in ~/.cache/keepassxc/keepassxc.ini and saves it
+  # the same way (O_TMPFILE "#<inode>", then a link onto the name); without "l" that link was denied
+  # on every start and exit (operation="link" name=".../.cache/keepassxc/keepassxc.ini" denied_mask="l")
+  owner @{HOME}/.cache/keepassxc/** rwkl,
   owner @{HOME}/.local/ rw,
   owner @{HOME}/.local/share/ rw,
   owner @{HOME}/.local/share/keepassxc/ rw,
-  owner @{HOME}/.local/share/keepassxc/** rwk,
+  owner @{HOME}/.local/share/keepassxc/** rwkl,
   owner @{run}/user/[0-9]*/ r,
   owner @{run}/user/[0-9]*/org.keepassxc.* rw,
   owner @{run}/user/[0-9]*/app/ r,
