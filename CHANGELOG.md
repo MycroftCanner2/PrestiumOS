@@ -641,6 +641,19 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   udisks still lets the desktop user attach disk images (needed for VeraCrypt file containers).
 
 ### Safety and virtual machines
+- **The session wipe reports a failure instead of success.** At shutdown, `prestium-wipe-session`
+  skipped a tree that wasn't there, ignored find's errors, always logged "session files deleted" and
+  exited 0. It now also deletes the overlay's work directory (keeping overlayfs's own `work/` and
+  `index/`, which the still-mounted root needs) and the runtime secrets under `/run`: Prestium's state
+  (the Tor Connection Assistant's previous bridge lines, the DoH cache, network logs), the IRC sign-in
+  tokens, Tor's control cookie, the onion-grater, i2pd and sudo state, and user runtime directories
+  that are still there (FUSE mount points such as gvfs are left alone). `/run/systemd`,
+  `/run/initramfs` (systemd-shutdown returns into it), `/run/udev`, `/run/dbus`, `/run/log` and the
+  read-only image stay, on purpose. Each tree is checked afterwards; a missing tree, a failing find or
+  a file left behind is logged as "session wipe FAILED" with the trees, and the script exits 1. The
+  USB watchdog's emergency fallback deletes the same trees, checks them after its second pass and logs
+  "emergency session wipe FAILED" when something is left; it powers off either way. Test:
+  `test_wipe_session.sh`.
 - **AppArmor health alert.** The safety notifier warns when the AppArmor module is off, when
   apparmor.service isn't active, or when one of Prestium's profiles isn't in enforce mode. A bug that
   could raise ten false alerts at every login (the profiles file looks readable to the user but only

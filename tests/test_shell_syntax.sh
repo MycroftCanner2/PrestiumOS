@@ -16,7 +16,9 @@ for f in \
   "$root/config/includes.chroot/usr/lib/systemd/system-sleep/prestium-usb-watchdog" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-vm-netcheck" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-netstatus" \
-  "$root/config/includes.chroot/usr/local/bin/prestium-vm-notify"
+  "$root/config/includes.chroot/usr/local/bin/prestium-vm-notify" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-wipe-session" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-usb-watchdog"
 do
   if ! bash -n "$f"; then
     echo "FAIL sh -n $f"; fail=1
@@ -35,7 +37,10 @@ for f in \
   "$root/config/includes.chroot/usr/local/sbin/prestium-browser-install" \
   "$root/config/includes.chroot/usr/local/bin/prestium-browser-updater" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-timesync" \
-  "$root/config/includes.chroot/usr/local/sbin/prestium-bootclock"
+  "$root/config/includes.chroot/usr/local/sbin/prestium-bootclock" \
+  "$root/config/includes.chroot/usr/local/sbin/prestium-wl-broker" \
+  "$root/config/includes.chroot/usr/local/bin/prestium-wl" \
+  "$root/config/includes.chroot/usr/share/prestium/build/aa-attach-check.py"
 do
   # bytecode goes to a throw-away prefix, never into config/includes.chroot (live-build would ship it)
   if ! PYTHONPYCACHEPREFIX="${TMPDIR:-/tmp}/prestium-pycache.$$" python3 -m py_compile "$f"; then

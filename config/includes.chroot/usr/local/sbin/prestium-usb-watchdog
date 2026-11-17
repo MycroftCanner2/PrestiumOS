@@ -22,6 +22,11 @@
 # session's files (overlay read-write branch, /tmp, /var/tmp, /dev/shm) with a
 # memlocked find, so their RAM is freed and zeroed (A2). During suspend the
 # watchdog is paused (/usr/lib/systemd/system-sleep/prestium-usb-watchdog).
+# 2.1 (review: the wipe reported success when deletion failed): it deletes the same trees as
+# prestium-wipe-session (also the overlay work directory and the runtime secrets under /run; see
+# there for the list and what is left on purpose) and checks each one after the second pass. A
+# failure is logged to the kernel log ("emergency session wipe FAILED" and the trees), never hidden;
+# the power-off happens either way.
 
 # 2.0 r7: only "toram" is an expected reason not to arm. Anything else is a failure the user must see:
 # exit 3 (unit failed, no restart loop: RestartPreventExitStatus=3) and a safety flag for the desktop.
@@ -50,10 +55,52 @@ case $disk in sr*) optical=1 ;; *) optical= ;; esac
     # delete the session files from RAM first (memlocked find:
     # the medium is gone), then SIGKILL everything so open files are freed too;
     # freed pages are zeroed by the kernel (init_on_free=1)
-    /usr/bin/find /run/live/overlay/rw /tmp /var/tmp /dev/shm -xdev -mindepth 1 -delete 2>/dev/null
+    # BEGIN emergency wipe (the trees of prestium-wipe-session; only builtins and the memlocked find)
+    F=/usr/bin/find
+    REQUIRED="/tmp /var/tmp /dev/shm /run/live/overlay/work /run/live/overlay/rw"
+    RUNTIME="/run/prestium /run/prestium-thelounge-launch /run/prestium-thelounge-tor-launch
+      /run/prestium-thelounge /run/prestium-thelounge-tor /run/prestium-torrents /run/prestium-i2p
+      /run/prestium-tbb /run/prestium-wl /run/tor /run/onion-grater /run/i2pd /run/sudo"
+    wipe_tree() {
+      if [ ! -d "$1" ] || [ -L "$1" ]; then bad="$bad $1(missing)"; return; fi
+      if [ "$1" = /run/live/overlay/work ]; then
+        $F "$1" -xdev -mindepth 2 -delete 2>/dev/null || bad="$bad $1(find)"
+        $F "$1" -xdev -mindepth 1 -maxdepth 1 ! -type d -delete 2>/dev/null || bad="$bad $1(find)"
+        left=$($F "$1" -xdev -mindepth 1 \( -path "$1/*/*" -o ! -type d \) -print -quit 2>/dev/null) || bad="$bad $1(list)"
+      else
+        $F "$1" -xdev -mindepth 1 -delete 2>/dev/null || bad="$bad $1(find)"
+        left=$($F "$1" -xdev -mindepth 1 -print -quit 2>/dev/null) || bad="$bad $1(list)"
+      fi
+      [ -z "$left" ] || bad="$bad $1(left)"
+    }
+    wipe_all() {
+      bad=; fuse=" "
+      while read -r _ mp ty _; do case $ty in fuse|fuse.*) fuse="$fuse$mp " ;; esac; done < /proc/self/mounts
+      for t in $RUNTIME; do
+        { [ -e "$t" ] || [ -L "$t" ]; } && wipe_tree "$t"
+      done
+      for u in /run/user/*; do
+        [ -d "$u" ] && [ ! -L "$u" ] || continue
+        for e in "$u"/* "$u"/.[!.]* "$u"/..?*; do
+          [ -e "$e" ] || [ -L "$e" ] || continue
+          case $fuse in *" $e "*) continue ;; esac
+          $F "$e" -xdev -delete 2>/dev/null || bad="$bad $e(find)"
+          { [ -e "$e" ] || [ -L "$e" ]; } && bad="$bad $e(left)"
+        done
+      done
+      for t in $REQUIRED; do wipe_tree "$t"; done
+    }
+    # END emergency wipe
+    wipe_all
     kill -KILL -1 2>/dev/null
     read -r -t 1 -u 4
-    /usr/bin/find /run/live/overlay/rw /tmp /var/tmp /dev/shm -xdev -mindepth 1 -delete 2>/dev/null
+    wipe_all
+    if [ -n "$bad" ]; then
+      bad=${bad//[^[:alnum:] \/()._:-]/?}   # names from /run/user: no newlines into the log
+      echo "<0>prestium: emergency session wipe FAILED, files may be left in RAM:${bad:0:400}" > /dev/kmsg
+    else
+      echo "<0>prestium: emergency session wipe done" > /dev/kmsg
+    fi
     read -r -t 1 -u 4
     echo o > /proc/sysrq-trigger' ) </dev/null >/dev/null 2>&1 &
 fallback=$!

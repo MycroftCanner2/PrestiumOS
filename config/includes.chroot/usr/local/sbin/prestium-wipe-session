@@ -1,12 +1,100 @@
 #!/bin/sh
-# Prestium (overlayfs-dirs cleanup at shutdown): late in shutdown,
-# after the desktop and services have stopped, delete the session's files from
-# RAM: the overlay read-write branch (everything written since boot: home,
-# downloads, browser profiles, keys), /tmp, /var/tmp and /dev/shm. Freed pages
-# are zeroed by the kernel (init_on_free=1).
-for d in /run/live/overlay/rw /tmp /var/tmp /dev/shm; do
-  [ -d "$d" ] || continue
-  find "$d" -xdev -mindepth 1 -delete 2>/dev/null
+# Prestium (overlayfs-dirs cleanup at shutdown): late in shutdown, after the desktop and services have
+# stopped, delete the session's files from RAM. Freed pages are zeroed by the kernel (init_on_free=1).
+#
+# 2.1 (review: the wipe reported success when deletion failed): every tree below is checked after the
+# deletion. A required tree that is missing, a find that fails, or anything left behind makes the
+# script log "session wipe FAILED" (kernel log, priority err) and exit 1, so the unit fails too.
+# "session files deleted" is logged only when everything is gone.
+#
+# Required (must exist; everything in them is deleted):
+#   /tmp /var/tmp /dev/shm
+#   /run/live/overlay/work  the overlay's work directory: copy-up and rename temp files (2.1). Its own
+#                           top-level directories (work/, index/) stay, because the root overlay is
+#                           still mounted and needs them until the final unmount; what is in them goes.
+#   /run/live/overlay/rw    the overlay's read-write branch: everything written since boot (home,
+#                           downloads, browser profiles, keys, the session password in /etc/shadow).
+#                           Last, since deleting through the merged view can leave whiteouts there.
+# Runtime secrets under /run (2.1; deleted when present, the directories themselves stay):
+#   /run/prestium           Tor Connection Assistant state and the previous bridge lines, DoH cache,
+#                           network logs, safety state
+#   /run/prestium-thelounge-launch /run/prestium-thelounge-tor-launch   IRC sign-in tokens
+#   /run/prestium-thelounge /run/prestium-thelounge-tor /run/prestium-torrents /run/prestium-i2p
+#   /run/prestium-tbb /run/prestium-wl /run/tor (control cookie) /run/onion-grater /run/i2pd
+#   /run/sudo (timestamps)
+#   /run/user/*             runtime directories that are still there (systemd's user-runtime-dir@
+#                           normally empties and unmounts them when the session ends). FUSE mount
+#                           points at their top (gvfs, doc) are left alone: nothing of them is in
+#                           that tmpfs, and their mount points can't be removed.
+# Deliberately left: /run/systemd, /run/initramfs (systemd-shutdown returns into it to unmount and
+# wipe memory), /run/udev, /run/dbus, /run/lock, /run/log (journald runs to the end and records this
+# result; its files are freed and zeroed when it exits), /run/live/medium and /run/live/rootfs (the
+# read-only image, still mounted).
+# find -xdev: a file system mounted inside a tree is not entered, and its mount point can't be
+# removed, which counts as a failure (its files were not deleted).
+# prestium-usb-watchdog's emergency fallback deletes the same trees (test_wipe_session.sh compares).
+case "$0" in
+  /usr/local/*) R= ; KMSG=/dev/kmsg; MOUNTS=/proc/self/mounts ;;
+  # tests run it from the source tree on a fake root
+  *) R=${PRESTIUM_WIPE_ROOT:-}; KMSG=${PRESTIUM_KMSG:-/dev/kmsg}; MOUNTS=${PRESTIUM_MOUNTS:-/proc/self/mounts} ;;
+esac
+REQUIRED="/tmp /var/tmp /dev/shm /run/live/overlay/work /run/live/overlay/rw"
+RUNTIME="/run/prestium /run/prestium-thelounge-launch /run/prestium-thelounge-tor-launch
+  /run/prestium-thelounge /run/prestium-thelounge-tor /run/prestium-torrents /run/prestium-i2p
+  /run/prestium-tbb /run/prestium-wl /run/tor /run/onion-grater /run/i2pd /run/sudo"
+failed=
+fail() { failed="$failed $1"; }
+present() { [ -e "$1" ] || [ -L "$1" ]; }
+
+# FUSE mount points (paths as in the mount table, so without $R)
+fuse=" "
+while read -r _ mp ty _; do
+  case $ty in fuse|fuse.*) fuse="$fuse$mp " ;; esac
+done < "$MOUNTS"
+
+# wipe DIR: delete everything in DIR and check that nothing is left
+wipe() {
+  d=$R$1
+  if [ ! -d "$d" ] || [ -L "$d" ]; then fail "$1(missing)"; return; fi
+  if [ "$1" = /run/live/overlay/work ]; then
+    find "$d" -xdev -mindepth 2 -delete 2>/dev/null || fail "$1(find)"
+    find "$d" -xdev -mindepth 1 -maxdepth 1 ! -type d -delete 2>/dev/null || fail "$1(find)"
+    left=$(find "$d" -xdev -mindepth 1 \( -path "$d/*/*" -o ! -type d \) -print -quit 2>/dev/null) || fail "$1(list)"
+  else
+    find "$d" -xdev -mindepth 1 -delete 2>/dev/null || fail "$1(find)"
+    left=$(find "$d" -xdev -mindepth 1 -print -quit 2>/dev/null) || fail "$1(list)"
+  fi
+  [ -z "$left" ] || fail "$1(left:${left#"$d"/})"
+}
+
+# wipe_user /run/user/UID: everything at its top except FUSE mount points
+wipe_user() {
+  for e in "$R$1"/* "$R$1"/.[!.]* "$R$1"/..?*; do
+    present "$e" || continue          # an unmatched pattern stays literal
+    case $fuse in *" ${e#"$R"} "*) continue ;; esac
+    find "$e" -xdev -delete 2>/dev/null || fail "${e#"$R"}(find)"
+    ! present "$e" || fail "${e#"$R"}(left)"
+  done
+}
+
+set -f   # the lists are words, not patterns
+for t in $RUNTIME; do
+  present "$R$t" || continue          # a runtime directory that doesn't exist holds nothing
+  wipe "$t"
 done
-echo "prestium: session files deleted" > /dev/kmsg 2>/dev/null
+set +f
+for u in "$R"/run/user/*; do
+  [ -d "$u" ] && [ ! -L "$u" ] || continue
+  wipe_user "${u#"$R"}"
+done
+set -f
+for t in $REQUIRED; do wipe "$t"; done
+
+if [ -n "$failed" ]; then
+  msg=$(printf '%s' "$failed" | tr -c '[:alnum:] /()._:-' '?' | cut -c 1-400)
+  echo "<3>prestium: session wipe FAILED, files may be left in RAM:$msg" > "$KMSG" 2>/dev/null
+  echo "prestium-wipe-session: FAILED:$msg" >&2
+  exit 1
+fi
+echo "prestium: session files deleted" > "$KMSG" 2>/dev/null
 exit 0
