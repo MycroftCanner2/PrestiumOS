@@ -310,7 +310,14 @@ deny prestium_tor_browser_launcher//bwrap /usr/bin/sudo x
 EOT
 
 echo "== LibreOffice (first start creates its user profile folders)"
+# 2.1 (boot fix): first start looks the user up with getpwuid() before it can name its profile folder;
+# with /etc/passwd or /etc/nsswitch.conf denied it stops with "User installation could not be
+# completed" (exit 77). Seen in the kernel log on a Debian 13 VM running this profile.
 run usr.lib.libreoffice.program <<EOT
+allow libreoffice /etc/nsswitch.conf r
+allow libreoffice /etc/passwd r
+allow libreoffice /etc/group r
+deny libreoffice /etc/shadow r
 allow libreoffice $H/ w
 allow libreoffice $H/.config/ w
 allow libreoffice $H/.config/libreoffice/ rw
@@ -337,6 +344,11 @@ allow libreoffice $H/Downloads/letter.odt r
 deny libreoffice $H/Downloads/letter.odt w
 deny libreoffice $G/pubring.kbx r
 EOT
+# the user lookup comes from nameservice-strict, not nameservice (no inet or netlink rules), and it stays offline
+L=$A/usr.lib.libreoffice.program
+grep -q '^ *include <abstractions/nameservice-strict>' "$L" || { echo "FAIL LibreOffice has no nameservice-strict (first start: exit 77)"; fail=1; }
+grep -q '^ *include <abstractions/nameservice>' "$L" && { echo "FAIL LibreOffice includes the full nameservice abstraction"; fail=1; }
+grep -q '^ *deny network inet,' "$L" && grep -q '^ *deny network inet6,' "$L" || { echo "FAIL LibreOffice lost its network deny"; fail=1; }
 
 echo "== KeePassXC (directory write, and link for Qt 6 linkat commit; files stay .kdbx-only), VLC, the others: no ~/.gnupg, offline"
 run usr.bin.keepassxc <<EOT

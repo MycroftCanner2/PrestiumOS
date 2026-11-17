@@ -230,6 +230,12 @@ done in).
   host working.
 - **LibreOffice, KeePassXC and the viewers work under their profiles** on a fresh home (first start,
   headless conversion, saving, recent files).
+- **LibreOffice starts again.** Its first start stopped with "Fatal Error: User installation could not
+  be completed" (exit 77) because the profile denied `/etc/passwd` and `/etc/nsswitch.conf`: LibreOffice
+  finds the home folder through the user database, not `$HOME`, so it never got as far as creating
+  `~/.config/libreoffice`. The profile now includes `nameservice-strict` (user lookups only, no
+  network rules); it still has no network. Found in the kernel's AppArmor log under the profile on a
+  Debian 13 VM; `test_apparmor_startup.sh` checks those reads.
 - **The first session password can only be set from the lock dialog,** which the broker shows on the
   compositor's full socket; `passwd` is no longer setuid and sudo allows only `status`. The password
   needs at least 8 characters, and each wrong attempt at the lock screen costs at least 4 seconds.

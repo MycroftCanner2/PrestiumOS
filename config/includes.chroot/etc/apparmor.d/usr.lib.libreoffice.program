@@ -1,7 +1,9 @@
 # Prestium 2.0 r9: LibreOffice, ENFORCED, with no network at all (documents are a common exploit
 # vector, and an office suite doesn't need to go online here). It may open and save documents in
 # the usual user folders, saves only in the shared ~/Documents (2.1, L-5), and uses its own profile. No sudo, no Prestium helpers, no system bus.
-# Not yet tested on a booted ISO.
+# First start tested under this profile on a Debian 13 VM with AppArmor enabled; not yet on a booted ISO.
+# The profile-folder, temp-dir and "m" rules below came from earlier guesses at the same error; that
+# VM's headless first start also ran without them, so they are not what fixed it.
 abi <abi/4.0>,
 include <tunables/global>
 
@@ -10,6 +12,15 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   include if exists <abstractions/enchant>
   include if exists <abstractions/aspell>
   include <abstractions/cups-client>
+  # 2.1 (boot fix, root cause of "User installation could not be completed", exit 77): LibreOffice
+  # finds the user's home through getpwuid() (sal's osl_getCurrentSecurity), not $HOME, so it reads
+  # /etc/nsswitch.conf and /etc/passwd before it can even name ~/.config/libreoffice/4. The profile
+  # had no nameservice rule: both reads were denied, no home was found, and first start stopped
+  # before creating anything. Reproduced under this profile on a Debian 13 VM with AppArmor on
+  # (LibreOffice 25.2.3, fresh home): exit 77 without it, a finished profile and conversion with it.
+  # nameservice-strict (as Kleopatra and pinentry): passwd, group, nsswitch, hosts; no inet or
+  # netlink rules come in through it, and "deny network inet/inet6" below still holds.
+  include <abstractions/nameservice-strict>
 
   network unix stream,
   network unix dgram,
