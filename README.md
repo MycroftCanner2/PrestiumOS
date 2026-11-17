@@ -65,7 +65,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
   SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets and its own
   Tor circuits per network. Networks connect only when you choose Connect. OFTC (default), Ergo,
-  DarkScience and IRCNow need no account.
+  DarkScience and IRCNow need no account. A network you add yourself checks the server's TLS
+  certificate by default; only the OFTC preset doesn't (its onion address authenticates it).
 - **Verified live image:** the root filesystem is mounted through dm-verity, and Prestium refuses to
   boot when it doesn't match the root hash in the boot menu (the kernel, initramfs and boot menu
   themselves are not covered yet; see the CHANGELOG's Known security limits).

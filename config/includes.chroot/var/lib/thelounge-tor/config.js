@@ -31,19 +31,25 @@ module.exports = {
 	fileUpload: {enable: false, maxFileSize: 10240, baseUrl: null},
 	transports: ["websocket", "polling"],
 	leaveMessage: "",
-	// "defaults" is the form behind "Connect to a network" (The Lounge 4.5 allows only one): OFTC,
-	// which needs no registration. The user "prestium" already has one network per preset
-	// (see /usr/local/share/prestium-thelounge-tor/prestium.json): OFTC, Ergo, DarkScience
-	// and IRCNow. No default channels. No SASL networks ship in the image.
-	// OFTC's certificate is for irc.oftc.net (Let's Encrypt), not for its onion address; the onion
-	// address itself authenticates the server, so certificate checking is off for it only.
+	// "defaults" is the form behind "Connect to a network" (The Lounge 4.5 allows only one). The user
+	// "prestium" already has one network per preset (see
+	// /usr/local/share/prestium-thelounge-tor/prestium.json): OFTC, Ergo, DarkScience and IRCNow.
+	// No default channels. No SASL networks ship in the image.
+	// Certificate checking is off only on the OFTC preset: OFTC's certificate is for irc.oftc.net
+	// (Let's Encrypt), not for its onion address, and the onion address itself authenticates that
+	// server. 2.1 (review: new IRC (Tor) networks skipped TLS checks): the form used to be OFTC's
+	// onion with checking off, so a clearnet TLS server typed into it was reached through a Tor exit
+	// that could impersonate it (and read a SASL password). The form now checks certificates
+	// ("Only allow trusted certificates" ticked) and names no server, since OFTC's onion can't pass
+	// that check and is already a preset. The Lounge 4.5.2 sends these values to the form as they
+	// are (lockNetwork false), and a network keeps what the form submitted.
 	defaults: {
-		name: "OFTC",
-		host: "oftcnet6xg6roj6d7id4y4cu6dchysacqj2ldgea73qzdagufflqxrid.onion",
+		name: "",
+		host: "",
 		port: 6697,
 		password: "",
 		tls: true,
-		rejectUnauthorized: false,
+		rejectUnauthorized: true,
 		nick: "anon%%%%",
 		username: "user",
 		realname: "anon",

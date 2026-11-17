@@ -783,6 +783,12 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   outproxy (`http_proxy`), not Tor. The reseed and torrent messages point to steps that exist.
 
 ### Apps
+- **IRC (Tor): new networks check TLS certificates.** The Connect form's defaults were OFTC's onion
+  with certificate checking off, so a clearnet TLS server entered there was reached through a Tor
+  exit that could impersonate it and read the session, a SASL password included. The form now has
+  "Only allow trusted certificates" ticked and names no server. Only the shipped OFTC network keeps
+  checking off: its certificate is for irc.oftc.net, and the onion address authenticates that server.
+  Test: `test_thelounge_tor.sh`.
 - **New: IRC (Tor)**, a second The Lounge (Communication menu, next to *IRC (I2P)*, which was "The Lounge
   (IRC, I2P)"). It reaches IRC only through Tor: its own system user `thelounge-tor`, state directory
   `/var/lib/thelounge-tor`, root-owned read-only `config.js`, web UI on 127.0.0.1:9010, systemd unit

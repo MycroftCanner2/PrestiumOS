@@ -107,7 +107,7 @@ sh -e "$T/copy.sh" && [ -f "$T/root/var/lib/thelounge-tor/packages/node_modules/
 ## config.js and presets
 C=$I/var/lib/thelounge-tor/config.js; C0=$I/var/lib/thelounge/config.js; J=$I/usr/local/share/prestium-thelounge-tor/prestium.json
 if command -v node >/dev/null; then
-  node - "$C" "$C0" "$J" "$I/etc/tor/torrc" "$I/usr/local/share/prestium-thelounge/prestium.json" <<'JS' && ok "config.js: 127.0.0.1:9010, OFTC default through 127.0.0.1:9050; 4 presets (no account, no SASL, no Pirate IRC), all through Tor" || bad "config.js / presets"
+  node - "$C" "$C0" "$J" "$I/etc/tor/torrc" "$I/usr/local/share/prestium-thelounge/prestium.json" <<'JS' && ok "config.js: 127.0.0.1:9010, Connect form checks certificates, through 127.0.0.1:9050; 4 presets (no account, no SASL, no Pirate IRC), all through Tor" || bad "config.js / presets"
 const [c, c0, j, torrc, j0] = process.argv.slice(2).map((f, i) => i < 2 ? require(f) : require("fs").readFileSync(f, "utf8"));
 const assert = require("assert");
 assert.strictEqual(c.port, 9010); assert.strictEqual(c.host, "127.0.0.1"); assert.strictEqual(c.public, false);
@@ -116,8 +116,10 @@ for (const k of ["prefetch", "prefetchStorage", "disableMediaPreview", "theme", 
 assert.deepStrictEqual(Object.keys(c).sort(), Object.keys(c0).sort());
 assert.strictEqual(c.theme, "thelounge-theme-tech-innovation");
 const d = c.defaults;
-assert.strictEqual(d.name, "OFTC"); assert.strictEqual(d.host, "oftcnet6xg6roj6d7id4y4cu6dchysacqj2ldgea73qzdagufflqxrid.onion");
-assert.strictEqual(d.port, 6697); assert.strictEqual(d.tls, true); assert.strictEqual(d.nick, c0.defaults.nick);
+// 2.1 (review): the Connect form checks certificates and names no server; only the OFTC preset doesn't check
+assert.strictEqual(d.name, ""); assert.strictEqual(d.host, "");
+assert.strictEqual(d.port, 6697); assert.strictEqual(d.tls, true); assert.strictEqual(d.rejectUnauthorized, true);
+assert.strictEqual(d.nick, c0.defaults.nick);
 assert.strictEqual(d.proxyEnabled, true); assert.strictEqual(d.proxyHost, "127.0.0.1"); assert.strictEqual(d.proxyPort, 9050);
 const p = JSON.parse(j);
 // 2.1: networks that need no account; SASL presets and Pirate IRC removed.
