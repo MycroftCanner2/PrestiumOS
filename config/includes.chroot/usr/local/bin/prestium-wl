@@ -1,29 +1,49 @@
 #!/usr/bin/python3 -I
 """Prestium 2.0 r11: ask the Wayland broker (root) for something that needs the compositor's full
 socket: start | panel | menu | lock | set-password | osk | display-settings | scale | wallpaper | screenshot | screenshot-area |
-status | i2p-apply JSON. The caller never gets that socket; see /usr/local/sbin/prestium-wl-broker."""
+status | i2p-apply JSON | tor-mode apply|cancel|revert|reconnect. The caller never gets that socket;
+see /usr/local/sbin/prestium-wl-broker."""
 import os, socket, sys
 OK = ("start", "panel", "menu", "lock", "set-password", "osk", "display-settings", "scale", "wallpaper", "screenshot", "screenshot-area", "status")
 # 2.1 (review N-2): i2p-apply takes one argument, the I2P Connection Assistant's JSON request (one line)
 if len(sys.argv) == 3 and sys.argv[1] == "i2p-apply" and "\n" not in sys.argv[2] and len(sys.argv[2]) <= 900:
     req = "i2p-apply " + sys.argv[2]
+# 2.1 (review: Tor retarget without confirmation): tor-mode CMD; for apply, the Tor Connection
+# Assistant's JSON request is read from stdin (one line). The broker asks the person at the screen first
+# and passes the helper's progress back as "progress JSON" lines; the last line is ok/fail JSON or error.
+elif len(sys.argv) == 3 and sys.argv[1] == "tor-mode" and sys.argv[2] in ("apply", "cancel", "revert", "reconnect"):
+    req = "tor-mode " + sys.argv[2]
+    if sys.argv[2] == "apply":
+        body = sys.stdin.read(120001).strip()
+        if not body or "\n" in body or len(body) > 120000:
+            print("prestium-wl: tor-mode apply needs one JSON line on stdin (at most 120000 bytes)", file=sys.stderr)
+            sys.exit(2)
+        req += " " + body
 elif len(sys.argv) == 2 and sys.argv[1] in OK:
     req = sys.argv[1]
 else:
-    print("usage: prestium-wl " + "|".join(OK) + " | i2p-apply JSON", file=sys.stderr); sys.exit(2)
+    print("usage: prestium-wl " + "|".join(OK) + " | i2p-apply JSON | tor-mode apply|cancel|revert|reconnect",
+          file=sys.stderr); sys.exit(2)
 s = socket.socket(socket.AF_UNIX)
 try:
     s.connect(os.path.join(os.environ.get("PRESTIUM_WL_BASE", "/run/prestium-wl"), "broker"))
 except OSError as e:
     print("prestium-wl: the Wayland broker is not running (%s)" % e, file=sys.stderr); sys.exit(1)
 s.sendall(req.encode() + b"\n")
-s.settimeout(None if sys.argv[1].startswith("screenshot") or sys.argv[1] in ("set-password", "i2p-apply") else 60)
-reply = b""
-while not reply.endswith(b"\n"):
+s.settimeout(None if sys.argv[1].startswith("screenshot") or sys.argv[1] in ("set-password", "i2p-apply", "tor-mode") else 60)
+# every line is printed as it comes ("progress ..." lines of tor-mode first); the last one decides
+reply, buf = "", b""
+while True:
     d = s.recv(4096)
     if not d:
         break
-    reply += d
-reply = reply.decode(errors="replace").strip()
-print(reply)
+    buf += d
+    while b"\n" in buf:
+        line, buf = buf.split(b"\n", 1)
+        reply = line.decode(errors="replace").strip()
+        print(reply, flush=True)
+        if not reply.startswith("progress "):
+            sys.exit(0 if reply.startswith(("ok", "session", "none")) else 1)
+if buf.strip():
+    reply = buf.decode(errors="replace").strip(); print(reply)
 sys.exit(0 if reply.startswith(("ok", "session", "none")) else 1)

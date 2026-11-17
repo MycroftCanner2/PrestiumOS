@@ -1,5 +1,9 @@
 #!/usr/bin/python3
-# Prestium 2.0: root helper of the Tor Connection Assistant (run through sudo by "user" only).
+# Prestium 2.0: root helper of the Tor Connection Assistant.
+# 2.1 (review: Tor retarget without confirmation): apply, cancel, revert and reconnect are run only by
+# the Wayland broker (root), after the person at the screen confirms them in a dialog on the
+# compositor's full socket, the same gate as I2P's settings (prestium-wl tor-mode ...). sudo lets
+# "user" run status and features only (sudoers.d/prestium-tor-mode).
 #   prestium-tor-mode apply      read a JSON request on stdin; STOP Tor, resolve the transport's
 #                                host names (DoH via the I2P outproxy, cached in /run), write the
 #                                firewall include, /etc/hosts pins and Tor's drop-in, START Tor.
@@ -10,6 +14,9 @@
 #   prestium-tor-mode reconnect  restart Tor (new guard/bridge connections), same configuration
 #   prestium-tor-mode status     print the current mode as JSON
 #   prestium-tor-mode features   print which transports are installed (JSON)
+#   prestium-tor-mode check      2.1: validate a request on stdin exactly as apply does and print it
+#                                normalised (mode, bridge lines); changes nothing. The broker shows
+#                                the result in its confirmation dialog.
 # Request: {"mode": "direct|snowflake|webtunnel|obfs4|meek", "bridges": "<lines>" (optional),
 #           "builtin": true|false}
 # Everything from the request is validated against strict patterns; nothing is passed to a shell.
@@ -279,6 +286,8 @@ def parse_request():
     try:
         req = json.loads(sys.stdin.read(200000))
     except Exception:
+        die("bad request")
+    if not isinstance(req, dict):
         die("bad request")
     mode = req.get("mode")
     if mode not in MODES:
@@ -558,12 +567,16 @@ def main():
         out({"ok": ok, "error": err}); return 0 if ok else 1
     if a == "status":
         return cmd_status()
+    if a == "check":
+        mode, builtin, lines, n_user = parse_request()
+        out({"ok": True, "mode": mode, "builtin": builtin, "bridges": lines, "user_bridges": n_user})
+        return 0
     if a == "features":
         out({"webtunnel": os.path.exists("/usr/bin/webtunnel-client"),
              "snowflake": os.path.exists("/usr/bin/snowflake-client"),
              "obfs4": os.path.exists("/usr/bin/lyrebird")})
         return 0
-    die("usage: prestium-tor-mode apply|cancel|revert|reconnect|status|features", 2)
+    die("usage: prestium-tor-mode apply|cancel|revert|reconnect|status|features|check", 2)
 
 if __name__ == "__main__":
     sys.exit(main())

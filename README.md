@@ -44,7 +44,9 @@ modernization of the 2023 Prestium build, with tighter security and new features
   no outproxy, so command-line tools reach `.i2p` sites only. For clearnet, use Tor
   (`curl --socks5-hostname 127.0.0.1:9050`) or the I2P outproxy (`curl -x http://127.0.0.1:4444`).
 - **Tor Connection Assistant:** Direct, Snowflake, WebTunnel, obfs4 and meek, with bootstrap progress,
-  Cancel, Retry and Revert at any point.
+  Cancel, Retry and Revert at any point. Every change (Apply, Cancel, Revert, Reconnect) is confirmed in
+  a dialog only the person at the screen can answer, as for the I2P settings, so another program
+  can't move Tor onto its own bridge or stop it.
 - **I2P:** i2pd with a per-boot port, signature-checked reseeding (over Tor or from a file), I2P mail
   (Claws Mail), IRC, torrents and Feather on I2P. To get the browser going sooner after boot, i2pd
   keeps only 38 tunnels ready: 2+2 for the browser proxy, 1+1 for most other services, and i2pd's

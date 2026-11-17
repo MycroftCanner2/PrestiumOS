@@ -24,6 +24,10 @@ start in turn is restricted again. Requests (one line on /run/prestium-wl/broker
   set-password       the first session password, asked in a dialog on the full socket (2.1, audit L-2)
   i2p-apply JSON     I2P hops, share level and outproxy: the person confirms in a dialog on the full
                      socket, then the broker runs prestium-i2p-mode apply as root (2.1, review N-2)
+  tor-mode CMD [JSON] Tor Connection Assistant: apply JSON | cancel | revert | reconnect. The person
+                     confirms in a dialog on the full socket, then the broker runs prestium-tor-mode
+                     CMD as root and passes its progress lines back ("progress JSON"), then
+                     "ok JSON" or "fail JSON" (2.1, the same gate as i2p-apply)
   osk                toggle the on-screen keyboard (wvkbd)
   display-settings   output settings (wdisplays)
   scale              apply ~/.config/prestium/scale to every output (wlr-randr)
@@ -62,6 +66,20 @@ I2P_MODE = _test_env("PRESTIUM_WL_I2P_MODE", "/usr/local/sbin/prestium-i2p-mode"
 I2P_SHARE = {"low": "Low", "medium": "Medium", "high": "High"}
 I2P_OUTPROXY = {"acetone": "Acetone", "stormycloud": "StormyCloud", "custom": "Custom"}
 I2P_CUSTOM_CHARS = re.compile(r"\A[A-Za-z0-9.:/-]{1,300}\Z")
+# 2.1 (review: Tor retarget without confirmation): prestium-tor-mode apply/cancel/revert/reconnect are
+# no longer in sudoers; only this broker runs them, after the dialog.
+TOR_MODE = _test_env("PRESTIUM_WL_TOR_MODE", "/usr/local/sbin/prestium-tor-mode")
+# The helper does not run inside this unit's sandbox: its DoH look-ups (runuser prestium-ptdns ->
+# 127.0.0.1:4444) need AF_INET, which RestrictAddressFamilies takes from the broker. It runs as its own
+# transient service, as it ran under sudo before, with stdin/stdout piped back here. "" (tests): directly.
+TOR_RUNNER = _test_env("PRESTIUM_WL_TOR_RUNNER", "/usr/bin/systemd-run")
+TOR_STATE_DIR = _test_env("PRESTIUM_WL_TOR_STATE", "/run/prestium")   # tor-mode.json, tor-mode.prev/state
+TOR_TITLES = {"direct": "Direct connection", "snowflake": "Snowflake", "webtunnel": "WebTunnel bridges",
+              "obfs4": "obfs4 bridges", "meek": "meek (Azure/CDN)"}
+TOR_CMDS = ("apply", "cancel", "revert", "reconnect")
+TOR_REQUEST_MAX = 120000            # one request line (the helper reads at most 200000 bytes)
+TOR_BUDGET = 600                    # seconds for one helper run (Tor stop/start 120 s each, DoH 25 s, ferm 60 s)
+REQUEST_MAX = TOR_REQUEST_MAX + 64  # longest request line the broker reads
 ETC = _test_env("PRESTIUM_WL_ETC", "/etc/xdg")          # override: tests only
 
 def log(msg, crit=False):
@@ -231,7 +249,7 @@ class Session:
         self.labwc = None; self.labwc_start = None
         self.ctx_conn = None; self.close_w = None
         self.kids = {}; self.lock = threading.Lock(); self.pw_busy = threading.Lock()
-        self.i2p_busy = threading.Lock()
+        self.i2p_busy = threading.Lock(); self.tor_busy = threading.Lock()
 
     def alive(self):
         return self.labwc is not None and proc_start(self.labwc) == self.labwc_start
@@ -482,6 +500,153 @@ class Session:
         finally:
             self.i2p_busy.release()
 
+    def tor_mode(self, cmd, raw="", pid=0, emit=None):
+        """2.1 (review: Tor retarget without confirmation): Tor's connection changes only after the person
+        at the screen confirms them, as I2P's do (i2p_apply). Before, any unconfined process of the user
+        could run "sudo prestium-tor-mode apply" and move Tor onto a bridge it picked (which sees the
+        client address; Snowflake also opens UDP for Tor's uid), or stop Tor with cancel. The dialog runs
+        on the compositor's full socket, so no application can draw over it or click it. The helper
+        validates the request again in full; every change is logged and announced."""
+        if cmd not in TOR_CMDS:
+            return "error unknown Tor command"
+        req, summary = None, None
+        if cmd == "apply":
+            try:
+                req = json.loads(raw)
+            except ValueError:
+                return "error request is not JSON"
+            if (not isinstance(req, dict) or set(req) - {"mode", "bridges", "builtin"}
+                    or req.get("mode") not in TOR_TITLES or not isinstance(req.get("bridges", ""), str)
+                    or not isinstance(req.get("builtin", True), bool)):
+                return "error invalid request"
+            # the helper's own parser (same patterns as apply), so the dialog shows what apply will use
+            try:
+                r = subprocess.run([TOR_MODE, "check"], input=json.dumps(req), capture_output=True,
+                                   text=True, timeout=30)
+                chk = json.loads((r.stdout.strip().splitlines() or ["{}"])[-1])
+            except (OSError, ValueError, subprocess.SubprocessError):
+                chk = {}
+            if not isinstance(chk, dict) or not chk.get("ok") or chk.get("mode") != req["mode"]:
+                return "error " + printable(str(chk.get("error") if isinstance(chk, dict) else "") or "invalid request", 300)
+            text, summary = self.tor_apply_text(chk)
+        elif raw:
+            return "error invalid request"
+        else:
+            text, summary = self.tor_other_text(cmd)
+        text += "\n\nAsked for by: " + requester(pid)
+        text += "\n\nIf you didn't just press %s in the Tor Connection Assistant, choose %s." % (
+            {"apply": "Apply and connect (or Retry)", "cancel": "Cancel", "revert": "Revert to previous",
+             "reconnect": "Reconnect"}[cmd], "Keep going" if cmd == "cancel" else "Cancel")
+        ok_label = {"apply": "Apply", "cancel": "Stop Tor", "revert": "Revert", "reconnect": "Reconnect"}[cmd]
+        if not self.tor_busy.acquire(blocking=False):
+            return "error a Tor settings dialog is already open"
+        try:
+            rc, _ = self.dialog(["zenity", "--question", "--no-markup", "--width", "460",
+                                 "--title", "Tor Connection Assistant", "--icon", "tor",
+                                 "--ok-label", ok_label,
+                                 "--cancel-label", "Keep going" if cmd == "cancel" else "Cancel",
+                                 "--text", text])
+        finally:
+            self.tor_busy.release()
+        if rc != 0:
+            log("uid %d: Tor %s cancelled at the dialog (%s)" % (self.uid, cmd, summary))
+            return "error cancelled"
+        log("uid %d: Tor %s confirmed (%s)" % (self.uid, cmd, summary))
+        st = self.run_tor_mode(cmd, req, emit)
+        if st.get("ok"):
+            log("uid %d: Tor %s done: %s" % (self.uid, cmd, summary))
+            try:
+                self.as_user(["notify-send", "-a", "Prestium", "-i", "tor",
+                              {"apply": "Tor settings changed", "cancel": "Tor stopped",
+                               "revert": "Tor settings reverted", "reconnect": "Tor reconnecting"}[cmd], summary])
+            except (OSError, subprocess.SubprocessError):
+                pass
+            return "ok " + json.dumps(st)
+        log("uid %d: Tor %s failed (%s): %s" % (self.uid, cmd, summary, st.get("error")), crit=True)
+        return "fail " + json.dumps(st)
+
+    def tor_apply_text(self, chk):
+        mode = chk["mode"]
+        lines = [l for l in chk.get("bridges") or [] if isinstance(l, str)]
+        n_user = chk.get("user_bridges") if type(chk.get("user_bridges")) is int else 0
+        summary = TOR_TITLES[mode] + ("" if mode == "direct" else ", %d bridge line(s)" % len(lines))
+        text = "Apply these Tor settings?\n\nConnection: %s" % TOR_TITLES[mode]
+        if mode != "direct":
+            text += "\nBridge lines: %d (%d entered, %d built-in)" % (len(lines), n_user, len(lines) - n_user)
+            # transport and address of each entered bridge (they see this computer's address)
+            shown = [printable(" ".join(l.split()[:2]), 80) for l in lines[:n_user]]
+            if shown:
+                text += "\nEntered bridges:\n  " + "\n  ".join(shown[:6])
+                if len(shown) > 6:
+                    text += "\n  … and %d more" % (len(shown) - 6)
+                text += "\nA bridge sees this computer's IP address. Use only bridges you got yourself."
+        if mode == "snowflake":
+            text += "\n\nSnowflake lets Tor send UDP (WebRTC) to the internet while it is on."
+        text += "\n\nTor stops and connects again: Tor connections drop until it is back."
+        return text, summary
+
+    def tor_other_text(self, cmd):
+        def mode_of(path):
+            try:
+                with open(path) as f:
+                    st = json.load(f)
+                return TOR_TITLES.get(st.get("mode"), "unknown") if isinstance(st, dict) else "unknown"
+            except (OSError, ValueError):
+                return None
+        cur = mode_of(os.path.join(TOR_STATE_DIR, "tor-mode.json")) or TOR_TITLES["direct"]
+        if cmd == "cancel":
+            return ("Stop Tor?\n\nIf a change is being applied, it is stopped and the previous settings are "
+                    "put back. Tor stays stopped until you press Reconnect, Retry or Revert.", "stop, " + cur)
+        if cmd == "revert":
+            prev = mode_of(os.path.join(TOR_STATE_DIR, "tor-mode.prev", "state")) or TOR_TITLES["direct"]
+            return ("Put the previous Tor settings back?\n\nNow: %s\nPrevious: %s\n\nTor restarts: Tor "
+                    "connections drop until it is back." % (cur, prev), "revert to " + prev)
+        return ("Restart Tor with the current settings?\n\nConnection: %s\n\nTor connections drop and Tor "
+                "connects again (new entry connections)." % cur, "reconnect, " + cur)
+
+    def run_tor_mode(self, cmd, req, emit):
+        """Run the helper as root; pass its progress lines to the caller, return its last JSON result."""
+        argv = [TOR_MODE, cmd]
+        if TOR_RUNNER:
+            argv = [TOR_RUNNER, "--quiet", "--pipe", "--wait", "--collect", "--service-type=exec",
+                    "--unit", "prestium-tor-mode-%s-%d" % (cmd, time.time_ns()),
+                    "-p", "Description=Prestium: Tor Connection Assistant %s (confirmed at the screen)" % cmd,
+                    "-p", "RuntimeMaxSec=%d" % TOR_BUDGET, "--"] + argv
+        try:
+            p = subprocess.Popen(argv, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                 stderr=subprocess.PIPE, text=True, start_new_session=True)
+        except OSError as e:
+            return {"ok": False, "error": "the helper did not start: %s" % e.__class__.__name__}
+        timer = threading.Timer(TOR_BUDGET + 30, p.kill); timer.daemon = True; timer.start()
+        final = None
+        try:
+            try:
+                p.stdin.write(json.dumps(req) if req is not None else ""); p.stdin.close()
+            except OSError:
+                pass
+            for line in p.stdout:
+                try:
+                    d = json.loads(line)
+                except ValueError:
+                    continue
+                if not isinstance(d, dict):
+                    continue
+                if "event" in d:
+                    if emit is not None:
+                        try:
+                            emit("progress " + json.dumps(d))
+                        except OSError:
+                            emit = None       # the assistant went away; the change still finishes
+                else:
+                    final = d
+            err = p.stderr.read()
+            p.wait()
+        finally:
+            timer.cancel()
+        if final is None:
+            final = {"ok": False, "error": (err.strip() or "the helper gave no answer")[-300:]}
+        return final
+
     def lock_screen(self):
         # GNOME dark-shield look: near-black purple screen, charcoal disc, Prestium-blue ring.
         rc, _ = self.spawn(["swaylock", "-f", "-C", SWAYLOCK_CONF,
@@ -582,17 +747,25 @@ def session_for(uid, create=False):
         return s
 
 class Handler(socketserver.StreamRequestHandler):
+    def emit(self, text):
+        """An extra reply line before the last one (Tor progress); raises OSError if the caller left."""
+        self.wfile.write((text.replace("\n", " ") + "\n").encode())
+
     def handle(self):
         try:
             pid, uid, _gid = peer_pid(self.request)
-            line = self.rfile.readline(1024).decode(errors="replace").strip()
+            # 2.1: a Tor request carries the bridge lines, so the limit is REQUEST_MAX (was 1024)
+            raw = self.rfile.readline(REQUEST_MAX)
+            if len(raw) >= REQUEST_MAX and not raw.endswith(b"\n"):
+                raise ValueError("request too long")
+            line = raw.decode(errors="replace").strip()
             if uid == 0:
                 reply = "error refusing root"
             elif not UID_MIN <= uid <= UID_MAX:
                 # 2.1 (audit L-4): system accounts (services, nobody) get nothing from the broker
                 reply = "error refusing system uid %d" % uid
             else:
-                reply = dispatch(uid, line, pid)
+                reply = dispatch(uid, line, pid, self.emit)
         except Exception as e:
             reply = "error " + str(e).replace("\n", " ")[:300]
             log("request failed: %s" % reply, crit=True)
@@ -601,7 +774,7 @@ class Handler(socketserver.StreamRequestHandler):
         except OSError:
             pass
 
-def dispatch(uid, cmd, pid=0):
+def dispatch(uid, cmd, pid=0, emit=None):
     if cmd == "start":
         return session_for(uid, create=True).start()
     s = session_for(uid)
@@ -626,6 +799,9 @@ def dispatch(uid, cmd, pid=0):
         return s.set_password()
     if cmd.startswith("i2p-apply "):
         return s.i2p_apply(cmd[len("i2p-apply "):], pid)
+    if cmd.startswith("tor-mode "):
+        sub, _, raw = cmd[len("tor-mode "):].partition(" ")
+        return s.tor_mode(sub, raw, pid, emit)
     if cmd == "scale":
         return s.scale()
     if cmd in ("screenshot", "screenshot-area"):

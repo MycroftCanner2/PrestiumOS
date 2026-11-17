@@ -3,8 +3,10 @@
 # Shows Tor's bootstrap progress (one persistent, read-only connection through the onion-grater
 # control-port filter, refreshed every second, plus Tor's NOTICE/WARN events in "Details") and lets
 # the user pick how Tor connects: Direct (default at boot), Snowflake, WebTunnel, obfs4 or meek.
-# Opening the assistant never stops or restarts Tor. "Apply and connect" runs the root helper
-# /usr/local/sbin/prestium-tor-mode (sudo, validated input), which stops Tor, resolves the host names
+# Opening the assistant never stops or restarts Tor. "Apply and connect" asks the Wayland broker
+# (prestium-wl tor-mode apply), which shows the change in a dialog only the person at the screen can
+# answer and then runs the root helper /usr/local/sbin/prestium-tor-mode (validated input). 2.1: Cancel,
+# Revert and Reconnect go the same way; sudo no longer runs any of the four. The helper stops Tor, resolves the host names
 # the transport needs (DNS-over-HTTPS through the I2P outproxy, parallel, cached), writes the
 # configuration and starts Tor again, so the progress bar runs from 0 %. "Cancel" aborts at any
 # point: the previous configuration is put back and Tor stays stopped (Retry / Revert offered).
@@ -17,7 +19,10 @@ from gi.repository import Gtk, Gdk, GLib, Gio, Pango
 
 APP_ID = "org.prestium.TorConnectionAssistant"
 CONTROL = "/run/onion-grater/control"
-HELPER = ["/usr/bin/sudo", "-n", "/usr/local/sbin/prestium-tor-mode"]
+# 2.1 (review: Tor retarget without confirmation): changes go through the Wayland broker, which asks the
+# person at the screen first (like the I2P Connection Assistant); sudo allows only status and features.
+BROKER = ["/usr/local/bin/prestium-wl", "tor-mode"]
+BROKER_TIMEOUT = 1000   # the dialog (300 s) and the helper (broker budget 600 s)
 DROPIN = "/etc/tor/torrc.d/50-prestium-assistant.conf"
 STATE = "/run/prestium/tor-mode.json"
 BUILTIN = "/usr/share/prestium/tor-bridges-builtin.json"
@@ -101,6 +106,50 @@ def validate(mode, text):
         elif mode == "webtunnel" and not re.search(r"(?:^| )url=https?://[A-Za-z0-9.-]+", l):
             bad.append("line %d has no url=https://... (needed by WebTunnel)" % i)
     return bad
+
+def broker(cmd, req=None, on_event=None, timeout=BROKER_TIMEOUT):
+    """Run apply|cancel|revert|reconnect through the broker. Progress events go to on_event; returns the
+    helper's result (a dict). A "No" in the confirmation dialog gives {"ok": False, "declined": True}."""
+    try:
+        p = subprocess.Popen(BROKER + [cmd], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, text=True)
+    except OSError as e:
+        return {"ok": False, "error": "the Wayland broker could not be asked: %s" % e}
+    timer = threading.Timer(timeout, p.kill); timer.daemon = True; timer.start()
+    final = None
+    try:
+        try:
+            p.stdin.write(json.dumps(req) + "\n" if req is not None else ""); p.stdin.close()
+        except OSError:
+            pass
+        for line in p.stdout:
+            line = line.strip()
+            if line.startswith("progress "):
+                try:
+                    d = json.loads(line[9:])
+                except ValueError:
+                    continue
+                if on_event and isinstance(d, dict):
+                    on_event(d)
+            elif line.startswith(("ok ", "fail ")):
+                try:
+                    d = json.loads(line.split(" ", 1)[1])
+                    final = d if isinstance(d, dict) else None
+                except ValueError:
+                    final = None
+                if final is None:
+                    final = {"ok": False, "error": "the broker's answer was not understood"}
+            elif line == "error cancelled":
+                final = {"ok": False, "declined": True, "error": "cancelled in the confirmation dialog"}
+            elif line.startswith("error "):
+                final = {"ok": False, "error": line[6:]}
+        err = p.stderr.read()
+        p.wait()
+    finally:
+        timer.cancel()
+    if final is None:
+        final = {"ok": False, "error": (err.strip() or "the broker gave no answer")[-300:]}
+    return final
 
 def read_dropin():
     """(mode, [bridge lines]) from Tor's active drop-in."""
@@ -248,7 +297,9 @@ class Assistant(Gtk.ApplicationWindow):
         self.last_request = None
         self.texts = {}
         self.cur_mode = None
-        self.helper_proc = None
+        self.phase_before_cancel = "applying"
+        self.apply_result = None      # an apply result that came in while the Cancel dialog was open
+        self.confirming = False       # 2.1: the broker's dialog for this change is open (Cancel waits)
         self.conf = read_json(CONF, {})
 
         outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
@@ -466,7 +517,8 @@ class Assistant(Gtk.ApplicationWindow):
         idle = self.phase == "idle"
         self.apply_btn.set_sensitive(idle and self.can_apply())
         self.reconnect_btn.set_sensitive(idle)
-        self.cancel_btn.set_sensitive(self.phase in ("applying", "connecting"))
+        # 2.1: while the broker's confirmation is on screen, that dialog's own Cancel is the way out
+        self.cancel_btn.set_sensitive(self.phase in ("applying", "connecting") and not self.confirming)
 
     def show_info(self, text, kind=Gtk.MessageType.WARNING, retry=True, revert=True):
         self.info.set_message_type(kind)
@@ -533,33 +585,19 @@ class Assistant(Gtk.ApplicationWindow):
         self.set_phase("applying")
         self.status.set_text("Applying %s…" % TITLES[req["mode"]])
         self.log("apply: %s" % TITLES[req["mode"]])
+        self.status.set_text("Confirm the change in the dialog…")
+        self.confirming = True; self.update_buttons()
         def work():
-            final = None
             try:
-                p = subprocess.Popen(HELPER + ["apply"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                                     stderr=subprocess.PIPE, text=True)
-                self.helper_proc = p
-                p.stdin.write(json.dumps(req)); p.stdin.close()
-                for line in p.stdout:
-                    try:
-                        d = json.loads(line)
-                    except ValueError:
-                        continue
-                    if "event" in d:
-                        GLib.idle_add(self.on_helper_event, d)
-                    else:
-                        final = d
-                err = p.stderr.read()
-                p.wait()
-                if final is None:
-                    final = {"ok": False, "error": (err or "the helper stopped unexpectedly").strip()[-300:]}
+                final = broker("apply", req, lambda d: GLib.idle_add(self.on_helper_event, d))
             except Exception as e:
                 final = {"ok": False, "error": str(e)}
-            self.helper_proc = None
             GLib.idle_add(self.on_apply_done, final)
         threading.Thread(target=work, daemon=True).start()
 
     def on_helper_event(self, d):
+        if self.confirming:
+            self.confirming = False; self.update_buttons()   # confirmed: the helper is running
         ev = d.get("event")
         if ev == "phase":
             if self.phase == "applying":
@@ -572,8 +610,20 @@ class Assistant(Gtk.ApplicationWindow):
         return False
 
     def on_apply_done(self, res):
-        if self.phase == "cancelling" or res.get("cancelled"):
+        self.confirming = False
+        if res.get("cancelled"):
             return False      # on_cancel_done handles the UI
+        if self.phase == "cancelling":
+            # 2.1: the Cancel dialog is still open; if the person keeps going, on_cancel_done shows this
+            self.apply_result = res
+            return False
+        if res.get("declined"):
+            self.set_phase("idle")
+            self.status.set_text("Not applied: cancelled in the confirmation dialog.")
+            self.log("apply: cancelled in the confirmation dialog; nothing changed")
+            self.show_info("Not applied: Cancel was chosen in the confirmation dialog. Nothing changed.",
+                           Gtk.MessageType.INFO, retry=True, revert=False)
+            return False
         if res.get("ok"):
             self.describe(res)
             self.set_phase("connecting")
@@ -597,22 +647,31 @@ class Assistant(Gtk.ApplicationWindow):
         return False
 
     def on_cancel(self, _b):
-        if self.phase not in ("applying", "connecting"):
+        if self.phase not in ("applying", "connecting") or self.confirming:
             return
+        self.phase_before_cancel, self.apply_result = self.phase, None
         self.set_phase("cancelling")
-        self.status.set_text("Cancelling…")
+        self.status.set_text("Confirm in the dialog to stop Tor…")
         self.log("cancel requested")
         def work():
             try:
-                r = subprocess.run(HELPER + ["cancel"], capture_output=True, text=True, timeout=60)
-                lines = r.stdout.strip().splitlines()
-                res = json.loads(lines[-1]) if lines else {"ok": False, "error": r.stderr.strip()[-300:]}
+                res = broker("cancel", timeout=420)
             except Exception as e:
                 res = {"ok": False, "error": str(e)}
             GLib.idle_add(self.on_cancel_done, res)
         threading.Thread(target=work, daemon=True).start()
 
     def on_cancel_done(self, res):
+        if res.get("declined"):
+            # 2.1: "Keep going" in the dialog: nothing was stopped
+            self.log("cancel: kept going (confirmation dialog)")
+            self.set_phase(self.phase_before_cancel)
+            self.status.set_text("Applying…" if self.phase == "applying" else "Connecting…")
+            if self.apply_result is not None:
+                res, self.apply_result = self.apply_result, None
+                self.on_apply_done(res)
+            return False
+        self.apply_result = None
         self.set_phase("idle")
         mode, lines = read_dropin()
         self.describe(dict(read_json(STATE, {}), mode=mode, bridges=len(lines)))
@@ -643,19 +702,26 @@ class Assistant(Gtk.ApplicationWindow):
 
     def run_simple(self, cmd, label):
         self.set_phase("applying")
-        self.status.set_text(label)
+        self.status.set_text(label + " (confirm in the dialog)")
         self.log(label)
+        self.confirming = True; self.update_buttons()
         def work():
             try:
-                r = subprocess.run(HELPER + [cmd], capture_output=True, text=True, timeout=180)
-                lines = r.stdout.strip().splitlines()
-                res = json.loads(lines[-1]) if lines else {"ok": False, "error": r.stderr.strip()[-300:]}
+                res = broker(cmd, timeout=600)
             except Exception as e:
                 res = {"ok": False, "error": str(e)}
             GLib.idle_add(self.on_simple_done, cmd, res)
         threading.Thread(target=work, daemon=True).start()
 
     def on_simple_done(self, cmd, res):
+        self.confirming = False
+        if res.get("declined"):
+            self.set_phase("idle")
+            self.status.set_text("%s: cancelled in the confirmation dialog; nothing changed." % cmd.capitalize())
+            self.log("%s: cancelled in the confirmation dialog" % cmd)
+            self.show_info("%s: Cancel was chosen in the confirmation dialog. Nothing changed." % cmd.capitalize(),
+                           Gtk.MessageType.INFO, retry=False, revert=False)
+            return False
         if res.get("ok"):
             self.set_phase("connecting")
             self.status.set_text("Tor restarted; connecting…")

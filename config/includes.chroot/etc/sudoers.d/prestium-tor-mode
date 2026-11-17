@@ -1,2 +1,6 @@
-# Prestium 2.0: Tor Connection Assistant (validated JSON on stdin; no free-form arguments)
-user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-tor-mode apply, /usr/local/sbin/prestium-tor-mode cancel, /usr/local/sbin/prestium-tor-mode revert, /usr/local/sbin/prestium-tor-mode reconnect, /usr/local/sbin/prestium-tor-mode status, /usr/local/sbin/prestium-tor-mode features
+# Prestium 2.0: Tor Connection Assistant. 2.1 (review: Tor retarget without confirmation): sudo
+# allows only reading the mode and the installed transports. apply, cancel, revert and reconnect go
+# through the Wayland broker (prestium-wl tor-mode ...), which asks the person at the screen first,
+# like the I2P settings; before, any unconfined program of the user could move Tor onto a bridge of
+# its choice, or stop it, with no prompt.
+user ALL=(root) NOPASSWD: /usr/local/sbin/prestium-tor-mode status, /usr/local/sbin/prestium-tor-mode features

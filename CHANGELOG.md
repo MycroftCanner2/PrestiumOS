@@ -760,6 +760,17 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   broker, which shows the change in a dialog only the person at the screen can answer, then logs it and
   sends a notification. sudo allows only reading the settings. The helper checks that the restarted
   listener on 4444 belongs to i2pd and reports a failed rollback.
+- **Tor connection changes need confirmation.** Any unconfined program of the desktop user (the
+  terminal, for one) could run `sudo prestium-tor-mode apply`, `cancel`, `revert` or `reconnect` with no
+  prompt, so it could move Tor onto a bridge of its choice (which sees this computer's address, and in
+  Snowflake mode the firewall lets Tor send UDP) or stop Tor. Those four now go through the Wayland
+  broker (`prestium-wl tor-mode ...`), like the I2P settings: it checks the request with the helper's
+  own parser, shows the connection type, the bridges you entered and the program that asked in a dialog
+  only the person at the screen can answer, then runs the helper as root, passes its progress back to
+  the Tor Connection Assistant, logs the change and sends a notification. Cancel asks too ("Stop Tor" or
+  "Keep going"). The helper runs as its own transient service, outside the broker's sandbox, since its
+  DNS-over-HTTPS look-ups need an IP socket. sudo allows only `status` and `features`. Test:
+  `test_tor_mode_confirm.py`.
 - The image-age notice mentions the Browser Updater. The README says command-line tools use the I2P
   outproxy (`http_proxy`), not Tor. The reseed and torrent messages point to steps that exist.
 
