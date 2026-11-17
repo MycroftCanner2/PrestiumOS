@@ -167,8 +167,11 @@ allow loupe / r
 allow loupe /proc/meminfo r
 allow loupe /usr/bin/bwrap x:C
 $(bw loupe//bwrap)
-allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-image-rs x:P
-allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-svg x:P
+# 2.1 (boot fix): bwrap sets no_new_privs, and the kernel refuses a plain Px under it (exec EPERM,
+# then glycin's seccomp filter kills bwrap's exit_group: "Loader process exited early with status
+# 159"); only a stacked transition ("ix -> &glycin-inner") is allowed. Same for mat2's helpers.
+allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-image-rs x:&glycin-inner
+allow loupe//bwrap /usr/libexec/glycin-loaders/1+/glycin-svg x:&glycin-inner
 allow loupe//bwrap /usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2 mr
 allow loupe//bwrap /var/cache/fontconfig/abc-le64.cache-9 mr
 allow loupe//bwrap $H/.cache/fontconfig/abc-le64.cache-9 r
@@ -184,6 +187,9 @@ EOT
 echo "== mat2 (\"Remove metadata\"; ffmpeg and exiftool in bubblewrap)"
 run usr.bin.mat2 <<EOT
 allow mat2 /usr/bin/bwrap x:C
+# 2.1 (boot fix): mat2's ProcessPoolExecutor semaphore (glibc links sem.XXXXXX to sem.mp-<random>)
+allow mat2 /dev/shm/sem.mp-4zvivvcm rwkl
+deny mat2 /dev/shm/other l
 allow mat2 /tmp/tmpab12cd/ w
 allow mat2 "$H/Documents/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
 allow mat2 "$H/Documents/.remove-metadata.Ab12Cd/1/clip.mp4" r
@@ -194,8 +200,8 @@ deny mat2 /media/user/STICK/clip.cleaned.mp4 w
 deny mat2 $H/Torrents/clip.mp4 w
 deny mat2 $H/Downloads/clip.mp4 w
 $(bw mat2//bwrap)
-allow mat2//bwrap /usr/bin/ffmpeg x:P
-allow mat2//bwrap /usr/bin/exiftool x:P
+allow mat2//bwrap /usr/bin/ffmpeg x:&mat2-inner
+allow mat2//bwrap /usr/bin/exiftool x:&mat2-inner
 allow mat2//bwrap $H/Downloads/clip.mp4 r
 allow mat2//bwrap "$H/Documents/.remove-metadata.Ab12Cd/1/clip.cleaned.mp4" w
 allow mat2//bwrap "$H/Documents/.remove-metadata.Ab12Cd/1/photo.cleaned.heic_exiftool_tmp" w
@@ -214,6 +220,8 @@ EOT
 echo "== Metadata Cleaner (mat2 writes to /tmp, then it moves the file)"
 run usr.bin.metadata-cleaner <<EOT
 $(bw metadata-cleaner//bwrap)
+allow metadata-cleaner//bwrap /usr/bin/exiftool x:&metadata-cleaner-inner
+allow metadata-cleaner//bwrap /usr/bin/ffmpeg x:&metadata-cleaner-inner
 allow metadata-cleaner//bwrap /tmp/0123abcd.mp4 w
 deny metadata-cleaner//bwrap $H/Downloads/clip.cleaned.mp4 w
 allow metadata-cleaner /tmp/0123abcd.mp4 rw

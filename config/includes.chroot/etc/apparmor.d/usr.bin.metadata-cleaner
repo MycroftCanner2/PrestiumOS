@@ -43,7 +43,13 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
     # without this the helpers got "Permission denied" for every file in
     # Documents. Only that cleaned name, only in ~/Documents.
     owner "@{HOME}/Documents/**.cleaned.*" w,
-    /usr/bin/{ffmpeg,exiftool,perl} mrPx -> metadata-cleaner-inner,
+    # 2.1 (boot fix): bubblewrap always sets no_new_privs before it runs the payload, and the kernel
+    # refuses a plain Px into another profile under no_new_privs (kernel log: operation="exec"
+    # info="no new privs" ... target="metadata-cleaner-inner"): the exec failed with EPERM, so no exiftool or ffmpeg ran.
+    # A stacked transition is allowed under no_new_privs, because it can only narrow: "ix -> &X"
+    # keeps this bwrap profile and stacks X on it, so the payload runs under this profile and
+    # metadata-cleaner-inner (both must allow every access).
+    /usr/bin/{ffmpeg,exiftool,perl} mrix -> &metadata-cleaner-inner,
     /usr/share/perl5/** r,
     /usr/lib/@{multiarch}/perl*/** mr,
   }

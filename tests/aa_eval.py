@@ -5,7 +5,9 @@ checks in test_apparmor_startup.sh. File rules only; "owner" is assumed to hold 
 files); a deny rule wins over any allow, as in the kernel.
 
   aa_eval.py EXPANDED < checks      each check line:  allow|deny PROFILE PATH PERMS (PATH may hold spaces)
-  PERMS: letters from r w m k l x; x may carry the transition, e.g. x:P (Px/Pix), x:i, x:C.
+  PERMS: letters from r w m k l x; x may carry the transition, e.g. x:P (Px/Pix), x:i, x:C,
+  or x:&NAME: a stacked transition onto profile NAME ("ix -> &NAME"), the only kind the kernel
+  allows under no_new_privs (bubblewrap sets it), so a payload bwrap runs must use it.
 """
 import re, sys
 
@@ -65,7 +67,7 @@ def glob_re(g):
     return re.compile('^' + out + '$')
 
 RULE = re.compile(r'^(?:audit\s+)?(deny\s+|allow\s+)?(?:(?:owner|other)\s+)?(?:file\s+)?'
-                  r'(?:("[^"]+"|[/@]\S*)\s+([a-zA-Z]+)|([a-zA-Z]+)\s+("[^"]+"|[/@]\S*))(?:\s+->\s+\S+)?\s*,$')
+                  r'(?:("[^"]+"|[/@]\S*)\s+([a-zA-Z]+)|([a-zA-Z]+)\s+("[^"]+"|[/@]\S*))(?:\s+->\s+(\S+))?\s*,$')
 
 def rules(var, body):
     out = []
@@ -77,15 +79,18 @@ def rules(var, body):
         if not re.fullmatch(r'[rwamlkxiuUpPcC]+', perms):
             continue
         for p in expand(path, var):
-            out.append((bool(m.group(1) and m.group(1).startswith('deny')), glob_re(re.sub('/+', '/', p)), perms))
+            out.append((bool(m.group(1) and m.group(1).startswith('deny')), glob_re(re.sub('/+', '/', p)), perms, m.group(6) or ''))
     return out
 
 def check(rs, path, need):
     want_x = None
     if 'x:' in need:
         need, want_x = need.split('x:')[0] + 'x', need.split('x:')[1]
-    have, denied, xm = set(), set(), ''
-    for deny, rx, perms in rs:
+    stack = None
+    if want_x and want_x.startswith('&'):
+        stack, want_x = want_x, 'i'
+    have, denied, xm, targets = set(), set(), '', set()
+    for deny, rx, perms, target in rs:
         if not rx.match(path):
             continue
         eff = set(c for c in perms if c in 'rwamlk') | ({'x'} if 'x' in perms else set())
@@ -95,10 +100,13 @@ def check(rs, path, need):
             have |= eff
             if 'x' in perms:
                 xm += ''.join(c for c in perms if c in 'iuUpPcC')
+                targets.add(target)
     need = set(need)
     ok = not (need - have) and not (need & denied)
     if ok and want_x:
         ok = all(c in xm for c in want_x)
+    if ok and stack:
+        ok = targets == {stack}
     return ok
 
 def main():

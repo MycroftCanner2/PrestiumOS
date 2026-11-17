@@ -21,13 +21,24 @@ profile mat2 /usr/bin/mat2 {
   /usr/share/perl/** r,
   /usr/lib/@{multiarch}/perl*/** mr,
   /usr/bin/bwrap mrCx -> bwrap,
+  # 2.1 (boot fix): mat2 cleans files in a ProcessPoolExecutor, whose lock is a POSIX semaphore:
+  # glibc creates /dev/shm/sem.XXXXXX and links it to "sem.mp-<random>". Without "l" on that name
+  # every clean failed with PermissionError (operation="link" name="/dev/shm/sem.mp-4zvivvcm").
+  # Only Python multiprocessing's names.
+  owner /dev/shm/sem.mp-* rwkl,
   # the cleaned copy "<name>.cleaned.<ext>", only in its own folder (shared with Metadata Cleaner, the
   # same engine); it never changes an original or any other file
   owner "@{HOME}/Documents/.remove-metadata*/**.cleaned.*" rw,
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
-    /usr/bin/{ffmpeg,exiftool,perl} mrPx -> mat2-inner,
+    # 2.1 (boot fix): bubblewrap always sets no_new_privs before it runs the payload, and the kernel
+    # refuses a plain Px into another profile under no_new_privs (kernel log: operation="exec"
+    # info="no new privs" ... target="mat2-inner"): the exec failed with EPERM, so no exiftool or ffmpeg ran.
+    # A stacked transition is allowed under no_new_privs, because it can only narrow: "ix -> &X"
+    # keeps this bwrap profile and stacks X on it, so the payload runs under this profile and
+    # mat2-inner (both must allow every access).
+    /usr/bin/{ffmpeg,exiftool,perl} mrix -> &mat2-inner,
     /usr/share/perl5/** r,
     /usr/lib/@{multiarch}/perl*/** mr,
     # 2.1 (review of 7242e00): mat2 mounts an empty temporary directory over the file's folder and

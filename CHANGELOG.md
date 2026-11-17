@@ -187,8 +187,9 @@ done in).
   mat2, Metadata Cleaner and Audacity (no network, camera, admin tools, other apps' mail, chat or browser
   data, OpenPGP keys or KeePassXC databases; they read the file folders and save only in
   `~/Documents`). VLC plays local files only. The bubblewrap helpers of Loupe (glycin) and mat2/Metadata
-  Cleaner run in capability-stripped inner profiles (`glycin-inner`, `mat2-inner`,
-  `metadata-cleaner-inner`) that may write only the one cleaned-copy name. Viewers can't ptrace or reach
+  Cleaner run stacked with capability-stripped inner profiles (`glycin-inner`, `mat2-inner`,
+  `metadata-cleaner-inner`, which may write only the one cleaned-copy name) on top of their bwrap
+  profile. Viewers can't ptrace or reach
   the session bus.
 - **New: Evince (Document Viewer)**, in *Office*, the default for PDF, PostScript, DjVu, DVI, XPS and
   comic books (TIFF stays with Loupe). It runs under Prestium's enforced `prestium.evince` profile
@@ -238,6 +239,16 @@ done in).
   still `.kdbx` only, and the secret folders stay denied. Its window state in `~/.cache/keepassxc`
   is saved again too. Found in the kernel's AppArmor log on a Debian 13 VM (KeePassXC 2.7.10, the GUI
   and `keepassxc-cli`); `test_apparmor_startup.sh` checks those names.
+- **Loupe opens images and Metadata Cleaner reads metadata again.** bubblewrap sets `no_new_privs`,
+  and under it the kernel refuses a plain switch into another AppArmor profile, so every glycin
+  decoder and every exiftool/ffmpeg run in bwrap failed to start (`operation="exec" info="no new
+  privs"`). Loupe showed "Loader process exited early with status 159" (glycin's seccomp filter then
+  killed bwrap's exit, SIGSYS) and Metadata Cleaner "Unable to Check for Metadata" for images. The
+  helpers are now stacked with their inner profile, the transition `no_new_privs` allows; they run
+  under both profiles, so nothing is loosened. Also: "Remove metadata" (mat2) can create its worker
+  lock in `/dev/shm`, and Loupe can stop a decoder it no longer needs. Tested on a Debian 13 VM with
+  AppArmor and the image's kernel options and sysctls; `test_apparmor_startup.sh` and
+  `test_viewer_confinement.sh` check the stacked transitions.
 - **KeePassXC's file dialog remembers its last folder.** It may write `~/.config/QtProject.conf`
   (with Qt's `.lock` and `QtProject.conf.XXXXXX` save files), and nothing else in `~/.config`.
   Creating, editing and reopening new databases in `~/Documents` and `~` was tested on an overlay

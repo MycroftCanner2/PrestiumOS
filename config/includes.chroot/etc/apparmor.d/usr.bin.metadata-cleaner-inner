@@ -3,7 +3,8 @@
 # copy is written next to the original in the shared ~/Documents folder (the GUI
 # cleans files in place there): only that "<name>.cleaned.<ext>" name, only in
 # ~/Documents. exiftool is a perl script: perl inherits this profile (ix).
-# No attachment: entered only by explicit Px from Metadata Cleaner.
+# No attachment: entered only by explicit transitions from Metadata Cleaner (Px directly,
+# stacked "ix -> &metadata-cleaner-inner" from its bwrap child, whose no_new_privs refuses Px).
 abi <abi/4.0>,
 include <tunables/global>
 

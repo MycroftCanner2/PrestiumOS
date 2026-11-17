@@ -1,11 +1,12 @@
 # Prestium 2.1 (bwrap split): mat2's helpers (ffmpeg, exiftool), ENFORCED in their
 # own profile. mat2 runs them in bubblewrap when it is installed (and directly
-# otherwise); either way they transition here (Px): no user namespaces of their
+# otherwise); they transition here (Px directly, stacked "ix -> &mat2-inner" from bwrap,
+# whose no_new_privs refuses Px): no user namespaces of their
 # own, no capabilities, no mounts, no network. They read the input file in the
 # file folders and write only "<name>.cleaned.<ext>" in the "Remove metadata"
 # work folder, so a crafted file that exploits one cannot escape, open a socket
 # or change any other file. exiftool is a perl script: perl inherits this
-# profile (ix). No attachment: entered only by explicit Px from mat2.
+# profile (ix). No attachment: entered only by explicit transitions from mat2.
 abi <abi/4.0>,
 include <tunables/global>
 

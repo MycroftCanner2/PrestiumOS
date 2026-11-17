@@ -1,10 +1,11 @@
 # Prestium 2.1 (bwrap split): Loupe's glycin image decoders, ENFORCED in their own
 # profile. The bwrap child (prestium-viewer-bwrap) builds the user, mount and PID
-# namespaces, then each decoder transitions here (Px): no user namespaces of its
+# namespaces, then each decoder is stacked with this profile (ix -> &glycin-inner,
+# the only transition allowed under bwrap's no_new_privs): no user namespaces of its
 # own, no capabilities, no mounts, no network, no writes anywhere. A decoder reads
 # only the image, its libraries and fontconfig, so a crafted image that exploits
 # one cannot escape the sandbox, open a socket or inspect other processes.
-# No attachment: entered only by explicit Px from the bwrap child.
+# No attachment: entered only by the explicit stacked transition from the bwrap child.
 abi <abi/4.0>,
 include <tunables/global>
 

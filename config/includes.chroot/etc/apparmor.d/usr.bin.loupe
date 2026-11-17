@@ -17,10 +17,20 @@ profile loupe /usr/bin/loupe {
   owner @{HOME}/.cache/loupe/** rwk,
   # rotate and save, "set as background" are not offered here: no writes in the folders
   /usr/bin/bwrap mrCx -> bwrap,
+  # 2.1 (boot fix): Loupe stops a decoder it no longer needs with SIGKILL to its bwrap; without
+  # these the kill was denied on both sides and the sandboxes stayed until Loupe closed.
+  signal (send) set=(kill) peer=loupe//bwrap,
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
-    /usr/libexec/glycin-loaders/** mrPx -> glycin-inner,
+    signal (receive) set=(kill) peer=loupe,
+    # 2.1 (boot fix): bubblewrap always sets no_new_privs before it runs the payload, and the kernel
+    # refuses a plain Px into another profile under no_new_privs (kernel log: operation="exec"
+    # info="no new privs" ... target="glycin-inner"): the exec failed with EPERM, so no image decoder ran.
+    # A stacked transition is allowed under no_new_privs, because it can only narrow: "ix -> &X"
+    # keeps this bwrap profile and stacks X on it, so the payload runs under this profile and
+    # glycin-inner (both must allow every access).
+    /usr/libexec/glycin-loaders/** mrix -> &glycin-inner,
     deny @{HOME}/** w,
     # the SVG decoder's fontconfig: the font caches glycin binds in, read-only
     /var/cache/fontconfig/ r,

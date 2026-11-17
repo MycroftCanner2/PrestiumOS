@@ -64,10 +64,16 @@ for f in usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-in
     usr.bin.mat2-inner) s=usr.bin.mat2; t=mat2-inner;;
     usr.bin.metadata-cleaner-inner) s=usr.bin.metadata-cleaner; t=metadata-cleaner-inner;;
   esac
-  grep -q "mrPx -> $t," "$A/$s" && ok "$s transitions to $t" || bad "$s: no Px to $t"
+  # 2.1 (boot fix): inside the bwrap child (no_new_privs) only a stacked transition works; a plain
+  # Px there fails with EPERM ("info=no new privs") and the loader/helper never starts
+  grep -q "^    .* mrix -> &$t,$" "$A/$s" && ok "$s: bwrap child stacks $t (ix -> &)" || bad "$s: bwrap child does not stack $t"
+  grep -Eq "^    .* m?r?[Pp]x -> $t," "$A/$s" && bad "$s: plain Px to $t inside the bwrap child (denied under no_new_privs)" || ok "$s: no plain Px to $t under no_new_privs"
   n=$(grep -c "$f" "$H"); [ "$n" -ge 2 ] && ok "hook enforces and checks $f" || bad "hook lists $f $n times (want 2)"
   grep -qx "0644 root root /etc/apparmor.d/$f" "$PM" && ok "perms: $f" || bad "perms: $f"
 done
+# 2.1 (boot fix): Loupe may stop a decoder's bwrap with SIGKILL, and only that
+grep -qx '  signal (send) set=(kill) peer=loupe//bwrap,' "$A/usr.bin.loupe" && grep -qx '    signal (receive) set=(kill) peer=loupe,' "$A/usr.bin.loupe" \
+  && ok "loupe: may kill its decoders' bwrap" || bad "loupe: no kill rule for its bwrap"
 for a in prestium-app-common prestium-app-secrets prestium-user-files prestium-viewer prestium-viewer-core prestium-viewer-write prestium-viewer-bwrap; do
   grep -qx "0644 root root /etc/apparmor.d/abstractions/$a" "$PM" || bad "perms: abstraction $a"; done
 if command -v apparmor_parser >/dev/null; then
