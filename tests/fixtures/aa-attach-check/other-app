@@ -1,0 +1,4 @@
+# Test fixture: an unrelated profile (another program, another name): the normal set passes
+profile other-app /usr/bin/other-app {
+  /etc/hostname r,
+}

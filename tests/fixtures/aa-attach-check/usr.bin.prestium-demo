@@ -1,0 +1,4 @@
+# Test fixture: the Prestium profile the check protects (test_aa_attach_check.sh)
+profile prestium-demo /usr/bin/prestium-demo {
+  /etc/hostname r,
+}

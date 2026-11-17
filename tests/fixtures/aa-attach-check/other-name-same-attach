@@ -1,0 +1,4 @@
+# Test fixture: another profile name on the Prestium program (must fail, as before)
+profile not-prestium /usr/bin/prestium-demo flags=(complain) {
+  /etc/hostname r,
+}

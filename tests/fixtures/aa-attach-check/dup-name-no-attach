@@ -1,0 +1,4 @@
+# Test fixture: a second file that reuses the Prestium profile name with no attachment (must fail)
+profile prestium-demo {
+  /etc/hostname r,
+}

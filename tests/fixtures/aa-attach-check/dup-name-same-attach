@@ -1,0 +1,4 @@
+# Test fixture: a second file that reuses the Prestium profile name and attachment (must fail)
+profile prestium-demo /usr/bin/prestium-demo {
+  /** rwix,
+}

@@ -1,0 +1,4 @@
+# Test fixture: a glob in another profile that also covers the Prestium program (must fail)
+profile bin-glob /usr/bin/prestium-* {
+  /etc/hostname r,
+}

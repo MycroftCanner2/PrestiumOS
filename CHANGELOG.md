@@ -157,6 +157,13 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   and both AppArmor profiles.
 
 ### Build system and supply chain
+- **The AppArmor attach check catches a second profile with a Prestium profile's name.** The build's
+  check (`aa-attach-check.py`, hook 0600) skipped every profile named like the Prestium profile it was
+  checking, so another file that reused the name, with its own rules and the same program, passed.
+  It now skips only the Prestium profile itself (same name, same file). Another file that defines a
+  Prestium profile name fails the build, whatever it attaches to, and so does any other profile on a
+  Prestium program, as before. Hook 0600 still deletes only the four known Debian conflicts; anything
+  else stops the build. Test: `test_aa_attach_check.sh` (fixture sets in `tests/fixtures/aa-attach-check`).
 - **Tor Browser is the newest signed release at every build.** `scripts/tb-latest.sh` asks the Tor
   Project's update service for the version, then downloads from dist.torproject.org. The tarball must
   be signed by the pinned Tor Browser key, no older than `TB_MIN_VERSION` (16.0.1), and must actually

@@ -10,6 +10,12 @@ loads it at boot.
    same path equally well, the kernel attaches neither ("conflicting profile attachments") and the
    program runs unconfined; when the other one matches it more exactly, that one wins. Debian's
    libreoffice-common profiles (complain mode, exact paths) did that to Prestium's LibreOffice profile.
+   Only the Prestium profile itself (the same name in the same file) is skipped. 2.1 (review): the
+   check used to skip every profile with the Prestium profile's name, so a second file that reused the
+   name, with its own rules and the same attachment, passed.
+3. No other file may define a profile with the name of a Prestium profile, whatever it attaches to:
+   two files with one profile name replace each other when loaded (the last one wins), so the rules
+   the image enforces would depend on the load order.
 
 APPARMOR_PARSER: the parser (default apparmor_parser). Exit 1 on any problem.
 """
@@ -103,6 +109,7 @@ def main():
     d, ours = sys.argv[1], set(sys.argv[2:])
     disabled = set(os.listdir(os.path.join(d, 'disable'))) if os.path.isdir(os.path.join(d, 'disable')) else set()
     bad, att = 0, []   # att: (file, name, [attachment patterns])
+    names = []         # (file, name) of every top-level profile, with or without an attachment
     for f in sorted(os.listdir(d)):
         if not os.path.isfile(os.path.join(d, f)) or SKIP.search(f) or f in disabled:
             continue
@@ -113,11 +120,20 @@ def main():
             continue
         ps, var = profiles(text)
         for name, a in ps:
+            names.append((f, name))
             if a:
                 att.append((f, name, [re.sub('/+', '/', x.strip('"')) for x in expand_vars(a, var)]))
     for f in ours:
         if not os.path.isfile(os.path.join(d, f)):
             print("E: %s: no such profile file in %s" % (f, d)); bad = 1
+    for f, name in names:
+        if f not in ours:
+            continue
+        for f2, n2 in names:
+            if n2 == name and f2 != f:
+                print("E: profile name %s: defined by the Prestium file %s and by %s; whichever loads last "
+                      "replaces the other" % (name, f, f2))
+                bad = 1
     rx = [(f, n, [glob_re(p) for p in pats]) for f, n, pats in att]
     for f, name, pats in att:
         if f not in ours:
@@ -127,7 +143,8 @@ def main():
                 if re.search(r'[*?\[]', path):
                     continue   # not a single program; Prestium attaches to named programs only
                 for f2, n2, rs in rx:
-                    if n2 == name or not any(r.match(path) for r in rs):
+                    # skip only this profile itself, not another file's profile of the same name
+                    if (f2, n2) == (f, name) or not any(r.match(path) for r in rs):
                         continue
                     print("E: %s: Prestium profile %s (%s) and %s (%s) both attach; the kernel would run it "
                           "unconfined or under %s" % (path, name, f, n2, f2, n2))

@@ -43,6 +43,9 @@ for p in usr.share.librewolf.librewolf usr.bin.gajim usr.bin.onionshare usr.loca
 done
 # 2.1: the whole set as apparmor.service loads it at boot: every file in /etc/apparmor.d compiles (one that
 # doesn't makes the service fail), and no other profile attaches to a program a Prestium profile confines
+# 2.1 (review): and no other file reuses a Prestium profile name. The rm -f lines above are only the
+# known Debian conflicts; any other file (a new name included) stops the build here instead of being
+# deleted, so a conflict is looked at, not silently dropped.
 python3 -I /usr/share/prestium/build/aa-attach-check.py /etc/apparmor.d usr.share.librewolf.librewolf torbrowser.Browser.firefox \
 	usr.bin.gajim usr.bin.onionshare usr.local.bin.feather usr.lib.libreoffice.program prestium.thelounge \
 	prestium.thelounge-tor opt.firefox.firefox usr.bin.claws-mail usr.local.sbin.prestium-onion-grater prestium.browser-launcher \
