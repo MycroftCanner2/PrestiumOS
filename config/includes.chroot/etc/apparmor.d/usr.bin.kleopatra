@@ -39,8 +39,11 @@ profile kleopatra /usr/bin/{kleopatra,kwatchgnupg} {
   # 2.1 (review of db6601c): never the GnuPG configuration files, which can name helper programs that
   # a socket-started (unconfined) gpg-agent or dirmngr would run. Kleopatra's settings dialog can't
   # change them here; edit them outside Kleopatra if needed.
-  deny @{HOME}/.gnupg/*.conf{,.*} w,
-  deny @{HOME}/.gnupg/common.conf w,
+  # 2.1 (review: hard-link gap, as in Claws Mail's gpg child): link is denied too. With only w
+  # denied, a hard link made under a .conf name to a file this profile can write (owner ~/.gnupg/**
+  # rwkl) would hand that content to the agent. GnuPG's lock files link other names, not these.
+  deny @{HOME}/.gnupg/*.conf{,.*} wl,
+  deny @{HOME}/.gnupg/common.conf wl,
   owner @{HOME}/.gnupg/ rw,
   owner @{HOME}/.gnupg/** rwkl,
   owner @{run}/user/[0-9]*/gnupg/ rw,

@@ -65,6 +65,11 @@ deny kleopatra $G/gpg.conf w
 deny kleopatra $G/gpg-agent.conf w
 deny kleopatra $G/dirmngr.conf w
 deny kleopatra $G/common.conf w
+deny kleopatra $G/gpg.conf l
+deny kleopatra $G/gpg-agent.conf l
+deny kleopatra $G/dirmngr.conf l
+deny kleopatra $G/common.conf l
+deny kleopatra $G/gpg-agent.conf.new l
 deny kleopatra $H/.ssh/id_ed25519 r
 deny kleopatra $H/.bashrc w
 deny kleopatra $H/.config/autostart/x.desktop w
@@ -91,6 +96,10 @@ allow claws-mail//gpg $G/pubring.kbx rw
 allow claws-mail//gpg $G/trustdb.gpg rwk
 allow claws-mail//gpg $G/private-keys-v1.d/0123456789ABCDEF0123456789ABCDEF01234567.key rw
 allow claws-mail//gpg $G/gpg.conf r
+allow claws-mail//gpg $G/pubring.kbx.lock rwl
+deny claws-mail//gpg $G/gpg-agent.conf w
+deny claws-mail//gpg $G/gpg-agent.conf l
+deny claws-mail//gpg $G/common.conf l
 allow claws-mail//gpg $S/S.gpg-agent rw
 allow claws-mail//gpg $S/S.keyboxd rw
 EOT

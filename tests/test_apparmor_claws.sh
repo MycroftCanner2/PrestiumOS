@@ -31,6 +31,7 @@ grep -q '^    /usr/bin/pinentry\* Px -> prestium_pinentry,' "$P" && ok "pinentry
 child=$(sed -n '/^  profile gpg {/,/^  }/p' "$P")
 grep -qF '    deny @{HOME}/.gnupg/*.conf{,.*} wl,' <<<"$child" && grep -qF '    deny @{HOME}/.gnupg/common.conf wl,' <<<"$child" \
   && ok "gpg child: no write or link on ~/.gnupg/*.conf" || no "gpg child may write ~/.gnupg/*.conf"
-grep -qF 'deny @{HOME}/.gnupg/*.conf{,.*} w' "$A/usr.bin.kleopatra" && ok "same deny as Kleopatra" || no "Kleopatra's deny changed"
+grep -qF '  deny @{HOME}/.gnupg/*.conf{,.*} wl,' "$A/usr.bin.kleopatra" && grep -qF '  deny @{HOME}/.gnupg/common.conf wl,' "$A/usr.bin.kleopatra" \
+  && ok "same deny as Kleopatra (write and link)" || no "Kleopatra's deny differs"
 grep -qF '    owner @{HOME}/.gnupg/** rwkl,' <<<"$child" && ok "gpg child keeps the keyring (keygen, sign)" || no "gpg child lost ~/.gnupg"
 exit $fail

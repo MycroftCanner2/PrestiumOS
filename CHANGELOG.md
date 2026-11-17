@@ -361,6 +361,12 @@ This is one combined summary of everything that changed from 2.0 to 2.1, as the 
   `~/.gnupg/*.conf` and `common.conf`, and on hard links to those names. Keys, signing and the
   passphrase prompt (still in `prestium_pinentry`) are unchanged. `prestium-gnupg-check` still raises
   its flag for such options written from outside Claws. Test: `test_apparmor_claws.sh`.
+- **Kleopatra can't hard-link a file onto GnuPG's configuration names either.** Its profile denied
+  writing `~/.gnupg/*.conf` and `common.conf` but allowed link on all of `~/.gnupg`, so a hard link
+  under such a name to a file Kleopatra may write would have given the agent that content anyway.
+  Link is now denied on those names too, as in Claws Mail's gpg child. Lock files and the keyring are
+  unchanged. Tests: `test_apparmor_startup.sh` (link checks against the compiled profile),
+  `test_apparmor_claws.sh`.
 - **LibreOffice runs under its AppArmor profile, and the whole profile set is checked as the boot loads
   it.** Debian's libreoffice-common ships complain-mode profiles for `oosplash` and `soffice.bin` that
   attach to the same two programs as Prestium's enforced `libreoffice` profile and match them just as
