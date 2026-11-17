@@ -2,961 +2,360 @@
 
 ## 2.1: changes since Prestium 2.0
 
-Prestium 2.1 is a security and features release on top of Prestium 2.0. It adds a Browser Updater, an
-I2P Connection Assistant, Tor onion time sync on Kicksecure's design, a new desktop look, tighter
-confinement and firewall rules, signed release files, and fixes for apps that broke or were too open
-in 2.0. It is still built with live-build on Debian 13 "trixie".
+Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build
+on Debian 13 "trixie". It adds a verified and locked boot chain, a Browser Updater, an I2P
+Connection Assistant, time sync over Tor onion services, IRC over Tor, a new Adwaita desktop,
+tighter confinement and firewall rules, and signed release files.
 
-This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
+This section describes what 2.1 ships compared with 2.0, as one summary (not the order the work was
+done in).
 
-### Fixes: viewers, media, metadata, LibreOffice, sharing, volume, logs and menu
-- **The pinned file list labels ~/Torrents as Torrents.** The folder is unchanged;
-  only the name in the file manager list changed, from i2P Torrents.
-- **Clicking an open app on the bottom bar selects it.** Left-click on the
-  desktop used to open the root menu (labwc's default mouse bind), so a click
-  that missed a window button opened the menu instead of that application.
-  That bind is cleared; a click on a window button focuses the window.
-  Right-click on the desktop still opens the menu.
-- **KeePassXC can save a database again.** Qt 6 commits the safe save with
-  `linkat` onto the `.kdbx` name. The profile allowed read, write and lock
-  but not link, so every save failed with Permission denied. Link is granted
-  on `*.kdbx` in the home and on unlocked volumes; other files stay denied.
-- **LibreOffice first start can finish its user installation.** Creating the
-  temporary files and the nested profile directories (not only `4/user/`)
-  needs write on those directories. `/tmp` is root-owned, so an owner-only
-  rule never matched it. Without that write, start kept stopping on
-  "the installation is not complete".
-- **The clock-sync symbol is back on the bar.** An amber clock shows until the time is
-  set over Tor, and a red one if the sync refused a time it could not trust. It
-  disappears once the clock is synced. The sync itself was never removed.
-- **I2P reseed refresh asks Tor through the onion-grater.** Refresh reseed (via Tor)
-  used to read Tor's own control socket and reported "not connected" while Tor was up.
-  It now asks the same filter the panel uses.
-- **Desktop and IRC (Tor).** The Applications button opens the root menu under itself
-  (top left), not on the bottom bar. Every window has one compositor title bar with
-  minimise, maximise and close, as part of the frame: Galculator and LibreWolf no longer
-  get a second bar painted over the top, and the local Firefox has the same buttons. The
-  bottom taskbar shows each app's own colour icon, not a white silhouette. LibreOffice's
-  first start can map the temporary files it uses while building its user profile, so it
-  no longer stops on "User installation could not be completed". IRC (Tor) no longer ships
-  the SASL networks (Libera.Chat, hackint, AlphaChat); the README no longer describes them.
-- **Right-click menus offer only Loupe for images; the "Remove Metadata" file entry is gone.**
-  `mimeapps.list` no longer falls back to Ristretto (a `org.xfce.ristretto.desktop`
-  shadow without `MimeType` keeps the installed viewer out of Open With, the same
-  mechanism as the Zenity shadow), and the file manager's `Remove Metadata`
-  custom action is removed (`prestium-remove-metadata` stays for terminal use).
-- **LibreOffice starts again ("Fatal Error" fixed).** A fresh home ships no
-  LibreOffice profile folders, and creating one needs write on its parent, which
-  the profile did not grant, so the first start could not create its user
-  installation and aborted. The profile now allows creating `~/.config`,
-  `~/.cache` and `~/.local/share` entries for its own three folders (file
-  writes stay limited to those folders, like Kleopatra's parent
-  `~/.local/state/` rule). `/etc/skel` has neither `~/.cache` nor `~/.local`,
-  so creating them also needed write on `~/` itself; that one parent rule was
-  the remaining gap and is now granted too.
-- **KeePassXC can save and open databases in the home and ~/Documents again.**
-  Saving a new database, its `.lock` sidecar on open, and an atomic-save
-  temporary file all create files, which needs write on the containing
-  directory; the profile granted file-level `rwk` on `*.kdbx` but no directory
-  write, so both failed. The profile now grants directory write in the home
-  (and on unlocked volumes for databases kept there); file writes stay
-  `*.kdbx`-only, with the temporary file covered too: the default safe save
-  writes through QSaveFile, whose temporary file is `<name>.kdbx<random>`
-  with no dot before the random suffix, which `*.kdbx.*` did not match.
-- **Network Logs are off unless you boot the new "Network Logs" entry.** The boot menus (GRUB and
-  isolinux) gain `Prestium 2.1 (Network Logs)`, the only entry with `prestium.network-logs` on the
-  kernel command line (`cmdline.policy` allows it, at most once). Only in that boot do Tor and i2pd
-  log (Tor `notice` to syslog, i2pd `--loglevel=info` to syslog), does `prestium-logs.service` run
-  (`ConditionKernelCommandLine`), and does the desktop menu show *Network > Network Logs*
-  (`prestium-wl-config` drops the entry from the labwc copy it writes in any other boot). In the
-  default boot Tor's log is discarded (`prestium-network-logs.service` writes `Log err file
-  /dev/null` to `torrc.d` before Tor starts; Tor has no "none" level), i2pd is exec'd with
-  `--loglevel=none` by `prestium-i2pd-start`, the logs service does not run, and there is no
-  Network Logs menu entry. New `tests/test_network_logs_boot.py`.
-- **Network Logs show the logs again instead of "the journal could not be read".**
-  `prestium-logs.service` set `ProcSubset=pid`, which hides everything in
-  `/proc` but process directories, including `/proc/sys/kernel/random/boot_id`;
-  `journalctl -b` needs that file for the boot ID and failed with "Failed to
-  get boot ID: No such file or directory" (exit 1). The setting is removed
-  (`ProtectProc=invisible` still hides other users' processes, and
-  `ProtectKernelTunables=yes` keeps `/proc/sys` read-only).
-- **Pidgin shows Tor on its proxy page, keeps the port in sync, and is light again.**
-  Its global proxy is Pidgin's own "Tor/Privacy (SOCKS5)" type at 127.0.0.1:9050
-  (the same SOCKS5 code as the plain type, with Tor's name on the page; stock
-  Pidgin has no named I2P proxy, I2P works through the launcher and per-account
-  SOCKS5 127.0.0.1:4447). `pidgin-tor` now syncs the port both ways, swapping
-  only between the known ports (Tor/both: 9050, I2P-only: 4447; a hand-set port
-  is left alone), so it can no longer get stuck on I2P after Tor comes back.
-  Pidgin also runs in stock light Adwaita again (`GTK2_RC_FILES` in the
-  launcher, this process only): its own colours don't follow Prestium-Dark,
-  and dark text was lost on the dark background. Pinentry, the tests for the
-  dark theme, and the system GTK 2 setup are untouched.
-- **Ristretto can view files in ~/Documents, VLC can open files in ~/Torrents, Metadata Cleaner
-  can clean files in ~/Documents, and the local Firefox can open files in ~/Torrents.**
-  Ristretto and VLC now state those folders explicitly in their profiles; the shared
-  file-folder abstraction grants read on ~/Torrents without the `owner` qualifier, because
-  Torrents files are downloaded by i2pd (uid 2000, group i2ptorrents) and an owner-only rule
-  never matched them. Metadata Cleaner's sandbox used to deny every home write in its child
-  profile (a deny wins over any allow in AppArmor), so mat2's `<name>.cleaned.<ext>` copies
-  in ~/Documents got "Permission denied"; the child now allows only that cleaned name in
-  ~/Documents. The local Firefox used to deny all read in ~/Torrents (`deny ... rw`); it now
-  reads there and is denied only writes, so I2P Torrents' file picker and Firefox can open
-  `.torrent` files there.
-- **Pidgin, GIMP and Xarchiver are gone.** Pidgin (GTK 2, XWayland-only) is removed with its
-  Tor launcher, OMEMO plugin build (lurch), OTR and XMPP extras, proxy prefs and menu entry;
-  Gajim stays as the messenger, with Tor and I2P proxies ready. GIMP and Xarchiver are removed
-  with their profiles and settings (Loupe views images, File Roller manages archives).
-- **Adwaita light desktop.** The shell is a dark top bar (Applications menu, clock,
-  Tor/I2P pills) plus a light bottom window-list taskbar, with client-side decorations and a
-  `Prestium-Adwaita` labwc theme; Qt uses Adwaita instead of Kvantum (packages and theme
-  overrides removed). A categorized Applications dropdown (`prestium-apps-menu`) replaces the
-  panel Menu button; per-app server-side frames stay for the terminal, XWayland, Qt and media
-  apps. The broker, its swaylock palette and the Wayland security boundary are unchanged.
-- **Viewers can't see mail or chat, trace each other, or reach the session bus; Qt6 apps stay on
-  Wayland.** `prestium-viewer-core` now explicitly denies mail/chat data (`~/.claws-mail`,
-  `~/.purple`, Gajim's config and data) and `ptrace`, so a crafted image or archive that
-  exploits a viewer can neither read another app's messages nor inspect other processes (the
-  expanded-profile test already asserted the absence; the denies now state it). `prestium-app-common`
-  denies the session-bus socket file, documenting that no confined app gets D-Bus. The broker
-  service caps file descriptors (`LimitNOFILE=256`). `qt6-wayland` is installed alongside
-  `qtwayland5` (`--apt-recommends` is off, as with the Qt5 multimedia plugins): without it Qt6
-  apps fall back to XWayland, bypassing the broker's security context.
-- **Bubblewrap payloads run in capability-stripped inner profiles.** Loupe's glycin decoders and
-  mat2's helpers (ffmpeg, exiftool) no longer inherit the sandbox-building profile (`ix`): they
-  transition (`Px`) into `glycin-inner`, `mat2-inner` and `metadata-cleaner-inner`, which grant
-  only the binaries, libraries, input files and the one cleaned-copy name each may write, and
-  explicitly deny user namespaces, all sandbox capabilities, mounts, the network, `ptrace` and
-  any other home write. The browsers already confined their payloads this way (their sandboxed
-  `firefox.real` and `librewolf` run in their own profiles); the viewers now match them.
-- **LibreOffice opens again.** Its profile now allows the XDG data dir
-  (`~/.local/share/libreoffice`), the cache directory itself, link (`l`) permission for its
-  lock files, and exec of `senddoc`; without a writable user profile the first run showed
-  "the installation is not complete" instead of opening.
-- **I2P Sharing defaults to Low again** (32 KB/s, 30 %): `i2pd.conf` ships L/30, the
-  Connection Assistant labels Low as the default, and Medium is no longer the fallback.
-- **Volume Control opens on the Playback tab.** Both the menu and the panel now launch
-  `pavucontrol --tab=1` (tab 1 is Playback; without it pavucontrol picks the first tab
-  with streams, so it opened on Recording/Input/Output when nothing was playing).
-- **i2pd network logs show in Network Logs** (in the Network Logs boot entry; see above). i2pd logs at `info` instead of `warn`
-  (at warn the I2P tab stayed empty in normal operation), and `prestium-logs` accepts
-  syslog-origin i2pd entries by `SYSLOG_IDENTIFIER=i2pd`, since journald does not always
-  tag syslog messages with `_SYSTEMD_UNIT`.
-- **Log Out is removed from the menu.** Restart… and Shut Down… remain (the
-  `prestium-power` helper itself is unchanged).
-- **Pidgin and Gajim have both Tor and I2P proxies ready to use, with plain menu names.**
-  Their Communication menu entries are now just *Gajim* and *Pidgin* (no "(Tor)" /
-  "(Chat, Tor)" suffix). Gajim's shipped `settings.sqlite` (both copies) holds Tor
-  (SOCKS5 127.0.0.1:9050), I2P SOCKS (SOCKS5 127.0.0.1:4447) and I2P HTTP
-  (HTTP 127.0.0.1:4444) proxy profiles with Tor as the global default, so either network
-  is a per-account / app-wide selection, not typed host/port by hand. Pidgin's global
-  proxy stays Tor (SOCKS5 127.0.0.1:9050, remote DNS on); its launcher now starts when
-  Tor *or* i2pd is up and, in I2P-only mode, swaps the global proxy port to 4447
-  (I2P SOCKS, remote DNS on) before starting, while per-account I2P use is SOCKS5
-  127.0.0.1:4447 in the account editor. New `tests/test_messenger_proxies.py` checks the
-  menu names, both Gajim proxy sets, both Pidgin prefs, the launcher, ferm's user ports
-  and both AppArmor profiles.
-
-### Build system and supply chain
-- **The AppArmor attach check catches a second profile with a Prestium profile's name.** The build's
-  check (`aa-attach-check.py`, hook 0600) skipped every profile named like the Prestium profile it was
-  checking, so another file that reused the name, with its own rules and the same program, passed.
-  It now skips only the Prestium profile itself (same name, same file). Another file that defines a
-  Prestium profile name fails the build, whatever it attaches to, and so does any other profile on a
-  Prestium program, as before. Hook 0600 still deletes only the four known Debian conflicts; anything
-  else stops the build. Test: `test_aa_attach_check.sh` (fixture sets in `tests/fixtures/aa-attach-check`).
-- **Tor Browser is the newest signed release at every build.** `scripts/tb-latest.sh` asks the Tor
-  Project's update service for the version, then downloads from dist.torproject.org. The tarball must
-  be signed by the pinned Tor Browser key, no older than `TB_MIN_VERSION` (16.0.1), and must actually
-  contain that release (`Browser/tbb_version.json`). A compromised server can't serve an older signed
-  tarball under a newer name. To pin a release for a reproducible build, set `PRESTIUM_TB_VERSION` and
-  `PRESTIUM_TB_SHA256`. torbrowser-launcher is not used.
-- **Signature checks refuse expired and revoked publisher keys.** gpg can still exit 0 on those;
-  every third-party signature (Tor Browser, Firefox, Feather, Node.js) is checked line by line, each
-  in a throw-away keyring that holds only that publisher's key. A failed import stops the build
-  (`scripts/sigcheck.sh`).
-- **Node.js is pinned to 24.22.3** (11 November 2026 security release: high-severity HTTP/2 and TLS
-  issues in 24.x). The Lounge's runtime is the official linux-x64 tarball in `/opt/nodejs`. The
-  signature must come from one of the current releasers' primary keys (`NODE_KEYS` in
-  `thirdparty/versions.sh`). The previous pin was 24.22.2.
-- **The Lounge's `npm ci` works on Debian 13's npm (9.2.0).** A package.json override that pointed
-  irc-framework at a local tarball made npm 9 treat the git request as a version range ("Invalid
-  comparator"). The working copy of the lockfile now asks for the locked version and has no override;
-  npm still runs with `--git=false`. irc-framework is installed from a `git archive` of the pinned
-  commit with a pinned SHA-256, so npm never packs it or runs unpinned build tools on the host.
-- **Python no longer loads the user's site-packages.** Hook 0460 used to patch `site.py`, which
-  Python 3.13 loads frozen, so the hook failed the image build. It now installs a `sitecustomize`
-  that turns the user site off, and sessions also get `PYTHONNOUSERSITE=1` so a `.pth` can't run
-  first.
-- **The I2P reseed file now ships with the repo.** `scripts/fetch-thirdparty.sh` uses the committed
-  `i2pseeds.su3` (currently echelon3@mail.i2p, whose certificate is in `thirdparty/keys/reseed/`) and
-  signature-checks it with its age only warned, so a build no longer fails when StormyCloud is down
-  or rate-limiting. The StormyCloud download (verify 14 days, reuse a verified copy under 24 h,
-  fall back to a cached copy under 3 days) stays as a fallback when the shipped file is missing.
-  Refresh `i2pseeds.su3` in git when the build warns it is old.
-- **Release files.** `build.sh` writes `SHA256SUMS` (the ISO, its manifest and its package list) and
-  `Prestium-2.1-amd64.manifest`: image SHA-256 and size, build date, source commit, Debian package
-  count, and the Tor Browser, Firefox, Node.js, The Lounge, Feather, Tor, i2pd and LibreWolf versions
-  that went in. `scripts/sign-release.sh FINGERPRINT`, run by the release key's holder, writes and
-  checks a detached `SHA256SUMS.asc`. The ISO itself is not signed yet.
-- **Repeatable builds (first step).** `PRESTIUM_SNAPSHOT=20261110T000000Z` builds Debian from
-  snapshot.debian.org at that time, and `build.sh` sets `SOURCE_DATE_EPOCH` to the commit's time. The
-  image is not yet bit-for-bit reproducible. The Tor, i2pd and LibreWolf repositories have no snapshots.
-- `tests/ci.sh` (run by hand on Debian 13) runs shellcheck, compiles every AppArmor profile, scans for
-  committed private keys and tokens, checks `systemd-analyze security` scores, and runs the tests that
-  don't need a live Wayland session.
-
-- **The live system is checked with dm-verity at boot.** The build makes a dm-verity hash tree for
-  `live/filesystem.squashfs` (`auto/config --dm-verity`, `veritysetup` on the build host) and puts its
-  root hash on the kernel command line of every GRUB and isolinux entry (hook 9010, which also checks the
-  tree once with `veritysetup verify`). The initramfs refuses to boot when the hash tree is missing, the
-  command line has no well-formed root hash for the image, an extra or non-squashfs image or "plain
-  root" mode turns up, or dm-verity can't be set up (hook 0405 patches live-boot, which otherwise falls
-  back to a plain mount or to a root hash file on the same stick). A changed block of the image is an
-  I/O error at mount time (the boot stops) or a kernel panic later (`dm-verity-oncorruption=panic`). The
-  root hash is in the release files (`Prestium-2.1-amd64.roothash`, the manifest, `SHA256SUMS`), so
-  a signed release signs it too. The kernel, initramfs and boot menu are not covered (see Known security limits).
-  Every boot entry also has `panic=10`: a failed check (or `break=`, or a missing init) reboots after 10
-  seconds instead of opening a root shell in the initramfs. Files live-boot would read from the stick
-  into its `mount` options or paths (`.fec`, `.fec.roots`, `.roothash`, `.roothash.p7s` next to the
-  image, `*.module` image lists) stop the boot, as does an image path with characters other than
-  letters, digits and `._/-`. live-boot's initramfs-tools hook no longer sources `live/boot.conf` from
-  the stick when the initramfs is rebuilt on a running system (at boot only the initramfs's own
-  `/etc/live/boot.conf` is read, and Prestium has none).
-
-- **Locked boot menus.** Nobody at the keyboard can edit a boot entry or open GRUB's command line, so
-  nobody can boot with AppArmor off or with `init=`. GRUB (UEFI) has a superuser with a PBKDF2 password
-  hash, and every boot entry is `--unrestricted`, so booting needs no password; only "UEFI Firmware
-  Settings" asks for it. isolinux (BIOS) takes no added options (`allowoptions 0`, `noescape 1`). The
-  hash comes from `PRESTIUM_GRUB_PASSWORD_HASH` or the gitignored `grub-password.pbkdf2`
-  (`scripts/grub-pbkdf2.py` makes it). Without one, the build locks the menu with the hash of a random
-  password nobody knows and prints a warning. `superusers` is exported, so entries inside submenus
-  (Utilities) are locked too, and the GRUB configs that run before the menu (the one in the EFI system
-  partition image and `boot/grub/x86_64-efi/grub.cfg`) set the same superuser first, so GRUB's command
-  line is locked even if they can't load the menu (the build host needs `mtools`). Hook 9020 checks
-  every kernel line in all of them word by word and stops the build on: `apparmor=` other than 1,
-  `security=` other than apparmor, `lsm=`, `selinux=`, `enforcing=`, `init=`, `rdinit=`, `single`,
-  `s`, `S`, `1`, `-b`, `emergency`, `rescue`, `break`, `break=`, `rd.break`, `rd.shell`,
-  `rd.emergency`, `rd.debug`, `rd.systemd.*`, `systemd.unit=`, `systemd.debug-shell`,
-  `systemd.wants=`, `systemd.run*`, `systemd.mask=`, `systemd.confirm_spawn`, `systemd.setenv=`,
-  `debug`, `persistence*`, `findiso=`, `fromiso=`, `live-media=`, `bootfrom=`, `module.sig_enforce=0`,
-  a `panic=` other than 10 or a missing `panic=10`, a `lockdown=` other than integrity or a missing
-  `lockdown=integrity`. live-build's `findiso=${iso_path}` and
-  `loopback.cfg` (booting the ISO file from another disk's GRUB) are removed. This word check lets
-  `toram=<file>` through, because the named image must still pass dm-verity. The command line policy
-  below refuses it anyway; plain `toram` is allowed.
-
-- **Only the image's own kernel command line boots.** One policy,
-  `/usr/share/prestium/boot/cmdline.policy`, lists the command line: every option of `auto/config`'s
-  APPEND (including `lockdown=integrity`), the dm-verity root hash, `dm-verity-oncorruption=panic`
-  and `panic=10`, each exactly once.
-  Only these may be added: `quiet`, `splash`, `nomodeset`, `prestium.nocammic`, `nomacspoof`,
-  `verify-checksums`, plain `toram`, and the `BOOT_IMAGE=`/`initrd=` that GRUB and isolinux add.
-  Anything else stops the boot: a missing option, an extra one (`apparmor=0`, `init=`, `break=`,
-  `fetch=`, `root=`, `bootconfig` and so on), an option given twice, odd characters (quotes, `$`,
-  tabs) or a missing policy. The check runs three times:
-  - The initramfs runs it first. The initramfs-tools hook `prestium-cmdline` puts it into the
-    initramfs copy of `/init`, right after `/scripts/functions`. That's before `/init` reads `break=`,
-    `init=`, `debug` or `panic=`, before any initramfs script runs and before the root filesystem is
-    mounted. On a mismatch it shows what's wrong and restarts the computer after 10 seconds, the same
-    as `panic=10`. It never opens a shell, even when `panic=` is missing.
-  - `prestium-cmdline-check.service` runs it again from the verified image, before AppArmor loads
-    and before `sysinit.target`. A mismatch restarts the computer (`FailureAction=reboot-force`). This
-    also covers an initramfs that lacks the check, such as an old or foreign initrd.
-  - `prestium-safety-notify` shows a "Protection NOT active" alert that names the wrong options. It
-    also alerts when the boot-time check didn't run.
-  GRUB (UEFI) now boots only this stick's own files. live-build's GRUB config in the EFI image used to
-  pick the first disk that had `/.disk/info`, which every Debian live stick has, and then loaded that
-  disk's menu, kernel and initramfs. It now searches for `/.disk/prestium-<id>`, which is unique to
-  each build (the first 32 hex digits of the root hash), and tries the disk GRUB started from first.
-  If that file is missing, GRUB restarts the computer instead of booting anything else. The new build
-  hook 9030 stops the build in any of these cases:
-  - a boot entry in any GRUB or isolinux config fails the policy, using the same code as the initramfs
-  - an entry carries another root hash
-  - a config uses `chainloader`, `linux16`, `multiboot`, `loopback`, `load_env`/`save_env`, any other
-    `search`, or `configfile`/`source` outside `/boot/grub`
-  - isolinux uses `config`, `localboot` or any `com32` module other than `hdt.c32`
-  - the policy drifts from `LB_BOOTAPPEND_LIVE`
-  - the kernel has a built-in or forced command line (`CONFIG_CMDLINE*`, `CONFIG_BOOT_CONFIG_FORCE`)
-  - the initrd in the image doesn't contain the check. Each `live/initrd.img*` is matched to the
-    chroot's `/boot/initrd.img*` by content, not by name: live-build ships both `initrd.img` and
-    `initrd.img-<version>`, but the chroot has only the versioned name, which made real builds stop
-    with "binary/live/initrd.img is not the chroot's /boot/initrd.img"
-  `tests/test_boot_cmdline_guard.sh` tests all of this. The existence checks at the top of the
-  initramfs hook and of hook 9030 are plain `if`/`then` blocks now (shellcheck 0.10 flagged the
-  `A && B || C` form, SC2015, which made the test fail); they refuse exactly the same cases.
-- **Secure Boot uses Debian's signed boot chain, and the build proves it.** The UEFI
-  path was already firmware → Debian's shim (`EFI/boot/bootx64.efi`, signed by Microsoft) → Debian's
-  signed GRUB for removable media (`EFI/boot/grubx64.efi`, `gcdx64.efi.signed` from
-  `grub-efi-amd64-signed`) → Debian's signed kernel (`linux-image-amd64` from `linux-signed-amd64`),
-  set up by live-build (`--uefi-secure-boot enable`). Nothing checked the result. The new hook 9040
-  stops the build when:
-  - `config/binary` no longer says `LB_UEFI_SECURE_BOOT="enable"` (`auto` would quietly ship an
-    unsigned GRUB when the signed one can't be installed)
-  - there is any EFI program other than `EFI/boot/bootx64.efi` and `grubx64.efi`, the two differ
-    between the ISO tree and `boot/grub/efi.img`, or efi.img holds anything but them and its `grub.cfg`
-    (the unused `efi.img` that live-build leaves in the ISO root, holding an unsigned GRUB whose
-    built-in config takes any disk's `/.disk/info`, is removed)
-  - `bootx64.efi` is not signed for the Microsoft UEFI CA 2011 or 2023, has no Debian Secure Boot CA
-    built in, or has no `shim.debian` SBAT entry (so another vendor's Microsoft-signed shim fails)
-  - `grubx64.efi` is not signed by Debian's `grub2` key, has no `grub.debian` SBAT entry, has another
-    built-in prefix than `/boot/grub`, carries the object that turns shim's kernel check off, or lacks a
-    built-in module the locked menu and the marker search use (`password_pbkdf2`, `regexp`, `search`,
-    `sleep`, `reboot`, `linux`, `efifwsetup` and others: under Secure Boot GRUB can't load modules
-    from the stick)
-  - a `live/vmlinuz*` is not the chroot's kernel, comes from a package that is `-unsigned` or not built
-    from `linux-signed-*`, doesn't match dpkg's MD5, or isn't signed by Debian's `linux` key
-  Signatures are checked with `sbverify` against the CA certificates in `thirdparty/keys/secure-boot/`,
-  which the hook pins by SHA-256; the build host needs `sbsigntool`. `scripts/efi-inspect.py` reads
-  SBAT, shim's built-in certificate and GRUB's built-in modules. The kernel command line includes
-  `lockdown=integrity`, so the kernel is locked down (integrity) even with Secure Boot off or on BIOS:
-  unsigned modules, `/dev/mem`, `/dev/port`, MSR writes, kexec of an unsigned kernel and hibernation
-  are refused. Prestium needs none of them (unsigned modules were already refused by
-  `module.sig_enforce=1`, kexec by `kernel.kexec_load_disabled`, and there is no swap). The safety
-  notifier raises a "Protection NOT active" alert when `/sys/kernel/security/lockdown` is `[none]` or
-  missing, and still says once per session, as information rather than an alert, when a UEFI computer
-  started with Secure Boot off. The BIOS path is otherwise unchanged.
-  `tests/test_secure_boot.sh` tests the hook on a fake tree, with Debian's real signed files when they
-  are available.
-
-### Base system
-- **Tor Browser 16.0.1** (or newer, as above) with Firefox security fixes and tor 0.4.9.16.
-  **System Tor 0.4.9.16** comes from deb.torproject.org at build time. LibreWolf and the local Firefox
-  still come from their apt repositories at build time.
-- **The desktop says when the image is old.** Prestium does not update itself during a session. Five
-  minutes after login, a notice says how many days old the image is once it is past 45 days.
-  `/etc/os-release` has the build date as `BUILD_ID`, and `/usr/share/prestium/build-date` records the
-  build time used as the lower bound for setting the clock.
-
-### New: Browser Updater
-- **Network → Browser Updater** installs the latest **publisher-signed** Tor Browser or I2P Browser
-  (LibreWolf) **in place** of the copy on the USB image, for this session only. Each browser has
-  **Update using Tor** (Tor's SOCKS port 9050, remote DNS, a fresh SOCKS username so the update gets
-  its own circuits) and **Update using I2P OutProxy** (i2pd's HTTP proxy on 127.0.0.1:4444; the
-  outproxy can see the host names, and the window says so). Only the transport that was clicked is
-  used. Downloads go only to `https://` on the publisher's own hosts; curl never follows redirects
-  itself. Nothing is fetched when the window opens. The local-only Firefox is not offered in this
-  release.
-- **Verified twice:** the window checks the signature as the user; the root helper
-  `prestium-browser-install` copies the staged files as the user into a root-only directory and
-  verifies them again with the keys shipped in the image, using the same policy as the build. Tor
-  Browser: the tarball's detached signature, and the version in the file name must match the changelog
-  inside it. LibreWolf: the repository's signed `InRelease`, then `Packages`, then the `.deb`'s
-  SHA-256. An expired key gives "key expired, use a newer ISO". Nothing older than the installed
-  version is installed. **Reset to shipped copy** is the only way back.
-- **Install is a bind mount, Reset is an unmount.** The update is unpacked on a tmpfs at
-  `/run/prestium/browsers` and bind-mounted read-only over the shipped path, so launchers and AppArmor
-  paths stay the same. LibreWolf's `.deb` is unpacked with `dpkg-deb -x`; its maintainer scripts never
-  run. A failed re-update puts the previous update of this session back. The helper refuses while the
-  browser is running. Prestium has no persistence, so an update lasts until Reset or reboot and stays
-  in RAM. The window shows the RAM cost and refuses to start without enough free memory. If an updated
-  browser doesn't start (for example because it needs AppArmor rules the shipped profile doesn't have),
-  press Reset to shipped copy.
-
-### App confinement and sandboxes
-- **Claws Mail's GnuPG can't write GnuPG's configuration files.** The child profile Claws runs gpg,
-  gpgconf and gpg-connect-agent in could write every file in `~/.gnupg`, `gpg-agent.conf` included. A
-  gpg-agent started by the user's systemd socket runs outside that profile and runs the helper programs
-  that file names (`pinentry-program` and the other `*-program` options), so code running in Claws
-  could get out of its profile as the desktop user. The child now has Kleopatra's deny on writing
-  `~/.gnupg/*.conf` and `common.conf`, and on hard links to those names. Keys, signing and the
-  passphrase prompt (still in `prestium_pinentry`) are unchanged. `prestium-gnupg-check` still raises
-  its flag for such options written from outside Claws. Test: `test_apparmor_claws.sh`.
-- **Kleopatra can't hard-link a file onto GnuPG's configuration names either.** Its profile denied
-  writing `~/.gnupg/*.conf` and `common.conf` but allowed link on all of `~/.gnupg`, so a hard link
-  under such a name to a file Kleopatra may write would have given the agent that content anyway.
-  Link is now denied on those names too, as in Claws Mail's gpg child. Lock files and the keyring are
-  unchanged. Tests: `test_apparmor_startup.sh` (link checks against the compiled profile),
-  `test_apparmor_claws.sh`.
-- **LibreOffice runs under its AppArmor profile, and the whole profile set is checked as the boot loads
-  it.** Debian's libreoffice-common ships complain-mode profiles for `oosplash` and `soffice.bin` that
-  attach to the same two programs as Prestium's enforced `libreoffice` profile and match them just as
-  well. The kernel then attaches neither ("conflicting profile attachments"), so LibreOffice ran
-  unconfined, with network access and every file the user can write. Hook 0600 removes those two Debian
-  profiles (senddoc and xpdfimport keep theirs; Prestium's LibreOffice runs them inside its own profile).
-  It now also runs `aa-attach-check.py` on `/etc/apparmor.d` as apparmor.service loads it at boot: every
-  profile file must compile (one that doesn't makes the service fail), and no other profile may attach to
-  a program a Prestium profile confines. The drop-in that lets apparmor.service run on the live overlay
-  (Debian skips it when `/run/live/overlay/work` exists) is documented and tested. Tests:
-  `test_apparmor_boot_load.sh`.
-- **Two shared folders for the apps' files, and three app-specific ones (L-5, revised).** The local
-  Firefox, Claws Mail, Gajim and Pidgin all save in `~/Downloads`; LibreOffice, GIMP, FeatherPad,
-  File Roller, Xarchiver, Audacity, Kleopatra, Metadata Cleaner and Feather all save in `~/Documents`.
-  Only the browsers and torrents keep their own top-level folders, like Tor Browser's `~/Tor Browser`:
-  the I2P Browser's `~/I2P Browser` and I2P Torrents' `~/Torrents`, and the shared apps can't
-  write in those three (the local Firefox may still read `*.torrent` files in the I2P Browser's folder,
-  for I2P Torrents' Add .torrent). The file manager's pinned list is exactly those five, labelled
-  i2P Browser, Torrents, Tor Browser, Documents and Downloads. mat2 writes its `name.cleaned.ext`
-  copy only in the "Remove metadata" work folder, `~/Documents/.remove-metadata.XXXXXX`; "Remove
-  metadata" in the file manager copies the file there, runs mat2 and moves the cleaned copy back next
-  to the original (never over an existing file; if that fails, the copy is left in `~/Documents`).
-  Viewers and editors still open files from every folder, but read-only. LibreOffice opens a document
-  from elsewhere but can't save it in place (use Save As; its default folder is `~/Documents`), and it
-  writes no `.~lock` files (`UseLocking=false`,
-  `/usr/lib/libreoffice/share/registry/prestium.xcd`).
-  The browsers see only their own folder (the local Firefox: files directly in `~/Downloads`), so to
-  upload a file, put it there first, as with Tor Browser.
-  Mail and chat can also read files you put directly in `~/Downloads`, for attachments, but not in
-  `~/Documents`: to attach a document, copy it from `~/Documents` to `~/Downloads` first.
-  Unlocked volumes under `/media` are read-only for the editors, LibreOffice and mat2 (only KeePassXC
-  writes its `.kdbx` there): move a file onto a volume with the file manager. Hook 0500 creates the
-  I2P Browser's folder (Torrents is made by i2pd's helper, "Tor Browser" by its own launcher). The
-  apps' settings point at the shared folders where the app has such a setting (LibreOffice's Work
-  folder, Xarchiver's extract folder, Audacity's save and export folders, the browsers', mail and chat
-  apps' download folders, in `/etc/skel` and the live user's home alike); GIMP, FeatherPad, File Roller
-  and Kleopatra have none and start in the home folder, which they can't write, so the shared folders
-  are in the file chooser's sidebar (GTK bookmarks; Qt's for FeatherPad and Kleopatra). (2.1, review
-  of 6bf1234: `/media` read-only, mat2 in its own folder, the editors' settings, the lock files,
-  `/etc/skel` in step with the live user's home and the second LibreWolf settings file, and Pidgin's
-  real file-folder settings: it has no `last_receive_folder`; received files use
-  `last_save_folder`.)
-- **The file manager makes no thumbnails and mounts no drives by itself.** PCManFM isn't confined, so it no
-  longer decodes downloaded pictures for previews (`/etc/xdg/libfm/libfm.conf`). USB drives are mounted with
-  a click, not on insert or at start-up.
-- **The file viewers, editors, KeePassXC and Kleopatra have no sound or microphone access.** VLC, Audacity,
-  the browsers and the chat and mail apps keep it.
-- **Programs that open downloaded files are confined:** Loupe, Ristretto, VLC, File Roller, Xarchiver,
-  FeatherPad, mat2, Metadata Cleaner, GIMP and Audacity run under enforced AppArmor profiles (no
-  network, no camera, no admin tools, no other app's mail/chat/browser data, no OpenPGP keys or
-  KeePassXC databases). They may read the file folders (Desktop, Documents, Downloads and the others),
-  save only in the shared ~/Documents folder (see above) and use their own settings. Files outside those folders need to be moved into Documents first. VLC plays
-  local files only (no network streams). Loupe's image decoders and mat2's helpers keep their own
-  bubblewrap sandbox, in a child profile with the same limits.
-- **KeePassXC and Kleopatra are confined too.** KeePassXC has no network and no browser integration.
-  Kleopatra and the GnuPG tools it starts may use `~/.gnupg`, read the file folders and save in `~/Documents`; only dirmngr opens
-  TCP (through Tor), and passphrase prompts use a confined pinentry. Kleopatra may not write the GnuPG
-  configuration files (those can name helper programs). The pinentry profile also applies when the
-  session's own gpg-agent starts a prompt.
-- **Browsers opened from mail and chat stay confined.** Claws Mail, Gajim and Pidgin used to start the
-  Tor Browser and I2P Browser launchers unconfined, and the launchers honoured the caller's
-  environment. They now enter dedicated launcher profiles, take a fixed PATH and fixed paths only, and
-  run as `bash -p`. Of the home directory, the sandbox child may write only its own browser's folders.
-- **The browser sandbox's bubblewrap child can no longer read the rest of the home, and ~/Torrents reads
-  work again for OnionShare and LibreOffice.** The shared launcher-bwrap rules granted `/** r, /dev/** rw,
-  /proc/** rw, /run/** rwlk`, so a process in that profile could read `~/.gnupg`, `~/.ssh`, `*.kdbx` and
-  the other browser's profile before the sandbox was built; they now grant a read-only system, the
-  browser install in `/opt`, only the sockets `browser-sandbox.sh` binds in (the restricted Wayland
-  socket, the Tor and onion-grater sockets, audio sockets, the I2P relay socket directory), and
-  explicit denies for the secrets, like the viewer bubblewrap children. Each launcher also denies the
-  other browser's folders for reading as well as writing. OnionShare and LibreOffice qualified their
-  `~/Torrents` reads with `owner`, which can never match i2pd-owned files (uid 2000); the qualifier is
-  dropped, as the shared file-folder rules already do. Audacity's loopback TCP allowance is documented
-  as relying on its network-namespace wrapper (ferm still limits the user to the local proxy ports if
-  the real binary were exec'd directly), Feather's `/tmp` rule is documented as map-only, Tor Browser's
-  dead pulseaudio exec rule is removed and its hardware-key access for U2F kept deliberately. Tests:
-  `test_apparmor_startup.sh` (the children deny the secrets and the other browser, and still get the
-  sockets and GPU they bind), `test_download_folders.sh` (no `owner`-qualified `~/Torrents` rule),
-  `test_apparmor_claws.sh` and `test_browser_update.py` (skip cleanly without `apparmor_parser`/`dpkg`).
-- **Ristretto no longer crashes opening pictures (found in a booted ISO).** GTK saves the
-  recent-files list by creating a temporary file in `~/.local/share/` and renaming it over
-  `recently-used.xbel`; the shared desktop rules granted the `.xbel` file itself but not write
-  on the directory, so the temporary create was denied and Ristretto segfaulted on every image
-  (Ristretto adds every opened file to recents; a fresh home has no `~/.local/share/` at all, and
-  the same app with an empty home or a /tmp data dir worked, which is how the cause was found).
-  The directory rule is granted next to the `.xbel` rule in `prestium-app-common`, as with
-  LibreOffice's own data-dir parent rules. `test_apparmor_startup.sh` checks the viewer may write
-  the directory and may not write other apps' data.
-- **LibreOffice first start and headless conversion finish their user installation (found in a
-  booted ISO).** On a fresh home the first start died with "User installation could not be
-  completed" (exit 77), and so did `soffice --convert-to`, while a later GUI start opened the
-  half-created profile. LibreOffice maps its profile files into memory to write them
-  (`registrymodifications.xcu`); the profile granted read/write/lock/link on them but not mapping,
-  so the mapped write was denied. The three profile folders now also grant `m`.
-  `test_apparmor_startup.sh` checks the mapped write on the registry file is allowed.
-- **The first session password can only be set from the lock dialog.** The Wayland broker shows that
-  dialog on the compositor's full socket and sets the password as root. `sudo prestium-session-password`
-  no longer allows `set`, and plain `passwd` is no longer setuid. The password must have at least 8
-  characters; each wrong attempt at the lock screen costs at least 4 seconds. There is no lockout.
-- **onion-grater can only read, not trace**, and it checks how a Python client was started. Its unit
-  filters out ptrace and process_vm syscalls; a new AppArmor profile allows `ptrace (read)` only. A
-  client started with `PYTHON*` (other than a short allow-list), `LD_*` or code from outside `/usr`
-  and `/lib` is refused (libffi's own `/memfd:libffi` trampolines excepted). The profile allows
-  `identify()` to stat only the Nyx, Tor Connection Assistant and OnionShare script paths (through
-  `/proc/<pid>/root` and on the host). The filter also holds `CAP_DAC_READ_SEARCH`, read-only, because
-  a client's `/proc/<pid>/environ` is readable by its owner only; its unit hides the shadow files,
-  sudoers, `/etc/ssh` and `/var/lib` from it. Every refusal is logged with its reason
-  (`journalctl -u prestium-onion-grater`).
-- **The Lounge can't rewrite its own code.** `config.js` and its packages are root-owned and read-only
-  for The Lounge. The sign-in token works once and never appears in a command line: it is handed to
-  the local-only Firefox through a one-off page in a private folder, which is the only `file://`
-  exception in Firefox's policy.
-- **Audacity can no longer reach the network**, not even the Tor and I2P proxy ports on 127.0.0.1. It
-  runs in its own empty network namespace. Its single-instance check still listens on that private
-  loopback, the microphone still works, and a second start joins the first namespace through a session
-  socket (no ptrace, which `ptrace_scope=2` would block). After joining, start is refused unless the
-  namespace has only loopback. Audacity may start its own plug-in host (the same program, same
-  profile, same namespace), so the Measure RMS plug-in (`rms.ny`) is no longer reported incompatible.
-- **prestium-gnupg-check** (a root timer) raises a safety flag when an unconfined GnuPG daemon is
-  running and that user's configuration names a helper outside `/usr`. Claws Mail and Kleopatra still
-  share `~/.gnupg` and the session's gpg-agent; nothing is masked or killed.
-- **Root daemons ignore their test overrides when installed.** The Wayland broker, prestium-wl-config
-  and the MAC guard read `PRESTIUM_*` variables only when run from the source tree.
-
-### Network, firewall and privileges
-- **The Tor pill, the VM warning, the clock sync and the clock fix now see Tor bootstrapped in the
-  default boot (found in a booted ISO).** They read Tor's bootstrap from the journal, but in the
-  default boot Tor logs nowhere (`Log err file /dev/null`, Network Logs off), so they reported
-  "Tor 0%" and "Tor NOT connected" while Tor itself worked - and `prestium-timesync` never synced
-  the clock, and `prestium-clockfix` would have moved the clock anyway. They now ask the control
-  port for `status/bootstrap-phase` through the onion-grater filter instead, via a new
-  read-only `tor-bootstrap.py` (GETINFO `version` and `status/bootstrap-phase` only; no events,
-  no GETCONF, no signals). The filter allows the two status service users as clients of that one
-  script only (socket group `prestium-tbb`; the hook puts both users in it). Default-boot logging
-  stays off. Tests: `test_vm_check.sh` (the helper is stubbed, the skew lines still come from the
-  journal), `test_desktop_theme.sh` (netstatus fixture), `test_timesync_bounds.sh` (clockfix sees
-  the helper and leaves a bootstrapped clock alone), `test_onion_grater_identity.py`
-  (`tor-bootstrap` recognised by the system script, minimal profile).
-- **i2pd builds fewer tunnels at boot, so the browser's come first.** Right after a cold boot the
-  router list is days old and i2pd has no peer history, so many tunnel builds fail, and i2pd started
-  68 tunnels (about 180 build requests) at once. Only the browser proxy's (4444) decide when sites
-  load; the rest competed with them for the same good peers and build slots. Every pool now sets its
-  size, so none falls back to i2pd's default of 5+5:
-  - browser proxy 4444: 2+2 (unchanged)
-  - terminal proxy 4450, IRC2P, Ilita, postman SMTP and POP3: 1+1 (were 2+2)
-  - SOCKS proxy 4447 and the SOCKS outproxy tunnels on 4500: 1+1 (were 5+5 each, no count set);
-    the outproxy tunnels keep their 1 hop
-  - exploratory: 3+3, i2pd's default (was 4+4)
-  - i2pd's shared destination (address book updates and lookups): 2+2 (was 3+3 by default)
-  - the torrent client: 5+5, i2pd's default. It was cut to 2+2 at first, which made downloads and
-    magnet lookups clearly slower, so it's back (see the next entry).
-  That's 38 tunnels, about 106 build requests at the default 3 hops. The I2P Connection Assistant
-  changes only the hops and never the tunnel counts. `tests/test_i2p_tunnel_budget.py` checks that
-  every pool sets its size, that no client pool but the torrent client has more than the browser's
-  2+2, that tunnels sharing keys agree, and that the total stays at 38 or less.
-- **I2P Torrents is faster and resolves magnet links without a tracker.** Its tunnels are 5+5 again
-  (were 2+2 for a short time), still 3 hops. i2pd's torrent client shipped with no trackers, and
-  with transient keys its DHT starts empty at every boot with no bootstrap node, so a magnet link
-  without a `tr=` tracker had nowhere to find its first peer. It now announces to I2P's usual open
-  trackers: postman (`tracker2.postman.i2p`), DgTrack (HTTP and UDP), InsulaOcculta (HTTP and UDP),
-  the defaults of I2P's own i2psnark, and `opentracker.skank.i2p` from i2pd's torrent guide. They are
-  all inside I2P and written as `.b32.i2p` addresses, because i2pd reads the list once when the
-  tunnel starts, before a fresh boot's address book knows any names. Peers found there also seed
-  the DHT. Every torrent announces to these trackers (i2pd has no per-torrent switch), as it already
-  did to the DHT. `tests/test_i2p_tunnel_budget.py` checks 5+5, the default hops and that every
-  tracker is a `.b32.i2p` address.
-- **I2P Torrents survive i2pd restarts.** The torrent client now uses a
-    persistent destination (`keys = torrents.dat`) and a DHT file (`dhtfile = dht.dat`): the peer
-    ID stays stable and the DHT routing table (the peer-finding node list) is saved on stop and
-    reloaded on start, instead of a fresh identity and empty DHT every i2pd start (transient
-    keys with no DHT file meant i2pd deliberately did not persist them). The torrent list and
-    progress already lived on disk (`.torrent`/`.magnet`/`.resume` plus `.part` data files in
-    `~/Downloads/Torrents`, reloaded at start); this makes peer discovery survive with them.
-    `/var/lib/i2pd/torrents` is now a real writable directory with only `web/` symlinked to the
-    shipped assets: the old whole-directory symlink put the DHT file in the read-only `/usr`
-    tree, so it could never persist. AppArmor allows the keys and DHT file, `[persist]`
-    profiles and address book are on, and more trackers were added (atia, opentracker.dg2,
-    InsulaOcculta hostname and skank/postman names alongside the `.b32.i2p` entries).
-    Torrent tunnels use the I2P Connection Assistant's hop count (default 3): the generated
-    tunnel reads the browser proxy's `outbound.length` back at every i2pd start, so changing
-    the hops in the assistant changes the torrents too. DHT, `i2p_pex` peer exchange and
-    `ut_metadata` run over I2P itself (streaming
-    tunnels and datagrams), so the firewall cannot block them; i2pd's network access is
-    already open. `tests/test_i2p_torrents_persist.py` and `tests/test_i2p_tunnel_budget.py`
-    check it. Like everything else on this live system, this survives i2pd restarts, not
-    reboots.
-- **I2P Torrents' *Add .torrent* button can open the I2P Browser's downloads.** The local Firefox
-  that shows I2P Torrents could open files only in `~/Downloads/Local Firefox`, so a `.torrent`
-  saved by the I2P Browser in `~/Downloads/I2P Browser` showed up in the file picker's sidebar but
-  couldn't be opened. Its AppArmor profile now lets it list that folder and its subfolders and read
-  `*.torrent` files there. Nothing else in the folder is readable and nothing in it is writable.
-  `tests/test_download_folders.sh` checks both.
-- **i2pd's port script and the I2P Connection Assistant no longer overwrite each other.**
-  `prestium-i2pd-port` (run before every i2pd start) now takes the same lock as the assistant's root
-  helper (`/run/prestium-hops.lock`) before it reads `i2pd.conf`. It waits at most 10 seconds; after
-  that it logs the reason to the journal and exits, so i2pd doesn't start and nothing changes. Apply
-  holds the lock only while it edits and writes the files (each written to a new file, then renamed),
-  and releases it before it restarts i2pd, because that restart runs the port script. Holding it
-  through the restart would deadlock. A separate lock (`/run/prestium-i2p-apply.lock`) still allows one
-  Apply at a time through the whole restart. Apply waits at most 30 seconds for the config lock, then
-  stops with nothing changed. A rollback takes the lock again and puts back the previous settings,
-  but keeps the port and console password the port script wrote in the meantime.
-  `test_i2pd_config_lock.py` runs both scripts at the same time with a stubbed systemctl and checks
-  for hangs and lost edits.
-  Review of 6bf1234: both lock files are made at boot by tmpfiles (`prestium-i2p.conf`) as root-only
-  regular files (0600). flock works on any file a process can open, so a lock file other users could
-  open would have let any of them hold Apply or i2pd's start up. Apply opens them with `O_NOFOLLOW` under
-  umask 077 and refuses a symlink, a non-regular file or another owner's file; the port script runs under
-  umask 077 and refuses the same before it opens the lock. i2pd's drop-in sets `TimeoutStartSec=180`
-  (the port script's rollback, two ferm reloads of at most 60 s each, no longer risks the default 90 s)
-  and `TimeoutStopSec=30`. Apply's restart is bounded (220 s) and the rollback's restart is queued, so
-  its worst case is about 345 s; the broker's timeout for it went from 330 s, which that could exceed,
-  to 420 s, and the assistant's from 700 s to 900 s (the confirmation dialog comes first).
-- **Feather says I2P everywhere.** The menu and `settings.json` already used I2P (Feather's i2p mode
-  through i2pd's SOCKS proxy 127.0.0.1:4447), but the firewall's comment still listed Feather on Tor's
-  9050. It now lists Feather on 4447. Port 9050 stays open to the desktop user for Tor Browser, Gajim and
-  `curl --socks5-hostname` in the terminal; Feather runs as the same user, so the firewall can't close a port for Feather alone. The
-  AppArmor profile lets Feather execute nothing, so its bundled Tor can't start, and its comment names the
-  port. `test_feather_i2p.sh` checks that the menu, both settings files, i2pd's port, ferm and the
-  profile agree.
-- **Network → Network Logs shows the Tor, I2P and control-port filter logs** of this boot, read-only.
-  The desktop user can't read the journal, so the hints that said `journalctl` led nowhere; Nyx and the
-  Tor Connection Assistant now point here. A small service, `prestium-logs` (its own user, journal group,
-  no network, read-only system), copies the last 400 entries of exactly `tor@default`, `i2pd` and
-  `prestium-onion-grater` to `/run/prestium/logs` every 10 seconds. It keeps only entries the journal
-  attributes to those units, and it replaces control, bidi and other invisible characters. The files
-  can be read only by the desktop user (group `user`, setgid directory), not by the confined apps
-  (AppArmor). There's no sudo rule, the user isn't in `systemd-journal` or `adm`, and nothing the user
-  sends can choose another unit.
-  Review of 6bf1234: one journal entry is always one line (a newline inside a message is shown as
-  `\n`, a backslash as `\\`), so a message can't add a line that looks like another entry, and at most
-  two combining marks follow a character. onion-grater also escapes newlines, CR and other control,
-  format and separator characters (`\x0a`, `\u202e`) before it logs a refused client's reason, since that
-  client chose its own path. When journalctl fails, the file shows an error with the reason instead of an
-  empty log. The unit has `MemoryMax=128M`, `TasksMax=16` and a restart limit (5 starts in 5 minutes),
-  so a missing `/run/prestium/logs` (made by tmpfiles) doesn't restart it every 10 seconds for ever.
-  `torrc` sets `SafeLogging 1` (Tor's default) explicitly, after the drop-ins, so addresses in the
-  readable Tor log stay `[scrubbed]`.
-- **Time over Tor onion services, on Kicksecure's design.** `prestium-timesync` is now a daemon built on
-  sdwdate's design (written for Prestium, not Kicksecure's code). Each round it asks one source from each
-  of three pools of onion web servers run by unrelated operators (Kicksecure's own list, kept under its
-  AGPL-3+ licence in `/usr/share/prestium/timesync/pools.conf`), each on its own Tor circuit as the
-  firewalled `prestium-htp` user, and uses the median. A pool with more than a third of its members
-  failing aborts the round. An answer outside the current Tor consensus window is rejected. The clock is
-  never set earlier than the build date, the last time it set this boot, or `/etc/minimum-unixtime`
-  (time replay protection). Up to one second of random nanoseconds is added. The first sync, and any
-  later difference over 10 seconds, steps the clock; smaller ones are slewed smoothly by the kernel. It re-syncs at random
-  60 to 180 minute intervals instead of once per boot.
-- **Boot clock randomization.** `prestium-bootclock.service` moves the clock a random 0 to 50 seconds
-  into the past or future (inside the 60 s i2pd allows between peers), with random nanoseconds, before Tor, i2pd and the time sync start.
-- **Clock-sync symbol in the bar.** An amber clock symbol shows until the time is set over Tor, and a red
-  one if the sync refused a time it could not trust. It disappears once the clock is synced. The
-  previous one-shot sync from clearnet HTTPS sites is gone.
-- **The control-port filter checks Python clients more strictly.** Nyx, OnionShare and the Tor Connection
-  Assistant must start with `PYTHONNOUSERSITE=1` (`prestium-run` and `prestium-nyx` set it), because Python
-  runs `.pth` files from the user's site-packages before `sitecustomize` can switch them off. The filter's
-  service won't start without its AppArmor profile.
-- **The Wayland broker's socket is open to group `user` only** (0660, was 0666).
-- **i2pd and Tor can no longer reach Prestium's local services.** Their firewall accepts are for the
-  network only. On loopback, i2pd keeps only its SOCKS outproxy tunnel (4500) and Tor only the kernel's
-  ephemeral ports 32768-60999, where its pluggable transports listen, and OnionShare's web server
-  (127.0.0.1:17600-17650), which its onion services forward to.
-- **The early firewall reports failure.** `prestium-firewall-early` checks every step, applies as much
-  drop-all as it can, and exits non-zero if IPv4 or IPv6 isn't DROP with only loopback allowed.
-  iptables and ip6tables are pinned to the legacy xtables backend, and the build fails if that pin
-  can't be set.
-- **The MAC guard keeps its egress filter current**, re-installing the rule that drops frames with a
-  card's real address on every device event.
-- **The Wayland broker and the MAC guard keep only the root powers they use.** The time sync, bootclock,
-  clockfix and the USB watchdog run in a systemd sandbox. The VM network check runs as its own user, not as root,
-  and never copies Tor's log text.
-- **Setting the clock has bounds.** `sudo date -s` is replaced by `sudo prestium-set-clock`. timesync,
-  clockfix and set-clock all refuse a time before the image was built (one day of slack) or more than
-  10 years after it. timesync raises a safety flag when it refuses, or when it moves the clock by more
-  than a day.
-- **Fewer filesystem drivers can be loaded.** 21 rarely used ones (hfs, minix, jfs, reiserfs and
-  others) are blocked. FAT, exFAT, NTFS, ext4, Btrfs, XFS, F2FS, ISO 9660, UDF and HFS+ still work.
-  udisks still lets the desktop user attach disk images (needed for VeraCrypt file containers).
-
-### Safety and virtual machines
-- **The session wipe reports a failure instead of success.** At shutdown, `prestium-wipe-session`
-  skipped a tree that wasn't there, ignored find's errors, always logged "session files deleted" and
-  exited 0. It now also deletes the overlay's work directory (keeping overlayfs's own `work/` and
-  `index/`, which the still-mounted root needs) and the runtime secrets under `/run`: Prestium's state
-  (the Tor Connection Assistant's previous bridge lines, the DoH cache, network logs), the IRC sign-in
-  tokens, Tor's control cookie, the onion-grater, i2pd and sudo state, and user runtime directories
-  that are still there (FUSE mount points such as gvfs are left alone). `/run/systemd`,
-  `/run/initramfs` (systemd-shutdown returns into it), `/run/udev`, `/run/dbus`, `/run/log` and the
-  read-only image stay, on purpose. Each tree is checked afterwards; a missing tree, a failing find or
-  a file left behind is logged as "session wipe FAILED" with the trees, and the script exits 1. The
-  USB watchdog's emergency fallback deletes the same trees, checks them after its second pass and logs
-  "emergency session wipe FAILED" when something is left; it powers off either way. Test:
-  `test_wipe_session.sh`.
-- **AppArmor health alert.** The safety notifier warns when the AppArmor module is off, when
-  apparmor.service isn't active, or when one of Prestium's profiles isn't in enforce mode. A bug that
-  could raise ten false alerts at every login (the profiles file looks readable to the user but only
-  root may open it) is fixed.
-- **Prestium tells you when it runs in a virtual machine**: a notification at
-  login says the host and the virtualization software can see and record everything done in Prestium.
-- **If Tor or I2P hasn't connected in a VM after 10 minutes, the desktop says why** (no route,
-  user-mode networking, a VM clock set to local time, or a host firewall blocking I2P). The diagnosis
-  is read-only and disappears once both connect.
+### Boot and integrity
+- **dm-verity for the live system.** The build makes a hash tree for `live/filesystem.squashfs`
+  (`auto/config --dm-verity`, hook 9010) and puts its root hash on every GRUB and isolinux entry. The
+  initramfs (live-boot, patched by hook 0405) refuses to boot when the hash tree is missing, the root
+  hash is missing or malformed, an extra or non-squashfs image or "plain root" mode turns up, or
+  dm-verity can't be set up; there is no fallback to a plain mount. A changed block is an I/O error at
+  mount time or a kernel panic later (`dm-verity-oncorruption=panic`). Files live-boot would read from
+  the stick into its mount options (`.fec`, `.roothash`, `*.module` lists and similar) stop the boot,
+  and live-boot no longer sources `live/boot.conf` from the stick. The root hash is in the release
+  files, so a signed release signs it too.
+- **Only the image's own kernel command line boots.** `/usr/share/prestium/boot/cmdline.policy` lists
+  the command line (the APPEND options, the root hash, `dm-verity-oncorruption=panic`, `panic=10`,
+  `lockdown=integrity`), each exactly once; only `quiet`, `splash`, `nomodeset`, `prestium.nocammic`,
+  `nomacspoof`, `verify-checksums`, plain `toram`, `prestium.network-logs` and the
+  `BOOT_IMAGE=`/`initrd=` the loaders add may be added. Anything else (a missing, extra or repeated
+  option, odd characters, no policy) stops the boot. The check runs three times: in the initramfs's
+  `/init` before it reads `break=`, `init=` or `debug` (a mismatch restarts the computer after 10
+  seconds and never opens a shell), in `prestium-cmdline-check.service` from the verified image before
+  AppArmor loads (`FailureAction=reboot-force`), and in the safety notifier, which names the wrong
+  options. Every entry has `panic=10`, so a failed check reboots instead of opening a root shell.
+- **Locked boot menus.** GRUB (UEFI) has a superuser with a PBKDF2 password hash and every entry is
+  `--unrestricted`: booting needs no password, but editing an entry or opening GRUB's command line
+  does (submenus and the configs that run before the menu included). isolinux (BIOS) takes no added
+  options. The hash comes from `PRESTIUM_GRUB_PASSWORD_HASH` or a gitignored `grub-password.pbkdf2`
+  (`scripts/grub-pbkdf2.py`); without one the menu is locked with a random password nobody knows.
+- **GRUB boots only this stick's files.** It searches for `/.disk/prestium-<id>`, unique to each build
+  (from the root hash), trying the disk it started from first, and restarts the computer if that file
+  is missing, instead of booting the first disk that has `/.disk/info`. `findiso=` and `loopback.cfg`
+  are removed.
+- **The build checks every boot config.** Hook 9020 checks every kernel line word by word (no
+  `apparmor=0`, `init=`, `break`, `rd.*` shells, `systemd.unit=`, `debug`, `persistence`,
+  `module.sig_enforce=0`, a missing `panic=10` or `lockdown=integrity`, and others). Hook 9030 runs the
+  same policy code as the initramfs over every GRUB and isolinux entry and also refuses another root
+  hash, `chainloader`, `linux16`, `multiboot`, `loopback`, `load_env`/`save_env`, other searches,
+  configs outside `/boot/grub`, isolinux `config`/`localboot`/`com32` modules other than `hdt.c32`, a
+  policy that drifts from `LB_BOOTAPPEND_LIVE`, a kernel with a built-in or forced command line, and an
+  initrd (matched to the chroot's by content) without the check.
+- **Secure Boot uses Debian's signed chain, and the build proves it.** Firmware → Debian's shim
+  (signed by Microsoft) → Debian's signed GRUB → Debian's signed kernel. Hook 9040 stops the build if
+  `LB_UEFI_SECURE_BOOT` isn't `enable`, if there is any other EFI program or the ISO tree and
+  `efi.img` differ (live-build's unused root `efi.img` with an unsigned GRUB is removed), or if shim,
+  GRUB or the kernel isn't the expected Debian-signed file (Microsoft UEFI CA 2011/2023, Debian's CA,
+  SBAT entries, GRUB's prefix and built-in modules, dpkg's MD5 for the kernel), checked with `sbverify`
+  against CA certificates pinned in `thirdparty/keys/secure-boot/`. The kernel runs with
+  `lockdown=integrity` even with Secure Boot off or on BIOS; the safety notifier alerts when lockdown
+  is off and says once per session when a UEFI computer started with Secure Boot off.
+- **Network Logs boot entry.** *Prestium 2.1 (Network Logs)* is the only entry with
+  `prestium.network-logs`. Only in that boot do Tor and i2pd log, does `prestium-logs` run and does the
+  menu show *Network > Network Logs*. In the default boot Tor logs to `/dev/null` and i2pd runs with
+  `--loglevel=none`.
 
 ### Desktop
-- **The logo and wallpapers are final.** `prestium-logo-256.png` is rendered again from the final
-  `prestium-logo.svg`; the old PNG still had an earlier gradient. The three wallpapers (Horizon,
-  Circuit, Mark) stay 2560x1440 and are recompressed losslessly with their metadata stripped, so the
-  pixels don't change (2.8, 2.8 and 2.5 MB, about 2 % smaller). Every volume, microphone and
-  brightness OSD icon and the notification-sound icons exist in Papirus-Dark itself (its panel icons
-  are shared with Papirus), so no names or fallbacks change. Tests: `test_design_assets.py`.
-- **A new Prestium look.** One palette everywhere: dark grey surfaces, an Electric Blue `#0066ff` accent
-  and Neon Cyan `#00ffff` highlights (the colours of The Lounge's Tech Innovation theme), with Cantarell
-  as the UI font. GTK 3 and 4 (libadwaita) apps are dark (prefer-dark, dconf `accent-color='blue'`) and
-  take the palette from a colour-only `gtk.css`; GTK 2 (Pidgin, the GnuPG passphrase prompt) uses
-  Prestium-Dark, Adwaita-dark's engine with the Prestium colours. Qt 5 and 6 apps use
-  Kvantum with a "Prestium" theme (`QT_STYLE_OVERRIDE=kvantum`). KDE apps use a
-  `Prestium` colour scheme, and Kleopatra picks it by default (`/etc/xdg/kleopatrarc`) instead of
-  Breeze Dark. Audacity, KeePassXC and the foot terminal (11 pt, readable red, blue, magenta and grey)
-  are dark too. Tor Browser keeps its own fonts. The build fails if the system dconf database isn't
-  compiled.
-- **Windows.** The labwc theme uses the same palette, with 8 px rounded corners and drop shadows. Every
-  window gets one labwc title bar; GTK and libadwaita apps no longer draw a second close button
-  (`button-layout ':'`). There is one desktop. Minimize and Maximize have icons in the window menu.
-- **One design spec for every window, dialog and notification (UI pass).** The palette is the same
-  in every toolkit: KDE's `kdeglobals` had kept the old `#0066ff` selection and `#ff7a7a` red and now
-  equals the `Prestium` colour scheme; visited links are `#8ab8ff` in GTK, Qt, KDE and GTK 2; the foot
-  selection is the accent `#0050c8`. GTK 2 apps finally get the palette (a colour scheme in
-  `/etc/gtk-2.0/gtkrc` is overridden by the theme's own, so Prestium-Dark sets it). Shapes: 8 px
-  corners for windows, menus, the bar, notifications, tooltips and cards, 6 px for buttons and bar
-  items, pills for the Tor/I2P status; spacing on a 4 px grid (12 px around tool windows and inside
-  notifications). New GTK styles: red destructive buttons (`#a8231c`, white text 7.2:1), message bars
-  with a coloured edge (blue, amber, red), and the Connection Assistants and Browser Updater group
-  their settings in cards. The Browser Updater now uses Prestium's stylesheet too, from the root-owned
-  `broker-style` directory. Notifications draw 48 px icons (Papirus's `notification-*` set for volume,
-  microphone and brightness; the OSD shows mako's progress bar instead of a second bar of block
-  characters). Menu and window icons match: Tor Browser and the Tor Connection Assistant use the Tor
-  icon rather than a file path, the I2P tools the i2pd icon, IRC a chat icon (`internet-group-chat`
-  doesn't exist in the icon themes), Feather the Monero icon. Copy: window titles and menu items in
-  Title Case, buttons in sentence case with a verb ("Shut down", "Set password", "Unlock", "Set up
-  account"; no zenity form or question falls back to "OK"), dialogs 460 px wide, close and the main
-  action at the right end in the Tor Connection Assistant as in the I2P one. The I2P web console and
-  I2P torrents pages, The Lounge's default Tech Innovation theme (worst text pair 4.8:1 to 6.4:1) and
-  LibreOffice's icons (Colibre dark) follow the palette. Tests: `test_ui_consistency.py` (palette,
-  themes, fonts, radii, copy, icon names), `test_contrast.py` (now 310 pairs); `tests/ci.sh` no longer
-  leaves `__pycache__` in the image tree.
-- **Broker confirmation dialogs use white text and a primary Apply button.** Zenity 4
-  (`AdwMessageDialog`, used for I2P settings, the Lock Screen password form and the power
-  confirmations) is libadwaita. The broker points `XDG_CONFIG_HOME` at a root-owned
-  `broker-style` directory so those windows never read the user's theme, which also hides
-  the session dconf `color-scheme='prefer-dark'`. gtk4.css already painted the surfaces
-  dark, but did not set `--window-fg-color` / `--dialog-fg-color`, so libadwaita kept
-  light-scheme near-black text on `#262626`. The broker now sets `ADW_DEBUG_COLOR_SCHEME=prefer-dark`
-  and `GTK_THEME=Adwaita:dark`, `broker-style` ships `settings.ini` with prefer-dark, and
-  gtk4.css sets the foreground CSS variables and gives `button.default` the accent fill
-  (`#0050c8` behind white text, 7.0:1) at rest, as gtk3.css already did. Tests:
-  `test_contrast.py` (315 pairs), `test_ui_consistency.py`, `test_broker_dialogs.py`,
-  `test_desktop_theme.sh`.
-- **Links and progress-bar text in Prestium's GTK tools are readable.** Unvisited links
-  (`GtkLinkButton`, label links such as "about bridges") use the palette blue `#8ab8ff` instead of
-  cyan, in GTK 3 and 4, GTK 2, Qt and KDE (visited was already `#8ab8ff`). Progress bar text (for
-  example "Connecting: 62 %") is white, 7:1 or more on the trough (`#161616`) and on the fill
-  (`#0050c8`); Adwaita's default was 40% opaque (about 3.4:1). The AppArmor safety-notify test
-  supplies a fake lockdown file, so it no longer depends on the host kernel. Tests:
-  `test_contrast.py`, `test_ui_consistency.py`, `test_safety_notify_apparmor.sh`.
-- **Papirus-Dark icons.** The Prestium icon theme holds the new logo mark (a blue-to-cyan "P.") and
-  inherits Papirus-Dark first; Adwaita, AdwaitaLegacy and gnome are fallbacks. Menus, notifications and
-  the bar use it.
-- **A floating bar.** waybar floats with rounded corners and margins and uses Font Awesome symbols. Its
-  status area is icons only (network, volume capped at 100 %, battery) with a two-line clock: time over
-  date, in UTC, no tooltip. Tor and I2P pills show connecting (amber), ready (cyan) or failed (red), and
-  a click opens the matching Connection Assistant. With no network
-  connection the Tor pill goes back to amber instead of staying ready. The state comes from `prestium-netstatus.service`
-  (its own user, read-only, writes only `/run/prestium/netstatus`, never copies log text). A clock symbol
-  shows until the time is set over Tor (see Network). Hover colours fade in; labwc and mako have no open
-  or close animations.
-- **The menu opens in one place, grouped by task.** The Menu button and Super+Space open it at the
-  bottom-left, its bottom edge on the bar; right-clicking the desktop opens it at the pointer. The top
-  level has I2P Browser, Tor Browser, I2P Router Console, Text Editor and File Manager, then Office,
-  Multimedia, Accessories, Security (KeePassXC, Kleopatra, Metadata Cleaner, Unlock Encrypted Volume,
-  Feather), Communication, Sharing (OnionShare, Torrents), Network and System, then Log Out…, Restart…
-  and Shut Down…. Networked apps name their network ("Gajim (XMPP, Tor)", "IRC (I2P)", "IRC (Tor)",
-  "Claws Mail (Email, I2P)"). Every entry has an icon Debian ships, and wording, ellipses and title case
-  are the same everywhere.
-- **Notifications.** One look per urgency (low: grey edge, 5 s; normal: blue edge, 8 s; critical: red
-  edge, stays and always shows), with app icons drawn at no more than 32 px so small ones stay sharp; only identical repeats are grouped. The volume and
-  brightness display is compact, at the top centre. Optional quiet sounds, off by default (System,
-  Notification Sounds (On/Off)). The VM, image-age and safety notices are no longer held up at login.
-- **Wallpapers and lock screen.** Three Prestium wallpapers (Horizon, Circuit, Mark) are picked in
-  System, Wallpaper; the broker takes only one of those names, never a path. The lock screen uses the
-  palette and shows Caps Lock and keypresses on its ring.
-- **The lock screen's password prompt and every dark dialog are readable (contrast review).** The prompt
-  is always on screen (not only after the first key): a raised grey disc with a blue ring on the dark
-  screen. Typing shows white ticks, Backspace dark gaps; Verifying, Wrong, Caps Lock and Cleared each have
-  their own ring and a tinted disc, with white (Caps Lock: amber) text at 10:1 or more. Before, the disc
-  was the screen's grey (1.1:1), key ticks and the verify ring were the same neon cyan, and the prompt was
-  hidden until a key was pressed. One accessible palette now covers GTK 3 and 4 (apps, the broker's
-  dialogs such as the Lock Screen password, the Connection Assistants, the GNOME passphrase prompt), Qt,
-  Kleopatra, labwc, waybar and mako: white text behind the blue accent uses `#0050c8` (7.0:1; `#0066ff`
-  was 4.8:1), hover goes darker (`#0047b3`, 8.2:1; the old `#0a6cff` was 4.6:1), focus edges, rings and
-  progress use `#3d8bff` (4.6:1 or more), text fields are `#161616` with a `#737373` edge (3.2:1 or
-  more) and a blue focus edge, error text is `#ff9494` (7.1:1 or more), and secondary text `#c8c8c8`.
-  Every text pair is 7:1 or more (disabled text and coloured text on a selection 4.5:1), every edge,
-  ring and focus mark 3:1 or more. Tests: `test_contrast.py` (173 pairs, read from the shipped files).
-- **Keys and dialogs.** Alt+arrows go to the browsers (Back/Forward), not labwc; Super+Return opens the
-  terminal. Log Out asks first; Restart and Shut Down have named buttons, and Restart… in the I2P
-  Connection Assistant uses the same confirmation. Long dialog texts wrap on small screens, file names
-  are shown as text, and the Prestium tools have keyboard shortcuts and a highlighted default button.
-  PCManFM makes no thumbnails (`[ui] show_thumbnail=0`). Boot menu labels take the version from the
-  image.
-- **Broker dialogs can't be answered by other programs.** The I2P settings confirmation and the
-  lock-screen password form run on the compositor's full socket with accessibility off (`GTK_A11Y=none`,
-  `NO_AT_BRIDGE=1`), and so do waybar and wdisplays, so other programs can't press their buttons or fill
-  in the password. They use the Prestium colours from a root-owned directory. A dialog that times out
-  closes. The I2P dialog names the program that asked; that line is self-reported, normalised (NFC),
-  stripped of control and invisible characters, length-limited, and shows up to three quoted arguments.
-- **Locking.** lxpolkit is no longer started (no prompt in Prestium used it), so the password dialog
-  says only that it unlocks the screen. When the screen is due to lock automatically and no password
-  is set, a notification says it is not locked instead of opening a dialog nobody sees. Lock Screen
-  from the menu still asks for a password first.
-- **Private OnionShare addresses open in Tor Browser.** Tor Browser's Tor socket has `ExtendedErrors`,
-  so Tor Browser asks for the private key instead of failing with "Unable to connect". onion-grater
-  drops `Flags=Permanent`, so "Remember this key" keeps the key until Tor restarts or Prestium shuts
-  down; nothing is written to disk. The key prompt's arguments are checked before they reach Tor.
-- **I2P settings need confirmation.** Apply in the I2P Connection Assistant goes through the Wayland
-  broker, which shows the change in a dialog only the person at the screen can answer, then logs it and
-  sends a notification. sudo allows only reading the settings. The helper checks that the restarted
-  listener on 4444 belongs to i2pd and reports a failed rollback.
-- **Tor connection changes need confirmation.** Any unconfined program of the desktop user (the
-  terminal, for one) could run `sudo prestium-tor-mode apply`, `cancel`, `revert` or `reconnect` with no
-  prompt, so it could move Tor onto a bridge of its choice (which sees this computer's address, and in
-  Snowflake mode the firewall lets Tor send UDP) or stop Tor. Those four now go through the Wayland
-  broker (`prestium-wl tor-mode ...`), like the I2P settings: it checks the request with the helper's
-  own parser, shows the connection type, the bridges you entered and the program that asked in a dialog
-  only the person at the screen can answer, then runs the helper as root, passes its progress back to
-  the Tor Connection Assistant, logs the change and sends a notification. Cancel asks too ("Stop Tor" or
-  "Keep going"). The helper runs as its own transient service, outside the broker's sandbox, since its
-  DNS-over-HTTPS look-ups need an IP socket. sudo allows only `status` and `features`. Test:
-  `test_tor_mode_confirm.py`.
-- The image-age notice mentions the Browser Updater. The README says command-line tools use the I2P
-  outproxy (`http_proxy`), not Tor. The reseed and torrent messages point to steps that exist.
+- **Adwaita light look.** GTK 2, 3 and 4 apps use stock Adwaita (light, blue accent, Cantarell),
+  set once in dconf (`/etc/dconf/db/local.d/10-prestium-desktop`; the build fails if it isn't
+  compiled), Qt apps use adwaita-qt (`QT_STYLE_OVERRIDE=Adwaita`) and KDE apps, Kleopatra included, a
+  matching light `Prestium` colour scheme. Kvantum, the Prestium-Dark GTK theme and the dark CSS are
+  gone. Windows get one labwc title bar (`Prestium-Adwaita` theme, 8 px corners, shadows) with
+  minimise, maximise and close; apps don't draw a second one.
+- **Two bars.** A black top bar: the Applications button (opens the menu under itself), the clock in
+  UTC in the centre, then the tray, Tor and I2P pills (red: not connected, amber: connecting, green:
+  connected; a click opens the matching Connection Assistant), a clock-sync symbol (amber until the
+  time is set over Tor, red if the sync refused a time), volume (capped at 100 %), network, battery
+  and power. A black bottom taskbar shows one colour icon per window; clicking it selects the window.
+  The pills' state comes from `prestium-netstatus.service` (its own user, read-only, writes only
+  `/run/prestium/netstatus`), which asks Tor's bootstrap state through the control-port filter, so
+  it is right in the default boot, where Tor keeps no log.
+- **The menu is grouped by task.** Top level: I2P Browser, Tor Browser, I2P Router Console, Text
+  Editor, File Manager; then Office, Multimedia, Accessories, Security, Communication, Sharing,
+  Network and System; then Restart… and Shut Down… (Log Out is gone). Super+Space opens it under the
+  Applications button, a right-click on the desktop at the pointer; a left-click on the desktop does
+  nothing. Networked apps name their network ("Claws Mail (Email, I2P)", "IRC (Tor)", "Feather
+  (Monero Wallet, I2P)"); Gajim is plain *Gajim*.
+- **Icons, logo and wallpapers.** A `Prestium` icon theme holds the final logo mark and falls back to
+  Adwaita, then Papirus. Three wallpapers (Horizon, Circuit, Mark) are picked in *System >
+  Wallpaper*; the broker takes only one of those names, never a path.
+- **Notifications** (mako): one look per urgency, critical ones stay; the volume and brightness
+  display is compact; optional quiet sounds, off by default. The VM, image-age and safety notices
+  are no longer held up at login.
+- **Lock screen and dialogs.** The swaylock prompt is always visible and shows Caps Lock, key presses,
+  verifying and wrong-password states at high contrast. Prestium's own dialogs (assistants, Browser
+  Updater, broker confirmations) share one style, with named buttons (no bare "OK"), wrapping text and
+  readable links and progress text; `test_contrast.py` checks every text pair from the shipped files.
+- **Keys and behaviour.** Super+Return opens the terminal; Alt+arrows go to the browsers. lxpolkit is
+  no longer started. When the screen is due to lock and no password is set, a notification says so.
+  The file manager makes no thumbnails and mounts no drives by itself. Images open only in Loupe; the
+  file manager's *Remove Metadata* action is gone (`prestium-remove-metadata` stays for the terminal).
+  Volume Control opens on the Playback tab.
+- **In a virtual machine** the session uses wlroots' software renderer (`WLR_RENDERER=pixman`), so
+  apps that hand the compositor GPU buffers (VLC, QtQR) no longer crash it. Nothing changes on real
+  hardware.
 
-### Apps
-- **IRC (Tor): new networks check TLS certificates.** The Connect form's defaults were OFTC's onion
-  with certificate checking off, so a clearnet TLS server entered there was reached through a Tor
-  exit that could impersonate it and read the session, a SASL password included. The form now has
-  "Only allow trusted certificates" ticked and names no server. Only the shipped OFTC network keeps
-  checking off: its certificate is for irc.oftc.net, and the onion address authenticates that server.
-  Test: `test_thelounge_tor.sh`.
-- **New: IRC (Tor)**, a second The Lounge (Communication menu, next to *IRC (I2P)*, which was "The Lounge
-  (IRC, I2P)"). It reaches IRC only through Tor: its own system user `thelounge-tor`, state directory
-  `/var/lib/thelounge-tor`, root-owned read-only `config.js`, web UI on 127.0.0.1:9010, systemd unit
-  `thelounge-tor.service` with the same sandbox, and AppArmor profile `thelounge-tor`. It shares
-  `/opt/thelounge`, Node.js, the one-use sign-in token, the local-only Firefox and the 10 themes (Tech
-  Innovation by default) with the I2P instance, and neither can read the other's files. The firewall
-  lets `thelounge-tor` reach only Tor's SOCKS port 127.0.0.1:9050: no clearnet, no DNS, no other local
-  service. Every network goes through that port (hook 0200 forces it, whatever a network's proxy
-  setting says), the server name is resolved by Tor, never locally, and each network has its own
-  random SOCKS username, so its own Tor circuits. Networks start disconnected with a random nick each,
-  as on I2P. Presets, all onion services, those without an account first: OFTC (default), Ergo,
-  DarkScience and IRCNow (plain IRC on the onion, which already encrypts), then Libera.Chat, hackint
-  and AlphaChat (SASL; through `MapAddress` lines in torrc, so their TLS certificates check out).
-  Pirate IRC is no longer a preset. OFTC's onion takes TLS but its certificate is for irc.oftc.net, so
-  certificate checking is off for that one only.
-- **IRC (Tor) explains SASL before connecting.** Libera.Chat and AlphaChat used to drop a connection
-  without SASL at once, with no explanation. In the Tor instance, hook 0200 now stops a connection whose
-  sign-in can't work and the lobby says what to fill in under *Edit this network > Authentication*:
-  Libera.Chat without a client certificate (its onion takes only SASL EXTERNAL, not a password),
-  AlphaChat without SASL, and any network set to SASL PLAIN with an empty account or password. The
-  AlphaChat preset uses SASL PLAIN, Libera.Chat SASL EXTERNAL. hackint still connects without an
-  account. With a certificate the lobby shows its SHA-512 fingerprint for `/msg NickServ CERT ADD`,
-  and a failed SASL sign-in is reported. There is no shared Prestium account; the README says how to
-  bring your own. The I2P instance is unchanged.
-- **New: I2P Connection Assistant** (Network menu). One window shows i2pd's port, which is random and new
-  at every start, and sets:
-  - tunnel hops, 1 to 7 (default 3);
-  - share level: Low 30 % at 32 KB/s, Medium 50 % at 64 KB/s (default), High 80 % at 128 KB/s.
-    i2pd.conf ships Medium (`bandwidth = 64`, router class M; `share = 50`, so at most 32 KB/s of
-    transit), which the assistant shows as Medium. The default used to be Low (`L`, 30 %); transit
-    stays on and floodfill off. A share level set by hand shows as Medium until it is applied;
-  - outproxy: Acetone (default), StormyCloud, or a custom I2P address.
-  StormyCloud also takes the SOCKS outproxy. A custom outproxy is HTTP only, so SOCKS stays on Acetone.
-  Local port 4500 never changes. *Apply* writes the settings through a root helper
-  (`prestium-i2p-mode`: sudo, a checked JSON request, no free-form arguments) and restarts i2pd.
-  If the browser proxy doesn't come back, the old settings are put back. Reseed (over Tor, or from a
-  file) and *Reboot* are in the same window. The old *I2P Tunnel Hops*, *Restart I2P* and reseed menu
-  items are gone. `prestium-tunnel-hops` still works from a terminal.
-  The window fits the screen: on small screens its content scrolls, and it can be resized.
-- **Tor Browser reconnects after Tor restarts.** Changing the method in the Tor Connection Assistant
-  restarts Tor, which makes a new SOCKS socket. The browser's sandbox had bound the old socket file,
-  so Tor Browser never reached Tor again until it was restarted. The sandbox now binds the socket
-  directories read-only (`/run/prestium-tbb`, `/run/onion-grater`), and onion-grater keeps its
-  directory across restarts.
-- **Apps no longer crash the session in a VM.** In a virtual machine, apps that hand the compositor
-  GPU buffers (VLC, the QtQR webcam view and others) crashed labwc, which dropped back to the login
-  screen. On real hardware, as on a USB stick, this didn't happen. (This replaces an earlier
-  workaround that ran VLC and QtQR through Xwayland; they are native Wayland apps again.) In a VM the session now uses
-  wlroots' software renderer (`WLR_RENDERER=pixman`, no hardware cursor). Apps then send plain
-  shared-memory buffers. Nothing changes on real hardware.
-- **The Lounge ships the 10 Theme Factory themes, and Tech Innovation is the default.** Ocean Depths,
-  Sunset Boulevard, Forest Canopy, Modern Minimalist, Golden Hour, Arctic Frost, Desert Rose, Tech
-  Innovation, Botanical Garden and Midnight Galaxy are local packages. The old Prestium theme is
-  removed; The Lounge's own themes can still be picked in Settings. Every theme sets the colour and
-  background of text fields and of chat text explicitly, at least 4.5:1 contrast (WCAG AA). Nothing
-  is loaded from outside; Theme Factory's fonts map to ones Prestium ships. The sign-in splash uses
-  Tech Innovation's colours. Palettes: Theme Factory (github.com/anthropics/skills, commit
-  `8a1541c4a3ffa5a20a5a91de0dcf3f0bab1d1ef4`), Apache License 2.0.
-- **The Lounge waits 320 seconds for an IRC ping reply**, so connections over I2P (IRC2P and Ilita)
-  are less likely to drop with "Ping timeout". irc-framework's default is 120 seconds. Hook 0200 sets
-  `ping_timeout: 320` where The Lounge creates the client; `ping_interval` stays 30 seconds. If a later
-  Lounge version changes that code, the build stops.
-- **The Lounge no longer says it is connecting when it is not.** On boot the lobby still printed
-  "Network created, connecting to 127.0.0.1:6668..." even though Prestium leaves networks
-  disconnected. That line now appears only when a connection actually starts; `/connect` and the
-  Connect menu show "Connecting to 127.0.0.1:6668...".
-- **Mail (I2P) asks for your account on first start**, instead of shipping a placeholder
-  `username@mail.i2p` account. Claws Mail can generate a PGP key again (an empty name line had made
-  GnuPG refuse). To use your own key, import it with Kleopatra; both use the same `~/.gnupg`.
-- **Kleopatra's self-test passes.** scdaemon is now installed, so the "scdaemon Configuration Check"
-  no longer fails at every start.
-- **The Tor Connection Assistant and Nyx can use the control-port filter again.** onion-grater had
-  refused them (`ConnectionError`, then `510 ... client not allowed` or `Broken pipe`, and Nyx's
-  terminal just closed): a missing AppArmor rule, then no permission to read their environment as
-  another user, and for the assistant the libffi memory GTK callbacks use. The assistant says when the
-  filter refused it and where to look; Nyx's window stays open when Nyx fails (`prestium-nyx`).
-- **The local-only Firefox launcher no longer builds a command string**, so a home directory with a
-  quote in its name can't change the command.
+### Network, firewall and Tor
+- **Tor connection changes need confirmation at the screen.** Apply, Cancel, Revert and Reconnect in
+  the Tor Connection Assistant go through the Wayland broker (`prestium-wl tor-mode …`): it checks the
+  request with the helper's own parser, shows the connection type, the bridges and the program that
+  asked in a dialog only the person at the screen can answer, then runs the helper as root, passes its
+  progress back, logs the change and sends a notification. sudo allows only `status` and `features`,
+  so another program can no longer move Tor onto its own bridge or stop it.
+- **Tighter firewall.** i2pd's and Tor's accepts are for the network only: on loopback i2pd keeps only
+  its SOCKS outproxy tunnel (4500) and Tor only the ephemeral ports 32768-60999 (pluggable transports)
+  and OnionShare's 127.0.0.1:17600-17650. The early firewall checks every step, applies as much
+  drop-all as it can and fails if IPv4 or IPv6 isn't DROP; iptables is pinned to the legacy backend.
+  The Wayland broker's socket is group `user` only (0660). The MAC guard re-installs its egress filter
+  on every device event.
+- **Fewer root powers.** The Wayland broker has a capability bounding set; the MAC guard keeps only
+  `CAP_NET_ADMIN`, Unix and netlink sockets. The time sync, boot clock, clock fix and USB watchdog run
+  in systemd sandboxes; the VM network check and the network-status and log services run as their own
+  users. Root daemons read `PRESTIUM_*` test overrides only when run from the source tree. Sessions get
+  `PYTHONNOUSERSITE=1` and a `sitecustomize` that turns the user site off.
+- **Control-port filter (onion-grater).** It runs under an enforced AppArmor profile (`ptrace (read)`
+  only) with ptrace and `process_vm` syscalls filtered, refuses a Python client started with `PYTHON*`
+  (other than a short allow-list), `LD_*` or code from outside `/usr` and `/lib`, and logs each refusal
+  with an escaped reason. Nyx, OnionShare, the Tor Connection Assistant and a read-only
+  `tor-bootstrap.py` (used by the bar, the time sync and the VM check) are its only clients; Nyx and
+  the assistant work through it again. Private OnionShare addresses open in Tor Browser (it asks for
+  the key, kept until Tor restarts, never on disk).
+- **Network → Network Logs** (in the Network Logs boot only) shows the last 400 entries of Tor, i2pd and
+  the filter, copied every 10 seconds by `prestium-logs` (its own user, no network) to files only the
+  desktop user can read, one line per entry with control and invisible characters escaped. `torrc`
+  sets `SafeLogging 1`.
+- **Setting the clock has bounds.** `sudo date` is replaced by `sudo prestium-set-clock` (strict UTC
+  format). It, the time sync and the clock fix refuse a time before the build date (one day of slack)
+  or more than 10 years after it.
+- **Fewer filesystem drivers.** 21 rarely used ones (hfs, minix, jfs, reiserfs and others) can't be
+  loaded; FAT, exFAT, NTFS, ext4, Btrfs, XFS, F2FS, ISO 9660, UDF and HFS+ still work.
+
+### Time over Tor
+- **`prestium-timesync`**, on Kicksecure's sdwdate design (written for Prestium; Kicksecure's source
+  list ships under AGPL-3+ in `/usr/share/prestium/timesync/pools.conf`). Each round asks one onion web
+  server from each of three pools run by unrelated operators, each on its own Tor circuit as the
+  firewalled `prestium-htp` user, and uses the median. A pool with more than a third of its members
+  failing aborts the round; an answer outside Tor's consensus window is rejected; the clock never goes
+  before the build date, the last time set this boot or `/etc/minimum-unixtime`. Up to a second of
+  random nanoseconds is added. The first sync, or a difference over 10 seconds, steps the clock;
+  smaller ones are slewed. It re-syncs every 60 to 180 minutes. A refused time, or a move of more than
+  a day, raises a safety flag. The old one-shot clearnet HTTPS sync is gone.
+- **Boot clock randomization.** `prestium-bootclock.service` moves the clock a random 0 to 50 seconds
+  either way (inside the 60 s i2pd allows) before Tor, i2pd and the sync start.
+
+### I2P
+- **New: I2P Connection Assistant** (Network menu). It shows i2pd's per-boot port and sets tunnel
+  hops (1 to 7, default 3), the share level (Low: 30 % of 32 KB/s, the default; Medium: 50 % of
+  64 KB/s; High: 80 % of 128 KB/s) and the outproxy (Acetone by default, StormyCloud, which also takes
+  the SOCKS outproxy, or a custom HTTP outproxy). Apply goes through the Wayland broker's confirmation
+  dialog, then a root helper (`prestium-i2p-mode`, a checked JSON request) writes the files and
+  restarts i2pd, and puts the old settings back if the browser proxy doesn't return. sudo allows only
+  reading the settings. Reseed (over Tor through the control-port filter, or from a file) and *Restart*
+  are in the same window, which scrolls on small screens. The old *I2P Tunnel Hops*, *Restart I2P* and
+  reseed menu items are gone; `prestium-tunnel-hops` still works in a terminal.
+- **`i2pd.conf` ships the Low share level** (`bandwidth = L`, `share = 30`), with transit on and
+  floodfill off.
+- **Fewer tunnels at boot, so the browser's come first.** Every pool sets its size: browser proxy 2+2,
+  terminal proxy (4450), IRC2P, Ilita, postman SMTP and POP3, SOCKS (4447) and the SOCKS outproxy
+  (4500) 1+1, exploratory 3+3, the shared destination 2+2 and the torrent client 5+5: 38 tunnels
+  (was 68). The assistant changes hops, never counts.
+- **I2P Torrents.** It announces to I2P's open trackers (postman, DgTrack, InsulaOcculta, skank, atia,
+  dg2; as `.b32.i2p` addresses, since the address book is empty at boot, and by name) as well as the
+  DHT, so magnet links without a tracker find peers. It keeps a persistent destination and DHT file,
+  so torrents and peer discovery survive i2pd restarts (not reboots). Its tunnels follow the
+  assistant's hop count. Its *Add .torrent* button can read `.torrent` files in the I2P Browser's
+  folder.
+- **Locking.** `prestium-i2pd-port` (before every i2pd start) and the assistant's helper share a
+  root-only config lock (`/run/prestium-hops.lock`, made by tmpfiles, opened with `O_NOFOLLOW`), with
+  bounded waits, so neither overwrites the other's edits; i2pd's start and stop timeouts fit the
+  rollback.
+- **Feather** uses I2P everywhere (i2pd's SOCKS 4447; its bundled Tor can't start).
+
+### App confinement and sandboxes
+- **Profiles are checked as they load.** Debian's complain-mode LibreOffice profiles attached to the
+  same programs as Prestium's, so the kernel attached neither and LibreOffice ran unconfined. Hook
+  0600 removes the four known Debian conflicts and runs `aa-attach-check.py`, which fails the build if
+  any other profile attaches to a program a Prestium profile confines, or if another file defines a
+  Prestium profile's name; apparmor.service runs it again at boot, and every profile must compile.
+- **Programs that open downloaded files are confined:** Loupe, VLC, File Roller, FeatherPad, mat2,
+  Metadata Cleaner and Audacity (no network, camera, admin tools, other apps' mail, chat or browser
+  data, OpenPGP keys or KeePassXC databases; they read the file folders and save only in
+  `~/Documents`). VLC plays local files only. The bubblewrap helpers of Loupe (glycin) and mat2/Metadata
+  Cleaner run in capability-stripped inner profiles (`glycin-inner`, `mat2-inner`,
+  `metadata-cleaner-inner`) that may write only the one cleaned-copy name. Viewers can't ptrace or reach
+  the session bus.
+- **KeePassXC and Kleopatra are confined.** KeePassXC has no network or browser integration and saves
+  `*.kdbx` (with its lock and safe-save files) in the home, `~/Documents` and unlocked volumes.
+  Kleopatra and its GnuPG tools use `~/.gnupg`, read the file folders and save in `~/Documents`; only
+  dirmngr opens TCP (through Tor) and the passphrase prompt is a confined pinentry. The file viewers,
+  editors, KeePassXC and Kleopatra have no sound or microphone.
+- **GnuPG's configuration files are off limits.** Neither Kleopatra nor the child profile Claws Mail
+  runs gpg in may write or hard-link `~/.gnupg/*.conf` or `common.conf`, which can name helper
+  programs that a socket-started gpg-agent would run outside the profile. `prestium-gnupg-check` (a
+  root timer) flags such options written by anything else.
+- **Shared folders.** Apps share `~/Downloads` (the local Firefox, Claws Mail, Gajim) and
+  `~/Documents` (LibreOffice, FeatherPad, File Roller, Audacity, Kleopatra, Metadata Cleaner, Feather);
+  only `~/I2P Browser`, `~/Torrents` and `~/Tor Browser` are app-specific, and the shared apps can't
+  write there. The file manager pins exactly those five. Mail and chat read only files directly in
+  `~/Downloads`. Volumes under `/media` are read-only for the apps (except KeePassXC databases).
+  LibreOffice can't save over a document opened from elsewhere (Save As) and writes no `.~lock` files.
+  mat2 writes only in a work folder under `~/Documents`.
+- **Browser launchers and sandboxes.** Browsers started from mail and chat stay confined: the
+  launchers have their own profiles, run as `bash -p` with a fixed PATH and ignore the caller's
+  environment. The bubblewrap child reads a read-only system, the browser in `/opt` and only the
+  sockets it binds, with the secrets and the other browser's folders denied. Tor Browser binds the
+  socket directories read-only, so it reconnects after Tor restarts.
+- **Audacity has no network,** not even the local proxy ports: it runs in its own empty network
+  namespace (a second start joins it through a session socket), with the microphone and its plug-in
+  host working.
+- **LibreOffice, KeePassXC and the viewers work under their profiles** on a fresh home (first start,
+  headless conversion, saving, recent files).
+- **The first session password can only be set from the lock dialog,** which the broker shows on the
+  compositor's full socket; `passwd` is no longer setuid and sudo allows only `status`. The password
+  needs at least 8 characters, and each wrong attempt at the lock screen costs at least 4 seconds.
+- **Broker dialogs can't be answered by other programs.** The confirmations and the password form run
+  on the full socket with accessibility off and Prestium's style from a root-owned directory, time
+  out and close, and show the requesting program's (self-reported, sanitised) name.
+
+### Browsers and Browser Updater
+- **New: Browser Updater** (*Network > Browser Updater*) installs the latest publisher-signed Tor
+  Browser or I2P Browser (LibreWolf) for this session, through Tor (its own circuit) or the I2P
+  outproxy, only from the publisher's `https://` hosts. The window checks the signature as the user;
+  the root helper `prestium-browser-install` copies the files into a root-only directory and checks
+  them again with the image's keys (Tor Browser: detached signature and the version inside; LibreWolf:
+  `InRelease`, `Packages`, the `.deb`'s SHA-256). Nothing older than the installed version is
+  installed, and an expired key says to use a newer ISO. The update is unpacked on a tmpfs and
+  bind-mounted read-only over the shipped path (no maintainer scripts run), so launchers and AppArmor
+  paths stay the same; it lasts until *Reset to shipped copy* or reboot, and the window shows the RAM
+  it costs. The helper refuses while the browser runs.
+- **Tor Browser is the newest signed release at build time** (at least 16.0.1), from the Tor Project's
+  update service and dist.torproject.org; the tarball must contain that release. `PRESTIUM_TB_VERSION`
+  and `PRESTIUM_TB_SHA256` pin one.
+- **The local-only Firefox launcher** passes its profile and URL through the environment, never a
+  command string; its only `file://` exception is The Lounge's one-off sign-in page.
+
+### Messaging, IRC and mail
+- **New: IRC (Tor)**, a second The Lounge next to *IRC (I2P)*: its own system user `thelounge-tor`,
+  state directory, read-only `config.js`, web UI on 127.0.0.1:9010, systemd unit and AppArmor profile.
+  The firewall lets it reach only Tor's SOCKS port; every network goes through it, names are resolved
+  by Tor, and each network has its own random SOCKS username (its own circuits). Presets, all onion
+  services that need no account: OFTC (default), Ergo, DarkScience and IRCNow. Networks start
+  disconnected with a random nick. The Connect form checks TLS certificates by default; only the OFTC
+  preset doesn't (its certificate is for irc.oftc.net, and the onion address authenticates it). For a
+  network you add that needs SASL (Libera.Chat, AlphaChat), the lobby says what to fill in before
+  connecting. Pirate IRC is no longer a preset.
+- **The Lounge, both instances.** `config.js` and the packages are root-owned and read-only; the
+  sign-in token works once and never appears in a command line. Ten Theme Factory themes are bundled
+  as local packages, Tech Innovation by default. The ping timeout is 320 seconds (hook 0200 stops the
+  build if The Lounge's code changes), so I2P networks drop less often, and the lobby no longer says
+  it is connecting when it isn't.
+- **Gajim** ships Tor (SOCKS5 9050, default), I2P SOCKS (4447) and I2P HTTP (4444) proxy profiles.
+- **Mail (I2P)** asks for your account on first start (postman's servers filled in) instead of
+  shipping a placeholder, and Claws Mail can generate a PGP key again. Kleopatra's self-test passes
+  (scdaemon is installed).
+
+### Safety and virtual machines
+- **Safety alerts** also cover AppArmor (module off, service not active, any Prestium profile not in
+  enforce mode), kernel lockdown, the boot settings check and the time sync's flags.
+- **Virtual machines.** A notice at login says the host can see and record everything. If Tor or I2P
+  hasn't connected after 10 minutes, the desktop says why (no route, user-mode networking, a VM clock
+  on local time, a host firewall blocking I2P); the check runs as its own user and never copies log
+  text.
+- **The image says when it is old:** a notice five minutes after login once the build is more than 45
+  days old (the build date is `BUILD_ID` in `/etc/os-release`), pointing to the Browser Updater.
+- **The session wipe reports failure.** At shutdown `prestium-wipe-session` deletes the overlay's
+  read-write branch and work directory and the runtime secrets under `/run` (the assistant's bridge
+  lines, the DoH cache, network logs, IRC sign-in tokens, Tor's control cookie, the filter's, i2pd's
+  and sudo's state, user runtime directories), checks each tree afterwards and logs "session wipe
+  FAILED" and exits 1 if anything is left. The USB watchdog's emergency wipe does the same.
+
+### Removed
+- **Pidgin** (GTK 2, XWayland-only) with its Tor launcher, OMEMO (lurch), OTR and XMPP extras; Gajim is
+  the messenger.
+- **GIMP, Xarchiver and Ristretto** with their profiles (Loupe views images, File Roller handles
+  archives), and lxpolkit.
+
+### Build and release
+- **Signature checks refuse expired and revoked keys** and check each signature line by line in a
+  throw-away keyring holding only that publisher's key; a failed import stops the build
+  (`scripts/sigcheck.sh`). Node.js must be signed by a current releaser's primary key.
+- **Versions:** Tor Browser newest signed (16.0.1 or later), system Tor 0.4.9.16 from
+  deb.torproject.org, Node.js 24.22.3 (November 2026 security release), The Lounge 4.5.2, Feather
+  2.9.1, Firefox 159.0.1; LibreWolf and i2pd from their repositories at build time.
+- **The Lounge's `npm ci` works on Debian 13's npm 9**; irc-framework is installed from a `git
+  archive` of the pinned commit with a pinned SHA-256, so npm never packs it or runs build tools.
+- **The I2P reseed file ships in the repository** (`i2pseeds.su3`, signer certificate in
+  `thirdparty/keys/reseed/`), signature-checked at every build, with an age warning; the StormyCloud
+  download is only a fallback.
+- **Release files.** `build.sh` writes `SHA256SUMS` (the ISO, its manifest, its dm-verity root hash
+  and its package list) and `Prestium-2.1-amd64.manifest` (image hash and size, build date, source
+  commit, package count and the third-party versions). `scripts/sign-release.sh FINGERPRINT` writes
+  and checks `SHA256SUMS.asc`.
+- **Repeatable builds, first step.** `PRESTIUM_SNAPSHOT` builds Debian from snapshot.debian.org and
+  `SOURCE_DATE_EPOCH` is the commit's time. Not yet bit-for-bit reproducible.
+- **Version strings** (`/etc/os-release`, `/etc/issue`, `/etc/issue.net`, boot menu labels) come from
+  one `VERSION` setting in the build hooks.
+
+### Tests
+- 85 test scripts under `tests/`, for the boot chain (`test_dm_verity.sh`, `test_boot_lock.sh`,
+  `test_boot_cmdline_guard.sh`, `test_secure_boot.sh`), AppArmor (`test_apparmor_startup.sh` evaluates
+  the compiled profiles, `test_apparmor_boot_load.sh`, `test_aa_attach_check.sh`,
+  `test_apparmor_claws.sh`), the firewall, the Wayland broker and its dialogs, the MAC guard, the Tor
+  and I2P helpers (`test_tor_mode_confirm.py`, `test_i2p_tunnel_budget.py`,
+  `test_i2pd_config_lock.py`), the time sync, The Lounge, the Browser Updater, the session wipe and
+  the desktop's design (`test_ui_consistency.py`, `test_contrast.py`). `tests/ci.sh` (run by hand on
+  Debian 13) runs shellcheck, compiles every profile, scans for committed keys and tokens, checks
+  `systemd-analyze security` scores and runs the tests that don't need a live session.
 
 ### Known security limits
-Not changed in 2.1, so you know where the edges are:
+- **Someone who can write to the USB stick can change the next boot.** Secure Boot checks shim, GRUB
+  and the kernel, but the boot menus (with the root hash and the password hash), the initramfs and
+  live-boot in it are unsigned files on the stick. Replacing them together with the image defeats
+  dm-verity, the menu lock and the command line check. A copy of the stick can also answer GRUB's
+  marker search when the boot disk doesn't. The fix, a signed unified kernel image booted by shim,
+  isn't implemented. Keep the stick with you and check it from another computer against a signed
+  release (`Prestium-2.1-amd64.roothash` is the hash the menu must carry; the hash tree's salt is
+  random, so two builds of one commit differ). dm-verity does stop a changed or swapped image on its
+  own, an extra image, a missing hash tree and blocks that change after boot.
+- **The boot menu lock is only as strong as the stick:** the password hash is on it, so a chosen
+  password must be long. Firmware boot menus and other boot media are outside Prestium's control.
+- **The ISO itself is not signed** (`SHA256SUMS` is), and builds are not bit-for-bit reproducible.
 - **Unprivileged user namespaces are on**, because the browser sandboxes (bubblewrap) need them.
-  Turning them off would mean a setuid bubblewrap instead.
-- **X11 programs share one Xwayland server**, so an X11-only program can read the keyboard input and
-  windows of the other X11 programs (not of Wayland apps such as the browsers).
-- **Neither dm-verity nor the boot menu lock stops someone who can write to the USB stick.** Secure
-  Boot checks shim, GRUB and the kernel (GRUB has shim check the kernel; nothing checks the
-  initramfs), but the boot menus (`grub.cfg` with the root hash and the
-  password hash, `isolinux/live.cfg`, the GRUB config in the EFI image), the initramfs and live-boot
-  in it are unsigned files on the stick. Whoever can write to the stick can replace them together with
-  the image, remove the root hash or `panic=10`, or reset the password, and the next boot trusts the
-  changes, including the kernel command line policy and its check in the initramfs. GRUB now looks
-  only for this build's own marker file, but a copy of the stick (or a disk made to look like it) can
-  still answer that search when the boot disk doesn't. The fix is
-  a signed unified kernel image (kernel, initramfs and command line in one Secure Boot-signed file)
-  booted directly by shim, which isn't implemented yet. Until then, keep the stick in your possession
-  and check it against a signed release from another computer (below). What dm-verity
-  does stop: a changed or swapped `filesystem.squashfs` on its own, an extra image or a missing hash
-  tree, and blocks of the image that change after the boot check (a faulty or malicious stick). To
-  check a stick against a signed release, compare it from another computer with `SHA256SUMS`
-  (`Prestium-2.1-amd64.roothash` is the hash the boot menu must carry). The hash tree's salt is
-  random, so two builds of the same commit have different root hashes.
-- **The boot menu lock is only as strong as the USB stick.** It stops changes made at the keyboard,
-  not someone who can write `grub.cfg` on the stick (see dm-verity above). The password hash is on the
-  stick, so a chosen password needs to be long; the default random one can't be guessed. Firmware
-  boot menus and other boot media are outside Prestium's control; a firmware password helps there.
-- **Programs running as the desktop user can still attach a disk image** (udisks loop-setup). The
-  confined apps can't reach udisks, and rarely used filesystem drivers can't be loaded.
-- **Per-app folders limit writes, not reads.** A compromised viewer or editor can still read every
-  file folder (it has no network, so it would need another app to send anything out), and mail and
-  chat can read the files you put directly in `~/Downloads`. The file manager and other unconfined
-  programs of the desktop user can still write everywhere. Unlocked volumes under `/media` are shared
-  by the editors.
-- **The i2pd console's per-boot password is readable by the desktop user's programs**, because the
-  local-only Firefox's launcher runs as the user and needs it.
+- **X11 programs share one Xwayland server**, so an X11-only program can read the input and windows of
+  the other X11 programs (not of Wayland apps such as the browsers).
+- **Programs running as the desktop user can attach a disk image** (udisks loop-setup, needed for
+  VeraCrypt containers); confined apps can't reach udisks.
+- **Per-app folders limit writes, not reads.** A compromised viewer can read every file folder (it has
+  no network), mail and chat can read files directly in `~/Downloads`, and the file manager and other
+  unconfined programs of the desktop user can write everywhere.
 - **The bubblewrap children of Loupe, mat2 and Metadata Cleaner keep bubblewrap's mount rights**, so a
-  compromised parent could present files at a path the child may write (rules are path-based).
+  compromised parent could present files at a path the child may write.
 - **GnuPG's socket-started daemons** may run outside Kleopatra's and Claws Mail's profiles; their
-  configuration files are read-only to Kleopatra, their pinentry is confined, and prestium-gnupg-check
-  flags a helper program from outside `/usr`.
-- **Audacity keeps an IPv4 TCP rule**, which its single-instance check needs. The rule only works
-  inside Audacity's own network namespace. Abstract Unix sockets of the desktop (such as Xwayland's)
-  can't be reached from there; X11 still connects through `/tmp/.X11-unix`. The real program in
-  `/usr/libexec` can still be started by hand outside the namespace. Two first starts at the same
-  instant can still race.
-- **AppArmor's D-Bus rules are not enforced on Debian 13's kernel** (6.12 has no D-Bus mediation).
-- **Tor's uid may reach any loopback port from 32768 to 60999**, which its pluggable transports need. It may also reach
-  127.0.0.1:17600-17650, where OnionShare's web server listens for its onion services.
-- **Programs of the desktop user may change NetworkManager's system connections** (to add Wi-Fi). The
-  MAC guard and the firewall keep the real MAC address and real IP address from leaking that way.
+  configuration files can't be written or linked from those profiles, their pinentry is confined, and
+  `prestium-gnupg-check` flags a helper from outside `/usr`.
+- **Audacity keeps an IPv4 TCP rule** for its single-instance check, usable only inside its own
+  namespace; the real program in `/usr/libexec` can still be started by hand outside it.
+- **AppArmor's D-Bus rules are not enforced** on Debian 13's kernel (6.12).
+- **Tor's uid may reach loopback ports 32768-60999** (pluggable transports) and 127.0.0.1:17600-17650
+  (OnionShare).
+- **The desktop user's programs may change NetworkManager's system connections** (to add Wi-Fi); the
+  MAC guard and the firewall keep the real MAC and IP addresses from leaking that way.
 - **The local-only Firefox's network rule follows a group** (`prestium-localweb`) that the desktop
-  user's programs can also use.
+  user's programs can also use, and **the i2pd console's per-boot password** is readable by them.
+- **The desktop user may restart i2pd** without a prompt (`sudo systemctl restart i2pd`).
 
-A booted 2.1 ISO should still be used to confirm: Audacity (start, microphone, second-file handoff, no
-reach to Tor or I2P proxies); the Tor Connection Assistant and Nyx through onion-grater, including
-NEWNYM and the circuit display; Browser Updater on the live overlay (download through Tor or I2P,
-bind-mount install and Reset, onion-grater's mount namespace, RAM freed after the last Reset); bridges
-after the tighter loopback firewall rules; the onion time sync and boot clock randomization; booting
-from USB and from a DVD or virtual CD with Secure Boot on and off (shim, signed GRUB, the locked menu
-and the marker search, `/sys/kernel/security/lockdown` showing `[integrity]` with Secure Boot on or
-off); and the
-new look (Kvantum, libadwaita accent, Kleopatra's colours, the bar's pills and Papirus-Dark tray icons).
+Still to confirm on a booted 2.1 ISO: booting from USB and DVD with Secure Boot on and off (shim,
+signed GRUB, the locked menu, the marker search, `lockdown` showing `[integrity]`); the kernel
+enforcing the GnuPG `*.conf` write and link denies; Kleopatra key generation, signing and settings;
+Audacity (microphone, second start, no proxy access); the Tor Connection Assistant and Nyx through
+the filter, with bridges under the tighter loopback rules; the Browser Updater on the live overlay;
+the onion time sync and boot clock randomization; and the new look.
 
 ## 2.0: changes since Prestium 1.9.1.3
 
