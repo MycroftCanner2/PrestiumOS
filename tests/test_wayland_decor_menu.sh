@@ -37,6 +37,14 @@ assert a.get("name") == "ShowMenu" and a.get("menu") == "root-menu"
 txt = {c.tag.split("}")[-1]: c for c in a.iter()}
 assert txt["atCursor"].text == "no"
 assert txt["x"].text == "0" and txt["y"].text == "0", "menu top-left under Applications (usable area starts under the top bar)"
+mouse = [m for m in root.iter() if m.tag.endswith("mouse")][0]
+assert any(c.tag.endswith("default") for c in list(mouse))
+ctx = [c for c in list(mouse) if c.tag.endswith("context") and c.get("name") == "Root"]
+assert len(ctx) == 1
+mb = [b for b in list(ctx[0]) if b.tag.endswith("mousebind") and b.get("button") == "Left" and b.get("action") == "Press"]
+assert len(mb) == 1
+act = [a for a in list(mb[0]) if a.tag.endswith("action")][0]
+assert act.get("name") == "None", "left-click on the desktop must not open the root menu"
 PY
 W=$R/etc/xdg/waybar/config.jsonc
 sed 's#//.*##' "$W" | python3 -c '

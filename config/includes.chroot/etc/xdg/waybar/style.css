@@ -97,6 +97,10 @@ window#waybar.prestium-bottom #taskbar {
 window#waybar.prestium-bottom #taskbar button {
     background-color: transparent;
     color: #ffffff;
+    /* a real hit target: a zero-height button lets the click fall through
+       to the desktop, which used to open the root menu */
+    min-width: 28px;
+    min-height: 24px;
     /* colour logos, not the white symbolic silhouette the button colour would paint */
     -gtk-icon-style: regular;
     border: none;

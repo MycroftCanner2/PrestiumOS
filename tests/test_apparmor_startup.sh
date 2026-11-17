@@ -276,13 +276,20 @@ allow libreoffice $H/.config/libreoffice/4/user/registrymodifications.xcu mrw
 allow libreoffice /tmp/lo.tmp m
 allow libreoffice /var/tmp/lo.tmp m
 allow libreoffice /dev/shm/lo.tmp m
+allow libreoffice /tmp/ w
+allow libreoffice /var/tmp/ w
+allow libreoffice /dev/shm/ w
+allow libreoffice $H/.config/libreoffice/4/user/extensions/ w
+allow libreoffice $H/.config/libreoffice/4/user/uno_packages/cache/ w
+allow libreoffice $H/.cache/libreoffice/4/ w
+allow libreoffice $H/.local/share/libreoffice/4/user/ w
 allow libreoffice $H/Documents/letter.odt rw
 allow libreoffice $H/Downloads/letter.odt r
 deny libreoffice $H/Downloads/letter.odt w
 deny libreoffice $G/pubring.kbx r
 EOT
 
-echo "== KeePassXC (new databases, the .lock sidecar and atomic-save temporaries need directory write; files stay .kdbx-only), VLC, the others: no ~/.gnupg, offline"
+echo "== KeePassXC (directory write, and link for Qt 6 linkat commit; files stay .kdbx-only), VLC, the others: no ~/.gnupg, offline"
 run usr.bin.keepassxc <<EOT
 allow keepassxc $H/ w
 allow keepassxc $H/Documents/ w
@@ -290,11 +297,16 @@ allow keepassxc $H/Documents/Passwords.kdbx rwk
 allow keepassxc $H/Documents/New.kdbx w
 allow keepassxc $H/Documents/Passwords.kdbx.lock w
 allow keepassxc $H/Documents/Passwords.kdbxAbC123 w
+allow keepassxc $H/Documents/Passwords.kdbx.AbC123 w
+allow keepassxc $H/Documents/Passwords.kdbx l
+allow keepassxc $H/Documents/Passwords.kdbx.AbC123 l
 allow keepassxc $H/Passwords.kdbxAbC123 w
 deny keepassxc $H/Documents/notes.txt w
 allow keepassxc /media/user/STICK/ w
 allow keepassxc /media/user/STICK/Passwords.kdbx rwk
 allow keepassxc /media/user/STICK/Passwords.kdbxAbC123 w
+allow keepassxc /media/user/STICK/Passwords.kdbx l
+allow keepassxc /media/user/STICK/Passwords.kdbx.AbC123 l
 deny keepassxc /media/user/STICK/notes.txt w
 allow keepassxc $H/.config/keepassxc/keepassxc.ini rwk
 allow keepassxc $H/.cache/ w

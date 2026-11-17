@@ -82,10 +82,23 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   owner /tmp/** ml,
   owner /var/tmp/** ml,
   owner /dev/shm/** ml,
+  # /tmp, /var/tmp and /dev/shm are root-owned, so an "owner" rule on the
+  # directory itself never matches. Creating the temps (and an O_TMPFILE)
+  # needs write on that directory; without it first start still dies with
+  # "User installation could not be completed" before it can map anything.
+  /tmp/ w,
+  /var/tmp/ w,
+  /dev/shm/ w,
   # Creating 4/ and 4/user/ needs write on each of those directories. The ** rule
-  # matches files under them; mkdir checks the directory line itself.
+  # matches files under them; mkdir checks the directory line itself. Deeper
+  # levels (extensions/, uno_packages/cache/, the cache and data dirs) are the
+  # same check: without a directory rule, first start still stops on
+  # "the installation is not complete".
   owner @{HOME}/.config/libreoffice/4/ rw,
   owner @{HOME}/.config/libreoffice/4/user/ rw,
+  owner @{HOME}/.config/libreoffice/**/ rw,
+  owner @{HOME}/.cache/libreoffice/**/ rw,
+  owner @{HOME}/.local/share/libreoffice/**/ rw,
 
   # no Java, no macros helpers outside the suite, no other programs
   deny /usr/lib/jvm/** x,

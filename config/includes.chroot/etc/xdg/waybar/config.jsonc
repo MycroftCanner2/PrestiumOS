@@ -86,10 +86,14 @@
   {
     // Bottom window-list taskbar: the app's own colour icon (Papirus). Adwaita
     // symbolic icons were recoloured white by the button colour, so the logos vanished.
+    // A click focuses that window. It must not open the root menu (labwc's default
+    // left-click on the desktop does; that bind is cleared in rc.xml).
     "name": "prestium-bottom",
     "layer": "top",
     "position": "bottom",
     "height": 30,
+    "exclusive": true,
+    "passthrough": false,
     "spacing": 4,
     "modules-left": ["wlr/taskbar"],
     "modules-center": [],
@@ -101,7 +105,7 @@
       "tooltip-format": "{title} ({app_id})",
       "sort-by-app-id": true,
       "all-outputs": true,
-      "on-click": "minimize-raise",
+      "on-click": "activate",
       "on-click-middle": "close",
       "ignore-list": ["waybar"]
     }

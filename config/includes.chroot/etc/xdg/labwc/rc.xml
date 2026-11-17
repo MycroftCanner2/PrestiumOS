@@ -76,7 +76,19 @@
     <keybind key="XF86Display"><action name="Execute" command="/usr/local/bin/prestium-wl display-settings" /></keybind>
   </keyboard>
 
-  <mouse><default /></mouse>
+  <mouse>
+    <default />
+    <!-- Left-click on the desktop must not open the root menu. The default
+         bind does, so a click that misses a bottom-bar window button opens
+         the menu instead of selecting that window. Right-click on the desktop
+         still opens the menu at the pointer. A later bind for the same
+         context, button and event replaces the default. -->
+    <context name="Root">
+      <mousebind button="Left" action="Press">
+        <action name="None" />
+      </mousebind>
+    </context>
+  </mouse>
 
   <libinput>
     <device category="touchpad">

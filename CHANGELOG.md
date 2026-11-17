@@ -10,6 +10,20 @@ in 2.0. It is still built with live-build on Debian 13 "trixie".
 This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
 
 ### Fixes: viewers, media, metadata, LibreOffice, sharing, volume, logs and menu
+- **Clicking an open app on the bottom bar selects it.** Left-click on the
+  desktop used to open the root menu (labwc's default mouse bind), so a click
+  that missed a window button opened the menu instead of that application.
+  That bind is cleared; a click on a window button focuses the window.
+  Right-click on the desktop still opens the menu.
+- **KeePassXC can save a database again.** Qt 6 commits the safe save with
+  `linkat` onto the `.kdbx` name. The profile allowed read, write and lock
+  but not link, so every save failed with Permission denied. Link is granted
+  on `*.kdbx` in the home and on unlocked volumes; other files stay denied.
+- **LibreOffice first start can finish its user installation.** Creating the
+  temporary files and the nested profile directories (not only `4/user/`)
+  needs write on those directories. `/tmp` is root-owned, so an owner-only
+  rule never matched it. Without that write, start kept stopping on
+  "the installation is not complete".
 - **The clock-sync symbol is back on the bar.** An amber clock shows until the time is
   set over Tor, and a red one if the sync refused a time it could not trust. It
   disappears once the clock is synced. The sync itself was never removed.

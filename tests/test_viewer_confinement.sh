@@ -115,7 +115,7 @@ if command -v apparmor_parser >/dev/null; then
       | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE 'Pictures/vlcsnap')
     [ -z "$sw" ] && ok "$f: no write outside the shared ~/Documents (L-5)" || bad "$f shared folder writes: $sw"
     # 2.1 (review of 6bf1234): volumes under /media are read-only (KeePassXC keeps its *.kdbx files there)
-    mw=$(grep -E '\s/media/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '/media/\*\*\.kdbx\*? rwk,')
+    mw=$(grep -E '\s/media/' <<<"$al" | grep -E '\s[a-z]*w[a-z]*,\s*$' | grep -vE '/media/\*\*\.kdbx\*? rwkl?,')
     if [ "$f" = usr.bin.keepassxc ]; then
       # A database on an unlocked volume needs its directory writable too
       # (new database, .lock sidecar, atomic-save temporary file); files

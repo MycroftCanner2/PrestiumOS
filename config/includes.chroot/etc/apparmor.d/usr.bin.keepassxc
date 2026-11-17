@@ -26,12 +26,14 @@ profile keepassxc /usr/bin/keepassxc {
 
   /usr/bin/keepassxc mr,
   /usr/lib/@{multiarch}/keepassxc/** mr,
-  owner @{HOME}/**.kdbx rwk,
-  # The default "safe save" writes through QSaveFile, whose temporary file
-  # is "<name>.kdbx<random>" with NO dot before the random suffix (Qt5's
-  # QTemporaryFile template), and opening a database creates "<name>.kdbx.lock":
-  # both need a file rule of their own next to the database name itself.
-  owner @{HOME}/**.kdbx* rwk,
+  # Qt 6 (Debian 13) commits the default safe save with linkat: QSaveFile opens
+  # an unnamed O_TMPFILE in the destination directory and linkat()s it onto
+  # the .kdbx name. "l" is that link. "rwk" alone left every save failing
+  # with Permission denied, in the home and on a volume. The named fallback
+  # (Qt appends ".XXXXXX", so "<name>.kdbx.<random>") and the ".kdbx.lock"
+  # sidecar are the "**.kdbx*" rule.
+  owner @{HOME}/**.kdbx rwkl,
+  owner @{HOME}/**.kdbx* rwkl,
   # Saving a new database, its .lock sidecar on open, and an atomic-save
   # temporary file all create files, which needs write on the containing
   # directory: without it databases could neither be saved nor opened (the
@@ -40,8 +42,8 @@ profile keepassxc /usr/bin/keepassxc {
   # and their sidecars by the two rules above.
   owner @{HOME}/ rw,
   owner @{HOME}/**/ rw,
-  /media/**.kdbx rwk,
-  /media/**.kdbx* rwk,
+  /media/**.kdbx rwkl,
+  /media/**.kdbx* rwkl,
   # Same for a database kept on an unlocked volume (see prestium-user-files:
   # only *.kdbx files there stay writable).
   /media/ rw,
@@ -50,7 +52,7 @@ profile keepassxc /usr/bin/keepassxc {
   # and ~/.local/share is two levels deep on a fresh home (nothing of KeePassXC in /etc/skel),
   # so the ~/.cache/, ~/.local/ and ~/.local/share/ parents are granted too (same as LibreOffice).
   owner @{HOME}/.config/keepassxc/ rw,
-  owner @{HOME}/.config/keepassxc/** rwk,
+  owner @{HOME}/.config/keepassxc/** rwkl,
   owner @{HOME}/.cache/ rw,
   owner @{HOME}/.cache/keepassxc/ rw,
   owner @{HOME}/.cache/keepassxc/** rwk,

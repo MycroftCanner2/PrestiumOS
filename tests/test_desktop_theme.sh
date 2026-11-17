@@ -85,7 +85,8 @@ assert top["custom/power"]["on-click"] == "/usr/local/bin/prestium-power-menu"
 assert top["clock"]["format"] == "{:%a %b %d, %H:%M}"
 for k in ("tor-status", "i2p-status"):
     assert top["custom/" + k]["exec"] == "cat /run/prestium/netstatus/%s.json" % k.split("-")[0] and top["custom/" + k]["return-type"] == "json"
-assert bottom["modules-left"] == ["wlr/taskbar"] and bottom["wlr/taskbar"]["on-click"] == "minimize-raise"
+assert bottom["modules-left"] == ["wlr/taskbar"] and bottom["wlr/taskbar"]["on-click"] == "activate"
+assert bottom.get("passthrough") is False and bottom.get("exclusive") is True
 PY
 python3 - "$W/config.jsonc" <<'PY' && ok "waybar: icon-only taskbar, centered clock with calendar tooltip" || bad "waybar status area"
 import json, re, sys
