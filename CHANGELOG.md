@@ -10,6 +10,17 @@ in 2.0. It is still built with live-build on Debian 13 "trixie".
 This is one combined summary of everything that changed from 2.0 to 2.1, as the image now ships it.
 
 ### Fixes: viewers, media, metadata, LibreOffice, sharing, volume, logs and menu
+- **I2P reseed refresh asks Tor through the onion-grater.** Refresh reseed (via Tor)
+  used to read Tor's own control socket and reported "not connected" while Tor was up.
+  It now asks the same filter the panel uses.
+- **Desktop and IRC (Tor).** The Applications button opens the root menu under itself
+  (top left), not on the bottom bar. Every window has one compositor title bar with
+  minimise, maximise and close, as part of the frame: Galculator and LibreWolf no longer
+  get a second bar painted over the top, and the local Firefox has the same buttons. The
+  bottom taskbar shows each app's own colour icon, not a white silhouette. LibreOffice's
+  first start can map the temporary files it uses while building its user profile, so it
+  no longer stops on "User installation could not be completed". IRC (Tor) no longer ships
+  the SASL networks (Libera.Chat, hackint, AlphaChat); the README no longer describes them.
 - **Right-click menus offer only Loupe for images; the "Remove Metadata" file entry is gone.**
   `mimeapps.list` no longer falls back to Ristretto (a `org.xfce.ristretto.desktop`
   shadow without `MimeType` keeps the installed viewer out of Open With, the same

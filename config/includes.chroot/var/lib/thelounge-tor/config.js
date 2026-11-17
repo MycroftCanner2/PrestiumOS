@@ -33,9 +33,8 @@ module.exports = {
 	leaveMessage: "",
 	// "defaults" is the form behind "Connect to a network" (The Lounge 4.5 allows only one): OFTC,
 	// which needs no registration. The user "prestium" already has one network per preset
-	// (see /usr/local/share/prestium-thelounge-tor/prestium.json), those without an account first:
-	// OFTC, Ergo, DarkScience, IRCNow, then Libera.Chat, hackint, AlphaChat (SASL; Libera.Chat and
-	// AlphaChat don't connect until their sign-in is filled in, see hook 0200). No default channels.
+	// (see /usr/local/share/prestium-thelounge-tor/prestium.json): OFTC, Ergo, DarkScience
+	// and IRCNow. No default channels. No SASL networks ship in the image.
 	// OFTC's certificate is for irc.oftc.net (Let's Encrypt), not for its onion address; the onion
 	// address itself authenticates the server, so certificate checking is off for it only.
 	defaults: {

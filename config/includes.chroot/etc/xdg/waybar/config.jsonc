@@ -76,7 +76,8 @@
     }
   },
   {
-    // Bottom window-list taskbar: icon-only buttons (raise on click, close on middle-click)
+    // Bottom window-list taskbar: the app's own colour icon (Papirus). Adwaita
+    // symbolic icons were recoloured white by the button colour, so the logos vanished.
     "name": "prestium-bottom",
     "layer": "top",
     "position": "bottom",
@@ -88,7 +89,7 @@
     "wlr/taskbar": {
       "format": "{icon}",
       "icon-size": 24,
-      "icon-theme": "Adwaita",
+      "icon-theme": "Papirus",
       "tooltip-format": "{title} ({app_id})",
       "sort-by-app-id": true,
       "all-outputs": true,

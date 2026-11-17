@@ -7,7 +7,7 @@ t=$(sed -n "s/^gtk-theme='\(.*\)'$/\1/p" "$I/etc/dconf/db/local.d/10-prestium-de
 case "$t" in Adwaita|HighContrast) ok "dconf gtk-theme '$t' is built into GTK 3" ;;
   *) grep -qx gnome-themes-extra "$L" && ok "dconf gtk-theme '$t' from gnome-themes-extra" || bad "dconf gtk-theme '$t' is not installed" ;; esac
 grep -q "^color-scheme='default'" "$I/etc/dconf/db/local.d/10-prestium-desktop" && ok "dconf follows the light theme" || bad "dconf: color-scheme not default"
-grep -q "^button-layout='appmenu:close'" "$I/etc/dconf/db/local.d/10-prestium-desktop" && ok "dconf: stock GNOME header-bar buttons" || bad "dconf: header-bar buttons not GNOME"
+grep -q "^button-layout='appmenu:minimize,maximize,close'" "$I/etc/dconf/db/local.d/10-prestium-desktop" && ok "dconf: header-bar buttons match the compositor bar" || bad "dconf: header-bar buttons"
 grep -qx 'gtk-application-prefer-dark-theme=0' "$I/etc/gtk-3.0/settings.ini" && ok "GTK 3 fallback light" || bad "GTK 3 fallback not light"
 # B2: dconf update needs dconf-cli, and the hook fails without the compiled db
 grep -qx dconf-cli "$L" && ok "dconf-cli listed" || bad "dconf-cli missing"

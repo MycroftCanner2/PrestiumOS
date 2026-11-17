@@ -74,6 +74,19 @@ profile libreoffice /usr/lib/libreoffice/program/{oosplash,soffice.bin} {
   /media/ r,
   /media/** r,
 
+  # 2.1: first start maps temporary copies in /tmp, /var/tmp and /dev/shm while it
+  # builds the user profile (not only registrymodifications.xcu). The shared rules
+  # grant rwk there but not mmap or link, so the mapped write was denied and every
+  # start died with "User installation could not be completed" (exit 77). The fatal
+  # dialog then stayed up. "m" is mapping its own temps, not executing them.
+  owner /tmp/** ml,
+  owner /var/tmp/** ml,
+  owner /dev/shm/** ml,
+  # Creating 4/ and 4/user/ needs write on each of those directories. The ** rule
+  # matches files under them; mkdir checks the directory line itself.
+  owner @{HOME}/.config/libreoffice/4/ rw,
+  owner @{HOME}/.config/libreoffice/4/user/ rw,
+
   # no Java, no macros helpers outside the suite, no other programs
   deny /usr/lib/jvm/** x,
 

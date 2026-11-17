@@ -270,7 +270,12 @@ allow libreoffice $H/.cache/libreoffice/ rw
 allow libreoffice $H/.local/ w
 allow libreoffice $H/.local/share/ w
 allow libreoffice $H/.local/share/libreoffice/ rw
+allow libreoffice $H/.config/libreoffice/4/ rw
+allow libreoffice $H/.config/libreoffice/4/user/ rw
 allow libreoffice $H/.config/libreoffice/4/user/registrymodifications.xcu mrw
+allow libreoffice /tmp/lo.tmp m
+allow libreoffice /var/tmp/lo.tmp m
+allow libreoffice /dev/shm/lo.tmp m
 allow libreoffice $H/Documents/letter.odt rw
 allow libreoffice $H/Downloads/letter.odt r
 deny libreoffice $H/Downloads/letter.odt w

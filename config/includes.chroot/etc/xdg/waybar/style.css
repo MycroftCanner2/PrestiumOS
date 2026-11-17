@@ -78,6 +78,8 @@ window#waybar.prestium-bottom #taskbar {
 window#waybar.prestium-bottom #taskbar button {
     background-color: transparent;
     color: #ffffff;
+    /* colour logos, not the white symbolic silhouette the button colour would paint */
+    -gtk-icon-style: regular;
     border: none;
     border-radius: 99px;
     margin: 3px 2px;

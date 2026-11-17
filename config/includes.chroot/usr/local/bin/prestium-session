@@ -6,6 +6,10 @@ export XDG_SESSION_TYPE=wayland XDG_CURRENT_DESKTOP=labwc:wlroots XDG_SESSION_DE
 export MOZ_ENABLE_WAYLAND=1 GDK_BACKEND=wayland,x11 QT_QPA_PLATFORM='wayland;xcb' \
        SDL_VIDEODRIVER=wayland,x11 CLUTTER_BACKEND=wayland _JAVA_AWT_WM_NONREPARENTING=1 \
        ELECTRON_OZONE_PLATFORM_HINT=wayland QT_WAYLAND_DISABLE_WINDOWDECORATION=1
+# 2.1: one compositor title bar, part of the frame. GTK 3 must not draw its own
+# (Galculator had both), and Firefox-based browsers must use the system frame
+# (LibreWolf drew a second bar; the local Firefox's frame had no minimise or maximise).
+export GTK_CSD=0 MOZ_GTK_TITLEBAR_DECORATION=system
 # Prestium 2.1 (design batch): Qt 5 and 6 apps use Adwaita (QT_STYLE_OVERRIDE=Adwaita).
 export QT_STYLE_OVERRIDE=Adwaita
 # 2.1: one cursor theme and size for labwc, Qt and GTK

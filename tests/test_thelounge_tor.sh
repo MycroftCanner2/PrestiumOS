@@ -107,7 +107,7 @@ sh -e "$T/copy.sh" && [ -f "$T/root/var/lib/thelounge-tor/packages/node_modules/
 ## config.js and presets
 C=$I/var/lib/thelounge-tor/config.js; C0=$I/var/lib/thelounge/config.js; J=$I/usr/local/share/prestium-thelounge-tor/prestium.json
 if command -v node >/dev/null; then
-  node - "$C" "$C0" "$J" "$I/etc/tor/torrc" "$I/usr/local/share/prestium-thelounge/prestium.json" <<'JS' && ok "config.js: 127.0.0.1:9010, OFTC default through 127.0.0.1:9050; 7 presets (no account first, no Pirate IRC), all through Tor" || bad "config.js / presets"
+  node - "$C" "$C0" "$J" "$I/etc/tor/torrc" "$I/usr/local/share/prestium-thelounge/prestium.json" <<'JS' && ok "config.js: 127.0.0.1:9010, OFTC default through 127.0.0.1:9050; 4 presets (no account, no SASL, no Pirate IRC), all through Tor" || bad "config.js / presets"
 const [c, c0, j, torrc, j0] = process.argv.slice(2).map((f, i) => i < 2 ? require(f) : require("fs").readFileSync(f, "utf8"));
 const assert = require("assert");
 assert.strictEqual(c.port, 9010); assert.strictEqual(c.host, "127.0.0.1"); assert.strictEqual(c.public, false);
@@ -120,16 +120,13 @@ assert.strictEqual(d.name, "OFTC"); assert.strictEqual(d.host, "oftcnet6xg6roj6d
 assert.strictEqual(d.port, 6697); assert.strictEqual(d.tls, true); assert.strictEqual(d.nick, c0.defaults.nick);
 assert.strictEqual(d.proxyEnabled, true); assert.strictEqual(d.proxyHost, "127.0.0.1"); assert.strictEqual(d.proxyPort, 9050);
 const p = JSON.parse(j);
-// 2.1: networks that need no account first, then the SASL ones; Pirate IRC removed.
+// 2.1: networks that need no account; SASL presets and Pirate IRC removed.
 // [host, port, tls, rejectUnauthorized, sasl]
 const want = {
 	"OFTC": ["oftcnet6xg6roj6d7id4y4cu6dchysacqj2ldgea73qzdagufflqxrid.onion", 6697, true, false, ""],
 	"Ergo": ["vrw7zcuarwx4oeju3iikiz3jffrvuijsysyznqf53mxizxrebomfnrid.onion", 6667, false, true, ""],
 	"DarkScience": ["darkirc6tqgpnwd3blln3yfv5ckl47eg7llfxkmtovrv7c7iwohhb6ad.onion", 6667, false, true, ""],
 	"IRCNow": ["4ufrikyorlatp5ekgz6tlre22v6b5jxqbiid6cp7nuhemklukiohidqd.onion", 6667, false, true, ""],
-	"Libera.Chat (SASL certificate)": ["palladium.libera.chat", 6697, true, true, "external"],
-	"hackint (SASL optional)": ["guybrush.hackint.org", 6697, true, true, ""],
-	"AlphaChat (SASL)": ["irc.alphachat.net", 6697, true, true, "plain"],
 };
 assert.ok(!/pirate/i.test(j), "Pirate IRC still in the presets");
 assert.deepStrictEqual(p.networks.map(n => n.name), Object.keys(want));
@@ -147,7 +144,6 @@ for (const n of p.networks) {
 	// certificate checking is off only where the certificate can't match (OFTC's onion)
 	if (n.tls && !n.rejectUnauthorized) assert.strictEqual(n.name, "OFTC");
 }
-assert.strictEqual(p.networks.find(n => n.name.startsWith("Libera")).sasl, "external");
 assert.deepStrictEqual(Object.keys(p).sort(), Object.keys(JSON.parse(j0)).sort());
 assert.deepStrictEqual(Object.keys(p.networks[0]).sort(), Object.keys(JSON.parse(j0).networks[0]).sort());
 JS
@@ -155,11 +151,7 @@ else echo "SKIP node missing (config.js)"; fi
 
 ## torrc
 TR=$I/etc/tor/torrc
-for l in 'MapAddress palladium.libera.chat libera75jm6of4wxpxt4aynol3xjmbtxgfyjpu34ss4d7r7q2v5zrpyd.onion' \
-  'MapAddress guybrush.hackint.org dtlbunzs5b7s5sl775quwezleyeplxzicdoh3cnhm7feolxmkfd42nqd.onion' \
-  'MapAddress irc.alphachat.net rnjlael46gqqmfiuiqsswdeev6axrf47j7bq4dtuqdsv2qgqfumcy4yd.onion'; do
-  grep -qxF "$l" "$TR" && ok "torrc: $l" || bad "torrc: no $l"; done
-[ "$(grep -c '^MapAddress ' "$TR")" = 3 ] && ok "torrc: exactly 3 MapAddress lines, all to .onion" || bad "torrc MapAddress count"
+! grep -q '^MapAddress ' "$TR" && ok "torrc: no MapAddress (SASL clearnet names removed)" || bad "torrc still has MapAddress"
 grep -qi 'pirate' "$TR" && bad "torrc still mentions Pirate IRC" || ok "torrc: no Pirate IRC"
 git -C "$R" grep -qi 'pirateirc\|pirate irc' -- . ':!CHANGELOG.md' ':!tests/test_thelounge_tor.sh' && bad "Pirate IRC still named outside the CHANGELOG" || ok "Pirate IRC gone (CHANGELOG notes the removal)"
 grep -qx 'SocksPort 127.0.0.1:9050 IsolateDestAddr IsolateDestPort IsolateSOCKSAuth' "$TR" && grep -q '^SocksPort unix:/run/prestium-tbb/socks WorldWritable ExtendedErrors KeepAliveIsolateSOCKSAuth$' "$TR" \

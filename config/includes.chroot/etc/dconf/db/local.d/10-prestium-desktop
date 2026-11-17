@@ -14,7 +14,7 @@ color-scheme='default'
 accent-color='blue'
 clock-format='24h'
 
-# 2.1: window buttons in app header bars (client-side decorations draw them);
-# stock GNOME layout (close only), matching labwc's server-side titlebars
+# 2.1: window buttons on any header bar an app still draws itself
+# (minimise, maximise, close), matching labwc's server-side titlebars
 [org/gnome/desktop/wm/preferences]
-button-layout='appmenu:close'
+button-layout='appmenu:minimize,maximize,close'

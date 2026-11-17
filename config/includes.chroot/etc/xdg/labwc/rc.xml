@@ -10,7 +10,7 @@
 -->
 <labwc_config>
   <core>
-    <decoration>client</decoration>
+    <decoration>server</decoration>
     <gap>0</gap>
     <xwaylandPersistence>no</xwaylandPersistence>
   </core>
@@ -21,7 +21,7 @@
     <dropShadows>yes</dropShadows>
     <!-- 2.1: icon theme for menu and titlebar icons (unset, labwc would look for a "Prestium-Adwaita" icon theme) -->
     <icon>Prestium</icon>
-    <titleLayout>icon,label:close</titleLayout>
+    <titleLayout>icon,label:minimize,maximize,close</titleLayout>
     <font place="ActiveWindow"><name>Cantarell</name><size>11</size><weight>bold</weight></font>
     <font place="InactiveWindow"><name>Cantarell</name><size>11</size><weight>bold</weight></font>
     <font place="MenuItem"><name>Cantarell</name><size>11</size></font>
@@ -46,14 +46,15 @@
     <keybind key="A-F4"><action name="Close" /></keybind>
     <keybind key="A-Escape"><action name="Lower" /></keybind>
     <keybind key="A-space"><action name="ShowMenu" menu="client-menu" /></keybind>
-    <!-- 2.1: the root menu always opens at the bottom-left, its bottom edge on the bar, above the Menu
+    <!-- 2.1: the root menu always opens at the top-left, just under the Applications
          button, wherever the pointer is (the panel button presses Super+Space after a short wait,
          so "at the pointer" moved with the mouse). Right-click on the desktop still opens it at the pointer.
-         Positions count inside the usable area, which already ends at the bar, so y=-1 is the bar top. -->
+         Positions count inside the usable area, which already starts under the top bar, so y=0 is
+         that bar's bottom edge. -->
     <keybind key="W-space">
       <action name="ShowMenu" menu="root-menu">
         <atCursor>no</atCursor>
-        <position><x>0</x><y>-1</y></position>
+        <position><x>0</x><y>0</y></position>
       </action>
     </keybind>
     <keybind key="A-Tab"><action name="NextWindow" /></keybind>
@@ -91,38 +92,10 @@
     <windowRule identifier="*zenity*" serverDecoration="yes">
       <action name="AutoPlace" policy="center" />
     </windowRule>
-    <!-- Default to client-side decorations (prevents double titlebars on GTK/Firefox) -->
-    <windowRule identifier="*" serverDecoration="no" />
-
-    <!-- Give a single Prestium-Adwaita titlebar to terminal, XWayland, Qt and
-         Firefox-based apps (and OnionShare, all of which draw none of their own) -->
-    <windowRule identifier="foot" serverDecoration="yes" />
-    <!-- foot with app-id prestium-nyx (Tor Monitor) is a different app_id, not covered by "foot" -->
-    <windowRule identifier="prestium-nyx" serverDecoration="yes" />
-    <!-- XWayland programs (GTK2: no client decorations of their own). Identifier is the
-         WM_CLASS class; confirm with lswt on the live ISO if a window opens bare. -->
-    <windowRule identifier="Pcmanfm" serverDecoration="yes" />
-    <windowRule identifier="pcmanfm" serverDecoration="yes" />
-    <windowRule identifier="Claws-mail" serverDecoration="yes" />
-    <windowRule identifier="Galculator" serverDecoration="yes" />
-    <windowRule identifier="galculator" serverDecoration="yes" />
-    <!-- pavucontrol and qtqr draw no client decorations of their own -->
-    <windowRule identifier="pavucontrol" serverDecoration="yes" />
-    <windowRule identifier="qtqr" serverDecoration="yes" />
-    <!-- Feather Wallet (thirdparty). Identifier from its desktop file; confirm with lswt on the live ISO. -->
-    <windowRule identifier="feather" serverDecoration="yes" />
-    <windowRule identifier="org.featherwallet.feather" serverDecoration="yes" />
-    <windowRule identifier="org.keepassxc.KeePassXC" serverDecoration="yes" />
-    <windowRule identifier="org.kde.kleopatra" serverDecoration="yes" />
-    <windowRule identifier="featherpad" serverDecoration="yes" />
-    <windowRule identifier="onionshare" serverDecoration="yes" />
-    <windowRule identifier="vlc" serverDecoration="yes" />
-    <!-- Firefox-based browsers use the compositor frame (no tabs in the title bar)
-         and OnionShare draws no frame of its own; without these they open bare. -->
-    <windowRule identifier="Tor Browser" serverDecoration="yes" />
-    <windowRule identifier="librewolf" serverDecoration="yes" />
-    <windowRule identifier="PrestiumLocalFirefox" serverDecoration="yes" />
-    <windowRule identifier="firefox" serverDecoration="yes" />
-    <windowRule identifier="OnionShare" serverDecoration="yes" />
+    <!-- One compositor title bar for every other window (core decoration=server:
+         minimise, maximise, close), outside the client surface. Forcing
+         serverDecoration=yes on an app that also draws its own bar painted that
+         bar over the top of the window (Galculator, LibreWolf). GTK_CSD=0 and
+         MOZ_GTK_TITLEBAR_DECORATION=system make those apps leave the bar to labwc. -->
   </windowRules>
 </labwc_config>

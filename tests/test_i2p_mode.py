@@ -157,6 +157,10 @@ check('APP_ID = "org.prestium.I2PConnectionAssistant"' in app and
       os.path.exists(os.path.join(I, "usr/share/applications/org.prestium.I2PConnectionAssistant.desktop")),
       "desktop file named after the app ID (panel icon)")
 menu = open(os.path.join(I, "etc/xdg/labwc/menu.xml")).read()
+reseed = open(os.path.join(I, "usr/local/sbin/prestium-i2p-reseed")).read()
+check("tor-bootstrap.py" in reseed and "PYTHONNOUSERSITE=1" in reseed
+      and "/run/tor/control" not in reseed and "control.authcookie" not in reseed,
+      "reseed refresh asks Tor through the onion-grater, not the raw control socket")
 check("prestium-i2p-assistant" in menu and "prestium-tunnel-hops" not in menu and "restart i2pd" not in menu
       and "prestium-i2p-reseed-gui" not in menu, "menu: one I2P Connection Assistant entry")
 check("deny /usr/local/bin/prestium-i2p-assistant mrwx," in open(os.path.join(I, "etc/apparmor.d/abstractions/prestium-no-admin")).read(),

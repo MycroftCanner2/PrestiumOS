@@ -52,25 +52,19 @@ T=$(mktemp -d /run/prestium-i2p-reseed.XXXXXX) || die 1 "cannot create a tempora
 trap 'rm -rf "$T"' EXIT
 NEW=$T/new.su3
 
-tor_ready(){ # Tor bootstrapped 100 % (control socket, cookie auth; root may read both)
-  python3 -I - <<'PY'
-import socket, sys
-try:
-    cookie = open("/run/tor/control.authcookie", "rb").read().hex()
-    s = socket.socket(socket.AF_UNIX); s.settimeout(10); s.connect("/run/tor/control")
-    s.sendall(("AUTHENTICATE %s\r\nGETINFO status/bootstrap-phase\r\nQUIT\r\n" % cookie).encode())
-    r = b""
-    while True:
-        b = s.recv(4096)
-        if not b: break
-        r += b
-except Exception as e:
-    print("cannot ask Tor (%s)" % e); sys.exit(1)
-t = r.decode(errors="replace")
-if "PROGRESS=100" in t and "TAG=done" in t: sys.exit(0)
-print(t.split("status/bootstrap-phase=")[-1].split("\r\n")[0][:160] if "status/bootstrap-phase=" in t else t[:160])
-sys.exit(1)
-PY
+tor_ready(){ # Tor bootstrapped 100 %, asked through the onion-grater (tor-bootstrap.py).
+  # The raw control socket is not how Prestium reads bootstrap: the panel and the
+  # Tor assistant ask the filter, and that is the answer that is up while Tor is
+  # connected. Root is an allowed client of that one script. A clean environment so
+  # the filter's client check accepts it (PYTHONNOUSERSITE=1, no LD_*). No -I:
+  # that would make the script path argv[2], which the filter does not recognise.
+  local pct
+  pct=$(env -i PATH=/usr/bin:/bin PYTHONNOUSERSITE=1 /usr/bin/python3 /usr/local/lib/prestium/tor-bootstrap.py 2>/dev/null) || pct=
+  case "$pct" in
+    100) return 0 ;;
+    ""|*[!0-9]*) echo "cannot ask Tor through the onion-grater"; return 1 ;;
+    *) echo "Tor bootstrap ${pct}%"; return 1 ;;
+  esac
 }
 
 if [ "$MODE" = download ]; then
