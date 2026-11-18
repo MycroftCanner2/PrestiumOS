@@ -136,6 +136,13 @@ modernization of the 2023 Prestium build, with tighter security and new features
   (not those of Wayland apps such as the browsers).
 - **Per-app folders limit writes, not reads:** a compromised viewer can still read the file folders
   (it has no network to send them anywhere).
+- **A kernel memory-corruption bug can still be turned into an escape through the vDSO.** The
+  technique in Phrack 73 ([Escaping from a Docker container through vDSO](https://phrack.org/issues/73/escaping-from-a-docker-container-through-vdso_md.html))
+  moves or remaps the vDSO (`mremap()`, or `arch_prctl()` with checkpoint/restore support) so that even a
+  weak primitive such as an arbitrary increment can rewrite code every process runs, which escapes
+  AppArmor, bubblewrap and Landlock alike. The fix, `CONFIG_MSEAL_SYSTEM_MAPPINGS` (system mappings
+  sealed with `mseal`), needs kernel 6.15 or later; Debian 13's 6.12 doesn't have it. `vsyscall=none`
+  and `ia32_emulation=0` remove the legacy mappings and the 32-bit entry points, not this one.
 - The ISO itself isn't signed (`SHA256SUMS` is), and builds are not yet bit-for-bit reproducible.
 - More, with details, in the CHANGELOG's Known security limits.
 

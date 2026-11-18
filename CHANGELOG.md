@@ -371,7 +371,34 @@ done in).
   Debian 13) runs shellcheck, compiles every profile, scans for committed keys and tokens, checks
   `systemd-analyze security` scores and runs the tests that don't need a live session.
 
+### Late 2.1 additions
+- **Tor:** `VanguardsLiteEnabled 1` is pinned after the torrc drop-ins, so no bridge or transport
+  drop-in can turn off the slowly rotating second-hop guards that protect onion-service circuits.
+- **No AF_ALG sockets for confined apps** (`deny network alg,` in prestium-no-admin, the browser
+  launchers, the Tor Browser and onion-grater profiles). It is not blacklisted system-wide: cryptsetup
+  uses AF_ALG for VeraCrypt and TrueCrypt volumes, and the unlock path (Unlock Volume, udisks,
+  cryptsetup, the file manager) stays outside these profiles.
+- **`ia32_emulation=0`** on the kernel command line (and required by the boot policy): nothing on the
+  image is 32-bit, so the 32-bit system call entry points are off.
+- **Landlock for Prestium's Python helpers** (time sync, MAC guard, logs, network logs): each restricts
+  itself at start to the paths it reads and writes, programs from `/usr` and (time sync only) Tor's
+  SOCKS port, through a small ctypes module with no new dependency. Without Landlock it logs that and
+  carries on. The Wayland broker and onion-grater are left out: they read other processes'
+  `/proc/<pid>` entries, which Landlock refuses, and the broker starts setuid tools.
+- **KeePassXC** starts with its light theme.
+- **Feather:** its settings (recent wallets, node) were never saved, because Qt's save links a
+  temporary file into `~/.config/feather` (AppArmor `l`), and Monero's shared ring database in
+  `~/.shared-ringdb` was denied; both allowed.
+- **Metadata Cleaner** cleans files in place wherever they are in the home, `~/Downloads` included,
+  and opens files elsewhere in the home (before, every file outside `~/Documents` failed with
+  "Permission denied" or "Unable to Read the File"). Hidden folders, `~/bin`, launchers, secrets and
+  volumes stay read-only for it; mat2 reads anywhere in the home too, and still writes only its work folder.
+- **Dialogs:** zenity dialogs (Power, Unlock Volume, confirmations) show one title, in the title bar,
+  over a flat content area, instead of a second bold title on a rounded card inside the frame.
+
 ### Known security limits
+- **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):
+  `CONFIG_MSEAL_SYSTEM_MAPPINGS`, which blocks it, needs kernel 6.15 or later; Debian 13 ships 6.12.
 - **Someone who can write to the USB stick can change the next boot.** Secure Boot checks shim, GRUB
   and the kernel, but the boot menus (with the root hash and the password hash), the initramfs and
   live-boot in it are unsigned files on the stick. Replacing them together with the image defeats
@@ -391,7 +418,8 @@ done in).
   VeraCrypt containers); confined apps can't reach udisks.
 - **Per-app folders limit writes, not reads.** A compromised viewer can read every file folder (it has
   no network), mail and chat can read files directly in `~/Downloads`, and the file manager and other
-  unconfined programs of the desktop user can write everywhere.
+  unconfined programs of the desktop user can write everywhere. A compromised Metadata Cleaner can
+  change your files outside the hidden folders (it cleans them in place).
 - **The bubblewrap children of Loupe, mat2 and Metadata Cleaner keep bubblewrap's mount rights**, so a
   compromised parent could present files at a path the child may write.
 - **GnuPG's socket-started daemons** may run outside Kleopatra's and Claws Mail's profiles; their
