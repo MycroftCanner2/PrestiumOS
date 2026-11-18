@@ -41,6 +41,8 @@ grep -qx 'FailureAction=reboot-force' "$U" && grep -qx 'ExecStart=/usr/local/sbi
   && ok "a mismatch restarts the computer (FailureAction=reboot-force)" || bad "unit does not enforce"
 grep -qx 'panic=10' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires panic=10" || bad "policy lacks panic=10"
 grep -qx 'lockdown=integrity' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires lockdown=integrity" || bad "policy lacks lockdown=integrity"
+# 2.1 (Phrack 73): no 32-bit syscall entry (nothing 32-bit ships)
+grep -qx 'ia32_emulation=0' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires ia32_emulation=0" || bad "policy lacks ia32_emulation=0"
 
 ## policy == auto/config
 A=$(sed -n 's/^APPEND="\(.*\)"$/\1/p' "$R/auto/config")
@@ -73,7 +75,7 @@ for s in $SHELLS; do command -v "$s" >/dev/null || [ "$s" = busybox ] || { skip 
     o=$(chk "$s" "$c") || { bad "$s: refused a real entry: $o"; g=1; }; done
   [ $g = 0 ] && ok "$s: every real boot entry passes"
   r=0
-  for c in "${LIVE/apparmor=1 /}" "${LIVE/security=apparmor /}" "${LIVE/panic=10 /}" "${LIVE/lockdown=integrity /}" "${LIVE/ module.sig_enforce=1/}" "${LIVE/boot=live /}" \
+  for c in "${LIVE/apparmor=1 /}" "${LIVE/security=apparmor /}" "${LIVE/panic=10 /}" "${LIVE/lockdown=integrity /}" "${LIVE/ia32_emulation=0 /}" "$LIVE ia32_emulation=1" "${LIVE/ia32_emulation=0/ia32_emulation=1}" "${LIVE/ module.sig_enforce=1/}" "${LIVE/boot=live /}" \
            "${LIVE/dm-verity-oncorruption=panic /}" "${LIVE/$V /}" "$LIVE apparmor=0" "$LIVE security=selinux" "$LIVE lsm=landlock" \
            "$LIVE init=/bin/sh" "$LIVE rdinit=/bin/sh" "$LIVE break=top" "$LIVE break" "$LIVE debug" "$LIVE single" "$LIVE emergency" \
            "$LIVE systemd.unit=rescue.target" "$LIVE persistence" "$LIVE findiso=/x.iso" "$LIVE fetch=http://x/y" "$LIVE live-media=/dev/sdb" \

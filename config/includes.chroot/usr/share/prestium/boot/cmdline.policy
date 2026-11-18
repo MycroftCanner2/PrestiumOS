@@ -22,6 +22,7 @@ require slab_nomerge
 require slub_debug=FZP
 require mce=0
 require vsyscall=none
+require ia32_emulation=0
 require page_poison=1
 require init_on_alloc=1
 require init_on_free=1
