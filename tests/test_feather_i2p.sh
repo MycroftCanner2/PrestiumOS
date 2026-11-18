@@ -37,6 +37,11 @@ grep -qE 'ptrace|capability|/run/tor|9050|control' <<<"$r" && bad "feather: ptra
 grep -q 'include <abstractions/prestium-app-base>' <<<"$r" && ok "feather: prestium-app-base" || bad "feather: base abstraction missing"
 grep -qE 'Downloads' <<<"$r" && bad "feather writes shared folders" || ok "feather writes no shared download folder"
 grep -qE 'Documents/\*\* rwk' <<<"$r" && ok "feather writes the shared ~/Documents" || bad "feather: shared ~/Documents missing"
+# 2.1 (wallet fix, verified in an enforcing VM): Qt's QSaveFile links an O_TMPFILE into ~/.config/feather
+# (needs l), wallets lock their .keys file (k), and Monero keeps its ring database in ~/.shared-ringdb
+grep -qE '^\s*owner @\{HOME\}/\.config/feather/\*\* [a-z]*l[a-z]*,' <<<"$r" && ok "feather: settings.json can be saved (QSaveFile link)" || bad "feather: ~/.config/feather lacks l (settings never saved)"
+grep -qE '^\s*owner @\{HOME\}/Monero/\*\* rwk,' <<<"$r" && ok "feather: wallets in ~/Monero read/write/lock" || bad "feather: ~/Monero not rwk"
+grep -qE '^\s*owner @\{HOME\}/\.shared-ringdb/\*\* rwk,' <<<"$r" && grep -qE '^\s*owner @\{HOME\}/\.shared-ringdb/ rw,' <<<"$r" && ok "feather: shared ring database allowed" || bad "feather: ~/.shared-ringdb missing"
 grep -q 'usr.local.bin.feather' "$R/config/hooks/live/0600-prestium-apparmor.hook.chroot" && ok "profile installed and enforced by hook 0600" || bad "hook 0600 lost feather"
 grep -q '\bfeather\b' "$I/usr/local/bin/prestium-safety-notify" && ok "safety notice watches the feather profile" || bad "safety notify misses feather"
 exit $fail

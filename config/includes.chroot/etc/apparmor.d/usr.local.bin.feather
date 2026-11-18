@@ -22,12 +22,21 @@ profile feather /usr/local/bin/feather {
   owner /tmp/** mrwk,
 
   owner @{HOME}/.config/feather/ rw,
-  owner @{HOME}/.config/feather/** rwk,
+  # 2.1 (wallet fix): Qt saves settings.json with QSaveFile: an O_TMPFILE in this folder, linked in
+  # with linkat (AppArmor names the unlinked file "#<inode>"), then renamed over settings.json. Without
+  # l every save failed (operation="link" target=".../.config/feather/#<inode>"), so nothing Feather
+  # remembers (recent wallets, node, settings) was ever written.
+  owner @{HOME}/.config/feather/** rwkl,
   owner @{HOME}/.local/share/feather/ rw,
   owner @{HOME}/.local/share/feather/** rwk,
   owner @{HOME}/.cache/feather/** rwk,
   owner @{HOME}/Monero/ rw,
   owner @{HOME}/Monero/** rwk,
+  # 2.1 (wallet fix): Monero's shared ring database (lmdb), which remembers the ring members of each
+  # spend so that a re-spend of the same output reuses the same ring. Without it, opening a wallet failed
+  # to create ~/.shared-ringdb and lmdb then tried ~/lock.mdb (both denied).
+  owner @{HOME}/.shared-ringdb/ rw,
+  owner @{HOME}/.shared-ringdb/** rwk,
   owner @{HOME}/Documents/ r,
   owner @{HOME}/Documents/** rwk,
 
