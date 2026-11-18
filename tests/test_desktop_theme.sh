@@ -46,7 +46,12 @@ for kd in etc/skel/.config etc/xdg home/user/.config; do [ ! -e "$I/$kd/Kvantum"
 grep -q 'owner @{HOME}/.config/gtk-4.0/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-common" && grep -q '/usr/share/themes/Adwaita/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-base" && grep -q '/usr/share/fonts/truetype/cantarell/\*\* r,' "$I/etc/apparmor.d/abstractions/prestium-app-base" && ok "AppArmor: confined apps read GTK 4 colours, Adwaita and Cantarell" || bad "AppArmor misses theme reads"
 grep -q "^accent-color='blue'" "$I/etc/dconf/db/local.d/10-prestium-desktop" && ok "dconf accent blue" || bad "dconf accent"
 for v in 3 4; do
-  [ ! -e "$I/usr/share/prestium/broker-style/gtk-$v.0/gtk.css" ] && ok "broker-style GTK $v: pure Adwaita, no dark override" || bad "broker-style gtk-$v.0 css override left"
+  c="$I/usr/share/prestium/broker-style/gtk-$v.0/gtk.css"
+  # 2.1 (dialog look): GTK 4 may carry the dialog layout rules (the same file as dialog-style), no colours
+  if [ ! -e "$c" ] || { [ $v = 4 ] && cmp -s "$c" "$I/usr/share/prestium/dialog-style/gtk-4.0/gtk.css" \
+       && ! tr '\n' ' ' < "$c" | sed 's#/\*[^*]*\*/##g' | grep -Eo '(background|color|@define-color|--[a-z-]*-color)[^;]*' | grep -qvx 'color: transparent'; }; then
+    ok "broker-style GTK $v: pure Adwaita colours, no dark override"
+  else bad "broker-style gtk-$v.0 css override left"; fi
   [ ! -e "$I/etc/skel/.config/gtk-$v.0/gtk.css" ] && [ ! -e "$I/home/user/.config/gtk-$v.0/gtk.css" ] && ok "no user gtk-$v.0 css shadow (stock Adwaita)" || bad "user gtk-$v.0 css shadow left"
 done
 # broker dialogs: the style directory only, and accessibility still applied last

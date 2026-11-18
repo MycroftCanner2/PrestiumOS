@@ -105,7 +105,9 @@
   </libinput>
 
   <windowRules>
-    <!-- zenity 4 draws title-less dialogs; give them a frame and open them centred -->
+    <!-- zenity 4 draws title-less dialogs; give them a frame and open them centred. 2.1 (dialog look):
+         /usr/local/bin/zenity loads dialog-style/gtk-4.0/gtk.css, which makes the content flat under this
+         title bar (no inner rounded card or outline, the title shown once) -->
     <windowRule identifier="*zenity*" serverDecoration="yes">
       <action name="AutoPlace" policy="center" />
     </windowRule>

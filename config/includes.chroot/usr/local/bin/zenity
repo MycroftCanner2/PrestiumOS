@@ -1,0 +1,15 @@
+#!/bin/sh
+# Prestium 2.1 (dialog look): every zenity dialog (Power, Unlock Volume, the confirmations, errors and
+# notices) gets the integrated look: labwc's title bar on top, a flat content area under it, the title
+# shown once. The rules are in /usr/share/prestium/dialog-style/gtk-4.0/gtk.css, which zenity reads
+# as its XDG_CONFIG_HOME, so no other application changes. File choosers keep the user's own settings
+# (their bookmarks and recent files live there). The Wayland broker already sets its own root-owned
+# style directory (broker-style, same rules), which is kept.
+for a do
+  case $a in --file-selection) exec /usr/bin/zenity "$@" ;; esac
+done
+case ${XDG_CONFIG_HOME:-} in
+  /usr/share/prestium/*) ;;
+  *) XDG_CONFIG_HOME=/usr/share/prestium/dialog-style; export XDG_CONFIG_HOME ;;
+esac
+exec /usr/bin/zenity "$@"

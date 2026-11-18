@@ -1,0 +1,17 @@
+/* Prestium 2.1 (dialog look): zenity 4 dialogs (libadwaita's AdwMessageDialog) under labwc's title bar.
+   zenity draws a title-less, rounded "card" with the title again as a bold heading; labwc gives every
+   zenity window a server-side title bar (rc.xml), so the dialog showed two titles and the card's
+   rounded corners left a rectangular outline inside the frame. Here the content is a flat area that
+   fills the frame, the title is shown once (in the title bar) and a list shows its rows.
+   Loaded only by zenity (/usr/local/bin/zenity points XDG_CONFIG_HOME here; the Wayland broker's
+   dialogs read the same rules from /usr/share/prestium/broker-style), never by other apps. */
+window.messagedialog { border-radius: 0; box-shadow: none; outline: none; }
+/* the heading repeats the window title, which the title bar already shows */
+window.messagedialog .message-area { padding-top: 18px; border-spacing: 12px; }
+window.messagedialog .message-area > .heading-bin { margin-bottom: -12px; }
+window.messagedialog .heading-bin label { color: transparent; font-size: 1px; min-height: 0; margin: 0; padding: 0; }
+/* --list: libadwaita squeezed the list to two rows whatever --height said */
+window.messagedialog .child scrolledwindow { min-height: 170px; }
+/* --forms: no bordered box inside the dialog either */
+window.messagedialog .child frame { border: none; border-radius: 0; }
+window.messagedialog .child frame > label { margin: 0 0 6px 0; }
