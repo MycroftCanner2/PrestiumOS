@@ -86,7 +86,7 @@ assert top["modules-left"] == ["custom/applications"] and top["modules-center"] 
 assert top["modules-right"] == ["tray", "custom/tor-status", "custom/i2p-status", "custom/timesync", "pulseaudio", "network", "battery", "custom/power"]
 assert top["custom/timesync"]["exec"] == "cat /run/prestium/timesync/waybar.json" and top["custom/timesync"]["return-type"] == "json" and top["custom/timesync"]["format"] == "{}"
 assert top["custom/applications"]["on-click-release"] == "/usr/local/bin/prestium-wl menu" and "on-click" not in top["custom/applications"]
-assert top["custom/power"]["on-click"] == "/usr/local/bin/prestium-power-menu"
+assert top["custom/power"]["on-click"] == "/usr/local/bin/prestium-launch /usr/local/bin/prestium-power-menu"
 assert top["clock"]["format"] == "{:%a %b %d, %H:%M}"
 for k in ("tor-status", "i2p-status"):
     assert top["custom/" + k]["exec"] == "cat /run/prestium/netstatus/%s.json" % k.split("-")[0] and top["custom/" + k]["return-type"] == "json"

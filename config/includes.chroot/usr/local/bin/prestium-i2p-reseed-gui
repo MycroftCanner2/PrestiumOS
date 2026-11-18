@@ -135,7 +135,9 @@ def main():
                     "    <tt>%s</tt>\n\nthen choose it with Reseed from file… in the I2P Connection Assistant (Network menu)." % esc(MANUAL_URL),
                     [("_Close", Gtk.ResponseType.CLOSE), ("_Open in Tor Browser", Gtk.ResponseType.YES)])
         if r == Gtk.ResponseType.YES:
-            subprocess.Popen(["setsid", "tor-browser", MANUAL_URL], stdin=subprocess.DEVNULL,
+            # prestium-launch: its own unit under the user's systemd manager, so Tor Browser's bwrap
+            # works even where this dialog inherited a restricted sandbox
+            subprocess.Popen(["/usr/local/bin/prestium-launch", "tor-browser", MANUAL_URL], stdin=subprocess.DEVNULL,
                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     else:
         text = "\n".join(msg) if msg else "the helper failed (exit %d)" % rc

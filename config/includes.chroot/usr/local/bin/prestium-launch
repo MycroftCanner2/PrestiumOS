@@ -1,0 +1,33 @@
+#!/bin/sh
+# Prestium 2.1: start an application from the panel in a clean context, like the menu does.
+#
+# The panel (waybar), notifications and idle lock are started by prestium-wl-broker, so they live in
+# prestium-wl-broker.service and keep its hardening: RestrictAddressFamilies=AF_UNIX AF_NETLINK and
+# RestrictNamespaces=yes are seccomp filters that every child inherits, through sudo and runuser too,
+# and the broker's environment points XDG_CONFIG_HOME at an empty root-owned directory. An app
+# clicked on the panel then had no IP sockets (Refresh reseed via Tor could not reach 127.0.0.1:9050)
+# and could not create namespaces (bwrap: Tor Browser, I2P Browser, Loupe, mat2 failed).
+#
+# This asks the user's systemd manager to start the command as a transient service: it is forked by
+# user@<uid>.service, outside the broker's unit, with the session environment the labwc autostart
+# imported there (restricted WAYLAND_DISPLAY, GTK_CSD and the rest), exactly like D-Bus-activated
+# programs. It still runs through prestium-run (restricted Wayland socket). It gains nothing a user's
+# program could not already get: any of them can run "systemd-run --user". Without a user manager it
+# starts the command directly, as before.
+#
+#   prestium-launch COMMAND [ARG...]
+[ $# -gt 0 ] || { echo "usage: prestium-launch COMMAND [ARG...]" >&2; exit 2; }
+n=$(basename -- "$1" | tr -d '\n' | tr -c 'A-Za-z0-9_.-' '_' | cut -c1-40); n=${n#prestium-}
+cd "${HOME:-/}" 2>/dev/null || cd /
+if command -v systemd-run >/dev/null 2>&1; then
+  # a fresh unit name per start (app-<name>-<random>.service, as desktop launchers name them)
+  r=$(od -An -N4 -tx4 /dev/urandom | tr -d ' \n')
+  if systemd-run --user --quiet --collect --no-block --service-type=exec \
+       --unit="app-prestium-$n-$r" --description="Prestium: $n (from the panel)" \
+       -p WorkingDirectory=~ -p StandardInput=null -p StandardOutput=null -p StandardError=null \
+       -- /usr/local/bin/prestium-run "$@" 2>/dev/null; then
+    exit 0
+  fi
+  logger -t prestium-launch "could not start $n through the user manager; starting it directly" 2>/dev/null
+fi
+exec /usr/local/bin/prestium-run "$@"

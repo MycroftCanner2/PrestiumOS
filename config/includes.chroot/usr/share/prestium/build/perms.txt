@@ -471,6 +471,7 @@
 0755 root root /usr/local/bin/prestium-power-menu
 0755 root root /usr/local/bin/zenity
 0755 root root /usr/local/bin/prestium-run
+0755 root root /usr/local/bin/prestium-launch
 0755 root root /usr/local/bin/prestium-audacity
 0755 root root /usr/local/lib/prestium/audacity-ns
 0755 root root /usr/local/lib/prestium/tor-bootstrap.py

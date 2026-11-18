@@ -27,6 +27,9 @@ LockPersonality=yes
 # (ProtectSystem=yes; "strict" would also block /etc, where chpasswd sets the first session
 # password, and the home directory, where screenshots go). Only local sockets and netlink (PAM's audit
 # messages); no raw or IP sockets. The tools it starts inherit all of this.
+# Apps opened from the panel (Tor/I2P pills, volume, power) must not inherit it (no IP sockets, no
+# namespaces for bwrap): waybar starts them with prestium-launch, a transient unit of the user's
+# systemd manager, so they run outside this unit like the apps the menu starts.
 ProtectSystem=yes
 ProtectKernelLogs=yes
 ProtectControlGroups=yes

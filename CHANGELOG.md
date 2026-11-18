@@ -379,6 +379,14 @@ done in).
   `systemd-analyze security` scores and runs the tests that don't need a live session.
 
 ### Late 2.1 additions
+- **Apps opened from the panel run outside the broker's sandbox.** The panel (waybar) is started by
+  prestium-wl-broker and lives in its unit, whose `RestrictAddressFamilies=AF_UNIX AF_NETLINK` and
+  `RestrictNamespaces=yes` seccomp filters every child inherited, through sudo too. The Tor and I2P
+  assistants, Volume and Power opened from the panel had no IP sockets and could not start bwrap, so
+  "Open in Tor Browser" from them, and Tor Browser, I2P Browser, Loupe or mat2 started from them,
+  failed. The panel now starts them with `prestium-launch`, a transient unit of the user's systemd
+  manager (like D-Bus-activated programs), still on the restricted Wayland socket; labwc's autostart
+  imports the session's settings there. The broker keeps its hardening.
 - **File chooser with one header** (Unlock Volume's "Unlock a file container" and keyfiles, VeraCrypt):
   `zenity --file-selection` now opens Prestium's own GTK 4 picker (`/usr/local/lib/prestium/file-picker`).
   zenity's chooser is a GTK 4 dialog with its own header bar, and labwc's title bar for zenity windows sat

@@ -6,6 +6,9 @@
   {
     // 2.1: Tor and I2P status. Root-free and read-only: prestium-netstatus.service
     // writes the state every 5 seconds; a click opens the matching Connection Assistant (Network menu).
+    // Clicks that open an app go through prestium-launch: waybar lives in prestium-wl-broker.service,
+    // whose seccomp filters (no IP sockets, no namespaces) every child would inherit; prestium-launch
+    // starts the app as its own unit under the user's systemd manager, like the menu's apps.
     "name": "prestium-top",
     "layer": "top",
     "position": "top",
@@ -34,14 +37,14 @@
       "return-type": "json",
       "interval": 5,
       "format": "\uf111  {}",
-      "on-click": "prestium-run /usr/local/bin/prestium-tor-assistant"
+      "on-click": "/usr/local/bin/prestium-launch /usr/local/bin/prestium-tor-assistant"
     },
     "custom/i2p-status": {
       "exec": "cat /run/prestium/netstatus/i2p.json",
       "return-type": "json",
       "interval": 5,
       "format": "\uf111  {}",
-      "on-click": "prestium-run /usr/local/bin/prestium-i2p-assistant"
+      "on-click": "/usr/local/bin/prestium-launch /usr/local/bin/prestium-i2p-assistant"
     },
     // clock sync over Tor (prestium-timesync). Hidden once the time is set; a clock
     // symbol in amber while it waits or syncs, red when it refused a time it could not trust.
@@ -70,7 +73,7 @@
       "tooltip-format": "Volume {volume} % (click: mixer, right-click: mute)",
       "scroll-step": 5,
       "max-volume": 100,
-      "on-click": "prestium-run pavucontrol --tab=1",
+      "on-click": "/usr/local/bin/prestium-launch pavucontrol --tab=1",
       "on-click-right": "/usr/local/bin/prestium-media-key mute"
     },
     "battery": {
@@ -83,7 +86,7 @@
     },
     "custom/power": {
       "format": "\uf011",
-      "on-click": "/usr/local/bin/prestium-power-menu",
+      "on-click": "/usr/local/bin/prestium-launch /usr/local/bin/prestium-power-menu",
       "tooltip-format": "Power"
     }
   },
