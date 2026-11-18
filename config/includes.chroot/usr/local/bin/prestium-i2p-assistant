@@ -6,7 +6,7 @@
 #   - share level: Low 30 % at 32 KB/s (default), Medium 50 % at 64 KB/s, High 80 % at 128 KB/s
 #   - outproxy: Acetone (default), StormyCloud, or a custom I2P address (HTTP only; the SOCKS
 #     outproxy on 127.0.0.1:4500 then stays on Acetone)
-#   - reseed from StormyCloud over Tor, or from a .su3 file (prestium-i2p-reseed-gui)
+#   - reseed over Tor (StormyCloud first, then the other reseed servers), or from a .su3 file (prestium-i2p-reseed-gui)
 #   - Apply writes the settings and restarts i2pd; Restart (the computer) is at the bottom.
 # Apply goes through the Wayland broker (prestium-wl i2p-apply): it shows the values in a
 # confirmation dialog and only then runs the root helper /usr/local/sbin/prestium-i2p-mode, which

@@ -126,9 +126,12 @@ def main():
         message("info", title, "The reseed file was checked and installed. I2P (i2pd) was restarted and is "
                 "now reseeding from it; it can take a few minutes to build tunnels." + note)
     elif rc == 2:
+        # 2.1: which servers were tried over Tor and why each failed ("FAIL: host: reason")
+        fails = [l[len("FAIL: "):] for l in out if l.startswith("FAIL: ")][:10]
+        why = ("\n\n" + "\n".join("• " + esc(f) for f in fails)) if fails else ""
         r = message("question", title,
-                    "The automatic download failed (StormyCloud and reseed.onion.im, both over Tor). Your current "
-                    "reseed file is kept and I2P was not restarted.\n\nDownload a reseed file by hand from:\n\n"
+                    "No reseed server gave a valid file over Tor. Your current "
+                    "reseed file is kept and I2P was not restarted." + why + "\n\nDownload a reseed file by hand from:\n\n"
                     "    <tt>%s</tt>\n\nthen choose it with Reseed from file… in the I2P Connection Assistant (Network menu)." % esc(MANUAL_URL),
                     [("_Close", Gtk.ResponseType.CLOSE), ("_Open in Tor Browser", Gtk.ResponseType.YES)])
         if r == Gtk.ResponseType.YES:

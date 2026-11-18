@@ -1,6 +1,7 @@
 #!/bin/bash
 # prestium-i2p-reseed: replace i2pd's reseed file and make i2pd reseed from it.
-#   prestium-i2p-reseed               download a fresh .su3 over Tor (StormyCloud, then reseed.onion.im)
+#   prestium-i2p-reseed               download a fresh .su3 over Tor (StormyCloud first, then the other
+#                                     reseed servers i2pd knows, one after the other, until one passes)
 #   prestium-i2p-reseed --file PATH   use a .su3 the user downloaded (e.g. from https://reseed2.i2p.net/)
 # Runs as root (user may run exactly this script through sudo, /etc/sudoers.d/prestium-i2p-reseed).
 # Every file is checked by /usr/local/lib/prestium/verify-su3 against i2pd's reseed certificates
@@ -9,6 +10,8 @@
 # atomically as the file i2pd.conf [reseed] file= names (i2pd 2000:2000, 0644), netDb is cleared and
 # i2pd restarted. On any failure the current file stays and i2pd is not touched.
 # Output lines "STEP: ..." are progress for the GUI (prestium-i2p-reseed-gui).
+# Output lines "NOTE: ..." explain a skipped server; "FAIL: host: reason" (one per server) come before
+# the final "ERROR: ..." when every server failed.
 # Exit: 0 done, 2 every download source failed (try a manual file), 3 Tor not ready, 1 other error.
 set -u
 umask 022
@@ -19,16 +22,68 @@ VERIFY=/usr/local/lib/prestium/verify-su3
 NETDB=/var/lib/i2pd/netDb
 MAXSIZE=10485760
 SAFE=/usr/local/lib/prestium/safefile
-# url  allowed signers (the certificate for each is in $CERTS)
+# url  allowed signer (the certificate for each is in $CERTS). StormyCloud first, then the other
+# reseed servers built into i2pd 2.56 whose signer has a certificate in i2pd's package, each pinned to
+# the signer it was seen signing with (2.1: checked over Tor). A server that is down, slow, has a
+# certificate curl rejects (expired, self-signed) or serves a file that fails verify-su3 is skipped and
+# the next one is tried. Every attempt goes through Tor; there is no clearnet fallback.
 SOURCES=(
   "https://reseed.stormycloud.org/i2pseeds.su3 admin@stormycloud.org,idk@stormycloud.org"
+  "https://reseed2.i2p.net/i2pseeds.su3 echelon3@mail.i2p"
   "https://reseed.onion.im/i2pseeds.su3 lazygravy@mail.i2p"
+  "https://reseed-fr.i2pd.xyz/i2pseeds.su3 r4sas-reseed@mail.i2p"
+  "https://reseed-pl.i2pd.xyz/i2pseeds.su3 r4sas-reseed@mail.i2p"
+  "https://www2.mk16.de/i2pseeds.su3 i2p-reseed@mk16.de"
+  "https://i2p.novg.net/i2pseeds.su3 igor@novg.net"
+  "https://coconut.incognet.io/i2pseeds.su3 rambler@mail.i2p"
 )
 # the Tor client runs as this uid: the firewall (ferm.conf) lets it reach 127.0.0.1:9050 and nothing
 # else; root and debian-tor are not used for the download (root is blocked, debian-tor bypasses Tor)
 TORUID=prestium-htp
+# 2.1: whole download budget; after it no further server is tried
+BUDGET=900
 
 step(){ echo "STEP: $*"; }
+# 2.1: every network step runs in its own transient system service as $TORUID, started by systemd,
+# never as a child of this script. This helper is started through sudo from the I2P Connection
+# Assistant, and when the panel's I2P button started the assistant, it inherited the panel's sandbox
+# (prestium-wl-broker.service: RestrictAddressFamilies=AF_UNIX AF_NETLINK, a seccomp filter that
+# survives sudo and runuser), so socket(AF_INET) failed with EAFNOSUPPORT and Tor's SOCKS port looked
+# unreachable although Tor was running. A unit started by systemd gets a clean environment and its
+# own sandbox: no capabilities, no home, read-only system, IPv4 to 127.0.0.1 only (the firewall
+# further limits $TORUID to Tor's SOCKS port), no proxy variables from the caller.
+NETUNIT=0
+tor_run(){ # tor_run SECONDS COMMAND... : stdin/stdout/stderr pass through, exit code is the command's
+  local max=$1; shift
+  NETUNIT=$((NETUNIT + 1))
+  systemd-run --quiet --pipe --wait --collect --service-type=exec \
+    --unit "prestium-i2p-reseed-net-$$-$NETUNIT" \
+    -p "Description=Prestium: I2P reseed download over Tor" \
+    -p "User=$TORUID" -p "Group=$TORUID" -p "RuntimeMaxSec=$max" -p UMask=0077 \
+    -p WorkingDirectory=/ -p Environment=HOME=/nonexistent \
+    -p NoNewPrivileges=yes -p CapabilityBoundingSet= -p PrivateTmp=yes -p PrivateDevices=yes \
+    -p ProtectSystem=strict -p ProtectHome=yes -p ProtectKernelTunables=yes -p ProtectKernelModules=yes \
+    -p ProtectKernelLogs=yes -p ProtectControlGroups=yes -p ProtectClock=yes -p ProtectHostname=yes \
+    -p "RestrictAddressFamilies=AF_INET AF_UNIX" -p IPAddressDeny=any -p IPAddressAllow=127.0.0.1 \
+    -p RestrictNamespaces=yes -p RestrictRealtime=yes -p RestrictSUIDSGID=yes -p LockPersonality=yes \
+    -p MemoryDenyWriteExecute=yes -p SystemCallArchitectures=native \
+    -- "$@"
+}
+curl_why(){ # a plain-language reason for a curl exit code
+  case "$1" in
+    5|7|97) echo "Tor could not connect to the server (it may be down)" ;;
+    6) echo "the server name could not be resolved through Tor" ;;
+    28) echo "timed out (the server or the Tor circuit is too slow)" ;;
+    22) echo "the server answered with an HTTP error" ;;
+    35|53|54|58|59|60|66|77|80|83|90|91) echo "TLS failed: the server's certificate is expired, self-signed or does not match" ;;
+    47) echo "too many redirects" ;;
+    1) echo "the server redirected to a non-HTTPS address" ;;
+    63) echo "the file is larger than 10 MB" ;;
+    18|56|92|16) echo "the connection broke during the download" ;;
+    124|143|137) echo "stopped after the time limit" ;;
+    *) echo "curl error $1" ;;
+  esac
+}
 die(){ echo "ERROR: $2"; exit "$1"; }
 
 if [ "$(id -u)" -ne 0 ]; then exec sudo -n /usr/local/sbin/prestium-i2p-reseed "$@"; fi
@@ -73,32 +128,48 @@ if [ "$MODE" = download ]; then
   # the firewall must let $TORUID reach Tor's SOCKS port. Tor restarts (a new
   # connection method, new bridges) keep the control port answering while the SOCKS
   # listener is briefly gone, so retry before failing.
-  socks_ok=0
+  socks_ok=0; socks_err=
   for _ in 1 2 3; do
-    if runuser -u "$TORUID" -- timeout 10 bash -c 'exec 3<>/dev/tcp/127.0.0.1/9050' 2>/dev/null; then
+    if socks_err=$(tor_run 20 /usr/bin/timeout 10 /bin/bash -c 'exec 3<>/dev/tcp/127.0.0.1/9050' 2>&1); then
       socks_ok=1; break
     fi
     sleep 5
   done
-  [ "$socks_ok" = 1 ] || die 3 "uid $TORUID cannot reach Tor's SOCKS port 127.0.0.1:9050 after 3 tries (firewall or Tor not listening; Tor's log: Network > Network Logs)"
-  ok=0
+  socks_err=$(printf '%s' "$socks_err" | tr '\n' ' ' | sed 's/^bash: line [0-9]*: //; s/  */ /g; s/ $//')
+  [ "$socks_ok" = 1 ] || die 3 "uid $TORUID cannot reach Tor's SOCKS port 127.0.0.1:9050 after 3 tries${socks_err:+ ($socks_err)}. Tor may be restarting: wait a minute and try again (Tor's log: Network > Network Logs)."
+  ok=0; tried=0; failed=(); start=$SECONDS
   for s in "${SOURCES[@]}"; do
     url=${s%% *}; signers=${s#* }; host=${url#https://}; host=${host%%/*}
-    step "Downloading from $host over Tor"
+    if [ $((SECONDS - start)) -ge "$BUDGET" ]; then
+      echo "NOTE: time budget used up; not trying $host"; failed+=("$host: not tried (time budget used up)"); continue
+    fi
+    tried=$((tried + 1))
+    step "Downloading from $host over Tor ($tried of ${#SOURCES[@]})"
     rm -f "$NEW"
-    # own Tor circuit per attempt (SOCKS user name); reseed servers only answer I2P's user agent
-    if ! runuser -u "$TORUID" -- curl -sfL --proto =https --max-redirs 3 --max-filesize $MAXSIZE \
-         --retry 2 --retry-delay 5 --retry-max-time 120 --connect-timeout 60 -m 180 -A "Wget/1.11.4" \
-         --proxy "socks5h://prestium-reseed-$$-$RANDOM:x@127.0.0.1:9050" "$url" > "$NEW"; then
-      echo "WARN: download from $host failed"; continue
+    # own Tor circuit per attempt (SOCKS user name); reseed servers only answer I2P's user agent.
+    # -q: no ~/.curlrc; --noproxy '': no host bypasses the proxy; HTTPS only, also after redirects.
+    tor_run 200 /usr/bin/curl -q -sSfL --noproxy '' --proto =https --proto-redir =https --max-redirs 3 \
+         --max-filesize $MAXSIZE --retry 1 --retry-delay 5 --connect-timeout 45 -m 150 -A "Wget/1.11.4" \
+         --proxy "socks5h://prestium-reseed-$$-$RANDOM:x@127.0.0.1:9050" "$url" > "$NEW" 2>"$T/curl.err"
+    rc=$?
+    if [ "$rc" -ne 0 ]; then
+      why=$(curl_why "$rc")
+      echo "NOTE: download from $host failed: $why ($(grep -m1 "^curl:" "$T/curl.err" | cut -c1-200))"; failed+=("$host: $why"); continue
+    fi
+    if [ "$(stat -c %s "$NEW")" -gt $MAXSIZE ]; then
+      echo "NOTE: the file from $host is larger than 10 MB"; failed+=("$host: file larger than 10 MB"); continue
     fi
     step "Checking the signature of the file from $host"
     if out=$(python3 -I "$VERIFY" --max-age 14 --signers "$signers" "$NEW" "$CERTS"); then
       echo "$out"; ok=1; FROM=$host; break
     fi
-    echo "$out"; echo "WARN: the file from $host was rejected"
+    echo "$out" | sed 's/^ERROR: /NOTE: /'; echo "NOTE: the file from $host was rejected"
+    failed+=("$host: $(printf '%s\n' "$out" | sed -n 's/^ERROR: su3: //p' | head -n1)")
   done
-  [ "$ok" = 1 ] || die 2 "the automatic download failed (StormyCloud and reseed.onion.im). The current reseed file is kept and i2pd was not restarted. Download a reseed file by hand from https://reseed2.i2p.net/ in Tor Browser, then use the menu entry \"Manual reseed file\"."
+  if [ "$ok" != 1 ]; then
+    for f in "${failed[@]}"; do echo "FAIL: $f"; done
+    die 2 "no reseed server gave a valid file over Tor ($tried of ${#SOURCES[@]} tried; the reasons are the FAIL lines). The current reseed file is kept and i2pd was not restarted. Download a reseed file by hand from https://reseed2.i2p.net/ in Tor Browser, then use the menu entry \"Manual reseed file\"."
+  fi
 else
   # the path comes from the user: never let root open it. Checks first, then the file is read as the
   # invoking user (so a symlink or a race can only reach what that user may read anyway), size-capped.

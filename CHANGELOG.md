@@ -402,6 +402,15 @@ done in).
   volumes stay read-only for it; mat2 reads anywhere in the home too, and still writes only its work folder.
 - **Dialogs:** zenity dialogs (Power, Unlock Volume, confirmations) show one title, in the title bar,
   over a flat content area, instead of a second bold title on a rounded card inside the frame.
+- **Refresh reseed (via Tor)** works when the I2P Connection Assistant was opened from the panel's
+  I2P button. The panel and everything it starts inherit the Wayland broker's sandbox (IP sockets
+  refused), which sudo and runuser keep, so the helper reported "cannot reach Tor's SOCKS port" with
+  Tor running. The SOCKS check and every download now run in their own transient systemd service as
+  `prestium-htp` (no capabilities, IPv4 to 127.0.0.1 only, clean environment). The helper tries
+  StormyCloud first, then seven more reseed servers built into i2pd, each over Tor and pinned to its
+  signer; a server that is down, slow, has a bad certificate or serves a bad, wrongly signed or stale
+  file is skipped with a reason, and when all fail the dialog lists each server's reason. There is no
+  clearnet fallback.
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):
