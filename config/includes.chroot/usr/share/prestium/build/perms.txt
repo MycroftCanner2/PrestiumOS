@@ -489,6 +489,7 @@
 0755 root root /usr/local/sbin/prestium-browser-install
 0755 root root /usr/local/bin/prestium-browser-updater
 0644 root root /usr/local/lib/prestium/browser_update.py
+0644 root root /usr/local/lib/prestium/prestium_landlock.py
 0644 root root /usr/local/lib/prestium/sigcheck.sh
 0644 root root /usr/share/applications/prestium-browser-updater.desktop
 0755 root root /usr/share/prestium/keys

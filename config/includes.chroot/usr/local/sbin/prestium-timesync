@@ -248,7 +248,34 @@ def one_round(pools, first):
     return True
 
 
+# 2.1 (HiddenForge review): Landlock. Reads: the system (not /home, /root, /media, /tmp), Tor's consensus,
+# its own state. Writes: /run/prestium (panel state, safety flags), its state directory. Programs: /usr
+# only (python3, runuser, curl, systemctl, safety-flag). TCP: only Tor's SOCKS port (curl as prestium-htp);
+# the control port is a Unix socket (tor-bootstrap.py through onion-grater).
+LANDLOCK = dict(read=("/usr", "/etc", "/proc", "/sys", "/dev", "/run") + ("/var/lib/tor", "/var/lib/prestium-timesync"),
+                write=("/run/prestium", "/var/lib/prestium-timesync"),
+                devices=("/dev/null", "/dev/kmsg"), connect_tcp=(9050,))
+
+def landlock():
+    """2.1 (HiddenForge review): Landlock (/usr/local/lib/prestium/prestium_landlock.py) with LANDLOCK
+    above, first thing in main(). Only for the installed copy: the tests run this file from the source
+    tree (tests/test_landlock.py checks the ruleset itself). Without Landlock in the kernel, it logs
+    one line and the helper runs as before, under its unit's sandbox."""
+    if os.path.realpath(__file__) != "/usr/local/sbin/prestium-timesync":
+        return False
+    try:
+        import importlib.util
+        sys.dont_write_bytecode = True
+        spec = importlib.util.spec_from_file_location("prestium_landlock", "/usr/local/lib/prestium/prestium_landlock.py")
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        return mod.restrict("prestium-timesync", **LANDLOCK)
+    except Exception as e:                  # never stop the helper because of its sandbox
+        print("prestium-timesync: landlock: not loaded (%s), running without it" % e, file=sys.stderr, flush=True)
+        return False
+
+
 def main():
+    landlock()
     pools = load_pools()
     if "--check" in sys.argv:
         print("pools: " + ", ".join("%s=%d" % (k, len(v)) for k, v in pools.items())); return 0

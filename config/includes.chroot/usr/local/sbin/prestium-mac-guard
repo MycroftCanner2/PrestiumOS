@@ -128,7 +128,32 @@ class EgressFilters:
 
 # ---------- NetworkManager over D-Bus ----------
 
+# 2.1 (HiddenForge review): Landlock. Reads: the system (not /home, /root, /media, /tmp). Writes: only
+# /run/prestium (safety flags). Programs: /usr only (nft, safety-flag, systemd-notify). No TCP (it talks
+# to NetworkManager on the system bus and to nftables over netlink).
+LANDLOCK = dict(read=("/usr", "/etc", "/proc", "/sys", "/dev", "/run") + ("/var/lib/dbus/machine-id",),
+                write=("/run/prestium",), devices=("/dev/null", "/dev/kmsg"))
+
+def landlock():
+    """2.1 (HiddenForge review): Landlock (/usr/local/lib/prestium/prestium_landlock.py) with LANDLOCK
+    above, first thing in main(). Only for the installed copy: the tests run this file from the source
+    tree (tests/test_landlock.py checks the ruleset itself). Without Landlock in the kernel, it logs
+    one line and the helper runs as before, under its unit's sandbox."""
+    if os.path.realpath(__file__) != "/usr/local/sbin/prestium-mac-guard":
+        return False
+    try:
+        import importlib.util
+        sys.dont_write_bytecode = True
+        spec = importlib.util.spec_from_file_location("prestium_landlock", "/usr/local/lib/prestium/prestium_landlock.py")
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        return mod.restrict("prestium-mac-guard", **LANDLOCK)
+    except Exception as e:                  # never stop the helper because of its sandbox
+        print("prestium-mac-guard: landlock: not loaded (%s), running without it" % e, file=sys.stderr, flush=True)
+        return False
+
+
 def main():
+    landlock()
     if "nomacspoof" in open(_test_env("PRESTIUM_CMDLINE", "/proc/cmdline")).read().split():
         log("boot option nomacspoof: MAC guard disabled")
         return 0

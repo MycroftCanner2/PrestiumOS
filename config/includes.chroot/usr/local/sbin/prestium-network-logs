@@ -47,7 +47,30 @@ def torrc_text(on):
             "Log err file /dev/null\n")
 
 
+# 2.1 (HiddenForge review): Landlock. Reads: the system. Writes: only /etc/tor/torrc.d (the unit's
+# only ReadWritePaths). Programs: /usr only (it starts none). No TCP.
+LANDLOCK = dict(read=("/usr", "/etc", "/proc", "/sys", "/dev", "/run"), write=("/etc/tor/torrc.d",))
+
+def landlock():
+    """2.1 (HiddenForge review): Landlock (/usr/local/lib/prestium/prestium_landlock.py) with LANDLOCK
+    above, first thing in main(). Only for the installed copy: the tests run this file from the source
+    tree (tests/test_landlock.py checks the ruleset itself). Without Landlock in the kernel, it logs
+    one line and the helper runs as before, under its unit's sandbox."""
+    if os.path.realpath(__file__) != "/usr/local/sbin/prestium-network-logs":
+        return False
+    try:
+        import importlib.util
+        sys.dont_write_bytecode = True
+        spec = importlib.util.spec_from_file_location("prestium_landlock", "/usr/local/lib/prestium/prestium_landlock.py")
+        mod = importlib.util.module_from_spec(spec); spec.loader.exec_module(mod)
+        return mod.restrict("prestium-network-logs", **LANDLOCK)
+    except Exception as e:                  # never stop the helper because of its sandbox
+        print("prestium-network-logs: landlock: not loaded (%s), running without it" % e, file=sys.stderr, flush=True)
+        return False
+
+
 def main(argv):
+    landlock()
     if argv[1:]:
         print("prestium-network-logs takes no arguments", file=sys.stderr)
         return 2
