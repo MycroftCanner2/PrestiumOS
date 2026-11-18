@@ -23,7 +23,9 @@ printf '#!/bin/sh\necho "XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-}"\n' > "$W/zenity";
 sed "s#/usr/bin/zenity#$W/zenity#g" "$Z" > "$W/wrap"
 r=$(env -u XDG_CONFIG_HOME sh "$W/wrap" --list --title Power); [ "$r" = "XDG_CONFIG_HOME=/usr/share/prestium/dialog-style" ] && ok "dialogs load dialog-style" || bad "dialogs: $r"
 r=$(XDG_CONFIG_HOME=/home/user/.config sh "$W/wrap" --question); [ "$r" = "XDG_CONFIG_HOME=/usr/share/prestium/dialog-style" ] && ok "dialogs ignore the user's config dir" || bad "user config: $r"
-r=$(XDG_CONFIG_HOME=/home/user/.config sh "$W/wrap" --file-selection --title Keyfile); [ "$r" = "XDG_CONFIG_HOME=/home/user/.config" ] && ok "file chooser keeps the user's settings (bookmarks)" || bad "file chooser: $r"
+printf '#!/bin/sh\necho "picker XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-} $*"\n' > "$W/picker"; chmod +x "$W/picker"
+sed -i "s#/usr/local/lib/prestium/file-picker#$W/picker#g" "$W/wrap"
+r=$(XDG_CONFIG_HOME=/home/user/.config sh "$W/wrap" --file-selection --title Keyfile); [ "$r" = "picker XDG_CONFIG_HOME=/home/user/.config --file-selection --title Keyfile" ] && ok "file chooser: Prestium's picker, the user's settings (bookmarks)" || bad "file chooser: $r"
 r=$(XDG_CONFIG_HOME=/usr/share/prestium/broker-style sh "$W/wrap" --forms); [ "$r" = "XDG_CONFIG_HOME=/usr/share/prestium/broker-style" ] && ok "broker's style directory kept" || bad "broker: $r"
 grep -q '"PATH": "/usr/local/bin:' "$I/usr/local/sbin/prestium-wl-broker" && ok "broker finds the wrapper first" || bad "broker PATH"
 exit $fail

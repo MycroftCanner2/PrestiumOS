@@ -2,11 +2,14 @@
 # Prestium 2.1 (dialog look): every zenity dialog (Power, Unlock Volume, the confirmations, errors and
 # notices) gets the integrated look: labwc's title bar on top, a flat content area under it, the title
 # shown once. The rules are in /usr/share/prestium/dialog-style/gtk-4.0/gtk.css, which zenity reads
-# as its XDG_CONFIG_HOME, so no other application changes. File choosers keep the user's own settings
-# (their bookmarks and recent files live there). The Wayland broker already sets its own root-owned
-# style directory (broker-style, same rules), which is kept.
+# as its XDG_CONFIG_HOME, so no other application changes. The Wayland broker already sets its own
+# root-owned style directory (broker-style, same rules), which is kept.
+# 2.1: --file-selection opens Prestium's file picker instead (/usr/local/lib/prestium/file-picker): one
+# header bar with Cancel, the title, search, OK and the window buttons. zenity's chooser is a GTK 4
+# dialog with its own header bar under labwc's title bar (two bars, the title twice). The picker keeps
+# the user's own settings (bookmarks, recent files) and runs the real zenity for options it lacks.
 for a do
-  case $a in --file-selection) exec /usr/bin/zenity "$@" ;; esac
+  case $a in --file-selection) exec /usr/local/lib/prestium/file-picker "$@" ;; esac
 done
 case ${XDG_CONFIG_HOME:-} in
   /usr/share/prestium/*) ;;

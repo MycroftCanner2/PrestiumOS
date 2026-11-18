@@ -30,7 +30,8 @@ python3 - "$RC" <<'PY'
 import sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 rules = [(k.get("identifier"), k.get("serverDecoration")) for k in root.iter() if k.tag.endswith("windowRule")]
-assert rules == [("*zenity*", "yes")], rules
+# the file picker draws its own single header (no serverDecoration), it is only centred
+assert rules == [("*zenity*", "yes"), ("org.prestium.FilePicker", None)], rules
 kb = [k for k in root.iter() if k.tag.endswith("keybind") and k.get("key") == "W-space"]
 assert len(kb) == 1, "one W-space keybind"
 a = [x for x in kb[0] if x.tag.endswith("action")][0]

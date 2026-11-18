@@ -379,6 +379,12 @@ done in).
   `systemd-analyze security` scores and runs the tests that don't need a live session.
 
 ### Late 2.1 additions
+- **File chooser with one header** (Unlock Volume's "Unlock a file container" and keyfiles, VeraCrypt):
+  `zenity --file-selection` now opens Prestium's own GTK 4 picker (`/usr/local/lib/prestium/file-picker`).
+  zenity's chooser is a GTK 4 dialog with its own header bar, and labwc's title bar for zenity windows sat
+  above it (two bars, the title twice). The picker has one header bar with Cancel, the title, search, Open
+  and minimise, maximise and close, like the other apps, and keeps the user's bookmarks and recent files.
+  Options it does not handle run zenity's chooser as before.
 - **Tor:** `VanguardsLiteEnabled 1` is pinned after the torrc drop-ins, so no bridge or transport
   drop-in can turn off the slowly rotating second-hop guards that protect onion-service circuits.
 - **No AF_ALG sockets for confined apps** (`deny network alg,` in prestium-no-admin, the browser

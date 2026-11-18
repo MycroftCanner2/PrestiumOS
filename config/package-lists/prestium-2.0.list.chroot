@@ -17,6 +17,8 @@ pavucontrol
 python3
 python3-gi
 gir1.2-gtk-3.0
+# file picker behind "zenity --file-selection" (Python + GTK 4)
+gir1.2-gtk-4.0
 # build/verification helpers used by hooks (kept: tiny)
 ca-certificates
 xz-utils

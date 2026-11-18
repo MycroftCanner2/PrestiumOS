@@ -1,0 +1,137 @@
+#!/usr/bin/python3 -I
+"""Prestium 2.1: the file chooser behind "zenity --file-selection" (Unlock Volume's file container and
+keyfiles, VeraCrypt), with one header.
+
+zenity's own file chooser is a GTK 4 dialog: it always draws a header bar (Cancel, the title, search,
+OK) and never shows the window buttons there. labwc gives every zenity window its own title bar
+(rc.xml, for zenity's title-less message dialogs), so the chooser had two bars with the same title.
+This is a normal GTK 4 window instead (app id org.prestium.FilePicker, which the zenity rule does not
+match): its single header bar holds Cancel, the title, search, OK and minimise, maximise and close, like
+the other GTK 4 apps. It reads the user's own GTK settings (bookmarks, recent files).
+
+zenity-compatible subset (anything else runs the real zenity):
+  --file-selection --title T --filename PATH --multiple --separator S --directory
+Prints the chosen path(s) and exits 0; Cancel, Escape or closing the window exits 1, like zenity.
+"""
+import os, sys, warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+ZENITY = "/usr/bin/zenity"
+APP_ID = "org.prestium.FilePicker"
+
+
+def parse(argv):
+    o = {"title": "Choose a File", "filename": None, "multiple": False, "separator": "|", "directory": False}
+    it = iter(argv)
+    seen = False
+    for a in it:
+        k, eq, v = a.partition("=")
+        if a == "--file-selection":
+            seen = True
+        elif a in ("--multiple", "--directory"):
+            o[a[2:]] = True
+        elif k in ("--title", "--filename", "--separator"):
+            if not eq:
+                v = next(it, None)
+                if v is None:
+                    return None
+            o[k[2:]] = v
+        else:
+            return None   # an option this picker does not implement (--save, --file-filter, ...)
+    return o if seen else None
+
+
+def main(argv):
+    o = parse(argv)
+    if o is None:
+        os.execv(ZENITY, ["zenity"] + argv)
+    try:
+        import gi
+        gi.require_version("Gtk", "4.0")
+        from gi.repository import Gio, GLib, GObject, Gtk
+    except (ImportError, ValueError):
+        os.execv(ZENITY, ["zenity"] + argv)   # no GTK 4 bindings: zenity's own chooser still works
+    GLib.set_prgname(APP_ID)
+    GLib.set_application_name(o["title"])
+    result = {"rc": 1}
+    app = Gtk.Application(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
+
+    def activate(app):
+        win = Gtk.ApplicationWindow(application=app, title=o["title"])
+        win.set_default_size(900, 600)
+        hb = Gtk.HeaderBar()
+        # the session's window buttons (dconf button-layout); fixed here so the chooser has them even
+        # where no settings backend answers
+        hb.set_decoration_layout(":minimize,maximize,close")
+        cancel = Gtk.Button(label="_Cancel", use_underline=True)
+        ok = Gtk.Button(label="_Open" if not o["directory"] else "_Select", use_underline=True)
+        ok.add_css_class("suggested-action")
+        search = Gtk.ToggleButton(icon_name="edit-find-symbolic", tooltip_text="Search")
+        hb.pack_start(cancel)
+        hb.pack_end(ok)
+        hb.pack_end(search)
+        win.set_titlebar(hb)
+        action = Gtk.FileChooserAction.SELECT_FOLDER if o["directory"] else Gtk.FileChooserAction.OPEN
+        ch = Gtk.FileChooserWidget(action=action, select_multiple=o["multiple"])
+        search.bind_property("active", ch, "search-mode",
+                             GObject.BindingFlags.BIDIRECTIONAL | GObject.BindingFlags.SYNC_CREATE)
+        win.set_child(ch)
+
+        def start_at():
+            # after the window is up: set before the first folder load, GTK cancels that load and
+            # shows "The folder contents could not be displayed"
+            f = o["filename"]
+            if not f:
+                return False
+            f = os.path.expanduser(f)
+            isdir = f.endswith("/") or os.path.isdir(f)
+            f = os.path.normpath(f)
+            try:
+                if isdir:
+                    ch.set_current_folder(Gio.File.new_for_path(f))
+                elif os.path.exists(f):
+                    ch.set_file(Gio.File.new_for_path(f))
+                elif os.path.isdir(os.path.dirname(f)):
+                    ch.set_current_folder(Gio.File.new_for_path(os.path.dirname(f)))
+            except GLib.Error:
+                pass
+            return False
+
+        def accept(*_):
+            files = ch.get_files()
+            paths = [files.get_item(i).get_path() for i in range(files.get_n_items())]
+            paths = [p for p in paths if p]
+            if not paths and o["directory"] and ch.get_current_folder() is not None:
+                paths = [ch.get_current_folder().get_path()]
+            if not paths:
+                return
+            if not o["directory"] and len(paths) == 1 and os.path.isdir(paths[0]):
+                ch.set_current_folder(Gio.File.new_for_path(paths[0]))   # Open on a folder enters it
+                return
+            if not o["directory"]:
+                paths = [p for p in paths if not os.path.isdir(p)]
+                if not paths:
+                    return
+            sys.stdout.write(o["separator"].join(paths) + "\n")
+            sys.stdout.flush()
+            result["rc"] = 0
+            win.destroy()
+
+        ok.connect("clicked", accept)
+        cancel.connect("clicked", lambda *_: win.destroy())
+        esc = Gtk.ShortcutController()
+        esc.add_shortcut(Gtk.Shortcut.new(Gtk.ShortcutTrigger.parse_string("Escape"),
+                                          Gtk.CallbackAction.new(lambda *_: win.destroy() or True)))
+        win.add_controller(esc)
+        # double-click / Enter on a file activates the window default (GTK 4 has no file-activated)
+        win.set_default_widget(ok)
+        win.present()
+        GLib.idle_add(start_at)
+
+    app.connect("activate", activate)
+    app.run([sys.argv[0]])
+    return result["rc"]
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
