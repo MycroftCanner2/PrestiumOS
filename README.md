@@ -39,10 +39,12 @@ modernization of the 2023 Prestium build, with tighter security and new features
   Audacity runs in an empty network namespace.
 - **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail
   and Gajim) and `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity,
-  Kleopatra, Metadata Cleaner and Feather). Only three folders are app-specific: the I2P Browser's
+  Kleopatra and Feather). Only three folders are app-specific: the I2P Browser's
   (`~/I2P Browser`), I2P Torrents' (`~/Torrents`) and Tor Browser's
-  (`~/Tor Browser`); the shared apps can't write in those three. The viewers, players and editors
-  (Loupe, Evince, VLC, LibreOffice, FeatherPad, Audacity) can open files anywhere in the home
+  (`~/Tor Browser`); the shared apps can't write in those three. Metadata Cleaner is the exception:
+  it cleans a file in place wherever you keep it in the home (never in a hidden folder, `~/bin`, a
+  desktop launcher, a wallet or a password database; volumes stay read-only). The viewers, players and editors
+  (Loupe, Evince, VLC, LibreOffice, FeatherPad, Audacity, mat2, Metadata Cleaner) can open files anywhere in the home
   read-only, hidden folders and those three included, so a file opens in place from the file manager;
   keys, password databases, keyrings, wallets, browser profiles, mail and chat accounts and shell
   histories stay denied, and each still saves only in its own folders. The file manager pins those

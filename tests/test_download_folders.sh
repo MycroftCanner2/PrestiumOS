@@ -128,7 +128,7 @@ spec() { for d in "I2P Browser" Torrents "Tor Browser"; do echo "deny $1 \"$H/$d
 # Others read the file folders but write nowhere in them.
 for pair in "usr.lib.libreoffice.program libreoffice" "usr.bin.featherpad featherpad" \
     "usr.bin.file-roller file-roller" "usr.bin.audacity audacity" \
-    "usr.bin.kleopatra kleopatra" "usr.bin.metadata-cleaner metadata-cleaner"; do
+    "usr.bin.kleopatra kleopatra"; do
   set -- $pair; echo "== $2: writes only the shared ~/Documents"
   run "$1" <<EOT
 allow $2 "$H/Documents/f.pdf" rw
@@ -146,6 +146,18 @@ deny $2 $H/Music/f.pdf w
 deny $2 $H/Videos/f.pdf w
 EOT
 done
+# 2.1 (Metadata Cleaner fix): Metadata Cleaner cleans files in place, so it writes your own files wherever
+# they are outside the dot directories (test_apparmor_startup.sh checks what stays denied); volumes stay read-only
+echo "== metadata-cleaner: cleans in place in the home, volumes read-only"
+run usr.bin.metadata-cleaner <<EOT
+allow metadata-cleaner "$H/Documents/f.pdf" rw
+allow metadata-cleaner $H/Downloads/f.pdf rw
+allow metadata-cleaner "$H/I2P Browser/f.pdf" rw
+allow metadata-cleaner "$H/Tor Browser/f.pdf" rw
+deny metadata-cleaner $H/Torrents/f.pdf w
+allow metadata-cleaner /media/user/STICK/f.pdf r
+deny metadata-cleaner /media/user/STICK/f.pdf w
+EOT
 echo "== feather: writes only the shared ~/Documents"
 run usr.local.bin.feather <<EOT
 allow feather "$H/Documents/f.pdf" rw

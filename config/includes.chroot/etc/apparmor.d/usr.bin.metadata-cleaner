@@ -1,5 +1,5 @@
 # Prestium 2.1 (audit of 96468c5, M-1): Metadata Cleaner (the GUI for mat2), ENFORCED. The same rules as mat2,
-# except where it writes (its own folder, L-5).
+# except where it reads and writes (see the 2.1 Metadata Cleaner fix below).
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
@@ -7,6 +7,9 @@ include <tunables/global>
 profile metadata-cleaner /usr/bin/metadata-cleaner {
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-write>
+  # 2.1 (Metadata Cleaner fix): it opens a file wherever it is in the home, read-only, like the
+  # viewers; the secret stores (keys, wallets, password databases, mail, chat, browser profiles) stay denied
+  include <abstractions/prestium-viewer-home-read>
   /usr/bin/metadata-cleaner r,
   /usr/share/metadata-cleaner/** r,
   owner @{HOME}/.config/metadata-cleaner/ rw,
@@ -21,28 +24,44 @@ profile metadata-cleaner /usr/bin/metadata-cleaner {
   /usr/share/perl/** r,
   /usr/lib/@{multiarch}/perl*/** mr,
   /usr/bin/bwrap mrCx -> bwrap,
-  # 2.1 (L-5): Metadata Cleaner replaces the files it cleans, so it may write only the shared
-  # ~/Documents folder: copy a file there to clean it in place. (For a file anywhere else,
-  # "Remove metadata" in the file manager copies it there, runs mat2 and moves the cleaned copy back
-  # next to it; mat2 too writes only this folder.) It still
-  # reads every file folder, but can't change a file another app wrote or will open.
-  owner @{HOME}/Documents/ rw,
-  owner @{HOME}/Documents/** rwk,
+  # 2.1 (Metadata Cleaner fix, reproduced in an enforcing VM): Metadata Cleaner cleans files in place:
+  # mat2 writes "<name>.cleaned.<ext>" next to the file, then the app copies it over the original.
+  # With writes limited to ~/Documents (L-5) every file anywhere else, ~/Downloads (where the browsers,
+  # Claws Mail and Gajim save) included, failed with "Unable to Remove Metadata ... Permission denied"
+  # (operation="open" name="/home/user/Downloads/x.jpg" denied_mask="wc"), and a file elsewhere in the
+  # home, which it could not even read, showed "Unable to Read the File". It now writes your own
+  # files outside the dot directories, where it cleans them. Still denied: every dot directory (settings,
+  # autostart, shell startup files), the secret stores (abstractions/prestium-viewer-home-read),
+  # ~/bin (in PATH once it exists), desktop launchers, ~/Torrents (i2pd's files, never "owner") and
+  # volumes under /media (read-only, as for every viewer: move the file to the home to clean it).
+  owner @{HOME}/[^.]* rwk,
+  owner @{HOME}/[^.]*/ rw,
+  owner @{HOME}/[^.]*/** rwk,
+  # GIO replaces a file through a hidden temporary next to it, renamed over the original (in the home
+  # itself that name starts with a dot); the rename can only land on a name allowed above
+  owner @{HOME}/.goutputstream-* rw,
+  deny @{HOME}/bin w,
+  deny @{HOME}/bin/** w,
+  deny @{HOME}/**.desktop w,
+  deny @{HOME}/Torrents/** w,
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
+    include <abstractions/prestium-viewer-home-read>
     # (Metadata Cleaner has mat2 write the cleaned copy to /tmp, then moves it itself)
     # No blanket "deny @{HOME}/** w" here (unlike Loupe's child): a deny wins
     # over any allow in AppArmor, so it would also deny the cleaned copy
     # below and every file in ~/Documents got "Permission denied". Writes
     # elsewhere in the home stay denied by default (viewer-bwrap denies the
     # home's own files and dot directories, and nothing else is allowed).
-    # mat2's helpers write "<name>.cleaned.<ext>" next to the original in
-    # ~/Documents (the GUI cleans files in place there, unlike the file
-    # manager's wrapper which uses ~/Documents/.remove-metadata.XXXXXX);
-    # without this the helpers got "Permission denied" for every file in
-    # Documents. Only that cleaned name, only in ~/Documents.
-    owner "@{HOME}/Documents/**.cleaned.*" w,
+    # mat2's helpers write "<name>.cleaned.<ext>" next to the original (the
+    # GUI cleans files in place, unlike the file manager's wrapper which uses
+    # ~/Documents/.remove-metadata.XXXXXX). Only that cleaned name, and (2.1,
+    # Metadata Cleaner fix) wherever the GUI cleans: outside the dot directories.
+    owner "@{HOME}/[^.]*.cleaned.*" w,
+    owner "@{HOME}/[^.]*/**.cleaned.*" w,
+    deny @{HOME}/bin/** w,
+    deny @{HOME}/Torrents/** w,
     # 2.1 (boot fix): bubblewrap always sets no_new_privs before it runs the payload, and the kernel
     # refuses a plain Px into another profile under no_new_privs (kernel log: operation="exec"
     # info="no new privs" ... target="metadata-cleaner-inner"): the exec failed with EPERM, so no exiftool or ffmpeg ran.

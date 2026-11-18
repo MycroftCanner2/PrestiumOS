@@ -10,6 +10,9 @@ include <tunables/global>
 profile mat2 /usr/bin/mat2 {
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-write>
+  # 2.1 (Metadata Cleaner fix): mat2 --show and the file manager's copy work on a file wherever it is in
+  # the home, read-only (it failed with "something went wrong" outside the file folders); secrets stay denied
+  include <abstractions/prestium-viewer-home-read>
   /usr/bin/mat2 r,
   include <abstractions/python>
   /usr/bin/python3* ix,
@@ -32,6 +35,9 @@ profile mat2 /usr/bin/mat2 {
 
   profile bwrap flags=(attach_disconnected,mediate_deleted) {
     include <abstractions/prestium-viewer-bwrap>
+    include <abstractions/prestium-viewer-home-read>
+    # nothing written directly in the home (moved here from prestium-viewer-bwrap in 2.1)
+    deny @{HOME}/* w,
     # 2.1 (boot fix): bubblewrap always sets no_new_privs before it runs the payload, and the kernel
     # refuses a plain Px into another profile under no_new_privs (kernel log: operation="exec"
     # info="no new privs" ... target="mat2-inner"): the exec failed with EPERM, so no exiftool or ffmpeg ran.

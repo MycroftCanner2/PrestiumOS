@@ -217,18 +217,44 @@ deny mat2//bwrap $H/.bashrc w
 deny mat2//bwrap $G/pubring.kbx r
 EOT
 
-echo "== Metadata Cleaner (mat2 writes to /tmp, then it moves the file)"
+echo "== Metadata Cleaner (cleans a file in place wherever it is in the home, outside the dot directories)"
+# 2.1 (Metadata Cleaner fix, reproduced in an enforcing VM): limited to ~/Documents, every file in ~/Downloads
+# failed with "Permission denied" and one elsewhere in the home showed "Unable to Read the File"
 run usr.bin.metadata-cleaner <<EOT
 $(bw metadata-cleaner//bwrap)
 allow metadata-cleaner//bwrap /usr/bin/exiftool x:&metadata-cleaner-inner
 allow metadata-cleaner//bwrap /usr/bin/ffmpeg x:&metadata-cleaner-inner
 allow metadata-cleaner//bwrap /tmp/0123abcd.mp4 w
-deny metadata-cleaner//bwrap $H/Downloads/clip.cleaned.mp4 w
+allow metadata-cleaner//bwrap $H/Downloads/clip.cleaned.mp4 w
+allow metadata-cleaner//bwrap $H/clip.cleaned.mp4 w
+allow metadata-cleaner//bwrap $H/Notes/clip.mp4 r
+deny metadata-cleaner//bwrap $H/Downloads/clip.mp4 w
+deny metadata-cleaner//bwrap $H/.config/autostart/x.cleaned.desktop w
+deny metadata-cleaner//bwrap $H/bin/x.cleaned.sh w
 allow metadata-cleaner /tmp/0123abcd.mp4 rw
 allow metadata-cleaner "$H/Documents/clip.mp4" rw
-allow metadata-cleaner $H/Downloads/clip.mp4 r
-deny metadata-cleaner $H/Downloads/clip.mp4 w
-deny metadata-cleaner "$H/I2P Browser/clip.mp4" w
+allow metadata-cleaner $H/Downloads/clip.mp4 rw
+allow metadata-cleaner $H/Downloads/clip.cleaned.mp4 rw
+allow metadata-cleaner $H/Downloads/.goutputstream-A3OWY3 rw
+allow metadata-cleaner "$H/Tor Browser/photo.jpg" rw
+allow metadata-cleaner $H/Pictures/sub/photo.jpg rw
+allow metadata-cleaner $H/photo.jpg rw
+allow metadata-cleaner $H/photo.cleaned.jpg rw
+allow metadata-cleaner $H/.goutputstream-A3OWY3 rw
+allow metadata-cleaner $H/Notes/a.odt rw
+deny metadata-cleaner $H/.bashrc w
+deny metadata-cleaner $H/.profile w
+deny metadata-cleaner $H/.config/autostart/x.desktop w
+deny metadata-cleaner $H/.config/labwc/autostart w
+deny metadata-cleaner $H/.local/bin/sudo w
+deny metadata-cleaner $H/bin w
+deny metadata-cleaner $H/bin/sudo w
+deny metadata-cleaner $H/Desktop/x.desktop w
+deny metadata-cleaner $H/Monero/wallets/wallet_1.keys rw
+deny metadata-cleaner $H/Documents/db.kdbx rw
+deny metadata-cleaner $G/pubring.kbx r
+deny metadata-cleaner $H/.claws-mail/accountrc r
+deny metadata-cleaner /media/user/STICK/photo.jpg w
 EOT
 
 echo "== inner payloads: decoders and helpers, no namespaces, capabilities, mounts, network or writes"
@@ -247,9 +273,13 @@ deny mat2-inner $G/pubring.kbx r
 EOT
 run usr.bin.metadata-cleaner-inner <<EOT
 allow metadata-cleaner-inner "$H/Documents/clip.mp4" r
+allow metadata-cleaner-inner $H/clip.mp4 r
 allow metadata-cleaner-inner "$H/Documents/clip.cleaned.mp4" w
+allow metadata-cleaner-inner $H/Downloads/clip.cleaned.mp4 w
+allow metadata-cleaner-inner $H/clip.cleaned.mp4 w
 deny metadata-cleaner-inner "$H/Documents/clip.mp4" w
-deny metadata-cleaner-inner $H/Downloads/clip.cleaned.mp4 w
+deny metadata-cleaner-inner $H/Downloads/clip.mp4 w
+deny metadata-cleaner-inner $H/.config/autostart/x.cleaned.desktop w
 deny metadata-cleaner-inner $G/pubring.kbx r
 EOT
 

@@ -1,8 +1,8 @@
 # Prestium 2.1 (bwrap split): Metadata Cleaner's helpers (mat2's ffmpeg, exiftool),
 # ENFORCED in their own profile. Same shape as mat2-inner, except the cleaned
-# copy is written next to the original in the shared ~/Documents folder (the GUI
-# cleans files in place there): only that "<name>.cleaned.<ext>" name, only in
-# ~/Documents. exiftool is a perl script: perl inherits this profile (ix).
+# copy is written next to the original (the GUI cleans files in place): only that
+# "<name>.cleaned.<ext>" name, outside the dot directories (2.1, Metadata Cleaner fix:
+# it used to be only ~/Documents). exiftool is a perl script: perl inherits this profile (ix).
 # No attachment: entered only by explicit transitions from Metadata Cleaner (Px directly,
 # stacked "ix -> &metadata-cleaner-inner" from its bwrap child, whose no_new_privs refuses Px).
 abi <abi/4.0>,
@@ -12,6 +12,8 @@ profile metadata-cleaner-inner {
   include <abstractions/base>
   include <abstractions/prestium-no-admin>
   include <abstractions/prestium-user-files>
+  # 2.1 (Metadata Cleaner fix): the file wherever it is in the home, read-only; secrets stay denied
+  include <abstractions/prestium-viewer-home-read>
   /usr/bin/{ffmpeg,exiftool,perl} mr,
   /usr/bin/perl ix,
   /usr/share/perl5/** r,
@@ -33,7 +35,10 @@ profile metadata-cleaner-inner {
   /dev/{null,zero,full,random,urandom} rw,
   owner /dev/shm/** rwk,
   owner /tmp/** rwlk,
-  owner "@{HOME}/Documents/**.cleaned.*" w,
+  owner "@{HOME}/[^.]*.cleaned.*" w,
+  owner "@{HOME}/[^.]*/**.cleaned.*" w,
+  deny @{HOME}/bin/** w,
+  deny @{HOME}/Torrents/** w,
   deny network inet,
   deny network inet6,
   deny userns,

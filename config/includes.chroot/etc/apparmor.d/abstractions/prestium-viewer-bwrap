@@ -70,10 +70,10 @@
   deny /dev/video* rw,
   deny /dev/hidraw* rw,
   deny /dev/snd/** rw,
-  # nothing directly in the home and nothing in a dot directory; the file folders stay read-only too
-  # unless a child adds one rule (mat2's ".cleaned" copy). Loupe's and Metadata Cleaner's children
-  # deny every home write.
-  deny @{HOME}/* w,
+  # nothing in a dot directory; the file folders stay read-only too unless a child adds one rule
+  # (mat2's and Metadata Cleaner's ".cleaned" copies). Loupe's child denies every home write and
+  # mat2's every write directly in the home; 2.1 (Metadata Cleaner fix): Metadata Cleaner's child
+  # may write the ".cleaned" copy of a file kept directly in the home, so that deny is no longer here.
   deny @{HOME}/.** w,
   deny @{HOME}/.gnupg/** rw,
   deny @{HOME}/**.kdbx rw,

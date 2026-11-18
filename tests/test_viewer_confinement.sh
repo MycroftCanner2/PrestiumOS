@@ -126,6 +126,14 @@ if command -v apparmor_parser >/dev/null; then
       # excused here; file writes stay in the profile folders and Documents.
       hw=$(grep -vE '@\{HOME\}/ rw,$' <<<"$hw")
     fi
+    if [ "$f" = usr.bin.metadata-cleaner ]; then
+      # 2.1 (Metadata Cleaner fix): it cleans files in place wherever they are outside the dot
+      # directories (and its bwrap child writes only the ".cleaned" copy there); the dot directories,
+      # ~/bin, launchers and secrets stay denied (checked below and in test_apparmor_startup.sh)
+      hw=$(grep -vE '@\{HOME\}/\[\^\.\]\*(/|/\*\*)? (rwk|rw),$|@\{HOME\}/\.goutputstream-\* rw,$|"@\{HOME\}/\[\^\.\]\*(/\*\*)?\.cleaned\.\*" w,$' <<<"$hw")
+      for d in '@{HOME}/bin w' '@{HOME}/bin/** w' '@{HOME}/**.desktop w' '@{HOME}/.** w'; do
+        grep -qF "deny $d," <<<"$x" && ok "$f: deny $d" || bad "$f: no deny $d"; done
+    fi
     [ -z "$hw" ] && ok "$f: writes only the shared ~/Documents and its own directories" || bad "$f home writes: $hw"
     # 2.1 (L-5, revised): the shared ~/Documents is writable (the editors' folder); no write in any other file folder
     sw=$(grep -E '@\{HOME\}/(\{Desktop|Desktop/|Downloads/|Pictures/\*|Music/|Videos/|Public/|Templates/|OnionShare/)' <<<"$al" \
@@ -147,10 +155,11 @@ if command -v apparmor_parser >/dev/null; then
     grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* [a-z]*w' <<<"$al" && bad "$f: write anywhere in the home"
     grep -Eq '^\S* \s*(owner\s+)?/\*\* r' <<<"$al" && bad "$f: reads the whole filesystem"
     # 2.1: the viewers, players and editors read anywhere in the home (prestium-viewer-home-read), read
-    # only, with the secret stores denied; the others (archives, metadata cleaners, keys) still don't
+    # only, with the secret stores denied, and (2.1, Metadata Cleaner fix) so do mat2 and Metadata Cleaner;
+    # the others (archives, keys) still don't
     if grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* r' <<<"$al"; then
       case $f in
-        usr.bin.loupe|usr.bin.vlc|usr.bin.featherpad|usr.bin.audacity|prestium.evince)
+        usr.bin.loupe|usr.bin.vlc|usr.bin.featherpad|usr.bin.audacity|prestium.evince|usr.bin.mat2|usr.bin.metadata-cleaner)
           grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* r,$' <<<"$al" && ! grep -Eq '^\S* \s*(owner\s+)?@\{HOME\}/\*\* [a-z]*[wl]' <<<"$al" \
             && ok "$f: reads anywhere in the home, read-only" || bad "$f: home-wide rule is not read-only"
           for d in '@{HOME}/.ssh/** rw' '@{HOME}/.gnupg/** rw' '@{HOME}/**.kdbx rw' '@{HOME}/.local/share/keyrings/** rw' \
