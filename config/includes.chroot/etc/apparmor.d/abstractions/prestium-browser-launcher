@@ -18,6 +18,8 @@
   deny /run/dbus/system_bus_socket rw,
   deny /var/run/dbus/system_bus_socket rw,
   deny /run/polkit-1/** rw,
+  # 2.1 (Phrack 73): no AF_ALG, as in prestium-no-admin
+  deny network alg,
 
   /{,usr/}bin/bash mrix,
   /{,usr/}bin/{id,getent,cut,mkdir,chmod,cp,sed,cat,rm,sleep,seq,readlink,head,tr} mrix,

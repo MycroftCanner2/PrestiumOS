@@ -28,6 +28,8 @@ profile torbrowser_firefox @{torbrowser_firefox_executable} {
   # (2.1 audit: the old "Pixr" was dead, a later "deny /usr/bin/pulseaudio x" overrides it).
   #dbus,
   network netlink raw,
+  # Prestium 2.1 (Phrack 73): no AF_ALG (kernel crypto API socket), as for every confined app
+  deny network alg,
   network tcp,
 
   # ibus socket

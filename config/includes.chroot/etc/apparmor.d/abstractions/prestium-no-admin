@@ -21,3 +21,8 @@
   deny /run/dbus/system_bus_socket rw,
   deny /var/run/dbus/system_bus_socket rw,
   deny /run/polkit-1/** rw,
+  # 2.1 (Phrack 73): no AF_ALG (the kernel crypto API socket). Any process may open one, which makes
+  # it a favourite kernel attack surface (the LLM-assisted exploit in Phrack 73 used an AF_ALG bug); no
+  # confined app needs it. Not blacklisted system-wide: cryptsetup (VeraCrypt/TrueCrypt and LUKS
+  # unlocks through udisks) uses it, and udisksd, cryptsetup and the file manager are not confined.
+  deny network alg,

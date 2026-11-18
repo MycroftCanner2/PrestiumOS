@@ -29,6 +29,8 @@ profile prestium_onion_grater /usr/local/sbin/prestium-onion-grater flags=(attac
 
   network unix stream,
   network unix dgram,
+  # 2.1 (Phrack 73): no AF_ALG (kernel crypto API socket), as for the confined apps
+  deny network alg,
 
   /usr/local/sbin/prestium-onion-grater r,
   /usr/bin/python3* mrix,
