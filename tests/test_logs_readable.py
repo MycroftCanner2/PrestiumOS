@@ -123,6 +123,10 @@ torrc = rd("config/includes.chroot/etc/tor/torrc")
 check(re.search(r"^SafeLogging 1$", torrc, re.M) and torrc.index("\nSafeLogging 1") > torrc.index("%include"), "torrc: SafeLogging 1, after %include")
 check(not re.search(r"^\s*SafeLogging\s+(0|relay)", torrc + rd("config/includes.chroot/etc/tor/torrc.d/50-prestium-assistant.conf"), re.M), "no SafeLogging 0/relay")
 check("SafeLogging" not in rd("config/includes.chroot/usr/local/bin/prestium-tor-assistant"), "the assistant's drop-in never sets SafeLogging")
+# Tor: Vanguards-lite pinned on, after the drop-ins (guard-discovery protection for onion circuits)
+check(re.search(r"^VanguardsLiteEnabled 1$", torrc, re.M) and torrc.index("\nVanguardsLiteEnabled 1") > torrc.index("%include"), "torrc: VanguardsLiteEnabled 1, after %include")
+check(not re.search(r"^\s*VanguardsLiteEnabled\s+[^1]", torrc + rd("config/includes.chroot/etc/tor/torrc.d/50-prestium-assistant.conf"), re.M), "nothing sets VanguardsLiteEnabled 0/auto")
+check("VanguardsLite" not in rd("config/includes.chroot/usr/local/bin/prestium-tor-assistant") + rd("config/includes.chroot/usr/local/sbin/prestium-tor-mode"), "the assistant and tor-mode never write VanguardsLiteEnabled")
 # onion-grater: what it logs is one line of visible text
 import importlib.machinery, importlib.util
 ld = importlib.machinery.SourceFileLoader("og", os.path.join(I, "usr/local/sbin/prestium-onion-grater"))

@@ -36,3 +36,7 @@ ClientPreferIPv6ORPort 0
 # turn it off: addresses in Tor's log are written as [scrubbed]. The log is readable on the desktop
 # (Network > Network Logs), so it must not show which sites or bridges were used.
 SafeLogging 1
+# 2.1: Vanguards-lite (Tor's default since 0.4.7), pinned after the drop-ins as well so no drop-in
+# (bridges, pluggable transports) can turn it off: onion-service circuits use a small, slowly rotating
+# set of second-hop guards, which defeats the guard-discovery attack against OnionShare and onion sites.
+VanguardsLiteEnabled 1
