@@ -49,7 +49,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   read-only, hidden folders and those three included, so a file opens in place from the file manager;
   keys, password databases, keyrings, wallets, browser profiles, mail and chat accounts and shell
   histories stay denied, and each still saves only in its own folders. The file manager pins those
-  five, labelled i2P Browser, Torrents, Tor Browser, Documents and Downloads, plus Claws Mail's
+  five, labelled I2P Browser, Torrents, Tor Browser, Documents and Downloads, plus Claws Mail's
   mailbox `~/Mail`, labelled Mail. To attach a document
   you made, copy it from `~/Documents` to `~/Downloads` first: mail and chat can't read `~/Documents`.
   Volumes under `/media` are read-only for the apps (KeePassXC may save its `.kdbx` there); move files
