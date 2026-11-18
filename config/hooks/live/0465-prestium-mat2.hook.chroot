@@ -1,0 +1,33 @@
+#!/bin/sh
+# Prestium 2.1: mat2 / Metadata Cleaner on images whose name does not match their content (a WebP or
+# JPEG saved as .png by a browser) or that cairo can't open: a clear reason, or the right parser,
+# instead of "Unable to Read the File" with an empty message. The code is
+# /usr/lib/python3/dist-packages/libmat2/prestium_filetype.py, which mat2's parser_factory imports
+# with its parsers. Fails the build if mat2 no longer loads it or its parsers changed shape, and
+# byte-compiles it (the confined apps can't write __pycache__, which would log a denial at every start).
+set -e
+F=/usr/lib/python3/dist-packages/libmat2/prestium_filetype.py
+[ -f "$F" ] || { echo "E: $F is missing"; exit 1; }
+chown root:root "$F"; chmod 0644 "$F"
+python3 -I - <<'PY' || { echo "E: mat2 does not load Prestium's file-type checks"; exit 1; }
+import os, sys, tempfile
+from libmat2 import parser_factory, images
+assert images.PNGParser.__init__.__name__ == "_png_init", "PNGParser not patched"
+assert images.GdkPixbufAbstractParser.__init__.__name__ == "_pixbuf_init", "GdkPixbuf parsers not patched"
+d = tempfile.mkdtemp()
+p = os.path.join(d, "x.png")
+open(p, "wb").write(b"RIFF\x10\x00\x00\x00WEBPVP8 " + b"\x00" * 16)
+try:
+    parser_factory.get_parser(p)
+    sys.exit("a WebP named .png was accepted")
+except ValueError as e:
+    assert "WebP" in str(e), str(e)
+open(p, "wb").close()
+try:
+    parser_factory.get_parser(p)
+    sys.exit("an empty .png was accepted")
+except ValueError as e:
+    assert str(e) == "The file is empty.", str(e)
+PY
+python3 -I -m py_compile "$F"
+echo "P: mat2 file-type checks loaded"

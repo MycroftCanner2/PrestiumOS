@@ -548,3 +548,4 @@
 0755 root root /etc/initramfs-tools/hooks/prestium-cmdline
 0755 root root /usr/local/sbin/prestium-cmdline-check
 0644 root root /etc/systemd/system/prestium-cmdline-check.service
+0644 root root /usr/lib/python3/dist-packages/libmat2/prestium_filetype.py

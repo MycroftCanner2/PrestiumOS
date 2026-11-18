@@ -282,6 +282,8 @@ ppp
 procps
 psmisc
 publicsuffix
+# 2.1: Metadata Cleaner cleans a WebP saved under a .png name with Pillow's WebP decoder (libmat2/prestium_filetype.py); already pulled in by gajim
+python3-pil
 qrencode
 qt5-gtk-platformtheme
 qtqr

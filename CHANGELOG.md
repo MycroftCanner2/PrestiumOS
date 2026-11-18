@@ -379,6 +379,14 @@ done in).
   `systemd-analyze security` scores and runs the tests that don't need a live session.
 
 ### Late 2.1 additions
+- **Metadata Cleaner: "Unable to Read the File" on browser-saved .png images.** mat2 chooses a parser
+  by the file name, and PNGParser turned any cairo failure into an empty `ValueError()`. Browsers often
+  save a WebP (or JPEG, AVIF) under a `.png` name, which then failed with no reason. A small add-on that
+  mat2 loads with its parsers (`libmat2/prestium_filetype.py`, checked and byte-compiled by hook 0465)
+  reads the real type from the file's first bytes: a WebP named `.png` is cleaned into a real PNG
+  (Pillow's WebP decoder only), a JPEG/TIFF/PNG with the wrong name goes to the right parser, a PNG too
+  large for cairo is re-encoded with GdkPixbuf, and everything else (AVIF, GIF/HEIC with the wrong name,
+  an empty, truncated or HTML file) says why on the details page.
 - **Apps opened from the panel run outside the broker's sandbox.** The panel (waybar) is started by
   prestium-wl-broker and lives in its unit, whose `RestrictAddressFamilies=AF_UNIX AF_NETLINK` and
   `RestrictNamespaces=yes` seccomp filters every child inherited, through sudo too. The Tor and I2P
