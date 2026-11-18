@@ -4,6 +4,7 @@
 #   scripts/fetch-thirdparty.sh            verify signature + pinned SHA-256 (fails on any mismatch)
 #   scripts/fetch-thirdparty.sh --repin    verify signature only, print the SHA-256 values to pin
 #   2.1: Tor Browser is the newest signed release unless pinned (thirdparty/versions.sh, scripts/tb-latest.sh)
+#   2.1: uBlock Origin is the newest Mozilla-signed release on addons.mozilla.org (scripts/amo-latest.py)
 #   It also stages a signature-checked I2P reseed file into config/includes.chroot/var/lib/i2pd/: the
 #   repo-shipped i2pseeds.su3 is used first (signature-checked; age only warns, refresh it in git when it
 #   gets old); without it, a StormyCloud download (a verified download under 24 h old is reused) is the fallback.
@@ -101,6 +102,19 @@ FEF=feather-$FEATHER_VERSION-linux.zip
 get https://featherwallet.org/files/releases/linux/$FEF $FEF
 get https://featherwallet.org/files/releases/linux/$FEF.asc $FEF.asc
 sigok "$C/$FEF.asc" "$C/$FEF" "$FEATHER_KEY" "$K/feather.asc"; pin FEATHER "$C/$FEF" "$FEATHER_SHA256"
+
+# uBlock Origin (2.1: always the newest release on addons.mozilla.org, nothing committed or pinned).
+# scripts/amo-latest.py reads the AMO API, downloads current_version.file.url over HTTPS and checks
+# its size and SHA-256 against the API, Mozilla's add-on signature (META-INF/mozilla.rsa over
+# mozilla.sf, chained to the pinned AMO root in thirdparty/keys/mozilla-amo-root.pem, signer CN = the
+# add-on id; manifest.mf covers every file), and the manifest's gecko id and version. Any failure
+# stops the build (no older copy is used). Hook 0200 checks it again and that both browsers meet its
+# strict_min_version, then installs it for Tor Browser and LibreWolf.
+UBW=$GNUPGHOME/ublock; mkdir -m 700 "$UBW"
+UBJ=$(python3 -I "$TOP/scripts/amo-latest.py" fetch "$UBW/ublock-origin.xpi") || { echo "ERROR: uBlock Origin download or verification failed"; exit 1; }
+UB_VERSION=$(printf '%s' "$UBJ" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["version"])')
+UB_SHA256=$(printf '%s' "$UBJ" | python3 -I -c 'import json,sys; print(json.load(sys.stdin)["sha256"])')
+echo "OK UBLOCK $UB_SHA256 (uBlock Origin $UB_VERSION from addons.mozilla.org, Mozilla signature verified, not pinned)"
 
 # irc-framework (a git dependency of The Lounge, commit-pinned, no integrity in the lockfile). 2.1: npm
 # never sees the git URL: packing a git dependency runs its "prepare" script (babel + webpack, caret-ranged
@@ -221,8 +235,11 @@ chmod 644 "$SU3.part"; mv -f "$SU3.part" "$SU3"
 rm -rf "$S"; mkdir -p "$S"
 cp "$TBW/$TBF" "$S/tor-browser.tar.xz"; echo "$TB_VERSION" > "$S/tor-browser.version"; cp "$C/$FFF" "$S/firefox.tar.xz"; cp "$C/$NF" "$S/node.tar.xz"
 cp "$C/$FEF" "$S/feather.zip"; echo "$FEATHER_VERSION" > "$S/feather.version"
+cp "$UBW/ublock-origin.xpi" "$S/ublock-origin.xpi"; echo "$UB_VERSION $UB_SHA256" > "$S/ublock-origin.version"
+cp "$TOP/scripts/amo-latest.py" "$TOP/thirdparty/keys/mozilla-amo-root.pem" "$S/"
 # 2.0 r7: re-check what was actually staged (closes the verify-then-copy gap)
-for x in "tor-browser.tar.xz $TB_SHA256" "firefox.tar.xz $FF_SHA256" "node.tar.xz $NODE_SHA256" "feather.zip $FEATHER_SHA256"; do
+for x in "tor-browser.tar.xz $TB_SHA256" "firefox.tar.xz $FF_SHA256" "node.tar.xz $NODE_SHA256" "feather.zip $FEATHER_SHA256" \
+         "ublock-origin.xpi $UB_SHA256"; do
   [ "$(sha "$S/${x%% *}")" = "${x#* }" ] || { echo "ERROR: staged ${x%% *} does not match its pinned SHA-256"; exit 1; }
 done
 # tar once per The Lounge version (node_modules has thousands of small files; slow on network filesystems)

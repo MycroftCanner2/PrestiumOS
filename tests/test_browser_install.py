@@ -770,7 +770,7 @@ del RUNS[:]
         ])
         S, s = r["steps"], r["state"]
         self.assertEqual(S[0][0], 0, S[0])
-        ov = os.path.join(T.INC, "usr/share/prestium/opt-overlay/librewolf/distribution")
+        ov = os.path.join(self.R, "overlay/librewolf/distribution")
         self.assertEqual(s[0]["lw"], "158.0")
         self.assertEqual(s[0]["dist"], sorted(os.listdir(ov)), "Prestium's sealed distribution/, nothing from the package")
         self.assertEqual(s[0]["policies"], open(os.path.join(ov, "policies.json")).read())

@@ -267,10 +267,26 @@ exit "$(cat "%(r)s/apt.rc" 2>/dev/null || echo 0)"
 '''
 
 
+UBLOCK = "uBlock0@raymondhill.net.xpi"
+
+
+def make_overlay(r):
+    """r/overlay: the image's /usr/share/prestium/opt-overlay. The repo copy plus what hook 0200 adds at
+    build time: uBlock Origin (2.1: fetched from addons.mozilla.org, not committed) for both browsers."""
+    o = os.path.join(r, "overlay")
+    shutil.copytree(os.path.join(INC, "usr/share/prestium/opt-overlay"), o, symlinks=True)
+    for d in ("tor-browser/Browser/distribution/extensions", "librewolf/distribution/extensions"):
+        os.makedirs(os.path.join(o, d), exist_ok=True)
+        with open(os.path.join(o, d, UBLOCK), "wb") as f:
+            f.write(b"PK\x05\x06" + b"\0" * 18)   # an empty zip stands in for the fetched add-on
+    return o
+
+
 def make_root(r, keys):
     """A fake system under r: factory Tor Browser 15.0.26 at r/opt/tor-browser, factory LibreWolf
     157.0.1-1 at r/usr/share/librewolf with /usr/bin/librewolf -> ../share/librewolf/librewolf."""
     os.makedirs(os.path.join(r, "opt"))
+    make_overlay(r)
     tar = tor_tarball(os.path.join(r, "factory.tar.xz"), "15.0.26")
     with tarfile.open(tar) as tf:
         tf.extractall(os.path.join(r, "opt"), filter="tar")
@@ -345,7 +361,7 @@ m.MOUNT = os.path.join(R, "run/prestium/browsers"); m.LOCK = os.path.join(R, "lo
 m.STAGING_ROOT = os.path.join(R, "home/user/.cache/prestium/browser-updater/staging")
 m.STAMP_DIR = os.path.join(R, "var/lib/prestium/browser-updates")
 m.HIGHEST_DIR = os.path.join(R, "var/lib/prestium/browser-updates-highest")
-m.OVERLAY = os.path.join(T.INC, "usr/share/prestium/opt-overlay")
+m.OVERLAY = os.path.join(R, "overlay")   # make_root: the repo overlay + the build-time uBlock Origin
 m.PROC = os.path.join(R, "proc"); m.MEMINFO = os.path.join(R, "meminfo")
 m.PY = sys.executable; m.COPY_AS = []; m.APT_GET = os.path.join(R, "fakeapt")
 m.UNITS = {"tor-browser": [("tor-browser", R + "/opt/tor-browser", "dir")],

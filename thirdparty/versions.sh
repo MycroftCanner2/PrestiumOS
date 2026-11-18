@@ -3,6 +3,8 @@
 # AND against the SHA-256 pinned here. To update: change the version, set the SHA to "" and run
 # scripts/fetch-thirdparty.sh --repin (it verifies the signature, then prints the new SHA to pin).
 # LibreWolf, i2pd and Tor come from their signed apt repositories (config/archives/), not from here.
+# 2.1: uBlock Origin is not pinned here either: every build takes the newest Mozilla-signed release
+# from addons.mozilla.org (scripts/amo-latest.py; Mozilla's AMO root in thirdparty/keys/mozilla-amo-root.pem).
 
 # 2.1: Tor Browser is the newest release at build time (scripts/tb-latest.sh asks the Tor Project's update
 # service for the version; the tarball must carry a valid signature by TB_KEY and be no older than

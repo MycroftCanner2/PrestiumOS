@@ -4,6 +4,9 @@
 # and the SHA-256 pinned in thirdparty/versions.sh before it got here).
 #   Tor Browser  -> /opt/tor-browser (root-owned, read-only; launched by /usr/local/bin/tor-browser
 #                   with the system Tor, TOR_SKIP_LAUNCH) + Prestium policies.json and uBlock Origin
+#   uBlock Origin -> Tor Browser and LibreWolf distribution/extensions (2.1: the newest Mozilla-signed release
+#                   from addons.mozilla.org at build time, not committed; also into the opt-overlay, so the
+#                   Browser Updater re-applies it to an updated browser)
 #   Firefox      -> /opt/firefox (local-only browser for Prestium's own pages) + policies.json
 #   Node.js      -> /opt/nodejs (runtime only: bin/node + LICENSE)
 #   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch, 320s IRC ping timeout, and connecting lobby text only when a connection starts;
@@ -15,6 +18,17 @@ S=/usr/src/prestium-thirdparty
 O=/usr/share/prestium/opt-overlay
 [ -d "$S" ] || { echo "E: $S missing: run scripts/fetch-thirdparty.sh before lb build"; exit 1; }
 T=$(mktemp -d)
+
+# uBlock Origin (fetched and verified by scripts/fetch-thirdparty.sh: AMO API SHA-256 and size, Mozilla's
+# add-on signature to the pinned AMO root, add-on id and version). Checked again here, from the staged copy.
+read -r UBV UBS < "$S/ublock-origin.version"
+PRESTIUM_AMO_ROOT="$S/mozilla-amo-root.pem" python3 -I "$S/amo-latest.py" verify "$S/ublock-origin.xpi" "$UBS" "$UBV" \
+  || { echo "E: uBlock Origin failed verification"; exit 1; }
+UBN=uBlock0@raymondhill.net.xpi
+for d in /usr/share/librewolf/distribution/extensions "$O/librewolf/distribution/extensions" \
+         "$O/tor-browser/Browser/distribution/extensions"; do
+  install -d -m 0755 "$d"; install -m 0644 -o root -g root "$S/ublock-origin.xpi" "$d/$UBN"
+done
 
 # Tor Browser
 rm -rf /opt/tor-browser
@@ -29,6 +43,14 @@ tbv=$(python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["v
 [ -n "$tbv" ] && [ "$tbv" = "$(cat "$S/tor-browser.version" 2>/dev/null)" ] \
   || { echo "E: Tor Browser in the image is '${tbv:-unknown}', expected $(cat "$S/tor-browser.version" 2>/dev/null)"; exit 1; }
 echo "P: Tor Browser $tbv"
+# uBlock Origin's strict_min_version (and any strict_max_version) must allow both browsers' Firefox versions
+ubapp(){ sed -n 's/^Version=//p' "$1" 2>/dev/null | head -1; }
+TBFF=$(ubapp /opt/tor-browser/Browser/application.ini); LWFF=$(ubapp /usr/share/librewolf/application.ini)
+[ -n "$TBFF" ] && [ -n "$LWFF" ] || { echo "E: cannot read the Firefox versions of Tor Browser ('$TBFF') and LibreWolf ('$LWFF')"; exit 1; }
+python3 -I "$S/amo-latest.py" minver /opt/tor-browser/Browser/distribution/extensions/$UBN "$TBFF" "$LWFF" \
+  || { echo "E: uBlock Origin $UBV does not support Tor Browser (Firefox $TBFF) or LibreWolf ($LWFF)"; exit 1; }
+cmp -s "$S/ublock-origin.xpi" /opt/tor-browser/Browser/distribution/extensions/$UBN || { echo "E: Tor Browser's uBlock Origin is not the verified copy"; exit 1; }
+echo "P: uBlock Origin $UBV (Tor Browser and LibreWolf)"
 
 # Firefox (local-only)
 rm -rf /opt/firefox

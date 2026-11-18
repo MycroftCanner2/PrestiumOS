@@ -295,6 +295,13 @@ done in).
 - **Tor Browser is the newest signed release at build time** (at least 16.0.1), from the Tor Project's
   update service and dist.torproject.org; the tarball must contain that release. `PRESTIUM_TB_VERSION`
   and `PRESTIUM_TB_SHA256` pin one.
+- **uBlock Origin is the newest release at build time**, from addons.mozilla.org, no longer a copy in
+  the repository. The build reads AMO's API, checks the download's size and SHA-256 against it, checks
+  Mozilla's add-on signature (`META-INF/mozilla.rsa` chained to the AMO root, pinned in
+  `thirdparty/keys/mozilla-amo-root.pem`, signer = the add-on id, every file covered by
+  `manifest.mf`), the add-on id and version, and that its `strict_min_version` fits the Tor Browser
+  and LibreWolf it ships with; any failure stops the build. During a session both browsers keep
+  updating it from AMO themselves (over Tor, or the I2P outproxy for LibreWolf).
 - **The local-only Firefox launcher** passes its profile and URL through the environment, never a
   command string; its only `file://` exception is The Lounge's one-off sign-in page.
 
@@ -475,7 +482,7 @@ This is one combined list of everything that changed since the last release, 1.9
 - Debian 13 trixie with updates and security fixes, kernel from the 6.12 line, firmware
   from trixie-backports plus extra network, TV tuner, Qualcomm and Samsung firmware.
 - Tor Browser 16.0, Firefox 159.0.1 (local pages only), Node.js 24.22.2, The Lounge 4.5.2, Feather 2.9.1,
-  and current LibreWolf, i2pd and Tor. uBlock Origin 1.75.4 and NoScript 13.6.37.
+  and current LibreWolf, i2pd and Tor. uBlock Origin 1.75.4 (2.1: the newest at build time) and NoScript 13.6.37.
 - Secure Boot (shim + GRUB), BIOS boot and the hybrid ISO are kept.
 - **PipeWire** with WirePlumber, pipewire-pulse and pipewire-alsa replaces plain ALSA (USB, HDMI and
   DisplayPort, SOF laptop DSPs, Surface devices). The panel volume control works with PipeWire.

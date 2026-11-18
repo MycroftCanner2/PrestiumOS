@@ -28,3 +28,6 @@ __pycache__/
 /grub-password.pbkdf2
 /SHA256SUMS
 /SHA256SUMS.asc
+# 2.1: uBlock Origin is fetched from addons.mozilla.org at build time (scripts/amo-latest.py), never committed
+/config/includes.chroot/usr/share/librewolf/distribution/extensions/uBlock0@raymondhill.net.xpi
+/config/includes.chroot/usr/share/prestium/opt-overlay/*/**/uBlock0@raymondhill.net.xpi

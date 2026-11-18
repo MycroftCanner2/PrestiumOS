@@ -43,7 +43,12 @@ which works but is several times slower.
    (npm), checks each one against its publisher's OpenPGP signature
    (`thirdparty/keys/`) **and** the SHA-256 pinned in `thirdparty/versions.sh`, and stages them in
    `config/includes.chroot/usr/src/prestium-thirdparty/` (not committed; removed from the image by
-   the last hook); it also stages an I2P reseed file — the repo-shipped `i2pseeds.su3` first (see CHANGELOG), checks it with
+   the last hook); it also fetches the newest uBlock Origin from addons.mozilla.org (`scripts/amo-latest.py`:
+   the AMO API's SHA-256 and size, Mozilla's add-on signature chained to the pinned AMO root
+   `thirdparty/keys/mozilla-amo-root.pem` with the add-on id as signer, every file against
+   `META-INF/manifest.mf`, the manifest's id and version; any failure stops the build, there is no
+   committed fallback), which hook 0200 checks again (and its `strict_min_version` against Tor
+   Browser's and LibreWolf's Firefox versions) and installs for both browsers and their opt-overlay; it also stages an I2P reseed file — the repo-shipped `i2pseeds.su3` first (see CHANGELOG), checks it with
    `config/includes.chroot/usr/local/lib/prestium/verify-su3` (SU3 format, RSA-4096/SHA-512 signature against `thirdparty/keys/reseed/`,
    at most 14 days old for downloads; the repo-shipped `i2pseeds.su3` is the primary source and its age only warns) and puts it at `config/includes.chroot/var/lib/i2pd/stormycloud-i2pseeds.su3`;
    (2.1: the image also ships copies of `thirdparty/keys/torbrowser.asc` and `mozilla.asc` in
@@ -129,6 +134,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/bootloaders/` | boot menu entries: Prestium 2.1, nomodeset, camera and microphone off |
 | `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile, the Secure Boot CA certificates (`keys/secure-boot/`: Microsoft UEFI CA 2011 and 2023, Debian Secure Boot CA; pinned in hook 9040) |
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |
+| `scripts/amo-latest.py` | newest uBlock Origin from addons.mozilla.org: AMO hash, Mozilla signature, id, version, `strict_min_version` |
 | `scripts/thelounge-themes.py` | regenerates The Lounge's 10 Theme Factory theme packages from `scripts/thelounge-theme.css.in` and checks their contrast (`--check` only verifies; the generated files are committed) |
 | `build.sh` | the whole build |
 
@@ -139,7 +145,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `0001-prestium-build-dns` | build only: gives the hooks a resolver (Prestium's own `resolv.conf` has none) |
 | `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `thelounge-tor` (2.1, IRC (Tor)), `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
-| `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + uBlock Origin), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, connecting line only when a connection starts, 320s IRC ping timeout, and for the Tor instance every network through Tor's SOCKS port), Feather |
+| `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + the newest uBlock Origin, also for LibreWolf), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, connecting line only when a connection starts, 320s IRC ping timeout, and for the Tor instance every network through Tor's SOCKS port), Feather |
 | `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives (iptables/ip6tables pinned to legacy, the backend ferm and `prestium-firewall-early` share), CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
 | `0405-prestium-verity` | live-boot mounts the image only through dm-verity: every image needs its hash tree and a root hash on the command line (`/usr/lib/live/boot/9989-prestium-verity.sh`), no plain-mount or root-hash-file fallback, no plain root, no `.fec`/`.fec.roots`/`.roothash`/`.roothash.p7s`/`*.module` next to the image; live-boot's initramfs hook stops sourcing `boot.conf` from the medium; the initramfs gets libcryptsetup (`/etc/initramfs-tools/hooks/prestium-verity`) |
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them); copies The Lounge's packages for the Tor instance (root:thelounge-tor, read-only) |
@@ -161,7 +167,11 @@ third-party trees in `/opt` are not copied: they are downloaded and verified at 
 
 Tor Browser needs nothing: each build takes the newest release, verified by its signature with the
 pinned Tor Browser key and held to `TB_MIN_VERSION` (see `thirdparty/versions.sh`; pin one release with
-`PRESTIUM_TB_VERSION=<v> PRESTIUM_TB_SHA256=<sha>`). Tor, LibreWolf and i2pd come from their signed apt
+`PRESTIUM_TB_VERSION=<v> PRESTIUM_TB_SHA256=<sha>`). Neither does uBlock Origin: each build takes the
+newest Mozilla-signed release from addons.mozilla.org (the build needs to reach addons.mozilla.org
+and its download CDN; if AMO is down or anything fails verification, the build stops). If Mozilla
+ever changes its add-on root, replace `thirdparty/keys/mozilla-amo-root.pem` with Firefox's
+`security/manager/ssl/addons-public.pem` and update `ROOT_FPR` in `scripts/amo-latest.py`. Tor, LibreWolf and i2pd come from their signed apt
 repositories, also at the newest version. For everything else:
 
 Edit the version in `thirdparty/versions.sh`, set its `*_SHA256` to `""`, run
