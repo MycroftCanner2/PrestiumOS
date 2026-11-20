@@ -352,7 +352,7 @@ done in).
   (`scripts/sigcheck.sh`). Node.js must be signed by a current releaser's primary key.
 - **Versions:** Tor Browser newest signed (16.0.1 or later), system Tor 0.4.9.16 from
   deb.torproject.org, Node.js 24.22.3 (November 2026 security release), The Lounge 4.5.2, Feather
-  2.9.1, Firefox 159.0.1, i2pd 3.0.0 (PurpleI2P's pinned GitHub `.deb`); LibreWolf from its repository
+  newest signed (2.9.1 or later), Firefox 159.0.1, i2pd 3.0.0 (PurpleI2P's pinned GitHub `.deb`); LibreWolf from its repository
   at build time.
 - **The Lounge's `npm ci` works on Debian 13's npm 9**; irc-framework is installed from a `git
   archive` of the pinned commit with a pinned SHA-256, so npm never packs it or runs build tools.
@@ -446,6 +446,15 @@ done in).
   "newest at build time", and Debian's own older i2pd is pinned out. The repository's apt source,
   key, keyring (`purplei2p.gpg`) and origin pins are removed; the i2pd user, its uid 2000 and the
   config set up by hooks 0100 and 0700 are unchanged.
+- **Feather is the newest signed release at build time**, like Tor Browser (`scripts/feather-latest.sh`).
+  Each build asks GitHub for feather-wallet/feather's latest release (never a draft or prerelease; the
+  tag must be a plain version), downloads its zip and `.asc` from the GitHub release and requires a valid
+  signature by Feather's key in a keyring holding only that key. That signature is now Feather's trust
+  anchor instead of a pinned SHA-256, with `FEATHER_MIN_VERSION` (2.9.1) as a floor so an older, still
+  validly signed release stops the build; the signed zip must hold `feather-<that version>`. The build
+  log and the image manifest record the version and SHA-256 shipped, and
+  `PRESTIUM_FEATHER_VERSION`/`PRESTIUM_FEATHER_SHA256` pin one release for reproducible builds. i2pd stays
+  pinned.
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):
