@@ -1,0 +1,27 @@
+#!/bin/sh
+# Prestium 2.1: install i2pd from the .deb staged by scripts/fetch-thirdparty.sh (PurpleI2P's trixie amd64
+# build from its GitHub releases; it replaces the repo.i2pd.xyz apt repository). The .deb carries no
+# signature: fetch-thirdparty.sh checked it against the SHA-256 pinned in thirdparty/versions.sh, the only
+# trust anchor, and wrote that hash and the version to i2pd.version. Checked again here, then apt installs
+# the local file and takes its dependencies (Boost, miniupnpc, OpenSSL...) from the Debian archive.
+# Runs before hook 0100, which moves the "i2pd" user the package creates to uid/gid 2000; 0500 (perms.txt)
+# and 0700 then set up /etc/i2pd and /var/lib/i2pd as before. Debian's own, older i2pd is never installed
+# (the package lists don't name it, and the apt preferences give it priority -1).
+# PRESTIUM_HOOK_ROOT: only for tests/test_i2pd_deb.sh (a fake staging tree); empty in the chroot.
+set -e
+S=${PRESTIUM_HOOK_ROOT:-}/usr/src/prestium-thirdparty
+D=$S/i2pd.deb
+[ -s "$D" ] && [ -s "$S/i2pd.version" ] || { echo "E: $D or i2pd.version missing: run scripts/fetch-thirdparty.sh before lb build"; exit 1; }
+read -r V H < "$S/i2pd.version"
+echo "$H" | grep -qxE '[0-9a-f]{64}' || { echo "E: i2pd.version has no SHA-256"; exit 1; }
+[ "$(sha256sum "$D" | cut -c1-64)" = "$H" ] || { echo "E: staged i2pd.deb does not match its pinned SHA-256"; exit 1; }
+[ "$(dpkg-deb -f "$D" Package Version Architecture | tr '\n' ' ')" = "Package: i2pd Version: $V Architecture: amd64 " ] \
+	|| { echo "E: staged i2pd.deb is not i2pd $V for amd64"; exit 1; }
+export DEBIAN_FRONTEND=noninteractive
+# --force-confold: config/includes.chroot already has Prestium's /etc/i2pd/i2pd.conf; keep it, as when the
+# includes were copied over the apt package (the package's copy, saved as .dpkg-dist, is removed)
+apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "$D"
+rm -f "${PRESTIUM_HOOK_ROOT:-}"/etc/i2pd/*.dpkg-dist
+got=$(dpkg-query -W -f '${Version}' i2pd 2>/dev/null || true)
+[ "$got" = "$V" ] || { echo "E: i2pd $V not installed (dpkg says: ${got:-nothing})"; exit 1; }
+echo "P: i2pd $V installed from the pinned GitHub .deb (sha256 $H)"

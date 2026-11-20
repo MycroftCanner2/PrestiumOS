@@ -11,7 +11,6 @@
 0644 root root /etc/apparmor.d/usr.share.librewolf.librewolf
 0644 root root /etc/apparmor.d/usr.local.sbin.prestium-onion-grater
 0644 root root /usr/share/prestium/build/apt/prestium-librewolf.list
-0644 root root /usr/share/prestium/build/apt/prestium-i2pd.list
 0644 root root /usr/share/prestium/build/apt/prestium-tor.list
 0644 root root /etc/ca-certificates.conf
 0644 root root /etc/dconf/profile/user
@@ -161,7 +160,6 @@
 0644 root root /usr/share/i2pd/torrents/web/rpc.js
 0755 root root /usr/share/initramfs-tools/hooks/prestium-shutdown
 0644 root root /usr/share/keyrings/librewolf.gpg
-0644 root root /usr/share/keyrings/purplei2p.gpg
 # 2.1: the uBlock Origin .xpi files are not in the repository; hook 0200 installs the build-time AMO download
 0644 root root /usr/share/librewolf/distribution/extensions/uBlock0@raymondhill.net.xpi
 0644 root root /usr/share/librewolf/distribution/extensions/{73a6fe31-595d-460b-a920-fcc0f8843232}.xpi

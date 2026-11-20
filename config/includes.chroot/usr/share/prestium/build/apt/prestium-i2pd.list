@@ -1,1 +1,0 @@
-deb [arch=amd64 signed-by=/usr/share/keyrings/purplei2p.gpg] https://repo.i2pd.xyz/debian trixie main
