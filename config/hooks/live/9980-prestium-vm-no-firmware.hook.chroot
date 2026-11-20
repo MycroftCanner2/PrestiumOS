@@ -1,0 +1,14 @@
+#!/bin/sh
+# quick_qubes: this image runs as a virtual machine guest (KVM/QEMU, VirtualBox, VMware, Xen/Qubes OS),
+# where the hypervisor owns the hardware, loads the CPU microcode and emulates or paravirtualizes every
+# device. Bare-metal firmware and microcode are left out (no prestium-firmware list, no firmware pin,
+# no non-free-firmware archive area); stop the build if a dependency pulled one in anyway.
+set -e
+bad=$(dpkg-query -W -f '${db:Status-Abbrev} ${Package}\n' 2>/dev/null \
+	| awk '$1 ~ /^.i/ { print $2 }' \
+	| grep -E '^(firmware-.*|.*-microcode|iucode-tool|atmel-firmware)$' || true)
+if [ -n "$bad" ]; then
+	echo "E: quick_qubes ships no bare-metal firmware or microcode, but these are installed:" $bad
+	exit 1
+fi
+echo "P: quick_qubes: no firmware or microcode packages installed"

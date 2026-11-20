@@ -1,6 +1,4 @@
 # Prestium 2.0: non-interactive answers needed while the chroot packages install
-firmware-ipw2x00 firmware-ipw2x00/license/accepted boolean true
-firmware-ivtv firmware-ivtv/license/accepted boolean true
 iperf3 iperf3/start_daemon boolean false
 wireshark-common wireshark-common/install-setuid boolean false
 console-setup console-setup/charmap47 select UTF-8

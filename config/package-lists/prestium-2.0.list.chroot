@@ -1,5 +1,6 @@
 # Prestium 2.0 additions
-# audio: PipeWire + WirePlumber + PulseAudio compatibility, SOF firmware, UCM profiles, tray icon
+# audio: PipeWire + WirePlumber + PulseAudio compatibility, UCM profiles, tray icon
+# quick_qubes: no firmware-sof-signed (Intel SOF DSP firmware; VMs emulate HDA/AC97 or USB audio)
 pipewire
 pipewire-bin
 pipewire-pulse
@@ -11,7 +12,6 @@ rtkit
 alsa-utils
 alsa-ucm-conf
 alsa-topology-conf
-firmware-sof-signed
 pavucontrol
 # Tor Connection Assistant (Python + GTK 3)
 python3

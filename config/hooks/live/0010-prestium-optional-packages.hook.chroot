@@ -1,6 +1,6 @@
 #!/bin/sh
-# Prestium 2.0: install the "parity" packages (what earlier releases had as dependencies/recommends) and the
-# extra firmware listed in /usr/share/prestium/build/optional-packages.txt. Names that the archive
+# Prestium 2.0: install the "parity" packages (what earlier releases had as dependencies/recommends)
+# listed in /usr/share/prestium/build/optional-packages.txt (quick_qubes: no extra firmware). Names that the archive
 # no longer has are skipped and logged instead of failing the build.
 set -e
 L=/usr/share/prestium/build/optional-packages.txt

@@ -16,14 +16,18 @@ if [ -n "${PRESTIUM_SNAPSHOT:-}" ]; then
 	MIRROR_SEC=https://snapshot.debian.org/archive/debian-security/$PRESTIUM_SNAPSHOT/
 	APT_OPTS="--yes -o Acquire::Check-Valid-Until=false"   # snapshot Release files are past Valid-Until
 fi
+# quick_qubes (VM / Qubes OS guest): no bare-metal firmware or CPU microcode (the hypervisor loads the
+# microcode and emulates the devices), so no "non-free-firmware" archive area. --firmware-chroot and
+# --firmware-binary stay explicitly false: live-build's default would pull every firmware package in.
+# Hook 9980 stops the build if a firmware or microcode package is installed anyway.
 # 2.1: --dm-verity: live-build writes live/filesystem.squashfs.verity (the hash tree); hook 9010 puts the
 # root hash on the kernel command line and the initramfs (hook 0405) refuses to boot without a match.
 lb config noauto \
 	--mode debian \
 	--distribution trixie \
 	--architecture amd64 \
-	--archive-areas "main contrib non-free-firmware" \
-	--parent-archive-areas "main contrib non-free-firmware" \
+	--archive-areas "main contrib" \
+	--parent-archive-areas "main contrib" \
 	--mirror-bootstrap "$MIRROR" \
 	--mirror-chroot "$MIRROR" \
 	--mirror-binary "$MIRROR" \
