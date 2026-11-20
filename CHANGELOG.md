@@ -1,5 +1,65 @@
 # Changelog
 
+## quick_qubes branch: Prestium 2.1 for VMs and Qubes OS
+
+A variant of 2.1 that runs as a virtual machine guest (KVM/QEMU, VirtualBox, VMware) or as a Qubes OS
+standalone HVM booting the ISO. It builds `Prestium-2.1-quick_qubes-amd64.iso`. The hypervisor owns
+the hardware, so bare-metal support is left out. The security layers are unchanged: firewall, AppArmor,
+sandboxes, Tor/I2P isolation, dm-verity, lockdown and the kernel command line with its guard. How to
+run it is in the README's quick_qubes section.
+
+### Removed
+- **Bare-metal firmware and CPU microcode:** the `prestium-firmware` package list (`firmware-*`,
+  `amd64-microcode`, `intel-microcode`, `iucode-tool`, `atmel-firmware`, `wireless-regdb`), the
+  trixie-backports firmware pin (`config/archives/prestium-firmware.pref.chroot`,
+  `/etc/apt/preferences.d/prestium`), `firmware-sof-signed`, the extra firmware in
+  `optional-packages.txt`, the firmware licence preseeds and the `non-free-firmware` archive area.
+  `--firmware-chroot`/`--firmware-binary` stay `false`. **New hook 9980** stops the build if a firmware
+  or microcode package is installed anyway.
+- **Wi-Fi** (`wpasupplicant`, `wireless-tools`), **mobile broadband and tethering** (`modemmanager`,
+  `ppp`, `usb-modeswitch`, `usb-modeswitch-data`, `usbmuxd`), with their units and D-Bus aliases.
+- **Graphics tablets** (`xserver-xorg-input-wacom`, `libwacom-bin`) and the **real-GPU X drivers**
+  (`xserver-xorg-video-all`, `-amdgpu`, `-ati`, `-intel`, `-nouveau`, `-radeon`). QXL, VMware, fbdev,
+  VESA and modesetting stay for virtual GPUs.
+- `xinput`, and the System menu's **Brightness** and **Touchpad** entries (no backlight or touchpad in a
+  VM; the tools stay, hidden).
+
+### Changed
+- **Name:** the ISO is `Prestium-2.1-quick_qubes-amd64.iso`, os-release has
+  `VARIANT_ID=quick_qubes`, and hook 9000 labels the boot entries "Prestium 2.1 quick_qubes". Only the
+  labels changed: the command lines, `cmdline.policy` and hook 9030 are the same as on `main`.
+- **VM notice:** "running in a virtual machine" is now information (normal urgency, the usual timeout,
+  no warning icon), since the VM is the expected environment. It still says what the host can see.
+- **VM network diagnosis (after 10 minutes):** now knows Xen/Qubes OS. It covers the static address a
+  Qubes HVM without Qubes tools needs (no DHCP; the IP and gateway from the qube's Settings or
+  `qvm-ls -n`, no DNS), the Qubes clock (dom0's clock qube), and I2P failing behind a sys-whonix or VPN
+  net qube.
+- **Xen paravirtual network cards keep the host's MAC address.** Qubes OS pins the address it assigned
+  in the net qube, so a spoofed one cut the network, and in Qubes that address never leaves the
+  computer. `prestium-spoof-mac` and `prestium-mac-guard` (`host_assigned_mac()`) skip cards on the
+  `xen` bus. Emulated cards (e1000, rtl8139, virtio-net, vmxnet3) are still spoofed and guarded, and
+  connection settings are still checked for every card.
+- **Faster boot from a virtual CD:** live-boot loads the SATA/IDE optical drivers after 1 second instead
+  of 8 when the CPU has the hypervisor flag. Real hardware keeps the 8-second USB-first wait.
+
+### Kept on purpose
+- No guest agents (`qemu-guest-agent`, `spice-vdagent`, VirtualBox Guest Additions, VMware Tools, Qubes
+  tools). They are host-to-guest channels (clipboard, files, commands), and the test suite checks that
+  none is listed.
+- MAC spoofing and the MAC guard on emulated cards, the boot-medium watchdog (ejecting the virtual CD
+  powers the VM off), Secure Boot (works in UEFI VMs; harmless in Qubes, which boots SeaBIOS), the
+  internal-disk blacklist, the shutdown memory wipe, time over Tor, PipeWire audio, `pcscd`, the
+  on-screen keyboard and the camera/microphone-off entry.
+
+### Docs and tests
+- README: a quick_qubes section covering what changed and why, plus how to run it in KVM/QEMU,
+  VirtualBox, VMware and Qubes OS (standalone HVM, `kernel=''`, `maxmem=0`, `--cdrom`, static
+  address, sys-firewall rather than sys-whonix). The Download, Verify and Repository layout sections
+  now point to `Prestium-2.1-amd64.iso.torrent`; the 2.0 torrent was deleted on `main`. BUILDING.md
+  covers the firmware-free package set, the archive areas, the output name and hook 9980.
+- New `tests/test_quick_qubes.sh`. `test_vm_check.sh`, `test_mac_spoof_udev.sh`,
+  `test_mac_guard_policy.py` and `test_mac_guard_dbus.py` are updated for the changes above.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build

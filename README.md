@@ -6,11 +6,18 @@ PrestiumOS is a privacy-focused live operating system for USB sticks, with Tor a
 is built with Debian's **live-build** on Debian 13 "trixie" (amd64), with broad hardware
 support: the current Debian release, kernel line and firmware set, with Secure Boot through shim and GRUB.
 
+> **This is the `quick_qubes` branch:** a variant of 2.1 made to run as a virtual machine guest
+> (KVM/QEMU, VirtualBox, VMware) or in **Qubes OS**, without bare-metal firmware. It builds
+> `Prestium-2.1-quick_qubes-amd64.iso`. See [quick_qubes: Prestium in a VM or Qubes OS](#quick_qubes-prestium-in-a-vm-or-qubes-os)
+> for what is different and how to run it. For real hardware (a USB stick), use the `main` branch.
+
 **Status:** Prestium **2.1** is the current release. It builds on **Prestium 2.0**, a full
 modernization of the 2023 Prestium build, with tighter security and new features.
 
-- **Download:** build the 2.1 ISO with [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). The previous
-  2.0 ISO is still available through [`Prestium-2.0-amd64.iso.torrent`](Prestium-2.0-amd64.iso.torrent).
+- **Download:** the 2.1 ISO (the bare-metal image from `main`) is available through
+  [`Prestium-2.1-amd64.iso.torrent`](Prestium-2.1-amd64.iso.torrent), or build it yourself with
+  [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). The quick_qubes ISO has no published download yet:
+  build it from this branch.
 - **What changed:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Highlights
@@ -121,7 +128,148 @@ modernization of the 2023 Prestium build, with tighter security and new features
   kernel command line isn't exactly the one in its boot menu. The initramfs checks first, then a
   service runs before AppArmor loads. GRUB loads only this stick's own boot files.
 - **Hardware:** current firmware, PipeWire audio, HiDPI scaling, laptop keys, touchpad settings and an
-  on-screen keyboard.
+  on-screen keyboard. (On `quick_qubes`, virtual hardware only, with no firmware; see
+  [quick_qubes](#quick_qubes-prestium-in-a-vm-or-qubes-os).)
+
+## quick_qubes: Prestium in a VM or Qubes OS
+
+The `quick_qubes` branch builds Prestium 2.1 for running **as a guest** in a virtual machine
+(KVM/QEMU with virt-manager, GNOME Boxes or Proxmox; VirtualBox; VMware) or as a **Qubes OS**
+standalone HVM qube that boots the ISO. The hypervisor owns the real hardware, so the image leaves out
+what only real hardware needs. It is smaller and quicker to build, and it boots a little faster from a
+virtual CD drive. Every security layer stays the same: firewall, AppArmor, sandboxes, Tor/I2P isolation,
+dm-verity, kernel lockdown and the boot command line guard.
+
+**A VM is not more private than a USB stick.** The host, and in Qubes OS dom0, can see everything
+you type and everything on the screen. Run this build only on a host you trust. Its advantage is
+convenience, plus Qubes OS's isolation from your other qubes. It does not hide you from the machine
+it runs on.
+
+### What is different from `main`
+
+Removed (a VM never touches the hardware these drive):
+- **All bare-metal firmware and CPU microcode:** the `prestium-firmware` package list (`firmware-*`,
+  `amd64-microcode`, `intel-microcode`, `iucode-tool`, `atmel-firmware`, `wireless-regdb`), the
+  trixie-backports firmware pin, `firmware-sof-signed`, the extra firmware in `optional-packages.txt`,
+  the firmware licence preseeds and the `non-free-firmware` archive area. The host loads microcode for
+  the real CPU, and the virtual devices need no firmware. live-build's `--firmware-chroot` and
+  `--firmware-binary` stay explicitly `false`, and the new hook 9980 stops the build if a firmware or
+  microcode package gets installed anyway.
+- **Wi-Fi** (`wpasupplicant`, `wireless-tools`). A VM gets a virtual Ethernet card, and the host
+  handles Wi-Fi.
+- **Mobile broadband and phone tethering** (`modemmanager`, `ppp`, `usb-modeswitch`,
+  `usb-modeswitch-data`, `usbmuxd`), along with their units and D-Bus aliases.
+- **Graphics tablets** (`xserver-xorg-input-wacom`, `libwacom-bin`), and the **X drivers for real GPUs**
+  (`xserver-xorg-video-all`, `-amdgpu`, `-ati`, `-intel`, `-nouveau`, `-radeon`). Kept: `-qxl`,
+  `-vmware`, `-fbdev`, `-vesa` and the built-in modesetting driver, which cover virtio-gpu,
+  bochs/stdvga (Qubes), QXL, VMware SVGA and VirtualBox VMSVGA. GPU passthrough to this image is not
+  supported, because it has no GPU firmware.
+- **`xinput`**, and the **Brightness** and **Touchpad** entries in the System menu, since a VM has no
+  backlight and no touchpad. The tools stay installed but hidden, and the brightness keys already
+  handle "no backlight".
+
+Changed:
+- **Name:** `Prestium-2.1-quick_qubes-amd64.iso`. The boot menus say "Prestium 2.1 quick_qubes", and
+  os-release has `VARIANT_ID=quick_qubes`. Only the labels changed: the kernel command line is the same
+  as on `main`, so the boot command line guard and its policy are unchanged.
+- **The "running in a virtual machine" notice is information, not a warning.** On this build the VM is
+  the expected environment. The notice still says what the host can see. The 10-minute "why Tor or
+  I2P hasn't connected" diagnosis is kept and now knows Xen/Qubes OS. It explains the static address
+  a Qubes HVM needs, the Qubes clock (dom0), and why I2P fails behind a sys-whonix or VPN net qube.
+- **Qubes OS network cards keep their address.** Spoofing a Xen paravirtual card's MAC address (every
+  network card of a Qubes HVM) cuts the network: the net qube pins the address Qubes assigned, and in
+  Qubes that address never leaves the computer anyway. The outside world sees sys-net's card. For those
+  cards only, the MAC spoofing script and the MAC guard keep the host's address. Emulated cards
+  (e1000, rtl8139, virtio-net, vmxnet3) in KVM, VirtualBox and VMware are still spoofed. With a bridged
+  VM network, the VM's MAC address does reach your LAN.
+- **A faster boot from a virtual CD:** live-boot hides SATA/IDE disks and normally waits 8 seconds for
+  a USB medium before it loads the optical drivers. In a VM (the CPU's hypervisor flag) it waits
+  1 second.
+
+Kept on purpose:
+- **No guest agents** (`qemu-guest-agent`, `spice-vdagent`, VirtualBox Guest Additions, VMware Tools
+  or open-vm-tools, Qubes tools). They are channels between host and guest (shared clipboard, file
+  transfer, commands run in the guest, window and screen integration), and each one is code that both
+  sides talk to. Without them, nothing is shared with the host except the virtual screen, keyboard,
+  mouse and network. That also means no shared clipboard, no automatic window resizing and no
+  host-to-guest file drag and drop. Don't install them.
+- **MAC spoofing and the MAC guard** on emulated cards (see above). They do no harm in a VM, and they
+  matter with bridged networking.
+- **The boot-medium watchdog:** it arms on the virtual CD drive, so ejecting or detaching the ISO from
+  the host powers the VM off, like pulling the USB stick. Booted with `toram`, it stays off as before.
+- **Secure Boot through shim, GRUB and the kernel:** it works in UEFI VMs with Secure Boot keys (OVMF
+  `*.ms.fd`, VMware, VirtualBox 7). It doesn't matter in Qubes OS, whose HVMs boot SeaBIOS (isolinux),
+  but it does no harm. `lockdown=integrity` holds either way.
+- **The internal-disk blacklist** (`ahci`, `libata`, `nvme` and the patched live-boot fallback), the
+  full kernel command line and its guard, dm-verity, AppArmor, bubblewrap, Landlock, the ferm firewall,
+  time over Tor, the shutdown memory wipe, the camera/microphone-off entry, PipeWire audio, `pcscd` (for
+  passed-through smartcards) and the on-screen keyboard (accessibility).
+
+### Running it in a VM (KVM/QEMU, VirtualBox, VMware)
+
+- **Memory and CPUs:** 4 GB of RAM (3 GB at least; the live system and its overlay live in RAM) and
+  2 or more vCPUs. No virtual disk is needed: Prestium never installs and doesn't use one.
+- **Boot media:** attach the ISO as the VM's CD/DVD drive. BIOS or UEFI both work, and so does UEFI
+  with Secure Boot.
+- **Network:** a NAT network (virt-manager's `default`, VirtualBox "NAT Network") or a bridge. User-mode
+  networking (QEMU `-nic user`/SLIRP, plain VirtualBox "NAT") works for Tor, but I2P barely works
+  behind it. The VM diagnosis tells you if that is the problem.
+- **Clock:** the VM's hardware clock must be UTC (virt-manager: `<clock offset='utc'>`; VirtualBox:
+  System > Motherboard > "Hardware Clock in UTC Time"). Tor and I2P refuse a wrong clock.
+- **Graphics:** virtio (without 3D), QXL, VMSVGA or VMware SVGA.
+- **No guest additions or tools** (see above). In virt-manager you can also remove the "qemu-ga" and
+  "spice" channel devices, which have nothing to talk to.
+
+Example (libvirt, NAT network, no disk):
+
+    virt-install --name prestium --memory 4096 --vcpus 2 --osinfo linux2022 \
+        --cdrom Prestium-2.1-quick_qubes-amd64.iso --disk none --livecd \
+        --network network=default --graphics spice --video virtio
+
+### Running it in Qubes OS
+
+Prestium runs as a **standalone HVM** that boots the ISO each time, as a live system. It has no
+Qubes tools, so it gets no seamless windows, no inter-qube clipboard or file copy, and no qrexec. It
+shows up as one window with its own desktop.
+
+1. **Create the qube** (dom0). In the Qube Manager: *New qube*, *Standalone* tab, "install system from
+   device" (this sets HVM mode), net qube **sys-firewall**. Or on the command line:
+
+       qvm-create --class StandaloneVM --label red --property virt_mode=hvm \
+           --property kernel='' --property memory=4096 --property maxmem=0 prestium
+       qvm-prefs prestium netvm sys-firewall
+
+   `kernel=''` lets the qube boot the ISO's own kernel. `maxmem=0` turns memory balancing off (it needs
+   Qubes tools). Give it at least 3 GB. The qube's disk volumes stay empty and unused.
+2. **Boot the ISO**, kept in another qube (never copy it to dom0):
+
+       qvm-start prestium --cdrom=<qube-with-the-iso>:/home/user/Prestium-2.1-quick_qubes-amd64.iso
+
+   Do this on every start: it is a live system, and nothing is kept between boots. In the Qube Manager,
+   use "Boot qube from CD-ROM" in the qube's settings.
+3. **Set the network address by hand.** Qubes gives every qube a fixed IP address, but no DHCP reaches
+   an HVM that uses Xen's network drivers, which Debian's kernel has. Look up the qube's IP address and
+   gateway in its Settings (Basic tab) or with `qvm-ls -n` in dom0. Then, in Prestium, open the network
+   icon's menu > *Edit Connections* > the wired connection > *IPv4*: method **Manual**, the qube's
+   address with netmask `255.255.255.0` (or `255.0.0.0`) and the gateway shown. **Leave DNS empty:**
+   Prestium has no system DNS, because Tor and I2P do their own lookups. The VM diagnosis repeats these
+   steps if it finds no route after 10 minutes. The setting is gone at the next boot, like everything
+   else.
+4. **Clock:** a Qubes HVM's clock comes from dom0 (the clock qube in Qubes Global Settings). If Tor
+   complains about the clock, fix dom0's clock.
+
+**Net qube: sys-firewall, not sys-whonix.** Prestium runs its own Tor (and I2P). With sys-whonix as
+its net qube, Prestium's Tor runs inside Whonix's Tor ("Tor over Tor"). That is slower, gives no extra
+anonymity, and may make your traffic stand out. Whonix also sends every TCP connection through Tor and
+drops UDP, so I2P can't work. A VPN qube as net qube is possible, with the usual caveat that the VPN
+sees that you use Tor and I2P.
+
+Other notes:
+- No sound without Qubes tools.
+- Qubes OS hides the real hardware and its MAC address from Prestium anyway (sys-net owns the network
+  card). This is why the Xen card keeps its address (see above).
+- The boot-medium watchdog arms on the attached CD. Shutting the qube down from Prestium's menu is the
+  normal way out, and the shutdown memory wipe runs as on real hardware.
 
 ## Known limits
 
@@ -187,8 +335,9 @@ Check a download before you write it to a USB stick.
   The first command must say "Good signature" from that fingerprint; a warning that the key is not
   certified is normal. The second must say `OK` for the ISO.
 - **2.0** has no signed checksum file. Compare `sha256sum Prestium-2.0-amd64.iso` with the SHA-256 on
-  prestium.org, and get the torrent from this repository: the torrent's piece hashes check the data
-  as it downloads, but neither proves who made the image.
+  prestium.org. Its torrent is no longer in this repository (it was replaced by
+  `Prestium-2.1-amd64.iso.torrent`). A torrent's piece hashes check the data as it downloads, but don't
+  prove who made the image.
 
 To build the same image yourself, see [BUILDING.md](BUILDING.md); each build writes a manifest of what
 went into it.
@@ -198,7 +347,7 @@ went into it.
 - `auto/`, `config/`, `build.sh`, `scripts/`, `thirdparty/`: the live-build configuration
   (see [BUILDING.md](BUILDING.md)); `thirdparty/` holds the pinned versions, hashes and publisher keys.
 - `i2pseeds.su3`: the signed I2P reseed file the build ships.
-- `Prestium-2.0-amd64.iso.torrent`: the torrent for the previous release.
+- `Prestium-2.1-amd64.iso.torrent`: the torrent for the 2.1 release (the bare-metal image from `main`).
 - `tests/`: checks for the boot chain (dm-verity, boot menu lock, command line policy, Secure Boot),
   the firewall, sandboxes and AppArmor profiles, the Wayland broker and its dialogs, the MAC guard,
   the Tor and I2P helpers, The Lounge, the Browser Updater and the desktop's design; `tests/ci.sh`

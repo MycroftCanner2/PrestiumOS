@@ -4,13 +4,19 @@ PrestiumOS is built from scratch with Debian's **live-build**, the same tool Deb
 images use. Everything that makes it Prestium is in this repository: the package lists, the
 customised files, the setup hooks and the pinned third-party downloads.
 
-- Base: Debian 13 "trixie", amd64. Archive areas `main contrib non-free-firmware`, plus
+**quick_qubes branch:** this branch builds the VM / Qubes OS variant,
+`Prestium-2.1-quick_qubes-amd64.iso`, with no bare-metal firmware (see the quick_qubes section of
+[README.md](README.md)). The build steps, requirements and checks are the same as on `main`. Only the
+package set, the archive areas and the output names differ, as described below.
+
+- Base: Debian 13 "trixie", amd64. Archive areas `main contrib` (quick_qubes: no `non-free-firmware`), plus
   `trixie-updates`, `trixie-security` and `trixie-backports`.
-- Kernel: Debian's trixie `linux-image-amd64` (the 6.12 line).
-- Firmware: the full set, with `firmware-*` pinned to trixie-backports
-  (`config/archives/prestium-firmware.pref.chroot`, priority 990), so `firmware-linux` is
-  20260916 or newer. Extra firmware beyond the base set (network cards, TV tuners, Qualcomm, Samsung) is
-  installed when the archive has it (`optional-packages.txt`).
+- Kernel: Debian's trixie `linux-image-amd64` (the 6.12 line). It has the guest drivers built in or
+  as modules (virtio, Xen PV front ends for Qubes OS, VMware and Hyper-V), so no extra package is needed.
+- Firmware (quick_qubes): none. No `firmware-*`, no CPU microcode (the host loads it) and no firmware
+  pin. `--firmware-chroot false` and `--firmware-binary false` stay set, and hook 9980 stops the build
+  if a firmware or microcode package is installed anyway. Wi-Fi, mobile broadband, tethering, tablet
+  and real-GPU X driver packages are left out too (see the quick_qubes section of README.md).
 - Boot: hybrid ISO, BIOS (isolinux) and UEFI, with **Secure Boot** through Debian's signed boot chain:
   `EFI/boot/bootx64.efi` is Debian's shim (signed by Microsoft), which loads
   `EFI/boot/grubx64.efi`, Debian's signed GRUB for removable media (`gcdx64.efi.signed` from
@@ -56,7 +62,7 @@ which works but is several times slower.
    Browser Updater, and keeps `/usr/share/prestium/opt-overlay`; when a key or `sigcheck.sh` changes,
    update both copies; `tests/test_browser_install.py` and `tests/test_sigcheck.sh` compare them)
 2. runs `lb config` (options in `auto/config`);
-3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-amd64.iso`, `Prestium-2.1-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
+3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-quick_qubes-amd64.iso`, `Prestium-2.1-quick_qubes-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
 
 **Secure Boot.** The UEFI boot chain is Debian's signed one, the same as Debian's live images:
 firmware → shim → GRUB → kernel. live-build installs `shim-signed` and `grub-efi-amd64-signed`
@@ -116,15 +122,14 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | --- | --- |
 | `auto/config` | the `lb config` options (distribution, archive areas, boot loaders, Secure Boot, kernel command line, squashfs compression) |
 | `config/package-lists/prestium.list.chroot` | the packages installed by hand in earlier Prestium releases (derived from their dpkg selections, build-only packages removed) |
-| `config/package-lists/prestium-firmware.list.chroot` | firmware and CPU microcode (full coverage) |
 | `config/package-lists/prestium-2.0.list.chroot` | 2.0 additions: PipeWire/WirePlumber audio, pasystray, the assistant's GTK bindings |
 | `config/package-lists/live.list.chroot` | live-boot (no live-config: Prestium sets up its user itself) |
 | `config/archives/` | build-time apt sources and keys: Tor Project, PurpleI2P (i2pd), LibreWolf, each `signed-by` its own key (live-build installs `<name>.key.chroot` as `/etc/apt/trusted.gpg.d/<name>.key.chroot.gpg`); origin pins limiting each repo to its own packages; firmware pin to backports |
-| `config/preseed/` | non-interactive answers (firmware licences, locale, keyboard, ferm) |
+| `config/preseed/` | non-interactive answers (locale, keyboard, ferm; quick_qubes: no firmware licences) |
 | `config/includes.chroot/` | Prestium's own files and the package files it changes, carried over from the earlier Prestium root filesystem as a diff against the packaged files (see below), plus the 2.0 changes |
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
 | `config/hooks/live/*.hook.chroot` | setup steps, in order (below) |
-| `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels |
+| `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels ("Prestium 2.1 quick_qubes": version and os-release `VARIANT_ID`) |
 | `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash, exported for submenus, also in the EFI image's and per-platform grub.cfg; needs mtools), every entry `--unrestricted`; isolinux `allowoptions 0`; every kernel line checked against a banned list (shells, init, security modules, debug, persistence, findiso=) and must have exactly one `lockdown=integrity`; findiso= and loopback.cfg removed |
 | `scripts/grub-pbkdf2.py` | makes the GRUB password hash (`--random` for one nobody knows) |
 | `scripts/efi-inspect.py` | read-only facts about an EFI file for hook 9040: SBAT, a built-in certificate (shim's vendor CA), a GRUB image's built-in modules, prefix and objects |
@@ -143,7 +148,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | Hook | Does |
 | --- | --- |
 | `0001-prestium-build-dns` | build only: gives the hooks a resolver (Prestium's own `resolv.conf` has none) |
-| `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
+| `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity), skipping names the archive no longer has (quick_qubes: no extra firmware) |
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `thelounge-tor` (2.1, IRC (Tor)), `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
 | `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + the newest uBlock Origin, also for LibreWolf), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, connecting line only when a connection starts, 320s IRC ping timeout, and for the Tor instance every network through Tor's SOCKS port), Feather |
 | `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives (iptables/ip6tables pinned to legacy, the backend ferm and `prestium-firewall-early` share), CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
@@ -151,6 +156,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them); copies The Lounge's packages for the Tor instance (root:thelounge-tor, read-only) |
 | `0600-prestium-apparmor` | enforces all Prestium profiles (LibreWolf included) and compiles them to catch errors |
 | `0700-prestium-i2pd` | i2pd's real config in `/var/lib/i2pd`, owned by uid 2000; `tunnels.conf.d` root:i2pd 0750 (written by root helpers only through `/usr/local/lib/prestium/safefile`); Prestium's dark theme inlined into the torrent web UI |
+| `9980-prestium-vm-no-firmware` | quick_qubes: stops the build if any `firmware-*`, `*-microcode`, `iucode-tool` or `atmel-firmware` package is installed |
 | `9990-prestium-cleanup` | final apt sources with signed-by keyrings, package list record, removes build-only files |
 
 ### How `config/includes.chroot/` was made
