@@ -2,6 +2,9 @@
 # Gajim may use its own config, data and cache directories and the shared ~/Downloads (file transfers; 2.1, L-5).
 # It can't run sudo or Prestium's helpers, read other apps' data, or open the system bus.
 # Links open in Tor Browser (its own sandbox); other programs can't be started from Gajim.
+# OpenPGP (gajim-openpgp, XEP-0373; 2.1 late): GPGME runs gpg, gpgconf and gpg-agent in the child
+# profile "gpg" (below), as in usr.bin.claws-mail. Its keyring is Gajim's own, one per account under
+# ~/.local/share/gajim/openpgp/<jid>/ (GPGME home_dir), never ~/.gnupg; it has no network but unix sockets.
 # Not yet tested on a booted ISO.
 abi <abi/4.0>,
 include <tunables/global>
@@ -51,6 +54,60 @@ profile gajim /usr/bin/gajim {
   /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut} ix,
   # 2.1 (review): Px into the launcher profile, not Ux (see prestium.browser-launcher)
   /usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,
+
+  # 2.1 (late): OpenPGP. Without these GPGME couldn't run gpg ("gpg --version" for the engine check) and
+  # gajim-openpgp failed at account connect with "GPGMEError: GPGME: Invalid crypto engine". GPGME's
+  # engine check also runs gpgconf --list-dirs/--list-components and gpgsm --version.
+  /usr/bin/gpg Cx -> gpg,
+  /usr/bin/gpgsm Cx -> gpg,
+  /usr/bin/gpgconf Cx -> gpg,
+  /usr/bin/gpg-connect-agent Cx -> gpg,
+  /usr/bin/gpg-agent Cx -> gpg,
+  # GPGME stops a gpg it no longer needs (cancel, context release)
+  signal (send) set=(term, kill, hup) peer=gajim//gpg,
+  # GnuPG's *.conf in Gajim's keyrings: never written or hard-linked by Gajim either (helper programs, as
+  # in Claws Mail's and Kleopatra's profiles); the plugin itself writes only contacts.db there
+  deny @{HOME}/.local/share/gajim/openpgp/*/*.conf{,.*} wl,
+  deny @{HOME}/.local/share/gajim/openpgp/*/common.conf wl,
+
+  profile gpg {
+    include <abstractions/base>
+    include <abstractions/prestium-no-admin>
+    network unix stream,
+    # gajim-openpgp runs gpg offline (key exchange is over XMPP): no dirmngr, and no inet/inet6 rule,
+    # so no TCP/UDP at all (Gajim's own "network inet stream" is not inherited by a child profile)
+    signal (receive) set=(term, kill, hup) peer=gajim,
+
+    /usr/bin/gpg mr,
+    /usr/bin/gpgsm mr,
+    /usr/bin/gpgconf mrix,
+    /usr/bin/gpg-connect-agent mrix,
+    /usr/bin/gpg-agent mrix,
+    /usr/lib/gnupg/* mrix,
+    /usr/share/gnupg/** r,
+    /etc/gcrypt/** r,
+    /etc/gnupg/** r,
+    @{PROC}/sys/crypto/** r,
+    owner @{PROC}/@{pid}/fd/ r,
+    owner @{PROC}/@{pid}/** r,
+
+    # never the GnuPG configuration files (written or hard-linked), as in usr.bin.claws-mail//gpg and
+    # usr.bin.kleopatra: they can name helper programs (agent-program, pinentry-program, ...)
+    deny @{HOME}/.local/share/gajim/openpgp/*/*.conf{,.*} wl,
+    deny @{HOME}/.local/share/gajim/openpgp/*/common.conf wl,
+    owner @{HOME}/.local/share/gajim/openpgp/*/ rw,
+    owner @{HOME}/.local/share/gajim/openpgp/*/** rwkl,
+    # the agent's sockets: $XDG_RUNTIME_DIR/gnupg/d.<hash>/ for a non-default home directory
+    owner @{run}/user/[0-9]*/gnupg/ rw,
+    owner @{run}/user/[0-9]*/gnupg/** rwk,
+    # the user's own keyring (Claws Mail, Kleopatra) and Gajim's settings and messages are not for gpg
+    deny @{HOME}/.gnupg/** rw,
+    deny @{HOME}/.config/gajim/** rw,
+
+    # a passphrase prompt (keys made by Gajim have none), in its own profile (prestium.pinentry)
+    /etc/alternatives/pinentry{,-x11} r,
+    /usr/bin/pinentry* Px -> prestium_pinentry,
+  }
 
   include if exists <local/usr.bin.gajim>
 }

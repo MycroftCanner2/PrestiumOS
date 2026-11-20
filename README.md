@@ -36,7 +36,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   Evince, VLC, File Roller, FeatherPad, mat2, Metadata Cleaner, Audacity); the helpers those viewers start in
   bubblewrap run in stricter inner profiles. The build fails if another profile could attach to a
   program a Prestium profile confines, and the boot checks the loaded set again. Neither Claws Mail's
-  GnuPG nor Kleopatra may write or hard-link GnuPG's `*.conf` files, which can name helper programs.
+  or Gajim's GnuPG nor Kleopatra may write or hard-link GnuPG's `*.conf` files, which can name helper programs.
   Audacity runs in an empty network namespace.
 - **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail
   and Gajim) and `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity,
@@ -84,7 +84,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Messenger (Gajim):** Tor and I2P proxies ready to use. Gajim ships Tor
   (SOCKS5 127.0.0.1:9050) plus I2P (SOCKS5 127.0.0.1:4447 and HTTP 127.0.0.1:4444) proxy
   profiles, with Tor as the global default; choose another per account in Account Settings.
-  Its menu entry is plain *Gajim*.
+  Its menu entry is plain *Gajim*. OpenPGP (the OpenPGP plugin) keeps one keyring per account under
+  `~/.local/share/gajim/openpgp/`, separate from `~/.gnupg`; its gpg runs offline in its own profile.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
   SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets and its own
