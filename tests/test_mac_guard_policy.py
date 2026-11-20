@@ -73,5 +73,36 @@ class Policy(unittest.TestCase):
         # and it can be wrapped as Update's argument
         GLib.Variant.new_tuple(g.repaired_variant(raw, [sec]))
 
+class XenPV(unittest.TestCase):
+    """quick_qubes: a Xen paravirtual card (Qubes OS) keeps its host-assigned address."""
+    def setUp(self):
+        import tempfile
+        self.t = tempfile.mkdtemp()
+        def card(name, bus):
+            os.makedirs(os.path.join(self.t, "bus", bus), exist_ok=True)
+            d = os.path.join(self.t, "devices", name)
+            os.makedirs(d)
+            os.symlink(os.path.join(self.t, "bus", bus), os.path.join(d, "subsystem"))
+            os.makedirs(os.path.join(self.t, "class", "net", name))
+            os.symlink(d, os.path.join(self.t, "class", "net", name, "device"))
+        card("eth0", "xen"); card("enp1s0", "pci")
+        os.makedirs(os.path.join(self.t, "class", "net", "lo"))
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.t)
+
+    def test_xen_card(self):
+        self.assertTrue(g.host_assigned_mac("eth0", self.t))
+
+    def test_pci_and_virtual_cards(self):
+        self.assertFalse(g.host_assigned_mac("enp1s0", self.t))
+        self.assertFalse(g.host_assigned_mac("lo", self.t))
+        self.assertFalse(g.host_assigned_mac("missing0", self.t))
+
+    def test_bad_names(self):
+        for n in ("", None, "../xen", "eth0/../../x", "a" * 16):
+            self.assertFalse(g.host_assigned_mac(n, self.t), n)
+
 if __name__ == "__main__":
     unittest.main(verbosity=1)

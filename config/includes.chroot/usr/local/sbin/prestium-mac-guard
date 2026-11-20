@@ -15,6 +15,11 @@ address) would make NetworkManager put the card's real address back. This root s
     (2) acts. (Wi-Fi management frames don't pass netfilter; (1) and (2) cover those.)
 
 Boot option "nomacspoof" turns MAC spoofing off on purpose; then this service does nothing.
+
+quick_qubes: a Xen paravirtual network card (on the "xen" bus; every NIC of a Qubes OS HVM) keeps the
+address the host assigned, as in prestium-spoof-mac: the host only delivers frames to that address, and
+in Qubes OS it never leaves the computer. Such a device gets no egress filter and is not disconnected
+for using its permanent address; connection settings are still checked (1) for every device.
 """
 import os, re, subprocess, sys, syslog
 
@@ -88,6 +93,15 @@ def fixed_settings(settings):
 def is_real_mac(current, permanent):
     c, p = (current or "").lower(), (permanent or "").lower()
     return bool(MAC_RE.match(p)) and p != "00:00:00:00:00:00" and c == p
+
+def host_assigned_mac(ifname, sysfs=None):
+    """quick_qubes: True for a Xen paravirtual network card (its device is on the "xen" bus), whose
+    host-assigned address prestium-spoof-mac keeps on purpose."""
+    if not IFNAME_RE.match(ifname or ""):
+        return False
+    sysfs = sysfs or _test_env("PRESTIUM_SYSFS", "/sys")
+    sub = os.path.realpath(os.path.join(sysfs, "class", "net", ifname, "device", "subsystem"))
+    return os.path.basename(sub) == "xen" and os.path.isdir(sub)
 
 def nft_rules(ifname, permanent):
     """nft script that drops frames with the permanent source address on ifname (egress)."""
@@ -232,6 +246,11 @@ def main():
         sub = {1: ".Device.Wired", 2: ".Device.Wireless"}.get(dtype)
         if not sub:
             return
+        if host_assigned_mac(iface):
+            if iface not in xen_logged:
+                xen_logged.add(iface)
+                log("%s: Xen paravirtual network card (Qubes OS): host-assigned MAC address kept" % iface)
+            return
         perm = prop(dev, NM + sub, "PermHwAddress")
         # Device.HwAddress (NM >= 1.24); the per-type interfaces still carry it too
         cur = prop(dev, NM + ".Device", "HwAddress") or prop(dev, NM + sub, "HwAddress")
@@ -243,6 +262,7 @@ def main():
                        "disconnected it. Restart Prestium before connecting again." % iface)
 
     egress = EgressFilters()
+    xen_logged = set()
 
     def on_signal(_c, _sender, path, iface, member, params, _d):
         if iface == NM + ".Settings" and member == "NewConnection":

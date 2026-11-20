@@ -39,7 +39,10 @@ class Guard(dbusmock.DBusTestCase):
             f.write("boot=live quiet\n")
         self.env = dict(os.environ, PRESTIUM_SAFETY_FLAG=os.path.join(self.tmp, "flag"),
                         PRESTIUM_NFT=os.path.join(self.tmp, "nft"),
-                        PRESTIUM_CMDLINE=os.path.join(self.tmp, "cmdline"))
+                        PRESTIUM_CMDLINE=os.path.join(self.tmp, "cmdline"),
+                        # quick_qubes: an empty sysfs, so the host's own eth0 (a Xen card on a Xen
+                        # CI machine) can't turn on the Xen exception in these tests
+                        PRESTIUM_SYSFS=os.path.join(self.tmp, "sys"))
         self.guard = None
 
     def tearDown(self):
@@ -123,6 +126,21 @@ class Guard(dbusmock.DBusTestCase):
             [WIRED, {"PermHwAddress": new}, dbus.Array([], signature="s")])
         self.assertTrue(wait(lambda: "ether saddr 02:ab:cd:ef:01:23 counter drop" in open(self.nftf).read()),
                         "egress filter not re-installed for the new permanent address")
+
+    def test_xen_pv_card_keeps_host_assigned_mac(self):
+        # quick_qubes: eth0 is a Xen paravirtual card (Qubes OS): its permanent address is the host's,
+        # so it is neither disconnected nor egress-filtered; the connection checks still run
+        sysfs = os.path.join(self.tmp, "sys")
+        os.makedirs(os.path.join(sysfs, "bus", "xen")); os.makedirs(os.path.join(sysfs, "devices", "vif-0"))
+        os.symlink(os.path.join(sysfs, "bus", "xen"), os.path.join(sysfs, "devices", "vif-0", "subsystem"))
+        os.makedirs(os.path.join(sysfs, "class", "net", "eth0"))
+        os.symlink(os.path.join(sysfs, "devices", "vif-0"), os.path.join(sysfs, "class", "net", "eth0", "device"))
+        dev = self.add_eth(DeviceState.ACTIVATED)          # HwAddress == PermHwAddress
+        self.start_guard()
+        time.sleep(1)
+        self.assertEqual(self.state(dev), DeviceState.ACTIVATED)
+        self.assertEqual(self.flags(), "")
+        self.assertFalse(os.path.exists(self.nftf) and "78:dd:08:d2:3d:43" in open(self.nftf).read())
 
     def test_nomacspoof_disables_guard(self):
         with open(os.path.join(self.tmp, "cmdline"), "w") as f:

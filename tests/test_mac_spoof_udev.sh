@@ -45,6 +45,20 @@ grep -q 'already spoofed' "$T/log" || { echo "FAIL: re-spoof"; cat "$T/log"; exi
 : > "$T/log"
 "$T/spoof" 9
 grep -q 'gone' "$T/log" || { echo "FAIL: missing device"; exit 1; }
+# quick_qubes: a Xen paravirtual card (device on the "xen" bus, Qubes OS) keeps its host-assigned address
+mkdir -p "$T/sys/class/net/eth0" "$T/sys/bus/xen" "$T/sys/devices/vif-0"
+ln -s "$T/sys/bus/xen" "$T/sys/devices/vif-0/subsystem"; ln -s "$T/sys/devices/vif-0" "$T/sys/class/net/eth0/device"
+echo 3 > "$T/sys/class/net/eth0/ifindex"; echo 00:16:3e:5e:6c:00 > "$T/sys/class/net/eth0/address"
+: > "$T/log"
+"$T/spoof" 3
+grep -q 'eth0: Xen paravirtual network card (Qubes OS): host-assigned MAC address kept' "$T/log" || { echo "FAIL: Xen card"; cat "$T/log"; exit 1; }
+[ "$(cat "$T/sys/class/net/eth0/address")" = 00:16:3e:5e:6c:00 ] || { echo "FAIL: Xen card spoofed"; exit 1; }
+# a PCI card is still spoofed
+mkdir -p "$T/sys/bus/pci" "$T/sys/devices/0000:01:00.0"; ln -s "$T/sys/bus/pci" "$T/sys/devices/0000:01:00.0/subsystem"
+ln -s "$T/sys/devices/0000:01:00.0" "$T/sys/class/net/enp1s0/device"; echo 52:54:00:12:34:56 > "$T/sys/class/net/enp1s0/address"
+: > "$T/log"
+PERM= "$T/spoof" 2
+grep -q 'enp1s0: MAC address spoofed' "$T/log" || { echo "FAIL: PCI card not spoofed"; cat "$T/log"; exit 1; }
 # boot menu: a "spoofing off" entry in both menus
 B=$R/../bootloaders
 grep -q '@APPEND_LIVE@ nomacspoof' "$B/grub-pc/grub.cfg"
