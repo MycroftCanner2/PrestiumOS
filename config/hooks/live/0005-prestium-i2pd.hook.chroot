@@ -1,6 +1,6 @@
 #!/bin/sh
 # Prestium 2.1: install i2pd from the .deb staged by scripts/fetch-thirdparty.sh (PurpleI2P's trixie amd64
-# build from its GitHub releases; it replaces the repo.i2pd.xyz apt repository). The .deb carries no
+# build from its GitHub releases; it replaces the former i2pd apt repository). The .deb carries no
 # signature: fetch-thirdparty.sh checked it against the SHA-256 pinned in thirdparty/versions.sh, the only
 # trust anchor, and wrote that hash and the version to i2pd.version. Checked again here, then apt installs
 # the local file and takes its dependencies (Boost, miniupnpc, OpenSSL...) from the Debian archive.
