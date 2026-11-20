@@ -352,7 +352,8 @@ done in).
   (`scripts/sigcheck.sh`). Node.js must be signed by a current releaser's primary key.
 - **Versions:** Tor Browser newest signed (16.0.1 or later), system Tor 0.4.9.16 from
   deb.torproject.org, Node.js 24.22.3 (November 2026 security release), The Lounge 4.5.2, Feather
-  2.9.1, Firefox 159.0.1; LibreWolf and i2pd from their repositories at build time.
+  2.9.1, Firefox 159.0.1, i2pd 3.0.0 (PurpleI2P's pinned GitHub `.deb`); LibreWolf from its repository
+  at build time.
 - **The Lounge's `npm ci` works on Debian 13's npm 9**; irc-framework is installed from a `git
   archive` of the pinned commit with a pinned SHA-256, so npm never packs it or runs build tools.
 - **The I2P reseed file ships in the repository** (`i2pseeds.su3`, signer certificate in
@@ -433,6 +434,18 @@ done in).
   signer; a server that is down, slow, has a bad certificate or serves a bad, wrongly signed or stale
   file is skipped with a reason, and when all fail the dialog lists each server's reason. There is no
   clearnet fallback.
+- **Feather and i2pd are downloaded from GitHub.** Feather's zip and `.asc` come from
+  `github.com/feather-wallet/feather` releases instead of featherwallet.org, still checked against
+  Feather's signing key and the pinned SHA-256 (unchanged: the GitHub file is the same). i2pd is no
+  longer installed from the repo.i2pd.xyz apt repository: `scripts/fetch-thirdparty.sh` downloads
+  PurpleI2P's `i2pd_3.0.0-1trixie1_amd64.deb` from `github.com/PurpleI2P/i2pd` releases, checks it
+  against the SHA-256 pinned in `thirdparty/versions.sh` and its package name, version and
+  architecture, and stages it; hook 0005 checks it again and installs it, with its dependencies from
+  Debian. PurpleI2P publishes no signature for the `.deb`, so the pinned SHA-256 is its only trust
+  anchor (the apt repository was signed, but unpinned). The i2pd version is now pinned instead of
+  "newest at build time", and Debian's own older i2pd is pinned out. The repository's apt source,
+  key, keyring (`purplei2p.gpg`) and origin pins are removed; the i2pd user, its uid 2000 and the
+  config set up by hooks 0100 and 0700 are unchanged.
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):

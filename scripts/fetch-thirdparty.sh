@@ -8,7 +8,7 @@
 #   It also stages a signature-checked I2P reseed file into config/includes.chroot/var/lib/i2pd/: the
 #   repo-shipped i2pseeds.su3 is used first (signature-checked; age only warns, refresh it in git when it
 #   gets old); without it, a StormyCloud download (a verified download under 24 h old is reused) is the fallback.
-# Needs: curl gpg gpgv git sha256sum unzip npm python3 openssl (the host's npm only runs "npm ci --ignore-scripts": pure JS,
+# Needs: curl gpg gpgv git sha256sum unzip npm python3 openssl dpkg-deb (the host's npm only runs "npm ci --ignore-scripts": pure JS,
 # architecture-independent). Every registry tarball is checked against the lockfile's sha512 integrity; the one git
 # dependency (irc-framework, pinned to a commit, no integrity in the lockfile) is installed from a "git archive" tarball
 # of IRC_FRAMEWORK_COMMIT with a pinned SHA-256, and checked file by file against a git checkout of that commit.
@@ -99,9 +99,24 @@ pin NODE "$C/$NF" "$NODE_SHA256"
 
 # Feather (Monero wallet)
 FEF=feather-$FEATHER_VERSION-linux.zip
-get https://featherwallet.org/files/releases/linux/$FEF $FEF
-get https://featherwallet.org/files/releases/linux/$FEF.asc $FEF.asc
+# from the project's GitHub releases (tag = the bare version); the signature check and the pin are unchanged
+get https://github.com/feather-wallet/feather/releases/download/$FEATHER_VERSION/$FEF $FEF
+get https://github.com/feather-wallet/feather/releases/download/$FEATHER_VERSION/$FEF.asc $FEF.asc
 sigok "$C/$FEF.asc" "$C/$FEF" "$FEATHER_KEY" "$K/feather.asc"; pin FEATHER "$C/$FEF" "$FEATHER_SHA256"
+
+# i2pd: PurpleI2P's own trixie amd64 .deb from its GitHub releases (replaces the former i2pd apt
+# repository). PurpleI2P publishes no detached OpenPGP signature for the .deb, so there is NO signature
+# check here: the SHA-256 pinned in thirdparty/versions.sh (I2PD_SHA256, committed to git) is the only
+# trust anchor. --repin prints the SHA-256 of whatever GitHub serves: compare it with the release page's
+# digest before committing it. Verified and staged from a private copy (the shared cache can change).
+I2PDF=i2pd_${I2PD_DEB_VERSION}_amd64.deb
+case "$I2PD_DEB_VERSION" in "$I2PD_VERSION"-*) ;; *) echo "ERROR: I2PD_DEB_VERSION $I2PD_DEB_VERSION is not a build of I2PD_VERSION $I2PD_VERSION"; exit 1;; esac
+get https://github.com/PurpleI2P/i2pd/releases/download/$I2PD_VERSION/$I2PDF $I2PDF
+I2W=$GNUPGHOME/i2pd; mkdir -m 700 "$I2W"; cp "$C/$I2PDF" "$I2W/$I2PDF"
+pin I2PD "$I2W/$I2PDF" "$I2PD_SHA256"
+# the hash covers the bytes, not what they claim to be: the package must be i2pd, that version, amd64
+[ "$(dpkg-deb -f "$I2W/$I2PDF" Package Version Architecture | tr '\n' ' ')" = "Package: i2pd Version: $I2PD_DEB_VERSION Architecture: amd64 " ] \
+  || { echo "ERROR: $I2PDF is not i2pd $I2PD_DEB_VERSION for amd64"; exit 1; }
 
 # uBlock Origin (2.1: always the newest release on addons.mozilla.org, nothing committed or pinned).
 # scripts/amo-latest.py reads the AMO API, downloads current_version.file.url over HTTPS and checks
@@ -235,11 +250,12 @@ chmod 644 "$SU3.part"; mv -f "$SU3.part" "$SU3"
 rm -rf "$S"; mkdir -p "$S"
 cp "$TBW/$TBF" "$S/tor-browser.tar.xz"; echo "$TB_VERSION" > "$S/tor-browser.version"; cp "$C/$FFF" "$S/firefox.tar.xz"; cp "$C/$NF" "$S/node.tar.xz"
 cp "$C/$FEF" "$S/feather.zip"; echo "$FEATHER_VERSION" > "$S/feather.version"
+cp "$I2W/$I2PDF" "$S/i2pd.deb"; echo "$I2PD_DEB_VERSION $I2PD_SHA256" > "$S/i2pd.version"
 cp "$UBW/ublock-origin.xpi" "$S/ublock-origin.xpi"; echo "$UB_VERSION $UB_SHA256" > "$S/ublock-origin.version"
 cp "$TOP/scripts/amo-latest.py" "$TOP/thirdparty/keys/mozilla-amo-root.pem" "$S/"
 # 2.0 r7: re-check what was actually staged (closes the verify-then-copy gap)
 for x in "tor-browser.tar.xz $TB_SHA256" "firefox.tar.xz $FF_SHA256" "node.tar.xz $NODE_SHA256" "feather.zip $FEATHER_SHA256" \
-         "ublock-origin.xpi $UB_SHA256"; do
+         "i2pd.deb $I2PD_SHA256" "ublock-origin.xpi $UB_SHA256"; do
   [ "$(sha "$S/${x%% *}")" = "${x#* }" ] || { echo "ERROR: staged ${x%% *} does not match its pinned SHA-256"; exit 1; }
 done
 # tar once per The Lounge version (node_modules has thousands of small files; slow on network filesystems)

@@ -39,11 +39,16 @@ which works but is several times slower.
 
 `build.sh`:
 
-1. runs `scripts/fetch-thirdparty.sh`: downloads Tor Browser, Firefox, Node.js, Feather, The Lounge
+1. runs `scripts/fetch-thirdparty.sh`: downloads Tor Browser, Firefox, Node.js, Feather (zip and `.asc`
+   from its GitHub releases, `github.com/feather-wallet/feather`), The Lounge
    (npm), checks each one against its publisher's OpenPGP signature
    (`thirdparty/keys/`) **and** the SHA-256 pinned in `thirdparty/versions.sh`, and stages them in
    `config/includes.chroot/usr/src/prestium-thirdparty/` (not committed; removed from the image by
-   the last hook); it also fetches the newest uBlock Origin from addons.mozilla.org (`scripts/amo-latest.py`:
+   the last hook); it also downloads i2pd, PurpleI2P's trixie amd64 `.deb` from its GitHub releases
+   (`github.com/PurpleI2P/i2pd`, version and SHA-256 pinned as `I2PD_VERSION`/`I2PD_DEB_VERSION`/`I2PD_SHA256`).
+   PurpleI2P publishes no detached signature for the `.deb`, so it has **no** signature check: the
+   SHA-256 pinned in `thirdparty/versions.sh` is its only trust anchor. Its package name, version and
+   architecture are checked too, and it is staged as `i2pd.deb` (hook 0005 installs it); it also fetches the newest uBlock Origin from addons.mozilla.org (`scripts/amo-latest.py`:
    the AMO API's SHA-256 and size, Mozilla's add-on signature chained to the pinned AMO root
    `thirdparty/keys/mozilla-amo-root.pem` with the add-on id as signer, every file against
    `META-INF/manifest.mf`, the manifest's id and version; any failure stops the build, there is no
@@ -98,7 +103,7 @@ starts over (`lb clean --purge`). Expect 1-2 hours on a normal amd64 machine (mu
 
 Repeatable builds: `sudo PRESTIUM_SNAPSHOT=20261110T000000Z ./build.sh` takes Debian (main and
 security) from snapshot.debian.org at that time, and `build.sh` sets `SOURCE_DATE_EPOCH` to the source
-commit's time. The Tor, i2pd and LibreWolf repositories have no snapshots, and the image is not yet
+commit's time. The Tor and LibreWolf repositories have no snapshots (i2pd is a pinned `.deb`), and the image is not yet
 bit-for-bit reproducible; compare two builds with their `.manifest` files.
 
 ## Checks
@@ -119,7 +124,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/package-lists/prestium-firmware.list.chroot` | firmware and CPU microcode (full coverage) |
 | `config/package-lists/prestium-2.0.list.chroot` | 2.0 additions: PipeWire/WirePlumber audio, pasystray, the assistant's GTK bindings |
 | `config/package-lists/live.list.chroot` | live-boot (no live-config: Prestium sets up its user itself) |
-| `config/archives/` | build-time apt sources and keys: Tor Project, PurpleI2P (i2pd), LibreWolf, each `signed-by` its own key (live-build installs `<name>.key.chroot` as `/etc/apt/trusted.gpg.d/<name>.key.chroot.gpg`); origin pins limiting each repo to its own packages; firmware pin to backports |
+| `config/archives/` | build-time apt sources and keys: Tor Project, LibreWolf, each `signed-by` its own key (live-build installs `<name>.key.chroot` as `/etc/apt/trusted.gpg.d/<name>.key.chroot.gpg`); origin pins limiting each repo to its own packages; firmware pin to backports |
 | `config/preseed/` | non-interactive answers (firmware licences, locale, keyboard, ferm) |
 | `config/includes.chroot/` | Prestium's own files and the package files it changes, carried over from the earlier Prestium root filesystem as a diff against the packaged files (see below), plus the 2.0 changes |
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
@@ -143,6 +148,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | Hook | Does |
 | --- | --- |
 | `0001-prestium-build-dns` | build only: gives the hooks a resolver (Prestium's own `resolv.conf` has none) |
+| `0005-prestium-i2pd` | installs i2pd from the staged GitHub `.deb` after checking it again against its pinned SHA-256, package name, version and architecture (apt takes its dependencies from Debian; Prestium's `/etc/i2pd` config files are kept); Debian's own i2pd is pinned out (`Pin-Priority: -1`) |
 | `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `thelounge-tor` (2.1, IRC (Tor)), `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
 | `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + the newest uBlock Origin, also for LibreWolf), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, connecting line only when a connection starts, 320s IRC ping timeout, and for the Tor instance every network through Tor's SOCKS port), Feather |
@@ -171,8 +177,9 @@ pinned Tor Browser key and held to `TB_MIN_VERSION` (see `thirdparty/versions.sh
 newest Mozilla-signed release from addons.mozilla.org (the build needs to reach addons.mozilla.org
 and its download CDN; if AMO is down or anything fails verification, the build stops). If Mozilla
 ever changes its add-on root, replace `thirdparty/keys/mozilla-amo-root.pem` with Firefox's
-`security/manager/ssl/addons-public.pem` and update `ROOT_FPR` in `scripts/amo-latest.py`. Tor, LibreWolf and i2pd come from their signed apt
-repositories, also at the newest version. For everything else:
+`security/manager/ssl/addons-public.pem` and update `ROOT_FPR` in `scripts/amo-latest.py`. Tor and LibreWolf come from their signed apt
+repositories, also at the newest version. For everything else (i2pd too, which has no signature: `--repin`
+only prints the SHA-256 GitHub served, so compare it with the asset digest on the release page first):
 
 Edit the version in `thirdparty/versions.sh`, set its `*_SHA256` to `""`, run
 `scripts/fetch-thirdparty.sh --repin` (it checks the signature and prints the new SHA-256), paste
@@ -192,8 +199,8 @@ thelounge's `github:kiwiirc/irc-framework#<commit>` request becomes the locked v
 is left; no package.json override, which npm 9.2.0 rejects with "Invalid comparator" and then
 misreports as a missing package-lock.json). npm then runs with `--git=false`, and the image ships the committed package.json and lockfile. Every
 installed irc-framework file is still checked against a git checkout of the commit, and `dist/` must
-be absent. Hook 0200 then patches The Lounge in the image (no outbound fetches, lobby text for disconnected networks, a connecting line only when a connection starts, and a 320-second IRC ping timeout); those exact source strings must still be present, or the build stops. If upstream's file list changes, update `IRC_FRAMEWORK_FILES` with the commit. LibreWolf, i2pd and Tor come from their
-signed apt repositories and are always the newest at build time.
+be absent. Hook 0200 then patches The Lounge in the image (no outbound fetches, lobby text for disconnected networks, a connecting line only when a connection starts, and a 320-second IRC ping timeout); those exact source strings must still be present, or the build stops. If upstream's file list changes, update `IRC_FRAMEWORK_FILES` with the commit. LibreWolf and Tor come from their
+signed apt repositories and are always the newest at build time; i2pd is the `.deb` pinned in `thirdparty/versions.sh`.
 
 ## Tor Connection Assistant and DNS
 

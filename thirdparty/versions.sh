@@ -2,7 +2,8 @@
 # Each download is checked against the publisher's OpenPGP signature (keys in thirdparty/keys/)
 # AND against the SHA-256 pinned here. To update: change the version, set the SHA to "" and run
 # scripts/fetch-thirdparty.sh --repin (it verifies the signature, then prints the new SHA to pin).
-# LibreWolf, i2pd and Tor come from their signed apt repositories (config/archives/), not from here.
+# LibreWolf and Tor come from their signed apt repositories (config/archives/), not from here.
+# i2pd is PurpleI2P's .deb from GitHub releases, pinned below by SHA-256 only (no signature is published).
 # 2.1: uBlock Origin is not pinned here either: every build takes the newest Mozilla-signed release
 # from addons.mozilla.org (scripts/amo-latest.py; Mozilla's AMO root in thirdparty/keys/mozilla-amo-root.pem).
 
@@ -38,4 +39,13 @@ IRC_FRAMEWORK_TAR_SHA256=0c25dd1efea08411f4df8e2a950efe1d720ea76650b8df8af406499
 
 FEATHER_VERSION=2.9.1
 FEATHER_SHA256=f1d40d619664d9e6318c086b9015ee72bc69741ec86148ce2ea2ef75ef47feed
-FEATHER_KEY=8185E158A33330C7FD61BC0D1F76E155CEFBA71C     # featherwallet.org (dsc)
+FEATHER_KEY=8185E158A33330C7FD61BC0D1F76E155CEFBA71C     # Feather release key (dsc); zip + .asc from github.com/feather-wallet/feather releases
+
+# i2pd: https://github.com/PurpleI2P/i2pd/releases/download/$I2PD_VERSION/i2pd_${I2PD_DEB_VERSION}_amd64.deb
+# (PurpleI2P's trixie build). PurpleI2P publishes no detached signature for its .deb files, so this
+# SHA-256, committed here, is the only trust anchor (no OpenPGP check). To update: set the versions, set
+# I2PD_SHA256 to "", run scripts/fetch-thirdparty.sh --repin, and check the printed value against the
+# release page's asset digest before pinning it. Installed in the chroot by hook 0005-prestium-i2pd.
+I2PD_VERSION=3.0.0
+I2PD_DEB_VERSION=3.0.0-1trixie1
+I2PD_SHA256=c48c9e2e44fb67e9c650b01225ccf816d8b2cecf3246a5112ccdcf5a6e4fbe70

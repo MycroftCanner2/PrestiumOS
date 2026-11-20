@@ -102,7 +102,7 @@ fi
 # They use the packages' own keyrings (signed-by /usr/share/keyrings/...); live-build's build-time lists for the
 # same repositories use its trusted.gpg.d keys, and with both present apt refuses to run ("Conflicting values set
 # for option Signed-By"). r16: the final files carry the build-time lists' names (prestium-tor.list,
-# prestium-i2pd.list, prestium-librewolf.list), so whenever live-build re-adds its lists (a --resume, or
+# prestium-librewolf.list), so whenever live-build re-adds its lists (a --resume, or
 # "lb binary" configuring its tool chroot, which may be a full copy of the image chroot) it overwrites them
 # instead of adding a second entry. Final copies left from an earlier run are removed first, and the older
 # names (r14 and earlier) too; they are installed again once the chroot stage is complete.
@@ -110,7 +110,8 @@ run_lb(){ lb "$@" 2>&1 | tee -a "$LOG"; [ "${PIPESTATUS[0]}" = 0 ] || { echo "lb
 APTF=config/includes.chroot/usr/share/prestium/build/apt
 SLD=chroot/etc/apt/sources.list.d
 if [ -d "$SLD" ]; then
-	rm -f "$SLD/tor.list" "$SLD/purplei2p.list" "$SLD/librewolf.sources"
+	# 2.1: also the final list of the removed i2pd apt repository, left in a chroot built before it was removed
+	rm -f "$SLD/tor.list" "$SLD/librewolf.sources" "$SLD/prestium-i2pd.list"
 	for f in "$APTF"/*; do
 		t="$SLD/$(basename "$f")"
 		if [ -e "$t" ] && grep -q 'signed-by=/usr/share/keyrings/' "$t"; then rm -f "$t"; fi
