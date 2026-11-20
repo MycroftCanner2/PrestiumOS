@@ -24,9 +24,10 @@ ca-certificates
 xz-utils
 unzip
 # display settings (hotplug, HiDPI scale), laptop brightness keys/slider, touchpad
+# quick_qubes: no xinput (X11 touchpad tool, unused on Wayland). brightnessctl stays: the brightness keys
+# and slider already handle "no backlight", which is what a VM has.
 xfce4-settings
 brightnessctl
-xinput
 # accessibility: Onboard on-screen keyboard (Orca was removed: it did not work)
 # 2.0 r10: Wayland desktop (labwc replaces Openbox; waybar tint2; swaylock/swayidle i3lock/xss-lock;
 # mako notification-daemon; grim/slurp scrot; wvkbd Onboard; foot the X terminal; wdisplays and

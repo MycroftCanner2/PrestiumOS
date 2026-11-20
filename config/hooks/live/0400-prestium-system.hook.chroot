@@ -17,8 +17,7 @@ while read -r link target; do
 done < "$B/systemd-wants.txt"
 find /etc/systemd/system /etc/systemd/user -type d -name '*.wants' -empty -delete 2>/dev/null || true
 ln -sfn /usr/lib/systemd/system/lightdm.service /etc/systemd/system/display-manager.service
-ln -sfn /usr/lib/systemd/system/wpa_supplicant.service /etc/systemd/system/dbus-fi.w1.wpa_supplicant1.service
-ln -sfn /usr/lib/systemd/system/ModemManager.service /etc/systemd/system/dbus-org.freedesktop.ModemManager1.service
+# quick_qubes: no wpa_supplicant (Wi-Fi) or ModemManager (mobile broadband) in a VM image, so no D-Bus aliases for them
 ln -sfn /usr/lib/systemd/system/NetworkManager-dispatcher.service /etc/systemd/system/dbus-org.freedesktop.nm-dispatcher.service
 systemctl set-default graphical.target
 # masks: no wait-online at boot, no zeitgeist activity log

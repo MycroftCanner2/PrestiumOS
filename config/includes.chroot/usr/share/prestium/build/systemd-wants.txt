@@ -1,5 +1,4 @@
 /etc/systemd/system/graphical.target.wants/udisks2.service /usr/lib/systemd/system/udisks2.service
-/etc/systemd/system/multi-user.target.wants/ModemManager.service /usr/lib/systemd/system/ModemManager.service
 /etc/systemd/system/multi-user.target.wants/NetworkManager.service /usr/lib/systemd/system/NetworkManager.service
 /etc/systemd/system/multi-user.target.wants/console-setup.service /usr/lib/systemd/system/console-setup.service
 /etc/systemd/system/multi-user.target.wants/i2pd.service /usr/lib/systemd/system/i2pd.service
@@ -18,7 +17,6 @@
 /etc/systemd/system/multi-user.target.wants/thelounge.service /etc/systemd/system/thelounge.service
 /etc/systemd/system/multi-user.target.wants/thelounge-tor.service /etc/systemd/system/thelounge-tor.service
 /etc/systemd/system/multi-user.target.wants/tor.service /usr/lib/systemd/system/tor.service
-/etc/systemd/system/multi-user.target.wants/wpa_supplicant.service /usr/lib/systemd/system/wpa_supplicant.service
 /etc/systemd/system/network-online.target.wants/NetworkManager-wait-online.service /usr/lib/systemd/system/NetworkManager-wait-online.service
 /etc/systemd/system/network-online.target.wants/ifupdown-wait-online.service /usr/lib/systemd/system/ifupdown-wait-online.service
 /etc/systemd/system/network-online.target.wants/networking.service /usr/lib/systemd/system/networking.service

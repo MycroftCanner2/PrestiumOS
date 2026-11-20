@@ -140,12 +140,7 @@
     <item label="Display Scale" icon="preferences-desktop-display">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-display-scale" />
     </item>
-    <item label="Brightness" icon="display-brightness">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-brightness" />
-    </item>
-    <item label="Touchpad" icon="input-touchpad">
-      <action name="Execute" command="prestium-run /usr/local/bin/prestium-touchpad" />
-    </item>
+    <!-- quick_qubes: no Brightness or Touchpad entries (a VM has no backlight and no touchpad) -->
     <menu id="/System/Accessibility" label="Accessibility" icon="preferences-desktop-accessibility">
       <item label="Screen Keyboard" icon="input-keyboard">
         <action name="Execute" command="/usr/local/bin/prestium-osk" />
