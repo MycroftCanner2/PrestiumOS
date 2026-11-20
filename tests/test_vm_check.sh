@@ -108,7 +108,16 @@ case "$o" in *"Tor works but I2P doesn't"*"VPN"*) ok "Tor up, no I2P peers: host
 
 o=$(VIRT=kvm GW= check)
 case "$o" in *"no network: no default route"*) ok "no default route: no network adapter hint";; *) bad "no-route: $o";; esac
+case "$o" in *"Qubes"*) bad "Qubes hint outside Xen: $o";; *) ok "no Qubes hint on KVM";; esac
 case "$o" in *"VPN"*|*"Neither Tor"*) bad "route-less VM got host hints";; *) ok "no host hints without a route";; esac
+# quick_qubes: Xen (Qubes OS HVM): name, clock fix, static address (no DHCP), sys-whonix/VPN net qube
+o=$(VIRT=xen GW= check)
+case "$o" in "Running in Xen (a Qubes OS HVM, or another Xen host)."*) ok "xen: named as Qubes OS / Xen";; *) bad "xen name: $o";; esac
+case "$o" in *"Qubes OS a standalone HVM gets no address by DHCP"*"IPv4 to Manual"*"qvm-ls -n"*"Leave DNS empty"*) ok "xen, no route: Qubes static address hint";; *) bad "xen no-route: $o";; esac
+case "$o" in *"Clock qube"*) ok "xen: Qubes clock hint (dom0)";; *) bad "xen clock: $o";; esac
+o=$(VIRT=xen GW=10.138.24.248 TORFCT=100 SSOUT="$OTHER" check)
+case "$o" in *"sys-whonix"*"sys-firewall"*) ok "xen, Tor up, no I2P: sys-whonix / VPN net qube hint";; *) bad "xen whonix hint: $o";; esac
+case "$o" in *"VPN, firewall or antivirus on the host"*) bad "xen got the desktop-host VPN hint";; *) ok "xen: no desktop-host VPN hint";; esac
 
 # a later check that finds both connected removes the old diagnosis
 mkdir -p "$T/out2"; echo old > "$T/out2/network"
@@ -124,7 +133,10 @@ run_notify(){ rm -f "$T/alerts"; env -i PATH="$T/bin:/usr/bin:/bin" ALERTS="$T/a
 rm -rf "$T/n"; mkdir -p "$T/n"
 o=$(run_notify); [ -z "$o" ] && ok "notifier: no VM file, no alert" || bad "notifier alerted on bare metal: $o"
 echo kvm > "$T/n/virt"
-o=$(run_notify); case "$o" in "Prestium is running in a virtual machine (kvm)|The host operating system and the virtualization software can see and record"*) ok "notifier: VM warning";; *) bad "no VM warning: $o";; esac
+o=$(run_notify); case "$o" in "Prestium quick_qubes: virtual machine (kvm)|This build is made to run in a virtual machine or Qubes OS. As in any VM, the host and its virtualization software"*) ok "notifier: VM notice (quick_qubes wording)";; *) bad "no VM notice: $o";; esac
+# quick_qubes: the VM is the expected environment, so the notice is information, not a warning
+grep -q 'notify-send -a Prestium -i dialog-information -u normal "Prestium quick_qubes: virtual machine' "$NOT" && ok "notifier: VM notice is informational (no warning icon, normal timeout)" || bad "VM notice still a warning"
+grep -q 'virtual machine.*-t 0\|-t 0.*virtual machine${virt' "$NOT" && bad "VM notice is sticky (-t 0)" || ok "VM notice is not sticky"
 echo "Running in QEMU. Tor NOT connected" > "$T/n/network"
 o=$(run_notify); case "$o" in *"Network problem in the virtual machine|Running in QEMU. Tor NOT connected"*) ok "notifier: shows the diagnosis";; *) bad "no diagnosis alert: $o";; esac
 [ "$(printf '%s\n' "$o" | grep -c 'Network problem')" = 1 ] && ok "notifier: same diagnosis shown once" || bad "repeated alerts"

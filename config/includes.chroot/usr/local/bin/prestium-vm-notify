@@ -1,5 +1,6 @@
 #!/bin/bash
-# Prestium: warn when Prestium runs in a virtual machine, and show the network
+# Prestium: say when Prestium runs in a virtual machine (quick_qubes: for information, the VM is the expected
+# environment), and show the network
 # diagnosis prestium-vm-netcheck (root, boot) writes to /run/prestium/vm when Tor or I2P can't connect.
 # Started from the session autostart. On real hardware the service never runs and this exits.
 D=${PRESTIUM_VM_OUT:-/run/prestium/vm}
@@ -14,8 +15,10 @@ while [ ! -s "$D/virt" ]; do
   sleep 5; n=$((n + 5))
 done
 virt=$(head -c 40 "$D/virt" | tr -cd 'a-z0-9_-')
-notify-send -a Prestium -i dialog-warning -u normal -t 0 "Prestium is running in a virtual machine${virt:+ ($virt)}" \
-  "The host operating system and the virtualization software can see and record everything you do in Prestium: what you type, what is on screen, and the network traffic before it is encrypted. Use a virtual machine only on a computer you trust. Nothing you do here is hidden from the host." 2>/dev/null
+# quick_qubes: this build is made for virtual machines, so this is information (normal urgency, the usual
+# timeout, no warning icon), not a warning. It still says what the host can see: that is true in any VM.
+notify-send -a Prestium -i dialog-information -u normal "Prestium quick_qubes: virtual machine${virt:+ ($virt)}" \
+  "This build is made to run in a virtual machine or Qubes OS. As in any VM, the host and its virtualization software (in Qubes OS: dom0) can see what you type and what is on screen; the host's network side (in Qubes OS: sys-firewall, sys-net) sees only Tor and I2P connections. Run it on a computer you trust." 2>/dev/null
 last=
 t=0
 while [ "$t" -lt "$LIFE" ]; do

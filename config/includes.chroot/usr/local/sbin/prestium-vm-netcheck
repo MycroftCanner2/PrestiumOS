@@ -2,7 +2,7 @@
 # Prestium 2.1: virtual machine detection and network diagnosis.
 # Started at boot by prestium-vm-netcheck.service (ConditionVirtualization=vm, so it never runs on real
 # hardware). Writes, for prestium-vm-notify (the desktop), in $OUT (root-owned, world-readable):
-#   virt     the hypervisor, as systemd-detect-virt names it (kvm, qemu, oracle, vmware, microsoft...)
+#   virt     the hypervisor, as systemd-detect-virt names it (kvm, qemu, oracle, vmware, xen, microsoft...)
 #   network  why Tor or I2P has not connected yet, in plain words; removed once both work
 # Read-only checks: it never changes the clock, the network, Tor or i2pd.
 set -u
@@ -31,6 +31,9 @@ case "$virt" in
     clock_fix="In VirtualBox: Settings, System, Motherboard, tick 'Hardware Clock in UTC Time'." ;;
   vmware) name="VMware"
     clock_fix="In VMware the guest clock follows the host: check the host's own clock and time zone." ;;
+  # quick_qubes: Xen, which in practice means a Qubes OS standalone HVM booting the ISO
+  xen) name="Xen (a Qubes OS HVM, or another Xen host)"
+    clock_fix="In Qubes OS the qube's clock comes from dom0 (Qubes Global Settings, Clock qube): check dom0's clock and time zone. On another Xen host, give the guest a UTC clock (localtime=0)." ;;
   microsoft) name="Hyper-V"
     clock_fix="In Hyper-V: VM Settings, Integration Services, tick 'Time synchronization', and check the host's own clock." ;;
   *) name=$virt
@@ -76,7 +79,11 @@ while [ "$round" -lt "$ROUNDS" ]; do
     printf 'Running in %s. After %s minutes: Tor %s, I2P %s.\n' "$name" "$mins" \
       "$([ "$t" = yes ] && echo connected || echo 'NOT connected')" \
       "$([ "${peers:-0}" -gt 0 ] && echo "connected ($peers peers)" || echo 'has NO peer connections')"
-    if [ -z "$gw" ]; then
+    if [ -z "$gw" ] && [ "$virt" = xen ]; then
+      # quick_qubes: Qubes gives every qube a fixed address but runs no DHCP server for a qube with Xen
+      # network drivers and no Qubes tools (Prestium), so NetworkManager never gets an address by itself
+      echo "- The VM has no network: no default route. In Qubes OS a standalone HVM gets no address by DHCP. In the network icon's menu choose Edit Connections, edit the wired connection, set IPv4 to Manual and enter the IP address and gateway shown in this qube's Settings (Basic tab; 'qvm-ls -n' in dom0) with netmask 255.255.255.0. Leave DNS empty: Tor and I2P do their own lookups. Also check that the qube has a net qube (sys-firewall)."
+    elif [ -z "$gw" ]; then
       echo "- The VM has no network: no default route. Check that the VM has a network adapter, that its link is up, and that its source is a NAT or bridged network (virt-manager: Virtual network 'default': NAT)."
     else
       case "$gw" in
@@ -92,7 +99,11 @@ while [ "$round" -lt "$ROUNDS" ]; do
       echo "- Check the clock: the VM thinks it is $(date -u '+%Y-%m-%d %H:%M') UTC. If that is wrong by more than a minute: $clock_fix"
     fi
     if [ -n "$gw" ] && [ "$t" = yes ] && [ "${peers:-0}" -eq 0 ]; then
-      echo "- Tor works but I2P doesn't: a VPN, firewall or antivirus on the host may block I2P's ports (random, 10000-30000, TCP and UDP) while letting Tor's ports (443, 9001) through. Try without the host VPN, or allow those ports."
+      if [ "$virt" = xen ]; then
+        echo "- Tor works but I2P doesn't: if this qube's net qube is sys-whonix (or a VPN qube), it sends all TCP through Tor or the VPN and drops UDP, which I2P can't work with. Use sys-firewall as the net qube for Prestium (Prestium runs its own Tor)."
+      else
+        echo "- Tor works but I2P doesn't: a VPN, firewall or antivirus on the host may block I2P's ports (random, 10000-30000, TCP and UDP) while letting Tor's ports (443, 9001) through. Try without the host VPN, or allow those ports."
+      fi
     fi
     if [ -n "$gw" ] && [ "$t" = no ] && [ "${peers:-0}" -eq 0 ]; then
       echo "- Neither Tor nor I2P connects: check that the host itself is online, and whether the network blocks Tor (then pick a bridge in the Tor Connection Assistant)."
