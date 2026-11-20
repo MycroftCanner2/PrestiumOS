@@ -78,6 +78,10 @@ Live ()
 
 			# Scan local devices for the image
 			i=0
+			# quick_qubes: in a virtual machine (the CPU's "hypervisor" flag) the image is almost
+			# always a virtual CD drive, so load the optical drivers below after 1 s, not 8 s
+			cd_at=8
+			grep -qw hypervisor /proc/cpuinfo 2>/dev/null && cd_at=1
 			while [ "$i" -lt 60 ]
 			do
 				livefs_root=$(find_livefs ${i})
@@ -91,7 +95,7 @@ Live ()
 				# If no USB live medium shows up, the image was probably booted from a
 				# SATA/IDE optical drive (DVD or a VM's CD drive): load only those
 				# drivers, then keep looking.
-				if [ "$i" -eq 8 ]
+				if [ "$i" -eq "$cd_at" ]
 				then
 					for m in scsi_common scsi_mod cdrom sr_mod libata ata_piix ata_generic libahci ahci
 					do

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Prestium 2.1 live-build configuration (Debian 13 "trixie", amd64).
+# Prestium 2.1 quick_qubes (VM / Qubes OS guest) live-build configuration (Debian 13 "trixie", amd64).
 # Run "lb config" (or ./build.sh) from the top of the repository; this file is the source of truth
 # for the generated config/{bootstrap,chroot,binary,common,source} files.
 set -e
@@ -60,7 +60,7 @@ lb config noauto \
 	--iso-application "Prestium" \
 	--iso-publisher "Prestium" \
 	--iso-preparer "Prestium live-build" \
-	--image-name Prestium-2.1 \
+	--image-name Prestium-2.1-quick_qubes \
 	--bootappend-live "$APPEND" \
 	--bootappend-live-failsafe "$APPEND nomodeset" \
 	--cache-packages true \

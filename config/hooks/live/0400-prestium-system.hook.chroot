@@ -4,6 +4,8 @@
 set -e
 B=/usr/share/prestium/build
 VERSION=2.1
+# quick_qubes: the VM / Qubes OS variant (os-release VARIANT_ID; hook 9000 adds it to the boot menu labels)
+VARIANT_ID=quick_qubes
 
 ## services: exactly the units earlier releases enabled (+ PipeWire for 2.0); everything else package
 ## postinsts enabled is disabled again
@@ -105,6 +107,8 @@ PRETTY_NAME="Prestium"
 NAME="Prestium"
 VERSION_ID="$VERSION"
 VERSION="$VERSION (trixie)"
+VARIANT="quick_qubes (VM / Qubes OS)"
+VARIANT_ID=$VARIANT_ID
 ID=prestium
 ID_LIKE=debian
 VERSION_CODENAME=trixie
@@ -112,6 +116,6 @@ HOME_URL="https://prestium.org/"
 BUILD_ID="$(date -u -d "@$BUILD_EPOCH" +%Y-%m-%d)"
 EOF
 rm -f /etc/os-release; cp /usr/lib/os-release /etc/os-release
-printf 'Prestium %s \\n \\l\n\n' "$VERSION" > /etc/issue
-printf 'Prestium %s\n' "$VERSION" > /etc/issue.net
-echo "P: system setup done (Prestium $VERSION)"
+printf 'Prestium %s %s \\n \\l\n\n' "$VERSION" "$VARIANT_ID" > /etc/issue
+printf 'Prestium %s %s\n' "$VERSION" "$VARIANT_ID" > /etc/issue.net
+echo "P: system setup done (Prestium $VERSION $VARIANT_ID)"
