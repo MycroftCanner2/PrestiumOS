@@ -104,6 +104,59 @@ allow claws-mail//gpg $S/S.gpg-agent rw
 allow claws-mail//gpg $S/S.keyboxd rw
 EOT
 
+# 2.1 (late): gajim-openpgp (python3-gpg/GPGME). Paths from an strace of the plugin's backend calls
+# (engine check: gpgconf --list-dirs/--list-components, gpg/gpgsm/gpgconf --version; key generation,
+# list, export, sign+encrypt, decrypt, import) with its per-account home directory. Before this, the
+# gpg exec was denied and Gajim failed at connect with "GPGME: Invalid crypto engine".
+echo "== Gajim's GnuPG child (its own keyrings under ~/.local/share/gajim/openpgp, not ~/.gnupg)"
+O=$H/.local/share/gajim/openpgp/alice@example.org; D=$S/d.75kgqs8wyccw7x6hezsc3ntk
+run usr.bin.gajim <<EOT
+allow gajim /usr/bin/gpg x:C
+allow gajim /usr/bin/gpgconf x:C
+allow gajim /usr/bin/gpgsm x:C
+allow gajim /usr/bin/gpg-agent x:C
+allow gajim $O/contacts.db rwk
+deny gajim $O/gpg.conf w
+deny gajim $O/gpg-agent.conf l
+deny gajim $G/pubring.kbx r
+allow gajim//gpg /usr/bin/gpg-agent x:i
+allow gajim//gpg /usr/lib/gnupg/keyboxd x:i
+allow gajim//gpg /usr/lib/gnupg/scdaemon x:i
+allow gajim//gpg /usr/bin/pinentry-gnome3 x:P
+allow gajim//gpg /usr/share/gnupg/sks-keyservers.netCA.pem r
+allow gajim//gpg /proc/4242/fd/ r
+allow gajim//gpg $O/ rw
+allow gajim//gpg $O/pubring.kbx rw
+allow gajim//gpg $O/pubring.kbx~ rw
+allow gajim//gpg $O/pubring.kbx.tmp rw
+allow gajim//gpg $O/pubring.kbx.lock rwl
+allow gajim//gpg $O/.#lk0x0000556f8c148a70.prestium.4242 rwl
+allow gajim//gpg $O/gnupg_spawn_agent_sentinel.lock rwl
+allow gajim//gpg $O/trustdb.gpg rwk
+allow gajim//gpg $O/trustdb.gpg.lock rwl
+allow gajim//gpg $O/random_seed rw
+allow gajim//gpg $O/private-keys-v1.d/ rw
+allow gajim//gpg $O/private-keys-v1.d/0123456789ABCDEF0123456789ABCDEF01234567.key rw
+allow gajim//gpg $O/openpgp-revocs.d/0123456789ABCDEF0123456789ABCDEF01234567.rev rw
+allow gajim//gpg $O/gpg.conf r
+deny gajim//gpg $O/gpg.conf w
+deny gajim//gpg $O/gpg-agent.conf w
+deny gajim//gpg $O/gpg-agent.conf l
+deny gajim//gpg $O/common.conf w
+allow gajim//gpg $S/ rw
+allow gajim//gpg $D/ rw
+allow gajim//gpg $D/S.gpg-agent rw
+allow gajim//gpg $D/S.keyboxd rw
+deny gajim//gpg $G/pubring.kbx r
+deny gajim//gpg $G/private-keys-v1.d/x.key r
+deny gajim//gpg $H/.config/gajim/settings.sqlite r
+deny gajim//gpg $H/.local/share/gajim/logs.db r
+deny gajim//gpg $H/Downloads/x r
+deny gajim//gpg /usr/bin/dirmngr x
+deny gajim//gpg /usr/local/sbin/prestium-tor-mode x
+deny gajim//gpg /usr/bin/sudo x
+EOT
+
 echo "== pinentry (started by a socket-started or app-started gpg-agent)"
 run prestium.pinentry <<EOT
 allow prestium_pinentry /usr/bin/pinentry-gnome3 mr

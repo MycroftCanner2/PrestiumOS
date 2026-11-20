@@ -515,6 +515,15 @@ done in).
   log and the image manifest record the version and SHA-256 shipped, and
   `PRESTIUM_FEATHER_VERSION`/`PRESTIUM_FEATHER_SHA256` pin one release for reproducible builds. i2pd stays
   pinned.
+- **Gajim: "GPGME: Invalid crypto engine" when connecting an account.** The OpenPGP plugin
+  (gajim-openpgp) uses GPGME, which runs `gpgconf`, `gpg --version` and `gpgsm --version` to check the
+  engine. Gajim's profile let it run none of them, so the engine check failed and the plugin raised
+  `GPGMEError` at connect. GnuPG now runs in a child profile `gajim//gpg`, as Claws Mail's does: it may
+  use only Gajim's own keyrings (`~/.local/share/gajim/openpgp/<account>/`, never `~/.gnupg`) and the
+  agent's sockets, has no TCP/UDP and no dirmngr (the plugin runs gpg offline), may not write or
+  hard-link GnuPG's `*.conf` there (neither may Gajim), and a passphrase prompt runs in
+  `prestium_pinentry`. Tested by `tests/test_apparmor_gajim.sh` and new start-up checks in
+  `tests/test_apparmor_startup.sh` (paths from an strace of the plugin's GPGME calls).
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):
