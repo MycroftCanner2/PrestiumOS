@@ -7,6 +7,8 @@
 #     versions.sh (no signature exists, and none is claimed), checked for package/version/arch, staged as
 #     i2pd.deb + i2pd.version and re-checked with the other staged files; hook 0005 checks it again and
 #     installs it with apt (dependencies from Debian), before hook 0100 moves the i2pd user to 2000
+#   - hook 0005 puts back Prestium's /var/lib/i2pd (from config/includes.chroot) after the .deb's
+#     /var/lib/i2pd/{i2pd,tunnels}.conf symlinks replace it (hook 0700 needs the real files)
 #   - the repo.i2pd.xyz apt repository is gone: no list, key, keyring, origin pin, perms entry or package
 #     list entry; Debian's own i2pd gets priority -1
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); fail=0
@@ -58,10 +60,14 @@ cmp -s "$R/config/archives/prestium-thirdparty.pref.chroot" "$I/etc/apt/preferen
 printf '%s\n' 0001-prestium-build-dns.hook.chroot "$(basename "$H")" 0010-prestium-optional-packages.hook.chroot | LC_ALL=C sort -c 2>/dev/null && ok "hook 0005 runs after the build resolver and before 0100 (i2pd user to 2000)" || bad "hook order"
 if command -v dpkg-deb >/dev/null; then
   mk(){ # dir pkg version arch
-    mkdir -p "$T/p/DEBIAN"; printf 'Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: t <t@t>\nDescription: t\n' "$2" "$3" "$4" > "$T/p/DEBIAN/control"
+    mkdir -p "$T/p/DEBIAN"
+    if [ -n "${MKDATA:-}" ]; then # like PurpleI2P's: /var/lib/i2pd/*.conf are symlinks to /etc/i2pd (not conffiles)
+      mkdir -p "$T/p/var/lib/i2pd"; ln -s /etc/i2pd/i2pd.conf "$T/p/var/lib/i2pd/i2pd.conf"
+      ln -s /etc/i2pd/tunnels.conf "$T/p/var/lib/i2pd/tunnels.conf"; ln -s /usr/share/i2pd/certificates "$T/p/var/lib/i2pd/certificates"; fi
+    printf 'Package: %s\nVersion: %s\nArchitecture: %s\nMaintainer: t <t@t>\nDescription: t\n' "$2" "$3" "$4" > "$T/p/DEBIAN/control"
     dpkg-deb -b --root-owner-group "$T/p" "$1/i2pd.deb" >/dev/null 2>&1; rm -rf "$T/p"; }
   mkdir -p "$T/bin"
-  printf '#!/bin/sh\necho "$*" >> "$T_LOG"; mkdir -p "$PRESTIUM_HOOK_ROOT/etc/i2pd"; : > "$PRESTIUM_HOOK_ROOT/etc/i2pd/i2pd.conf.dpkg-dist"; echo "${INSTALLED:-}" > "$T_STATE"\n' > "$T/bin/apt-get"
+  printf '#!/bin/sh\necho "$*" >> "$T_LOG"; mkdir -p "$PRESTIUM_HOOK_ROOT/etc/i2pd"; : > "$PRESTIUM_HOOK_ROOT/etc/i2pd/i2pd.conf.dpkg-dist"; echo "${INSTALLED:-}" > "$T_STATE"\nfor a; do d=$a; done; [ -z "${APT_X:-}" ] || dpkg-deb -x "$d" "$PRESTIUM_HOOK_ROOT"\n' > "$T/bin/apt-get"
   printf '#!/bin/sh\ncat "$T_STATE" 2>/dev/null\n' > "$T/bin/dpkg-query"
   chmod +x "$T/bin/"*
   run(){ # root -> rc
@@ -81,6 +87,23 @@ if command -v dpkg-deb >/dev/null; then
   r=$(stage badarch i2pd 3.0.0-1trixie1 i386); run "$r" && bad "hook 0005 accepted another architecture" || ok "hook 0005: another architecture stops"
   r=$(stage notinst i2pd 3.0.0-1trixie1 amd64); INST=2.56.0-1 run "$r" && bad "hook 0005 passed with the wrong version installed" || ok "hook 0005: checks the installed version"
   run "$T/empty" && bad "hook 0005 ran without a staged .deb" || ok "hook 0005: missing .deb stops"
+  # the build failure of 3a05cf1: live-build copies config/includes.chroot before the hooks, so the .deb's
+  # /var/lib/i2pd/{i2pd,tunnels}.conf symlinks replaced Prestium's files and hook 0700 stopped
+  grep -q 'cp -a "\$L/\." "\$KEEP/"' "$H" && grep -qF 'diff -r --no-dereference "$KEEP" "$L"' "$H" \
+    && ok "hook 0005 keeps a copy of /var/lib/i2pd before apt and compares after" || bad "hook 0005 does not protect /var/lib/i2pd"
+  r=$(MKDATA=1 stage varlib i2pd 3.0.0-1trixie1 amd64); mkdir -p "$r/var/lib"; cp -a "$I/var/lib/i2pd" "$r/var/lib/"
+  APT_X=1 run "$r"; rc=$?
+  [ $rc = 0 ] && [ -L "$r/var/lib/i2pd/certificates" ] && ok "hook 0005 with the .deb's /var/lib/i2pd symlinks unpacked" || bad "hook 0005 failed (rc $rc) on the /var/lib/i2pd symlinks"
+  d=$(diff -r --no-dereference "$I/var/lib/i2pd" "$r/var/lib/i2pd" 2>&1 | grep -v "^Only in $r/var/lib/i2pd: certificates$")
+  [ -z "$d" ] && ok "hook 0005: Prestium's /var/lib/i2pd (i2pd.conf, tunnels.conf, tunnels.d, ...) restored as shipped" || bad "/var/lib/i2pd differs: $d"
+  for f in i2pd.conf tunnels.conf; do
+    [ -f "$r/var/lib/i2pd/$f" ] && [ ! -L "$r/var/lib/i2pd/$f" ] && grep -q '^\[' "$r/var/lib/i2pd/$f" && ok "hook 0700's check passes: /var/lib/i2pd/$f is Prestium's file" || bad "/var/lib/i2pd/$f is not Prestium's file"; done
+  if [ "$(id -u)" != 0 ]; then # fail closed: a /var/lib/i2pd that can't be put back stops the build
+    r=$(MKDATA=1 stage varlibro i2pd 3.0.0-1trixie1 amd64); mkdir -p "$r/var/lib"; cp -a "$I/var/lib/i2pd" "$r/var/lib/"
+    printf '#!/bin/sh\nfor a; do d=$a; done; dpkg-deb -x "$d" "$PRESTIUM_HOOK_ROOT"; chmod a-w "$PRESTIUM_HOOK_ROOT/var/lib/i2pd"; echo "$INSTALLED" > "$T_STATE"\n' > "$T/bin/apt-get"
+    run "$r" && bad "hook 0005 passed although /var/lib/i2pd could not be restored" || ok "hook 0005: a /var/lib/i2pd it can't restore stops the build"
+    chmod u+w "$r/var/lib/i2pd"
+  fi
 else echo "SKIP hook 0005 run (no dpkg-deb)"; fi
 
 [ $fail = 0 ] && echo "i2pd deb: OK"; exit $fail

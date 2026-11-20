@@ -464,6 +464,15 @@ done in).
   hard-link GnuPG's `*.conf` there (neither may Gajim), and a passphrase prompt runs in
   `prestium_pinentry`. Tested by `tests/test_apparmor_gajim.sh` and new start-up checks in
   `tests/test_apparmor_startup.sh` (paths from an strace of the plugin's GPGME calls).
+- **Build: hook 0700 stopped with "/var/lib/i2pd/i2pd.conf is still the package symlink".** PurpleI2P's
+  `.deb` ships `/var/lib/i2pd/i2pd.conf` and `tunnels.conf` as symlinks to `/etc/i2pd` (not conffiles, so
+  `--force-confold` doesn't cover them). The apt package used to be installed before live-build copied
+  `config/includes.chroot`, which then replaced the symlinks; hook 0005 installs the `.deb` after the
+  copy, so dpkg replaced Prestium's files with the symlinks instead. Hook 0005 now keeps a copy of
+  `/var/lib/i2pd` as the includes left it, puts every entry back after the install, and stops the build
+  if anything still differs (the package's extra `certificates` symlink, which 0700 sets anyway, may
+  stay). 0700's check and all the `.deb` checks are unchanged. Tested by `tests/test_i2pd_deb.sh`
+  (a package with the same symlinks, and a `/var/lib/i2pd` that can't be put back stops the build).
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):

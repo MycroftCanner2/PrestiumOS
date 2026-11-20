@@ -18,10 +18,35 @@ echo "$H" | grep -qxE '[0-9a-f]{64}' || { echo "E: i2pd.version has no SHA-256";
 [ "$(dpkg-deb -f "$D" Package Version Architecture | tr '\n' ' ')" = "Package: i2pd Version: $V Architecture: amd64 " ] \
 	|| { echo "E: staged i2pd.deb is not i2pd $V for amd64"; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
+# The package ships /var/lib/i2pd/i2pd.conf, tunnels.conf (symlinks to /etc/i2pd) and tunnels.d (symlink to
+# /etc/i2pd/tunnels.conf.d). They are not conffiles, so --force-confold doesn't protect them: dpkg replaces
+# the regular files config/includes.chroot already put there (live-build copies the includes before the
+# hooks run) with the symlinks, and hook 0700 then stops ("still the package symlink"). Keep a copy of
+# Prestium's /var/lib/i2pd as the includes left it and put every entry back after the install; any
+# difference afterwards stops the build. Owners and modes are set later (0100, 0500 perms.txt, 0700).
+L=${PRESTIUM_HOOK_ROOT:-}/var/lib/i2pd
+KEEP=
+if [ -d "$L" ] && [ ! -L "$L" ]; then
+	KEEP=$(mktemp -d); trap 'rm -rf "$KEEP"' EXIT
+	cp -a "$L/." "$KEEP/"
+fi
 # --force-confold: config/includes.chroot already has Prestium's /etc/i2pd/i2pd.conf; keep it, as when the
 # includes were copied over the apt package (the package's copy, saved as .dpkg-dist, is removed)
 apt-get install -y --no-install-recommends -o Dpkg::Options::=--force-confdef -o Dpkg::Options::=--force-confold "$D"
 rm -f "${PRESTIUM_HOOK_ROOT:-}"/etc/i2pd/*.dpkg-dist
+if [ -n "$KEEP" ]; then
+	for e in "$KEEP"/* "$KEEP"/.[!.]* "$KEEP"/..?*; do
+		[ -e "$e" ] || [ -L "$e" ] || continue
+		n=${e##*/}; rm -rf "${L:?}/$n"; cp -a "$e" "$L/$n"
+	done
+	# entries the package adds (the certificates symlink, which 0700 sets anyway) may stay; nothing else differs
+	d=$(diff -r --no-dereference "$KEEP" "$L" 2>&1 | grep -v "^Only in ${L}[:/]" || true)
+	[ -z "$d" ] || { echo "E: could not restore Prestium's $L after installing i2pd:"; echo "$d"; exit 1; }
+	for f in i2pd.conf tunnels.conf; do
+		if [ -e "$KEEP/$f" ] && [ -L "$L/$f" ]; then echo "E: $L/$f is still the package symlink"; exit 1; fi
+	done
+	echo "P: Prestium's $L restored over the package's symlinks"
+fi
 got=$(dpkg-query -W -f '${Version}' i2pd 2>/dev/null || true)
 [ "$got" = "$V" ] || { echo "E: i2pd $V not installed (dpkg says: ${got:-nothing})"; exit 1; }
 echo "P: i2pd $V installed from the pinned GitHub .deb (sha256 $H)"
