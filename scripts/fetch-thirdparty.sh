@@ -4,6 +4,7 @@
 #   scripts/fetch-thirdparty.sh            verify signature + pinned SHA-256 (fails on any mismatch)
 #   scripts/fetch-thirdparty.sh --repin    verify signature only, print the SHA-256 values to pin
 #   2.1: Tor Browser is the newest signed release unless pinned (thirdparty/versions.sh, scripts/tb-latest.sh)
+#   2.1: Feather too: the newest signed GitHub release unless pinned (scripts/feather-latest.sh)
 #   2.1: uBlock Origin is the newest Mozilla-signed release on addons.mozilla.org (scripts/amo-latest.py)
 #   It also stages a signature-checked I2P reseed file into config/includes.chroot/var/lib/i2pd/: the
 #   repo-shipped i2pseeds.su3 is used first (signature-checked; age only warns, refresh it in git when it
@@ -97,12 +98,34 @@ mv -f "$C/node-$NODE_VERSION.SHASUMS256.txt.tmp" "$C/node-$NODE_VERSION.SHASUMS2
 grep -q "^$(sha "$C/$NF")  $NF\$" "$C/node-$NODE_VERSION.SHASUMS256.txt" || { echo "ERROR: Node not in signed SHASUMS"; exit 1; }
 pin NODE "$C/$NF" "$NODE_SHA256"
 
-# Feather (Monero wallet)
+# Feather (Monero wallet; 2.1: the newest GitHub release unless versions.sh or PRESTIUM_FEATHER_VERSION pins one)
+. "$TOP/scripts/feather-latest.sh"
+if [ "$FEATHER_VERSION" = latest ]; then
+  FEATHER_VERSION=$(feather_latest) || exit 1
+  FEATHER_LATEST=1; echo "Feather: newest release is $FEATHER_VERSION"
+else
+  FEATHER_LATEST=0
+  feather_version_ok "$FEATHER_VERSION" || { echo "ERROR: bad FEATHER_VERSION '$FEATHER_VERSION'"; exit 1; }
+  feather_version_ge "$FEATHER_VERSION" "$FEATHER_MIN_VERSION" || { echo "ERROR: FEATHER_VERSION $FEATHER_VERSION is older than FEATHER_MIN_VERSION $FEATHER_MIN_VERSION"; exit 1; }
+fi
 FEF=feather-$FEATHER_VERSION-linux.zip
-# from the project's GitHub releases (tag = the bare version); the signature check and the pin are unchanged
+# from the project's GitHub releases (tag = the bare version)
 get https://github.com/feather-wallet/feather/releases/download/$FEATHER_VERSION/$FEF $FEF
 get https://github.com/feather-wallet/feather/releases/download/$FEATHER_VERSION/$FEF.asc $FEF.asc
-sigok "$C/$FEF.asc" "$C/$FEF" "$FEATHER_KEY" "$K/feather.asc"; pin FEATHER "$C/$FEF" "$FEATHER_SHA256"
+# verified and staged from a private copy (the shared cache can change)
+FEW=$GNUPGHOME/feather; mkdir -m 700 "$FEW"; cp "$C/$FEF" "$FEW/$FEF"; cp "$C/$FEF.asc" "$FEW/$FEF.asc"
+sigok "$FEW/$FEF.asc" "$FEW/$FEF" "$FEATHER_KEY" "$K/feather.asc"
+if [ "$FEATHER_LATEST" = 1 ]; then
+  # no pin to compare with: the signature by FEATHER_KEY (checked above) is the trust anchor, with the
+  # FEATHER_MIN_VERSION floor; record what was used
+  FEATHER_SHA256=$(sha "$FEW/$FEF"); echo "OK FEATHER $FEATHER_SHA256 (Feather $FEATHER_VERSION, signature verified, not pinned)"
+else
+  pin FEATHER "$FEW/$FEF" "$FEATHER_SHA256"
+fi
+# the signature does not bind the file name: the signed zip's only entry must be feather-<that version>
+FEATHER_GOT=$(feather_zip_version "$FEW/$FEF") \
+  || { echo "ERROR: $FEF does not hold exactly one feather-<version> program"; exit 1; }
+[ "$FEATHER_GOT" = "$FEATHER_VERSION" ] || { echo "ERROR: $FEF contains Feather $FEATHER_GOT, not $FEATHER_VERSION"; exit 1; }
 
 # i2pd: PurpleI2P's own trixie amd64 .deb from its GitHub releases (replaces the former i2pd apt
 # repository). PurpleI2P publishes no detached OpenPGP signature for the .deb, so there is NO signature
@@ -249,14 +272,14 @@ chmod 644 "$SU3.part"; mv -f "$SU3.part" "$SU3"
 # stage for the hooks
 rm -rf "$S"; mkdir -p "$S"
 cp "$TBW/$TBF" "$S/tor-browser.tar.xz"; echo "$TB_VERSION" > "$S/tor-browser.version"; cp "$C/$FFF" "$S/firefox.tar.xz"; cp "$C/$NF" "$S/node.tar.xz"
-cp "$C/$FEF" "$S/feather.zip"; echo "$FEATHER_VERSION" > "$S/feather.version"
+cp "$FEW/$FEF" "$S/feather.zip"; echo "$FEATHER_VERSION" > "$S/feather.version"
 cp "$I2W/$I2PDF" "$S/i2pd.deb"; echo "$I2PD_DEB_VERSION $I2PD_SHA256" > "$S/i2pd.version"
 cp "$UBW/ublock-origin.xpi" "$S/ublock-origin.xpi"; echo "$UB_VERSION $UB_SHA256" > "$S/ublock-origin.version"
 cp "$TOP/scripts/amo-latest.py" "$TOP/thirdparty/keys/mozilla-amo-root.pem" "$S/"
 # 2.0 r7: re-check what was actually staged (closes the verify-then-copy gap)
 for x in "tor-browser.tar.xz $TB_SHA256" "firefox.tar.xz $FF_SHA256" "node.tar.xz $NODE_SHA256" "feather.zip $FEATHER_SHA256" \
          "i2pd.deb $I2PD_SHA256" "ublock-origin.xpi $UB_SHA256"; do
-  [ "$(sha "$S/${x%% *}")" = "${x#* }" ] || { echo "ERROR: staged ${x%% *} does not match its pinned SHA-256"; exit 1; }
+  [ "$(sha "$S/${x%% *}")" = "${x#* }" ] || { echo "ERROR: staged ${x%% *} does not match its pinned or recorded SHA-256"; exit 1; }
 done
 # tar once per The Lounge version (node_modules has thousands of small files; slow on network filesystems)
 LT="$C/thelounge-$THELOUNGE_VERSION.tar"

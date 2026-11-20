@@ -48,7 +48,9 @@ which works but is several times slower.
 1. runs `scripts/fetch-thirdparty.sh`: downloads Tor Browser, Firefox, Node.js, Feather (zip and `.asc`
    from its GitHub releases, `github.com/feather-wallet/feather`), The Lounge
    (npm), checks each one against its publisher's OpenPGP signature
-   (`thirdparty/keys/`) **and** the SHA-256 pinned in `thirdparty/versions.sh`, and stages them in
+   (`thirdparty/keys/`) **and** the SHA-256 pinned in `thirdparty/versions.sh` (Tor Browser and Feather:
+   the newest signed release at build time instead, see below: their signature, in a keyring holding only
+   that publisher's key, is the trust anchor, with a pinned minimum version), and stages them in
    `config/includes.chroot/usr/src/prestium-thirdparty/` (not committed; removed from the image by
    the last hook); it also downloads i2pd, PurpleI2P's trixie amd64 `.deb` from its GitHub releases
    (`github.com/PurpleI2P/i2pd`, version and SHA-256 pinned as `I2PD_VERSION`/`I2PD_DEB_VERSION`/`I2PD_SHA256`).
@@ -179,7 +181,19 @@ third-party trees in `/opt` are not copied: they are downloaded and verified at 
 
 Tor Browser needs nothing: each build takes the newest release, verified by its signature with the
 pinned Tor Browser key and held to `TB_MIN_VERSION` (see `thirdparty/versions.sh`; pin one release with
-`PRESTIUM_TB_VERSION=<v> PRESTIUM_TB_SHA256=<sha>`). Neither does uBlock Origin: each build takes the
+`PRESTIUM_TB_VERSION=<v> PRESTIUM_TB_SHA256=<sha>`). Feather works the same way (`scripts/feather-latest.sh`):
+each build asks GitHub for feather-wallet/feather's latest release (the releases API, or the
+`/releases/latest` redirect if the API can't be read; never a draft or prerelease, and the tag must be a
+plain version such as `2.9.1`), downloads `feather-<version>-linux.zip` and its `.asc` from
+`github.com/feather-wallet/feather/releases/download/<version>/`, and requires a valid signature by
+`FEATHER_KEY` (a keyring holding only `thirdparty/keys/feather.asc`). No SHA-256 can be pinned for a
+release that isn't out yet, so that signature is Feather's trust anchor; `FEATHER_MIN_VERSION` is a floor
+(an older, still validly signed release stops the build; raise it, never lower it), and the signed zip's
+only entry must be `feather-<that version>`. The build log (`OK FEATHER <sha> (Feather <v>, ...)`) and the
+image manifest record the version and SHA-256 shipped. Pin one release with
+`PRESTIUM_FEATHER_VERSION=<v> PRESTIUM_FEATHER_SHA256=<sha>` (or in `thirdparty/versions.sh`); the
+signature is checked then too. If Feather ever changes its signing key, replace `thirdparty/keys/feather.asc`
+and `FEATHER_KEY`. Neither does uBlock Origin: each build takes the
 newest Mozilla-signed release from addons.mozilla.org (the build needs to reach addons.mozilla.org
 and its download CDN; if AMO is down or anything fails verification, the build stops). If Mozilla
 ever changes its add-on root, replace `thirdparty/keys/mozilla-amo-root.pem` with Firefox's

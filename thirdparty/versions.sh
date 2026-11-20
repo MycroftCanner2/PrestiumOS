@@ -4,6 +4,7 @@
 # scripts/fetch-thirdparty.sh --repin (it verifies the signature, then prints the new SHA to pin).
 # LibreWolf and Tor come from their signed apt repositories (config/archives/), not from here.
 # i2pd is PurpleI2P's .deb from GitHub releases, pinned below by SHA-256 only (no signature is published).
+# 2.1: Tor Browser and Feather are the newest signed releases unless pinned (below).
 # 2.1: uBlock Origin is not pinned here either: every build takes the newest Mozilla-signed release
 # from addons.mozilla.org (scripts/amo-latest.py; Mozilla's AMO root in thirdparty/keys/mozilla-amo-root.pem).
 
@@ -37,9 +38,19 @@ IRC_FRAMEWORK_COMMIT=9578e59a1056499e4a03a0f0fd2c260e9aadc541
 IRC_FRAMEWORK_FILES="package.json README.md LICENSE.txt src"
 IRC_FRAMEWORK_TAR_SHA256=0c25dd1efea08411f4df8e2a950efe1d720ea76650b8df8af406499ea5583a0e
 
-FEATHER_VERSION=2.9.1
-FEATHER_SHA256=f1d40d619664d9e6318c086b9015ee72bc69741ec86148ce2ea2ef75ef47feed
-FEATHER_KEY=8185E158A33330C7FD61BC0D1F76E155CEFBA71C     # Feather release key (dsc); zip + .asc from github.com/feather-wallet/feather releases
+# 2.1: Feather is the newest release at build time, like Tor Browser (scripts/feather-latest.sh asks
+# GitHub for feather-wallet/feather's latest release, never a draft or prerelease; the zip and .asc come
+# from github.com/feather-wallet/feather/releases/download/<version>/). No SHA-256 can be pinned for a
+# release that isn't out yet, so the zip's signature by FEATHER_KEY (a keyring holding only
+# thirdparty/keys/feather.asc) is the trust anchor, with FEATHER_MIN_VERSION as a floor against
+# rollbacks. The build log shows the version and SHA-256 it shipped ("OK FEATHER <sha> (Feather <v>,
+# ...)"), and the image manifest records them. To pin one release instead (reproducible builds), set
+# FEATHER_VERSION to it and FEATHER_SHA256 to its SHA-256, or build with
+# PRESTIUM_FEATHER_VERSION=<v> PRESTIUM_FEATHER_SHA256=<sha> (2.9.1: f1d40d619664d9e6318c086b9015ee72bc69741ec86148ce2ea2ef75ef47feed).
+FEATHER_VERSION=${PRESTIUM_FEATHER_VERSION:-latest}
+FEATHER_SHA256=${PRESTIUM_FEATHER_SHA256:-}
+FEATHER_MIN_VERSION=2.9.1                               # never ship anything older (raise it, never lower it)
+FEATHER_KEY=8185E158A33330C7FD61BC0D1F76E155CEFBA71C     # Feather release key (dsc)
 
 # i2pd: https://github.com/PurpleI2P/i2pd/releases/download/$I2PD_VERSION/i2pd_${I2PD_DEB_VERSION}_amd64.deb
 # (PurpleI2P's trixie build). PurpleI2P publishes no detached signature for its .deb files, so this

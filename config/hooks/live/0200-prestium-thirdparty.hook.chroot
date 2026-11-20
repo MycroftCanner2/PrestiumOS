@@ -12,7 +12,7 @@
 #   The Lounge   -> /opt/thelounge (npm ci from the pinned lockfile) + Prestium's offline patch, 320s IRC ping timeout, and connecting lobby text only when a connection starts;
 #                   shared by both instances, IRC (I2P) and IRC (Tor) (Tor: every network through 127.0.0.1:9050,
 #                   no connection whose SASL sign-in can't work)
-#   Feather      -> /usr/local/bin/feather
+#   Feather      -> /usr/local/bin/feather (2.1: the newest signed release at build time unless pinned)
 set -e
 S=/usr/src/prestium-thirdparty
 O=/usr/share/prestium/opt-overlay
@@ -426,6 +426,8 @@ echo "P: The Lounge $(sed -n 's/.*"version": "\(.*\)".*/\1/p' /opt/thelounge/nod
 
 # Feather (Monero wallet; I2P-only settings in ~/.config/feather/settings.json)
 FV=$(cat "$S/feather.version")
+# 2.1: the newest signed release unless pinned; fetch-thirdparty.sh checked the version, check its form again
+case "$FV" in ''|.*|*.|*..*|*[!0-9.]*) echo "E: bad Feather version '$FV' in feather.version"; exit 1;; esac
 unzip -p "$S/feather.zip" "feather-$FV" > /usr/local/bin/feather 2>/dev/null || {
 	n=$(unzip -Z1 "$S/feather.zip" | grep -E '^feather(-[0-9.]+)?$' | head -1); unzip -p "$S/feather.zip" "$n" > /usr/local/bin/feather; }
 chmod 755 /usr/local/bin/feather; [ -s /usr/local/bin/feather ]

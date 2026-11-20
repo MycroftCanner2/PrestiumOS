@@ -1,7 +1,8 @@
 #!/bin/bash
 # 2.1: Feather and i2pd come from GitHub releases.
-#   - Feather: zip and .asc from github.com/feather-wallet/feather (tag = FEATHER_VERSION), still checked
-#     with sigok against FEATHER_KEY and pinned to FEATHER_SHA256
+#   - Feather: zip and .asc from github.com/feather-wallet/feather (tag = the version), always checked
+#     with sigok against FEATHER_KEY; the newest release unless pinned (tests/test_feather_latest.sh), and
+#     a pinned FEATHER_VERSION is still checked against FEATHER_SHA256
 #   - i2pd: PurpleI2P's trixie amd64 .deb from github.com/PurpleI2P/i2pd, pinned by SHA-256 in
 #     versions.sh (no signature exists, and none is claimed), checked for package/version/arch, staged as
 #     i2pd.deb + i2pd.version and re-checked with the other staged files; hook 0005 checks it again and
@@ -18,8 +19,9 @@ T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 grep -qxF 'get https://github.com/feather-wallet/feather/releases/download/$FEATHER_VERSION/$FEF $FEF' "$F" \
   && grep -qxF 'get https://github.com/feather-wallet/feather/releases/download/$FEATHER_VERSION/$FEF.asc $FEF.asc' "$F" \
   && ok "Feather zip and .asc from GitHub releases" || bad "Feather URLs"
-grep -qxF 'sigok "$C/$FEF.asc" "$C/$FEF" "$FEATHER_KEY" "$K/feather.asc"; pin FEATHER "$C/$FEF" "$FEATHER_SHA256"' "$F" \
-  && ok "Feather: signature (FEATHER_KEY) and pin (FEATHER_SHA256) checks unchanged" || bad "Feather checks changed"
+grep -qxF 'sigok "$FEW/$FEF.asc" "$FEW/$FEF" "$FEATHER_KEY" "$K/feather.asc"' "$F" \
+  && grep -qxF '  pin FEATHER "$FEW/$FEF" "$FEATHER_SHA256"' "$F" \
+  && ok "Feather: signature (FEATHER_KEY) always checked; a pinned release also against FEATHER_SHA256" || bad "Feather checks changed"
 grep -q 'featherwallet\.org/files' "$F" "$V" "$R/BUILDING.md" && bad "featherwallet.org download still referenced" || ok "no featherwallet.org download"
 
 ## i2pd: pin and fetch

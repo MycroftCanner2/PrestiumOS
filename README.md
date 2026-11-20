@@ -25,8 +25,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Built from git:** the whole image is built from the live-build configuration here, and every
   third-party download (Tor Browser, Firefox, Node.js, The Lounge, Feather) is checked against its
   publisher's signature, in a keyring holding only that publisher's key, and a pinned SHA-256 (Tor
-  Browser: the newest signed release at build time, no older than a pinned minimum; uBlock Origin: the
-  newest Mozilla-signed release on addons.mozilla.org at build time). The I2P reseed
+  Browser and Feather: the newest signed release at build time, no older than a pinned minimum; uBlock
+  Origin: the newest Mozilla-signed release on addons.mozilla.org at build time). The I2P reseed
   file ships in this repository (`i2pseeds.su3`) and is signature-checked at every build.
 - **Wayland desktop** (labwc, waybar, swaylock, mako) with a restricted Wayland socket for apps:
   no screen capture, input injection or window snooping. A root broker keeps the full socket away from
