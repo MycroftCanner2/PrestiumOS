@@ -304,7 +304,7 @@ def environment(uid, has_bus):
 def notify_fail(msg):
     sys.stderr.write("app-confine: %s\n" % msg)
     try:
-        subprocess.run(["/usr/bin/notify-send", "-a", "Prestium", "-i", "dialog-error", "-u", "critical",
+        subprocess.run(["/usr/bin/notify-send", "-a", "Prestium", "-u", "critical", "-i", "dialog-error",
                         "Application not started", msg], timeout=5, stdin=subprocess.DEVNULL,
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except (OSError, subprocess.SubprocessError):

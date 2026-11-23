@@ -55,9 +55,11 @@ for l in "0755 root root /usr/local/bin/prestium-gajim-keys" "0644 root root /us
   grep -qxF "$l" "$PM" && ok "perms.txt: ${l##* }" || no "perms.txt lacks $l"
 done
 D=$I/usr/share/applications/prestium-gajim-keys.desktop
-for l in "Name=Gajim OpenPGP Keys" "Exec=/usr/local/bin/prestium-gajim-keys" "Icon=dialog-password" "Terminal=false" "StartupWMClass=org.prestium.GajimKeys"; do
+for l in "Name=Gajim OpenPGP Keys" "Exec=/usr/local/lib/prestium/app-confine prestium-gajim-keys" "Icon=dialog-password" "Terminal=false" "StartupWMClass=org.prestium.GajimKeys"; do
   grep -qxF "$l" "$D" && ok "desktop: $l" || no "desktop lacks $l"
 done
+# security review F-01/F-05: started in its own mount namespace (no session bus, no broker socket, private /tmp)
+grep -q "^    \"prestium-gajim-keys\":" "$I/usr/local/lib/prestium/app-confine" && ok "app-confine table lists prestium-gajim-keys" || no "app-confine table lacks prestium-gajim-keys"
 grep -q 'APP_ID = "org.prestium.GajimKeys"' "$I/usr/local/bin/prestium-gajim-keys" && ok "window app_id matches StartupWMClass" || no "app_id"
 M=$I/etc/xdg/labwc/menu.xml
 grep -A1 '<item label="Gajim OpenPGP Keys" icon="dialog-password">' "$M" | grep -qF 'command="prestium-run /usr/local/bin/prestium-gajim-keys"' \

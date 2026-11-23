@@ -53,9 +53,11 @@ for l in "0755 root root /usr/local/bin/prestium-translate" "0644 root root /usr
   grep -qxF "$l" "$PM" && ok "perms.txt: ${l##* }" || no "perms.txt lacks $l"
 done
 D=$I/usr/share/applications/prestium-translate.desktop
-for l in "Name=Prestium Translate" "Exec=/usr/local/bin/prestium-translate" "Icon=accessories-dictionary" "Terminal=false" "StartupWMClass=org.prestium.Translate"; do
+for l in "Name=Prestium Translate" "Exec=/usr/local/lib/prestium/app-confine prestium-translate" "Icon=accessories-dictionary" "Terminal=false" "StartupWMClass=org.prestium.Translate"; do
   grep -qxF "$l" "$D" && ok "desktop: $l" || no "desktop lacks $l"
 done
+# security review F-01/F-05: started in its own mount namespace (no session bus, no broker socket, private /tmp)
+grep -q "^    \"prestium-translate\":" "$I/usr/local/lib/prestium/app-confine" && ok "app-confine table lists prestium-translate" || no "app-confine table lacks prestium-translate"
 grep -q '^Categories=.*Utility;Office;' "$D" && ok "desktop: Accessories and Office" || no "desktop categories"
 B=$I/usr/local/bin/prestium-translate
 grep -q 'APP_ID = "org.prestium.Translate"' "$B" && ok "window app_id matches StartupWMClass" || no "app_id"
