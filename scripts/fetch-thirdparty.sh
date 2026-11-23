@@ -6,6 +6,8 @@
 #   2.1: Tor Browser is the newest signed release unless pinned (thirdparty/versions.sh, scripts/tb-latest.sh)
 #   2.1: Feather too: the newest signed GitHub release unless pinned (scripts/feather-latest.sh)
 #   2.1: uBlock Origin is the newest Mozilla-signed release on addons.mozilla.org (scripts/amo-latest.py)
+#   2.1: Prestium Translate: bergamot-translator's source (pinned commit, submodules, one pinned tar) and
+#   Mozilla's en->ru/ru->en models (signed Remote Settings records + pins; scripts/translate-models.py)
 #   It also stages a signature-checked I2P reseed file into config/includes.chroot/var/lib/i2pd/: the
 #   repo-shipped i2pseeds.su3 is used first (signature-checked; age only warns, refresh it in git when it
 #   gets old); without it, a StormyCloud download (a verified download under 24 h old is reused) is the fallback.
@@ -214,6 +216,52 @@ done
 echo "OK IRC_FRAMEWORK $IRC_FRAMEWORK_COMMIT ($(find "$IRCF" -type f | wc -l) files match the commit)"
 echo "OK THELOUNGE $THELOUNGE_VERSION (npm ci, lockfile integrity + pinned irc-framework tarball)"
 
+# Prestium Translate (2.1): the Bergamot engine and Mozilla's English<->Russian models (thirdparty/versions.sh).
+# Engine: bergamot-translator is in no Debian release and publishes no signed source tarball, and GitHub's
+# tarballs leave out its submodules. The pinned commit is cloned with only the submodules the CPU build
+# uses, each checked out at the commit the parent records (git checks the object ids), every one exported
+# with "git archive" and appended into one tar whose SHA-256 is pinned. There is no signature to check: the
+# pinned commit and BERGAMOT_TAR_SHA256 are the trust anchor. Hook 0210 builds the engine from this tar.
+BG=$C/bergamot-translator-src
+if [ ! -d "$BG/.git" ]; then rm -rf "$BG"; git clone -q https://github.com/browsermt/bergamot-translator.git "$BG"; fi
+git -C "$BG" cat-file -e "$BERGAMOT_COMMIT^{commit}" 2>/dev/null || git -C "$BG" fetch -q origin
+git -C "$BG" -c advice.detachedHead=false checkout -q -f "$BERGAMOT_COMMIT" && git -C "$BG" clean -qfdx
+[ "$(git -C "$BG" rev-parse HEAD)" = "$BERGAMOT_COMMIT" ] || { echo "ERROR: bergamot-translator checkout is not $BERGAMOT_COMMIT"; exit 1; }
+for m in $BERGAMOT_MODULES; do
+  [ "$m" = . ] && continue
+  parent=$(dirname "$m"); sub=$(basename "$m")
+  while [ ! -e "$BG/$parent/.git" ]; do sub=$(basename "$parent")/$sub; parent=$(dirname "$parent"); done
+  git -C "$BG/$parent" submodule -q update --init --checkout -f -- "$sub"
+  [ "$(git -C "$BG/$m" rev-parse HEAD)" = "$(git -C "$BG/$parent" rev-parse "HEAD:$sub")" ] \
+    || { echo "ERROR: bergamot-translator submodule $m is not at the commit its parent records"; exit 1; }
+  git -C "$BG/$m" clean -qfdx
+done
+BT=$C/bergamot-translator-$BERGAMOT_COMMIT.tar
+rm -f "$BT.tmp" "$BT.part"
+for m in $BERGAMOT_MODULES; do
+  if [ "$m" = . ]; then pre=bergamot-translator/; else pre=bergamot-translator/$m/; fi
+  git -C "$BG/$m" archive --format=tar --prefix="$pre" HEAD > "$BT.part"
+  if [ -s "$BT.tmp" ]; then tar -Af "$BT.tmp" "$BT.part"; else mv "$BT.part" "$BT.tmp"; fi
+done
+rm -f "$BT.part"; mv -f "$BT.tmp" "$BT"
+pin BERGAMOT_TAR "$BT" "$BERGAMOT_TAR_SHA256"
+# Models: scripts/translate-models.py checks Mozilla's content signature over the Remote Settings collection
+# main/translations-models (certificate chain to the pinned AMO root), finds the signed record of each file
+# (model, lex, vocab) of each pair and version, and downloads it with exactly that size and SHA-256; each
+# SHA-256 must also be the one pinned in versions.sh. Then staged from a private copy (the cache can change).
+TRW=$GNUPGHOME/translate; mkdir -m 700 "$TRW"
+TRP=$(python3 -I "$TOP/scripts/translate-models.py" fetch "$C/translate-models" "enru:$TR_ENRU_VERSION" "ruen:$TR_RUEN_VERSION") \
+  || { echo "ERROR: translation models: download or verification failed"; exit 1; }
+[ "$(printf '%s\n' "$TRP" | grep -c '^PIN ')" = 6 ] || { echo "ERROR: translation models: expected 6 files"; exit 1; }
+while read -r _ name got _ ver; do
+  v=TR_${name}_SHA256; pinhash "TR_$name" "$got" "${!v}"
+  p=$(echo "${name%_*}" | tr 'A-Z' 'a-z'); t=$(echo "${name#*_}" | tr 'A-Z' 'a-z')
+  case $t in model) f=model.$p.intgemm.alphas.bin;; lex) f=lex.50.50.$p.s2t.bin;; vocab) f=vocab.$p.spm;; esac
+  mkdir -p "$TRW/models/$p"; cp "$C/translate-models/$p-$ver/$f" "$TRW/models/$p/$f"
+  echo "$got  models/$p/$f" >> "$TRW/SHA256SUMS"
+done <<< "$TRP"
+echo "$BERGAMOT_TAR_SHA256  bergamot-translator.tar" >> "$TRW/SHA256SUMS"
+
 [ "$REPIN" = 1 ] && exit 0
 
 # I2P reseed file, checked every time before use: SU3 format, allowed signer (StormyCloud or echelon3),
@@ -276,6 +324,12 @@ cp "$FEW/$FEF" "$S/feather.zip"; echo "$FEATHER_VERSION" > "$S/feather.version"
 cp "$I2W/$I2PDF" "$S/i2pd.deb"; echo "$I2PD_DEB_VERSION $I2PD_SHA256" > "$S/i2pd.version"
 cp "$UBW/ublock-origin.xpi" "$S/ublock-origin.xpi"; echo "$UB_VERSION $UB_SHA256" > "$S/ublock-origin.version"
 cp "$TOP/scripts/amo-latest.py" "$TOP/thirdparty/keys/mozilla-amo-root.pem" "$S/"
+# Prestium Translate: the source tar, the engine's own source (in this repository), the models, and the
+# SHA-256 list hook 0210 checks (written from the pins above, not from the files)
+mkdir -p "$S/translate"; cp -r "$TRW/models" "$TRW/SHA256SUMS" "$S/translate/"; cp "$BT" "$S/translate/bergamot-translator.tar"
+cp "$TOP/thirdparty/translate/prestium-translate-engine.cpp" "$S/translate/"
+echo "$BERGAMOT_COMMIT enru:$TR_ENRU_VERSION ruen:$TR_RUEN_VERSION" > "$S/translate/translate.version"
+( cd "$S/translate" && sha256sum --strict --quiet -c SHA256SUMS ) || { echo "ERROR: staged Prestium Translate files do not match their pinned SHA-256"; exit 1; }
 # 2.0 r7: re-check what was actually staged (closes the verify-then-copy gap)
 for x in "tor-browser.tar.xz $TB_SHA256" "firefox.tar.xz $FF_SHA256" "node.tar.xz $NODE_SHA256" "feather.zip $FEATHER_SHA256" \
          "i2pd.deb $I2PD_SHA256" "ublock-origin.xpi $UB_SHA256"; do

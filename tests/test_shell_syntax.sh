@@ -38,6 +38,9 @@ for f in \
   "$root/config/includes.chroot/usr/local/bin/prestium-browser-updater" \
   "$root/config/includes.chroot/usr/local/bin/prestium-gajim-keys" \
   "$root/config/includes.chroot/usr/local/lib/prestium-keys/gajim_keys.py" \
+  "$root/config/includes.chroot/usr/local/bin/prestium-translate" \
+  "$root/config/includes.chroot/usr/local/lib/prestium-translate/core.py" \
+  "$root/scripts/translate-models.py" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-timesync" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-bootclock" \
   "$root/config/includes.chroot/usr/local/sbin/prestium-wl-broker" \

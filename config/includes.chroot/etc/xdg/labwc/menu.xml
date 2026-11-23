@@ -70,6 +70,9 @@
     <item label="QR Generator" icon="qtqr">
       <action name="Execute" command="prestium-run qtqr" />
     </item>
+    <item label="Prestium Translate" icon="accessories-dictionary">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-translate" />
+    </item>
   </menu>
   <menu id="/Security" label="Security" icon="dialog-password">
     <item label="KeePassXC (Passwords)" icon="keepassxc">

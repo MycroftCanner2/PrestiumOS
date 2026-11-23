@@ -562,6 +562,43 @@ done in).
   import from a `pubring.kbx` and a keyboxd keyring left unchanged, backups and restores, the command
   line, and Gajim's own plugin backend accepting the keys) and `tests/test_apparmor_gajim_keys.sh`
   (paths from an strace of every flow, against the compiled profile). Not yet tested on a booted ISO.
+- **New: Prestium Translate** (`/usr/local/bin/prestium-translate`, *Accessories* menu after QR
+  Generator, also listed under Office), offline English↔Russian translation and a style rewriter in one
+  GTK 3 window in the style of Gajim OpenPGP Keys. The engine is bergamot-translator (Firefox
+  Translations' engine; Debian 13 packages neither it nor translateLocally), built by the new hook 0210
+  from a pinned source tar with a small pipe front end (`thirdparty/translate/prestium-translate-engine.cpp`)
+  for x86-64 with SSE4.1 and no BLAS library (11 MB, links only the C/C++ runtime). The models are
+  Mozilla's English→Russian and Russian→English models, version 2.1 of each (69 MB together), taken
+  from the records of Mozilla's signed Remote Settings collection (content signature checked against
+  the pinned AMO root by `scripts/translate-models.py`) and pinned by SHA-256; engine and models add
+  about 52 MB to the compressed image. Hook 0210 fails closed on a missing, extra or changed file,
+  installs them read-only in `/usr/share/prestium-translate/`, and stops the build if the engine
+  can't translate a test sentence both ways. The engine starts once (on first use) and is fed
+  through a pipe, inside bubblewrap (every namespace unshared, no network, no home, read-only
+  libraries and models, private `/tmp`). Translate runs as you pause or on Ctrl+Enter, with a
+  direction button and Cyrillic auto-detect. Rewrite has Light (invisible and look-alike characters,
+  emoji and emoticons, fillers, slang and British spellings, punctuation, quotes, dashes, case and
+  contractions evened out, with some choices random) and Strong (Light, then a round trip through the
+  other language, then Light again), *Show changes* (word diff), and a *Check before sending* list of
+  names, places, times, dates, numbers, addresses and repeated rare words a rewrite can't hide, with an
+  honest note. Paste & go (Ctrl+Shift+V), Copy, Copy & clear (Ctrl+Shift+C), Clear, an optional
+  60-second clipboard clear (only if the clipboard still holds the copied text). Status line
+  "Offline, nothing saved": no history, no temporary files, no recent-files entries; only the mode,
+  direction, strength and two switches go to `~/.config/prestium-translate/settings.json`, and the
+  boxes are emptied on Clear and on close. The logic is in `/usr/local/lib/prestium-translate/core.py`
+  (no GTK), also behind `--translate en-ru|ru-en|auto` and `--rewrite light|strong [--leftovers]` (stdin
+  to stdout). Its enforced profile `usr.local.bin.prestium-translate` allows only a unix stream
+  socket (Wayland; no TCP/UDP, netlink or bus), nothing of the home but its settings file, and no
+  writes in `/tmp`; bubblewrap runs in the child profile `engine`, and the engine program, stacked
+  (bubblewrap sets no_new_privs), in `prestium_translate_engine`, which denies all networking, user
+  namespaces, mounts and capabilities and reads only its models and the runtime. On a recent
+  processor a long paragraph takes about 0.5 seconds on one core and both models use about 300 MB.
+  Tested by `tests/test_translate.py` (Light rules, leftovers, diff, settings, command line, and with
+  the real engine and models: both directions, auto-detect, Strong keeps numbers and varies, the
+  bubblewrap sandbox), `tests/test_translate_hook.sh` (pins, fetch steps, hook 0210 refusing changed,
+  missing and extra files) and `tests/test_apparmor_translate.sh` (paths from an strace, against the
+  compiled profiles). The button labels are in sentence case ("Paste & go", "Copy & clear") as the
+  rest of Prestium. Not yet tested on a booted ISO.
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):

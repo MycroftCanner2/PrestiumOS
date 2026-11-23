@@ -26,12 +26,13 @@ rm -f /etc/apparmor.d/usr.lib.libreoffice.program.soffice.bin /etc/apparmor.d/lo
 # 2.0 r9: Gajim, OnionShare, Feather, LibreOffice, The Lounge and the local-only Firefox are confined too
 # 2.1: The Lounge's Tor instance (IRC (Tor)) too; Evince (Document Viewer) too
 # 2.1 (late): Gajim OpenPGP Keys (prestium-gajim-keys) too
+# 2.1 (late): Prestium Translate (prestium-translate) and its engine's inner profile too
 for p in usr.share.librewolf.librewolf torbrowser.Browser.firefox system_tor usr.bin.i2pd \
 	usr.bin.gajim usr.bin.onionshare usr.local.bin.feather usr.lib.libreoffice.program prestium.thelounge prestium.thelounge-tor \
 	opt.firefox.firefox usr.bin.claws-mail usr.local.sbin.prestium-onion-grater \
 	prestium.browser-launcher prestium.pinentry \
 	usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-inner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra prestium.evince \
-	usr.local.bin.prestium-gajim-keys; do
+	usr.local.bin.prestium-gajim-keys usr.local.bin.prestium-translate prestium.translate-engine; do
 	f=/etc/apparmor.d/$p
 	[ -e "$f" ] || { echo "W: no profile $p"; continue; }
 	sed -i 's/ flags=(complain)//; s/flags=(complain) //' "$f"
@@ -45,7 +46,7 @@ for p in usr.share.librewolf.librewolf usr.bin.gajim usr.bin.onionshare usr.loca
 	usr.lib.libreoffice.program prestium.thelounge prestium.thelounge-tor opt.firefox.firefox local/torbrowser.Browser.firefox \
 	usr.bin.claws-mail prestium.pinentry \
 	usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad usr.bin.mat2 usr.bin.metadata-cleaner usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-inner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra prestium.evince \
-	usr.local.bin.prestium-gajim-keys; do
+	usr.local.bin.prestium-gajim-keys usr.local.bin.prestium-translate prestium.translate-engine; do
 	grep -q 'prestium-no-admin\|prestium-app-base\|prestium-app-common\|prestium-viewer' "/etc/apparmor.d/$p" || { echo "E: $p does not deny sudo"; exit 1; }
 done
 # 2.1: the whole set as apparmor.service loads it at boot: every file in /etc/apparmor.d compiles (one that
@@ -58,5 +59,5 @@ python3 -I /usr/share/prestium/build/aa-attach-check.py /etc/apparmor.d usr.shar
 	prestium.thelounge-tor opt.firefox.firefox usr.bin.claws-mail usr.local.sbin.prestium-onion-grater prestium.browser-launcher \
 	prestium.pinentry usr.bin.loupe usr.bin.vlc usr.bin.file-roller usr.bin.featherpad \
 	usr.bin.mat2 usr.bin.metadata-cleaner usr.libexec.glycin-inner usr.bin.mat2-inner usr.bin.metadata-cleaner-inner usr.bin.audacity usr.bin.keepassxc usr.bin.kleopatra prestium.evince \
-	usr.local.bin.prestium-gajim-keys \
+	usr.local.bin.prestium-gajim-keys usr.local.bin.prestium-translate prestium.translate-engine \
 	|| { echo "E: the AppArmor profile set would not load cleanly at boot"; exit 1; }

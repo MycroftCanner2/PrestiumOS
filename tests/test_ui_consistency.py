@@ -240,7 +240,7 @@ for f in glob.glob(os.path.join(I, "usr/local/bin/*")) + glob.glob(os.path.join(
 check(not widths, "message, question and form dialogs are 460 px wide", "; ".join(widths))
 
 # ----------------------------------------------------------------------------------------- 4. copy
-PROPER = {"Tor", "I2P", "Prestium", "VeraCrypt", "BitLocker", "Kleopatra", "Gajim", "OpenPGP"}
+PROPER = {"Tor", "I2P", "Prestium", "VeraCrypt", "BitLocker", "Kleopatra", "Gajim", "OpenPGP", "English", "Russian"}
 def sentence_case(label):
     t = label.replace("_", "").replace("Display Settings…", "Display settings…")
     words = re.findall(r"[A-Za-z][\w'’-]*", t)

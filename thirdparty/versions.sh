@@ -4,6 +4,8 @@
 # scripts/fetch-thirdparty.sh --repin (it verifies the signature, then prints the new SHA to pin).
 # LibreWolf and Tor come from their signed apt repositories (config/archives/), not from here.
 # i2pd is PurpleI2P's .deb from GitHub releases, pinned below by SHA-256 only (no signature is published).
+# 2.1: Prestium Translate's engine (bergamot-translator, built from a pinned source tar by hook 0210) and
+# Mozilla's en->ru/ru->en models (Mozilla's signed Remote Settings records + pinned SHA-256), at the end.
 # 2.1: Tor Browser and Feather are the newest signed releases unless pinned (below).
 # 2.1: uBlock Origin is not pinned here either: every build takes the newest Mozilla-signed release
 # from addons.mozilla.org (scripts/amo-latest.py; Mozilla's AMO root in thirdparty/keys/mozilla-amo-root.pem).
@@ -60,3 +62,32 @@ FEATHER_KEY=8185E158A33330C7FD61BC0D1F76E155CEFBA71C     # Feather release key (
 I2PD_VERSION=3.0.0
 I2PD_DEB_VERSION=3.0.0-1trixie1
 I2PD_SHA256=c48c9e2e44fb67e9c650b01225ccf816d8b2cecf3246a5112ccdcf5a6e4fbe70
+
+# Prestium Translate (2.1). Engine: Bergamot, the engine of Firefox Translations (bergamot-translator, MPL-2.0;
+# github.com/browsermt/bergamot-translator). Debian 13 has neither translateLocally nor bergamot-translator, so
+# hook 0210-prestium-translate builds it in the chroot (CPU only, x86-64 with SSE4.1, no BLAS library: Ruy for
+# float GEMM, intgemm for the int8 models). The project publishes no signed source release, and GitHub's
+# tarballs leave out its git submodules, so fetch-thirdparty.sh clones BERGAMOT_COMMIT with only the
+# submodules the CPU build needs (BERGAMOT_MODULES, each at the commit the parent records), exports each with
+# "git archive" (appended with tar -A, in this order) and checks the tar against BERGAMOT_TAR_SHA256. No
+# signature exists, so the pinned commit and this SHA-256 are the trust anchor (as for irc-framework).
+# To update: set the commit, set BERGAMOT_TAR_SHA256 to "", run scripts/fetch-thirdparty.sh --repin.
+BERGAMOT_COMMIT=9271618ebbdc5d21ac4dc4df9e72beb7ce644774      # main, 2024-05-12
+BERGAMOT_MODULES=". 3rd_party/marian-dev 3rd_party/ssplit-cpp 3rd_party/marian-dev/src/3rd_party/sentencepiece 3rd_party/marian-dev/src/3rd_party/intgemm 3rd_party/marian-dev/src/3rd_party/ruy 3rd_party/marian-dev/src/3rd_party/ruy/third_party/cpuinfo"
+BERGAMOT_TAR_SHA256=adf861f4a569848abe60216cf05e68658d4462b5a1b9b2fe39a91b5c95a04764
+# Models: Mozilla's Firefox Translations models (MPL-2.0), English->Russian and Russian->English, version 2.1 of
+# each (int8 "base-memory" models with a shortlist: model.<pair>.intgemm.alphas.bin 31.6 MB, lex.50.50.<pair>.s2t.bin
+# 2.8/4.4 MB, vocab.<pair>.spm 0.9 MB). Firefox gets them from Mozilla's Remote Settings collection
+# main/translations-models, whose records (file name, size, SHA-256) carry Mozilla's content signature:
+# scripts/translate-models.py checks that signature (chain to the pinned AMO root in thirdparty/keys/
+# mozilla-amo-root.pem), takes each file's size and SHA-256 from its signed record, downloads it, and
+# fetch-thirdparty.sh then compares each SHA-256 with the pin below. To update: set the version, set its three
+# SHA-256 values to "", run --repin (it prints what Mozilla's signed records name).
+TR_ENRU_VERSION=2.1
+TR_ENRU_MODEL_SHA256=184cb5cda528eeefc0f75f5d0035d787b71d74af135e3c5608d01ae02ecfb920
+TR_ENRU_LEX_SHA256=4d91839726b960e70b6d05c53d0cffd16262832b1c0e1ea99d66f412dcc6a239
+TR_ENRU_VOCAB_SHA256=56ee63e14e8cb926c394242adc3ed7cc602644c3d33058cff2ce2959d52a6258
+TR_RUEN_VERSION=2.1
+TR_RUEN_MODEL_SHA256=aa0efa194b3dbd2da129ba0b8db8ef139126cb0914e57072f62061294746f1e2
+TR_RUEN_LEX_SHA256=c944e753f298bbdf6506388de7257fb48cbd12c83e2807e2c284fc323771895b
+TR_RUEN_VOCAB_SHA256=de8af5f87e231ee4016cec4bb482e6b584cb1ca34dcb624fc7b8398f25bb35df

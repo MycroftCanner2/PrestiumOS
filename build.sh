@@ -161,6 +161,7 @@ for f in live-image-amd64.packages chroot.packages.live; do [ -s "$f" ] && { cp 
 	echo "firefox_local: $FF_VERSION sha256 $FF_SHA256"
 	echo "nodejs: $NODE_VERSION sha256 $NODE_SHA256"
 	echo "thelounge: $THELOUNGE_VERSION"
+	echo "translate: bergamot-translator $BERGAMOT_COMMIT, models en-ru $TR_ENRU_VERSION ru-en $TR_RUEN_VERSION (Mozilla, signed Remote Settings records; pinned in thirdparty/versions.sh)"
 	echo "feather: $(cat "$TP/feather.version" 2>/dev/null || echo unknown) sha256 $(sha256sum "$TP/feather.zip" 2>/dev/null | cut -c1-64)"
 	echo "apt (installed at build time, signed repositories): tor $(chroot chroot dpkg-query -W -f '${Version}' tor 2>/dev/null), i2pd $(chroot chroot dpkg-query -W -f '${Version}' i2pd 2>/dev/null), librewolf $(chroot chroot dpkg-query -W -f '${Version}' librewolf 2>/dev/null)"
 } > "$MAN"
