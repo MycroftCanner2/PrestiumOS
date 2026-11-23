@@ -76,6 +76,16 @@ echo 'LANG=en_US.UTF-8' > /etc/default/locale
 echo 'Etc/UTC' > /etc/timezone; ln -sfn /usr/share/zoneinfo/Etc/UTC /etc/localtime
 
 echo prestium > /etc/hostname
+# security review F-03: the hostname never goes out in DHCP. NetworkManager uses its own client
+# with dhcp-send-hostname=false (conf.d/45-prestium-dhcp.conf); dhclient (isc-dhcp-client, installed
+# for nothing that runs) would send it through dhclient.conf's "send host-name", so that line goes too.
+if [ -f /etc/dhcp/dhclient.conf ]; then
+	sed -i 's/^\([[:space:]]*send[[:space:]]\+host-name\)/#prestium F-03: \1/' /etc/dhcp/dhclient.conf
+	grep -qE '^[[:space:]]*send[[:space:]]+(host-name|fqdn)' /etc/dhcp/dhclient.conf && { echo "E: dhclient.conf still sends the hostname"; exit 1; }
+fi
+grep -qx 'ipv4.dhcp-send-hostname=false' /etc/NetworkManager/conf.d/45-prestium-dhcp.conf \
+	&& grep -qx 'ipv6.dhcp-send-hostname=false' /etc/NetworkManager/conf.d/45-prestium-dhcp.conf \
+	|| { echo "E: NetworkManager would send the hostname over DHCP"; exit 1; }
 
 ## Tor: torrc drop-in directory for the Tor Connection Assistant
 install -d -m 755 /etc/tor/torrc.d

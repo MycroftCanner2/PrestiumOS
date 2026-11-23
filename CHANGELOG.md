@@ -59,6 +59,18 @@ run it is in the README's quick_qubes section.
   covers the firmware-free package set, the archive areas, the output name and hook 9980.
 - New `tests/test_quick_qubes.sh`. `test_vm_check.sh`, `test_mac_spoof_udev.sh`,
   `test_mac_guard_policy.py` and `test_mac_guard_dbus.py` are updated for the changes above.
+## Unreleased: fixes from the November 2026 security review
+
+Each entry names the review finding (F-xx) it fixes.
+
+- **F-03: DHCP no longer sends the hostname.** NetworkManager sent `prestium` to every DHCP server
+  (DHCPv4 option 12/FQDN, DHCPv6), naming Prestium on the local network. The new global defaults in
+  `NetworkManager/conf.d/45-prestium-dhcp.conf` set `ipv4.dhcp-send-hostname=false` and
+  `ipv6.dhcp-send-hostname=false`, pin NetworkManager's internal DHCP client, and derive the client
+  identifiers from the (random, per-boot) MAC address only (`dhcp-client-id=mac`, `dhcp-iaid=mac`,
+  `dhcp-duid=ll`). Hook 0400 also comments out `send host-name` in dhclient.conf and fails the build if
+  either setting is missing. Test: `tests/test_nm_dhcp_privacy.sh` (also checks NetworkManager's own
+  merged configuration when it is installed).
 
 ## 2.1: changes since Prestium 2.0
 
