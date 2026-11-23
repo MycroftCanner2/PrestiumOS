@@ -73,4 +73,8 @@
   # the session bus: no confined app gets it (nothing allows the socket file,
   # so this only documents the boundary and survives future abstraction edits)
   deny @{run}/user/[0-9]*/bus rw,
+  # security review F-01: the only session bus an application gets is app-confine's filtered proxy
+  # (own names, notifications, the tray); the 6.12 kernel does not mediate connect() by path, so the
+  # real boundary is that no other bus socket is in the application's mount namespace
+  owner @{run}/user/[0-9]*/prestium-bus rw,
   deny @{run}/user/[0-9]*/prestium-sandbox/** rw,

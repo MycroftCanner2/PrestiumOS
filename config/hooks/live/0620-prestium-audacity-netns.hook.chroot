@@ -25,8 +25,9 @@ fi
 cat > "$B" <<'SHIM'
 #!/bin/sh
 # Prestium (hook 0620): Audacity runs only in its own network namespace. The real program is
-# /usr/libexec/prestium-audacity; this starts it through /usr/local/bin/prestium-audacity.
-exec /usr/local/bin/prestium-audacity "$@"
+# /usr/libexec/prestium-audacity; this starts it through /usr/local/bin/prestium-audacity, in
+# app-confine (security review F-01, F-05: no session or system bus, no Wayland broker, its own /tmp).
+exec /usr/local/lib/prestium/app-confine audacity "$@"
 SHIM
 chown root:root "$B"
 chmod 0755 "$B"
@@ -38,5 +39,5 @@ if ldd "$REAL" | grep -q 'not found'; then echo "E: $REAL: libraries not found:"
 grep '^Exec=' "$D" | grep -qvE '^Exec=(env GDK_BACKEND=x11 )?(/usr/bin/)?audacity( %[fFuU])?$' \
 	&& { echo "E: $D starts Audacity another way: update hook 0620"; grep '^Exec=' "$D"; exit 1; }
 grep -rlsF "$REAL" /usr/share/applications /etc/xdg 2>/dev/null && { echo "E: a menu entry starts $REAL directly"; exit 1; }
-grep -q 'prestium-audacity' "$B" || { echo "E: $B is not the shim"; exit 1; }
+grep -q '^exec /usr/local/lib/prestium/app-confine audacity "\$@"$' "$B" || { echo "E: $B is not the shim"; exit 1; }
 echo "P: Audacity starts in its own network namespace"

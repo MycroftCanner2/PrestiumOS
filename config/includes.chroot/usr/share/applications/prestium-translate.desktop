@@ -2,7 +2,7 @@
 Type=Application
 Name=Prestium Translate
 Comment=Translate between English and Russian, and rewrite text in a plainer style, offline
-Exec=/usr/local/bin/prestium-translate
+Exec=/usr/local/lib/prestium/app-confine prestium-translate
 Icon=accessories-dictionary
 Terminal=false
 StartupNotify=true

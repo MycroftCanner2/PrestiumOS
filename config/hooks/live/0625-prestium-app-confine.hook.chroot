@@ -1,0 +1,131 @@
+#!/bin/sh
+# Prestium (security review F-01, F-05): every way the image starts a confined desktop application
+# goes through /usr/local/lib/prestium/app-confine (no session or system bus but a filtered one, no
+# Wayland broker, its own /tmp and /dev/shm; see its header).
+#  - /usr/local/bin/NAME: a shim for each program of app-confine's table in /usr/bin (PATH has
+#    /usr/local/bin first: the menu's "prestium-run NAME", the panel, terminals, desktop files that
+#    say "Exec=NAME"). The programs in /usr/local/bin themselves (feather, prestium-gajim-keys,
+#    prestium-translate) are sent there by prestium-run and their desktop files.
+#  - desktop files (/usr/share/applications, /etc/xdg/autostart) and D-Bus activation files
+#    (/usr/share/dbus-1/services) that start a program by its real path: an override with the same
+#    name in /usr/local/share/applications or /usr/local/share/dbus-1/services (searched first), whose
+#    Exec runs the shim; autostart files are changed in place.
+# The build stops if anything is left that would start one of these programs directly, if a D-Bus
+# service would start one through systemd (SystemdService=), or if a systemd user unit runs one.
+set -e
+AC=/usr/local/lib/prestium/app-confine
+[ -x "$AC" ] || { echo "E: $AC is missing"; exit 1; }
+[ -x /usr/bin/xdg-dbus-proxy ] || { echo "E: xdg-dbus-proxy is missing (app-confine's D-Bus filter)"; exit 1; }
+/usr/bin/python3 -I - <<'PY'
+import os, re, subprocess, sys
+AC = "/usr/local/lib/prestium/app-confine"
+table = [l.split() for l in subprocess.run([AC, "--list"], check=True, capture_output=True, text=True).stdout.splitlines()]
+progs = {n: p for n, p in table}
+err = []
+
+def launcher(n):
+    p = progs[n]
+    return ("/usr/local/bin/" + n) if p.startswith("/usr/bin/") else (AC + " " + n)
+
+SHIM = '#!/bin/sh\n# Prestium (hook 0625, security review F-01): %s runs through app-confine.\nexec %s %s "$@"\n'
+for n, p in sorted(progs.items()):
+    if not p.startswith("/usr/bin/"):
+        if not os.path.exists(p):
+            err.append("%s is missing" % p)
+        continue
+    if not os.path.exists(p):
+        print("I: %s is not installed, no shim" % p)
+        continue
+    s = "/usr/local/bin/" + n
+    if os.path.lexists(s) and "app-confine" not in open(s, errors="replace").read():
+        err.append("%s exists and is not app-confine's shim" % s)
+        continue
+    with open(s, "w") as f:
+        f.write(SHIM % (n, AC, n))
+    os.chmod(s, 0o755)
+
+def match(cmd):
+    """the table name a command starts (after env and VAR=value words), or None"""
+    w = cmd.split()
+    while w and (w[0] in ("env", "/usr/bin/env") or re.match(r"^[A-Za-z_][A-Za-z0-9_]*=", w[0])):
+        w = w[1:]
+    if not w:
+        return None, None
+    for n, p in progs.items():
+        if w[0] in (n, p):
+            return n, w[0]
+    return None, None
+
+def rewrite(text, key):
+    out, changed = [], False
+    for line in text.splitlines(keepends=True):
+        m = re.match(r"^(%s=)(.*?)(\r?\n?)$" % key, line)
+        if m:
+            n, tok = match(m.group(2))
+            if n and not m.group(2).lstrip().startswith(launcher(n)):
+                line = m.group(1) + m.group(2).replace(tok, launcher(n), 1) + m.group(3)
+                changed = True
+        out.append(line)
+    return "".join(out), changed
+
+def process(src_dir, dst_dir, key, suffix, check_systemd=False):
+    if not os.path.isdir(src_dir):
+        return
+    for root, _, files in os.walk(src_dir):
+        for f in files:
+            if not f.endswith(suffix):
+                continue
+            rel = os.path.relpath(os.path.join(root, f), src_dir)
+            dst = os.path.join(dst_dir, rel) if dst_dir else os.path.join(src_dir, rel)
+            src = dst if (dst_dir and os.path.exists(dst)) else os.path.join(src_dir, rel)
+            text = open(src, errors="replace").read()
+            new, changed = rewrite(text, key)
+            if check_systemd and changed and re.search(r"^SystemdService=", text, re.M):
+                err.append("%s starts an app-confine program through systemd (SystemdService=)" % src)
+            if changed:
+                os.makedirs(os.path.dirname(dst), exist_ok=True)
+                with open(dst, "w") as fh:
+                    fh.write(new)
+                os.chmod(dst, 0o644)
+                print("I: %s -> %s" % (src, dst))
+
+process("/usr/share/applications", "/usr/local/share/applications", "Exec", ".desktop")
+process("/usr/local/share/applications", None, "Exec", ".desktop")
+process("/etc/xdg/autostart", None, "Exec", ".desktop")
+process("/usr/share/dbus-1/services", "/usr/local/share/dbus-1/services", "Exec", ".service", check_systemd=True)
+process("/usr/local/share/dbus-1/services", None, "Exec", ".service", check_systemd=True)
+
+# verify: what the desktop and D-Bus actually use (an override in /usr/local hides /usr's file)
+def effective(dirs, suffix):
+    seen = {}
+    for d in dirs:
+        for root, _, files in os.walk(d) if os.path.isdir(d) else []:
+            for f in files:
+                if f.endswith(suffix):
+                    seen.setdefault(os.path.relpath(os.path.join(root, f), d), os.path.join(root, f))
+    return seen.values()
+
+for path in list(effective(["/usr/local/share/applications", "/usr/share/applications"], ".desktop")) + \
+        list(effective(["/etc/xdg/autostart"], ".desktop")) + \
+        list(effective(["/usr/local/share/dbus-1/services", "/usr/share/dbus-1/services"], ".service")):
+    for line in open(path, errors="replace"):
+        if line.startswith("Exec="):
+            n, _ = match(line[5:])
+            if n and not line[5:].lstrip().startswith(launcher(n)):
+                err.append("%s starts %s directly: %s" % (path, n, line.strip()))
+for d in ("/usr/lib/systemd/user", "/etc/systemd/user"):
+    for root, _, files in os.walk(d) if os.path.isdir(d) else []:
+        for f in files:
+            p = os.path.join(root, f)
+            if os.path.isfile(p):
+                for line in open(p, errors="replace"):
+                    if re.match(r"^Exec(Start|StartPre|StartPost|Reload)=", line):
+                        n, _ = match(line.split("=", 1)[1].lstrip("-@:+!"))
+                        if n:
+                            err.append("systemd user unit %s runs %s directly" % (p, n))
+if err:
+    for e in err:
+        print("E: " + e)
+    sys.exit(1)
+print("P: %d programs start through app-confine" % len(progs))
+PY

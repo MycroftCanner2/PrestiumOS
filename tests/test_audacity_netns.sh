@@ -61,7 +61,7 @@ echo "== hook 0620 (divert, shim)"
 grep -qF 'dpkg-divert --quiet --local --rename --divert "$REAL" --add "$B"' "$HK" && grep -qx 'B=/usr/bin/audacity' "$HK" && grep -qx "REAL=$REAL" "$HK" \
   && ok "hook: diverts /usr/bin/audacity to $REAL" || bad "hook: no divert"
 grep -qF 'if ! dpkg-divert --list "$B" | grep -q "$REAL"; then' "$HK" && ok "hook: diverts once (safe to run again)" || bad "hook: divert not guarded"
-grep -qx 'exec /usr/local/bin/prestium-audacity "$@"' "$HK" && ok "hook: shim runs the wrapper with \"\$@\"" || bad "hook: shim"
+grep -qx 'exec /usr/local/lib/prestium/app-confine audacity "$@"' "$HK" && ok "hook: shim runs the wrapper in app-confine with \"\$@\" (F-01)" || bad "hook: shim"
 grep -q 'chmod 0755 "$B"' "$HK" && grep -q 'chown root:root "$B"' "$HK" && ok "hook: shim root:root 0755" || bad "hook: shim mode"
 grep -q 'ldd "$REAL"' "$HK" && ok "hook: checks the real program's libraries resolve from /usr/libexec" || bad "hook: no ldd check"
 grep -q 'NS=/usr/local/lib/prestium/audacity-ns' "$HK" && grep -q '\[ -x "$NS" \]' "$HK" && ok "hook: requires the helper" || bad "hook: no helper check"
@@ -69,6 +69,8 @@ grep -q 'NS=/usr/local/lib/prestium/audacity-ns' "$HK" && grep -q '\[ -x "$NS" \
 F=$T/hook; mkdir -p "$F/bin" "$F/usr/bin" "$F/usr/libexec" "$F/usr/local/bin" "$F/usr/local/lib/prestium" "$F/apps" "$F/xdg"
 cp /usr/bin/true "$F/usr/bin/audacity"; printf '#!/bin/sh\necho wrapper "$@"\n' > "$F/usr/local/bin/prestium-audacity"; chmod 0755 "$F/usr/local/bin/prestium-audacity"
 printf '#!/bin/sh\nexit 0\n' > "$F/usr/local/lib/prestium/audacity-ns"; chmod 0755 "$F/usr/local/lib/prestium/audacity-ns"
+# app-confine stand-in (F-01): the shim must name "audacity", then pass the arguments to the wrapper
+printf '#!/bin/sh\n[ "$1" = audacity ] || exit 9\nshift\nexec %s "$@"\n' "$F/usr/local/bin/prestium-audacity" > "$F/usr/local/lib/prestium/app-confine"; chmod 0755 "$F/usr/local/lib/prestium/app-confine"
 printf '[Desktop Entry]\nName=Audacity\nExec=env GDK_BACKEND=x11 audacity %%F\n' > "$F/apps/audacity.desktop"
 cat > "$F/bin/dpkg-divert" <<'FAKE'
 #!/bin/bash
@@ -84,6 +86,7 @@ FAKE
 chmod 0755 "$F/bin/dpkg-divert"
 sed -e "s|/usr/bin/audacity|$F/usr/bin/audacity|g; s|/usr/libexec/prestium-audacity|$F/usr/libexec/prestium-audacity|g" \
     -e "s|/usr/local/bin/prestium-audacity|$F/usr/local/bin/prestium-audacity|g; s|/usr/local/lib/prestium/audacity-ns|$F/usr/local/lib/prestium/audacity-ns|g" \
+    -e "s|/usr/local/lib/prestium/app-confine|$F/usr/local/lib/prestium/app-confine|g" \
     -e "s|/usr/share/applications/audacity.desktop|$F/apps/audacity.desktop|" \
     -e "s|/usr/share/applications /etc/xdg|$F/apps $F/xdg|; s|chown root:root|: |" "$HK" > "$F/hook.sh"
 h1=$(PATH=$F/bin:$PATH sh "$F/hook.sh" 2>&1); r1=$?; h2=$(PATH=$F/bin:$PATH sh "$F/hook.sh" 2>&1); r2=$?
@@ -112,7 +115,7 @@ grep -qx "  $REAL mrix," "$PF" && ok "profile: Audacity may start its plug-in ho
 grep -vE '^\s*(#|profile )' "$PF" | grep -F "$REAL" | grep -qvx "  $REAL mrix," && bad "profile: another rule for $REAL" || ok "profile: one rule for $REAL"
 grep -vE '^\s*#' "$PF" | grep -qE '\s(Ux|ux|Ix|Pux|pux|Cux|cux)\b|\s[a-z]*U[a-z]*x,' && bad "profile: unconfined exec" || ok "profile: no unconfined exec"
 grep -q '<action name="Execute" command="prestium-run audacity" />' "$I/etc/xdg/labwc/menu.xml" && ok "menu: prestium-run audacity (restricted Wayland socket, then the shim)" || bad "menu entry"
-o=$(grep -rlF "$REAL" "$I" "$R/config/hooks" | grep -vE "usr/local/bin/prestium-audacity$|usr/local/lib/prestium/audacity-ns$|etc/apparmor.d/usr.bin.audacity$|0620-prestium-audacity-netns.hook.chroot$")
+o=$(grep -rlF "$REAL" "$I" "$R/config/hooks" | grep -vE "usr/local/bin/prestium-audacity$|usr/local/lib/prestium/audacity-ns$|usr/local/lib/prestium/app-confine$|etc/apparmor.d/usr.bin.audacity$|0620-prestium-audacity-netns.hook.chroot$")
 [ -z "$o" ] && ok "nothing else starts $REAL directly" || bad "other references to $REAL: $o"
 
 echo "== the wrapper with stand-ins (fail closed)"

@@ -98,4 +98,6 @@ if [ ! -e "$rc" ] && [ ! -L "$rc" ]; then
   [ $r = 2 ] && exit 0                              # cancelled: no account, Mail not started
 fi
 harden
-exec /usr/bin/claws-mail "$@"
+# security review F-01, F-05: in app-confine (no session or system bus but a filtered one, no Wayland
+# broker, its own /tmp and /dev/shm; the user's gnupg/ for ~/.gnupg's agent)
+exec /usr/local/lib/prestium/app-confine claws-mail "$@"

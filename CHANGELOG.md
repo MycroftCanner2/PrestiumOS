@@ -40,6 +40,37 @@ Each entry names the review finding (F-xx) it fixes.
   `config/archives` or a Prestium key lands in `trusted.gpg.d`. The final image's sources were already
   scoped (`/usr/share/keyrings`). Test: `tests/test_apt_keyrings.sh` (also pins both fingerprints).
 
+- **F-01: confined applications no longer reach the session bus, the system bus or the Wayland
+  broker.** On the 6.12 kernel AppArmor does not mediate `connect()` on a Unix socket path and enforces
+  no D-Bus rules, so the `deny` rules for `/run/user/*/bus`, the system bus and
+  `/run/prestium-wl/broker` did not stop a confined application from, for example, asking
+  `systemd --user` (StartTransientUnit) to run any program outside every profile. The new
+  `/usr/local/lib/prestium/app-confine` starts Gajim, the Gajim keys tool, Claws Mail, Kleopatra,
+  KeePassXC, LibreOffice, OnionShare, Feather, FeatherPad, Evince, VLC, File Roller, Loupe, Metadata
+  Cleaner, mat2, Prestium Translate and Audacity in a user and mount namespace of their own (no
+  bubblewrap and no `no_new_privs`, so every AppArmor profile and its Px/Cx transitions, such as
+  gpg and pinentry, work as before; the same user and group ids; no capabilities). In it:
+  `/run/user/<uid>` is the application group's own runtime directory with only PulseAudio's and
+  PipeWire's sockets and dconf's cache bound in (and the real `gnupg/` for Kleopatra and Claws Mail;
+  Gajim's is private: F-02); `/run/dbus` and `/run/prestium-wl` are empty except the restricted Wayland
+  socket; the session bus is either absent (Gajim keys tool, mat2, Translate, Audacity, onionshare-cli)
+  or an `xdg-dbus-proxy --filter` that lets the application own its own names and talk to
+  notifications and the panel's tray, nothing else (no systemd, portals, dconf writes or other
+  applications). Every way to start one goes through it: `/usr/local/bin` shims (hook 0625) first in
+  PATH, `prestium-run` for the programs that live in `/usr/local/bin`, `claws-mail-i2p`, the Audacity
+  shim (hook 0620), and overrides of desktop files and D-Bus activation files that name a real path;
+  the build stops if anything is left that starts one directly. A second Audacity start still joins
+  the first (audacity-ns now also hands over and checks the mount namespace). Tests:
+  `tests/test_app_confine.py` (table vs. profiles, launch paths, and a functional run in a real
+  namespace with a private bus, fake system bus and broker), `tests/test_app_confine_hook.sh`,
+  `tests/test_audacity_netns.sh`. Needs a live-boot check of every application (see the review page).
+- **F-05: a private `/tmp` and `/dev/shm` for each confined application.** app-confine gives each
+  application group its own `/tmp` (`/tmp/.prestium-confine-<uid>/<group>`, shared by its own
+  instances for single-instance sockets, with Xwayland's `/tmp/.X11-unix` bound in read-only) and a new
+  `/dev/shm` for each start, so the profiles' `owner /tmp/** rwk` and `owner /dev/shm/** rwk` rules
+  no longer reach other applications' files (the Gajim keys tool's keyring copies, LibreOffice and
+  KeePassXC sockets, Feather's temporary files).
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build
