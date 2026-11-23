@@ -82,6 +82,12 @@ Each entry names the review finding (F-xx) it fixes.
   longer re-run themselves through sudo. Tests: `tests/test_broker_confirm_f07.py`, updated
   `test_set_clock.sh` and `test_i2p_reseed.py`.
 
+- **The screen lock asks for its password at the start of the session (security review F-10).**
+  Without a session password the idle lock and the lock before suspend could only show a
+  notification, so a laptop left alone or closed came back unlocked. The broker now opens the
+  password dialog once when the session starts; *Not now* skips it (Lock Screen… or Super+L asks
+  again, and the automatic locks keep notifying). Test: `tests/test_session_lock.sh`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build

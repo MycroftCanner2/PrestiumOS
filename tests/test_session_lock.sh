@@ -36,6 +36,23 @@ rm -f "$T/notified"; PATH=$T/bin:$PATH sh "$T/ls"; [ -e "$T/dialog" ] && [ ! -e 
 grep -q 'dpkg-statoverride --update --add root root 0755 /usr/bin/passwd' "$R/config/hooks/live/0500-prestium-permissions.hook.chroot" \
   && grep -q 'still setuid' "$R/config/hooks/live/0500-prestium-permissions.hook.chroot" && ok "hook 0500: passwd not setuid, checked" || bad "passwd setuid"
 grep -q 'deny /{,usr/}{,s}bin/{passwd,gpasswd,chsh,chfn,chage,expiry,newgrp,sg} mrwx,' "$I/etc/apparmor.d/abstractions/prestium-no-admin" && ok "no-admin: denies passwd" || bad "no-admin passwd"
+# security review F-10: the first session start asks for the password (skippable), so idle and suspend lock
+python3 - "$B" <<'PY' && ok "F-10: panel start asks for a password once per session, skippable (Not now)" || bad "F-10 first-login prompt"
+import sys, threading, runpy
+g = runpy.run_path(sys.argv[1], run_name="prestium_wl_broker_f10")
+S = g["Session"]; asked = []
+s = object.__new__(S); s.kids = {}
+S.running = lambda self, k: k in self.kids
+S.spawn = lambda self, argv, key=None, **k: self.kids.__setitem__(key, 1)
+S.swaybg_argv = lambda self: ["swaybg"]
+S.set_password = lambda self, first=False: asked.append(first)
+for _ in range(2):
+    s.panel()
+    for t in threading.enumerate():
+        if t is not threading.current_thread(): t.join(5)
+src = open(sys.argv[1]).read()
+sys.exit(0 if asked == [True] and '"Not now" if first else "Cancel"' in src and "PW_FIRST_TEXT if first else PW_TEXT" in src else 1)
+PY
 P=$I/etc/pam.d/swaylock
 grep -qE '^auth\s+optional\s+pam_faildelay\.so delay=4000000$' "$P" && ok "pam: 4 s per wrong password" || bad "pam faildelay"
 grep -qE '^auth\s+include\s+login$' "$P" && ok "pam: then the login stack" || bad "pam include login"

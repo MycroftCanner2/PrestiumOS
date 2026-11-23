@@ -66,6 +66,10 @@ SWAYLOCK_CONF = "/usr/share/prestium/swaylock.conf"
 SESSION_PASSWORD = "/usr/local/sbin/prestium-session-password"
 PW_TEXT = ("Set a password to lock the screen.\nYou'll need it to unlock the screen.\n"
            "Use at least 8 characters; a few unrelated words are best.\nIt lasts until you shut down.")
+# security review F-10: asked once at the start of each session, so idle and suspend can lock the screen
+PW_FIRST_TEXT = ("Set a password to lock the screen.\nWithout one, Prestium can't lock the screen when "
+                 "you're away or the computer goes to sleep.\n"
+                 "Use at least 8 characters; a few unrelated words are best.\nIt lasts until you shut down.")
 UID_MIN, UID_MAX = 1000, 60000      # login users (login.defs UID_MIN..UID_MAX)
 I2P_MODE = _test_env("PRESTIUM_WL_I2P_MODE", "/usr/local/sbin/prestium-i2p-mode")
 I2P_SHARE = {"low": "Low", "medium": "Medium", "high": "High"}
@@ -415,9 +419,15 @@ class Session:
                               "lock", "/usr/local/bin/prestium-lock-screen --auto"])):
             if not self.running(key):
                 self.spawn(argv, key=key); started.append(key)
+        # security review F-10: without a session password the idle lock and the lock before suspend can
+        # only notify. Ask once, when the session's panel first starts; "Not now" skips it (Lock Screen
+        # or Super+L asks again).
+        if "swayidle" in started and not getattr(self, "first_pw_asked", False):
+            self.first_pw_asked = True
+            threading.Thread(target=self.set_password, kwargs={"first": True}, daemon=True).start()
         return "ok " + (" ".join(started) or "running")
 
-    def set_password(self):
+    def set_password(self, first=False):
         """2.1 (audit L-2): the first session password is set here, not through sudo: the dialog runs on
         the compositor's full socket (no application can draw over it, type into it or read it) and the
         broker, as root, hands the password to prestium-session-password. Any process of the user could
@@ -430,8 +440,9 @@ class Session:
             if st.stdout.decode(errors="replace").strip() == "set":
                 return "ok already set"
             # 2.1 (UI pass): the button says what it does ("Set password", not zenity's "OK")
-            rc, out = self.dialog(["zenity", "--forms", "--title", "Lock Screen", "--text", PW_TEXT,
-                                   "--ok-label", "Set password", "--cancel-label", "Cancel",
+            rc, out = self.dialog(["zenity", "--forms", "--title", "Lock Screen",
+                                   "--text", PW_FIRST_TEXT if first else PW_TEXT,
+                                   "--ok-label", "Set password", "--cancel-label", "Not now" if first else "Cancel",
                                    "--add-password", "Password", "--add-password", "Confirm password",
                                    "--separator", "\n"], capture=True, timeout=900)
             if rc != 0:
