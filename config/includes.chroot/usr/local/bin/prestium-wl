@@ -1,7 +1,8 @@
 #!/usr/bin/python3 -I
 """Prestium 2.0 r11: ask the Wayland broker (root) for something that needs the compositor's full
 socket: start | panel | menu | lock | set-password | osk | display-settings | scale | wallpaper | screenshot | screenshot-area |
-status | i2p-apply JSON | tor-mode apply|cancel|revert|reconnect. The caller never gets that socket;
+status | i2p-apply JSON | tor-mode apply|cancel|revert|reconnect | set-clock DATE TIME |
+i2p-reseed [--file PATH]. The caller never gets that socket;
 see /usr/local/sbin/prestium-wl-broker."""
 import os, socket, sys
 OK = ("start", "panel", "menu", "lock", "set-password", "osk", "display-settings", "scale", "wallpaper", "screenshot", "screenshot-area", "status")
@@ -19,10 +20,20 @@ elif len(sys.argv) == 3 and sys.argv[1] == "tor-mode" and sys.argv[2] in ("apply
             print("prestium-wl: tor-mode apply needs one JSON line on stdin (at most 120000 bytes)", file=sys.stderr)
             sys.exit(2)
         req += " " + body
+# security review F-07: set-clock YYYY-MM-DD HH:MM[:SS] (UTC) and i2p-reseed [--file PATH]; the
+# broker asks the person at the screen first (no sudo rule for either any more)
+elif len(sys.argv) == 4 and sys.argv[1] == "set-clock" and len(sys.argv[2]) <= 10 and len(sys.argv[3]) <= 8:
+    req = "set-clock %s %s" % (sys.argv[2], sys.argv[3])
+elif len(sys.argv) == 2 and sys.argv[1] == "i2p-reseed":
+    req = "i2p-reseed"
+elif len(sys.argv) == 4 and sys.argv[1] == "i2p-reseed" and sys.argv[2] == "--file" and sys.argv[3].startswith("/") \
+        and "\n" not in sys.argv[3] and len(sys.argv[3]) <= 4000:
+    req = "i2p-reseed --file " + sys.argv[3]
 elif len(sys.argv) == 2 and sys.argv[1] in OK:
     req = sys.argv[1]
 else:
-    print("usage: prestium-wl " + "|".join(OK) + " | i2p-apply JSON | tor-mode apply|cancel|revert|reconnect",
+    print("usage: prestium-wl " + "|".join(OK) + " | i2p-apply JSON | tor-mode apply|cancel|revert|reconnect"
+          " | set-clock YYYY-MM-DD HH:MM[:SS] | i2p-reseed [--file PATH]",
           file=sys.stderr); sys.exit(2)
 s = socket.socket(socket.AF_UNIX)
 try:
@@ -30,7 +41,7 @@ try:
 except OSError as e:
     print("prestium-wl: the Wayland broker is not running (%s)" % e, file=sys.stderr); sys.exit(1)
 s.sendall(req.encode() + b"\n")
-s.settimeout(None if sys.argv[1].startswith("screenshot") or sys.argv[1] in ("set-password", "i2p-apply", "tor-mode") else 60)
+s.settimeout(None if sys.argv[1].startswith("screenshot") or sys.argv[1] in ("set-password", "i2p-apply", "tor-mode", "set-clock", "i2p-reseed") else 60)
 # every line is printed as it comes ("progress ..." lines of tor-mode first); the last one decides
 reply, buf = "", b""
 while True:

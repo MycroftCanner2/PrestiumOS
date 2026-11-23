@@ -1,5 +1,6 @@
 #!/usr/bin/python3
-# prestium-i2p-reseed-gui: menu front end for /usr/local/sbin/prestium-i2p-reseed (run through sudo).
+# prestium-i2p-reseed-gui: menu front end for /usr/local/sbin/prestium-i2p-reseed, which the Wayland
+# broker runs as root after the person at the screen confirms (security review F-07: no sudo rule).
 #   prestium-i2p-reseed-gui           Network > Refresh I2P Reseed (via Tor)
 #   prestium-i2p-reseed-gui --manual  Network > Manual Reseed File (pick a .su3 you downloaded)
 # Shows the helper's progress, then a success or failure dialog.
@@ -12,7 +13,8 @@ import gi
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk, GLib, Pango
 
-HELPER = "/usr/local/sbin/prestium-i2p-reseed"
+HELPER = "/usr/local/sbin/prestium-i2p-reseed"   # run by the broker, never from here
+WL = "/usr/local/bin/prestium-wl"
 MANUAL_URL = "https://reseed2.i2p.net/"
 WIDTH_CHARS = 56
 
@@ -91,13 +93,25 @@ class Progress(Gtk.Window):
 
     def work(self, args):
         try:
-            p = subprocess.Popen(["sudo", "-n", HELPER] + args, stdout=subprocess.PIPE,
+            p = subprocess.Popen([WL, "i2p-reseed"] + args, stdout=subprocess.PIPE,
                                  stderr=subprocess.STDOUT, text=True, errors="replace")
+            rc, last = 1, ""
             for line in p.stdout:
-                line = line.rstrip("\n"); self.lines.append(line)
-                if line.startswith("STEP: "):
-                    GLib.idle_add(self.label.set_text, line[6:])
-            rc = p.wait()
+                line = line.rstrip("\n")
+                if line.startswith("progress "):
+                    line = line[len("progress "):]; self.lines.append(line)
+                    if line.startswith("STEP: "):
+                        GLib.idle_add(self.label.set_text, line[6:])
+                    continue
+                last = line
+            p.wait()
+            m = re.match(r"^(ok|error) rc ([0-9]+)$", last)
+            if m:
+                rc = int(m.group(2))
+            elif last == "error cancelled":
+                rc = 3
+            else:
+                self.lines.append("ERROR: " + (last[len("error "):] if last.startswith("error ") else last or "no answer from the broker"))
         except OSError as e:
             self.lines.append("ERROR: cannot run the reseed helper (%s)" % e); rc = 1
         GLib.idle_add(self.finish, rc)
@@ -120,6 +134,8 @@ def main():
     w = Progress(title, args); w.show_all(); Gtk.main()
     rc, out = w.result, w.lines
     msg = [re.sub(r"^(ERROR|WARN|DONE|OK): ", "", l) for l in out if re.match(r"^(ERROR|WARN|DONE|OK): ", l)][-6:]
+    if rc == 3:   # Cancel in the broker's confirmation dialog: nothing happened
+        return 0
     if rc == 0:
         warn = [l[len("WARN: su3: "):] for l in out if l.startswith("WARN: su3: ")]
         note = ("\n\nNote: " + esc(" ".join(warn))) if warn else ""
