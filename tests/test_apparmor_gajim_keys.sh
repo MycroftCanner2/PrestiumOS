@@ -177,6 +177,11 @@ allow $C $T/public-keys.d/pubring.db rwk
 allow $C $D/ w
 allow $C $D/S.gpg-agent rw
 allow $C $D/S.keyboxd rw
+# F-02: never ~/.gnupg's agent (Kleopatra, Claws Mail), whose sockets are directly in gnupg/
+deny $C /run/user/1000/gnupg/S.gpg-agent rw
+deny $C /run/user/1000/gnupg/S.gpg-agent.extra rw
+deny $C /run/user/1000/gnupg/S.keyboxd rw
+deny $C /run/user/1000/gnupg/S.dirmngr rw
 deny $C $G/ r
 deny $C $G/pubring.kbx r
 deny $C $G/pubring.kbx.lock w

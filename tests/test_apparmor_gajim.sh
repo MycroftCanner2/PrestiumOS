@@ -41,6 +41,27 @@ grep -q 'include <abstractions/prestium-no-admin>' <<<"$child" && ok "child: no 
 grep -qx '    /usr/bin/pinentry\* Px -> prestium_pinentry,' <<<"$child" && ok "pinentry: Px into prestium_pinentry" || no "pinentry not Px"
 grep -Eq '@\{HOME\}/\*\*|^\s*/\*\* ' <<<"$child" && no "child: broad access" || ok "child: no broad home or root access"
 
+# security review F-02: the compiled child profile reaches its own agent (gnupg/d.<hash>/) only,
+# never the ~/.gnupg agent's sockets directly in gnupg/ (Kleopatra's and Claws Mail's keys)
+if command -v apparmor_parser >/dev/null; then
+  AW=$(mktemp -d); cp -r "${AA_SYSTEM_DIR:-/etc/apparmor.d}"/. "$AW"/ 2>/dev/null; cp -r "$A"/. "$AW"/
+  if apparmor_parser -p -b "$AW" "$AW/usr.bin.gajim" > "$AW/.exp" 2>/dev/null; then
+    GD=/run/user/1000/gnupg
+    python3 -B "$T/tests/aa_eval.py" "$AW/.exp" <<EOT && ok "F-02: gpg reaches only its own agent" || no "F-02: gpg agent sockets"
+allow gajim//gpg $GD/ w
+allow gajim//gpg $GD/d.64c8yunxnuqikwbosfpqkxcb/ w
+allow gajim//gpg $GD/d.64c8yunxnuqikwbosfpqkxcb/S.gpg-agent rw
+allow gajim//gpg $GD/d.64c8yunxnuqikwbosfpqkxcb/S.keyboxd rw
+deny gajim//gpg $GD/S.gpg-agent rw
+deny gajim//gpg $GD/S.gpg-agent.extra rw
+deny gajim//gpg $GD/S.gpg-agent.ssh rw
+deny gajim//gpg $GD/S.keyboxd rw
+deny gajim//gpg $GD/S.dirmngr rw
+EOT
+  else no "usr.bin.gajim does not expand"; fi
+  rm -rf "$AW"
+else echo "SKIP apparmor_parser missing (F-02 compiled check)"; fi
+
 # GPGME's engine check, with gpg runnable and with its exec denied (needs python3-gpg and bwrap)
 if python3 -c 'import gpg' 2>/dev/null && command -v bwrap >/dev/null && command -v gpg >/dev/null \
    && bwrap --dev-bind / / true 2>/dev/null; then

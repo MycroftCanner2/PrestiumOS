@@ -105,9 +105,16 @@ profile prestium_gajim_keys /usr/local/bin/prestium-gajim-keys {
     # the temporary copy of Kleopatra's public keyring (gpg, and keyboxd for a keyboxd keyring)
     owner /tmp/prestium-keys-*/ rw,
     owner /tmp/prestium-keys-*/** rwkl,
-    # the agent's sockets: $XDG_RUNTIME_DIR/gnupg/d.<hash>/ for a non-default home directory
+    # the agent's sockets: $XDG_RUNTIME_DIR/gnupg/d.<hash>/ for a non-default home directory, and
+    # only those (security review F-02): never the sockets directly in $XDG_RUNTIME_DIR/gnupg/, which
+    # belong to ~/.gnupg's agent (Kleopatra's and Claws Mail's keys). The 6.12 kernel does not mediate
+    # connect() on a socket path, so these rules are kept for kernels that do; what keeps gpg away
+    # from that agent today is app-confine: Gajim and this tool get their own $XDG_RUNTIME_DIR, where
+    # the ~/.gnupg agent's directory does not exist.
     owner @{run}/user/[0-9]*/gnupg/ rw,
-    owner @{run}/user/[0-9]*/gnupg/** rwk,
+    owner @{run}/user/[0-9]*/gnupg/d.*/ rw,
+    owner @{run}/user/[0-9]*/gnupg/d.*/** rwk,
+    deny @{run}/user/[0-9]*/gnupg/S.* rwk,
     # never Kleopatra's keyring (not even read: the app hands gpg a copy) nor Gajim's settings and messages
     deny @{HOME}/.gnupg/** rwlk,
     deny @{HOME}/.config/gajim/** rw,
