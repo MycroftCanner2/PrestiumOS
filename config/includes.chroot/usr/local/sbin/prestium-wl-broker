@@ -28,6 +28,11 @@ start in turn is restricted again. Requests (one line on /run/prestium-wl/broker
                      confirms in a dialog on the full socket, then the broker runs prestium-tor-mode
                      CMD as root and passes its progress lines back ("progress JSON"), then
                      "ok JSON" or "fail JSON" (2.1, the same gate as i2p-apply)
+  set-clock DATE TIME set the clock by hand (UTC): the person confirms the time in a dialog on the full
+                     socket, then prestium-set-clock runs as root (security review F-07; no sudo rule)
+  i2p-reseed [--file PATH] reseed I2P over Tor, or from a .su3 file read as the user: confirmed the same
+                     way, then prestium-i2p-reseed runs as root; "progress LINE" lines, then "ok rc 0"
+                     or "error rc N" / "error cancelled" (security review F-07; no sudo rule)
   osk                toggle the on-screen keyboard (wvkbd)
   display-settings   output settings (wdisplays)
   scale              apply ~/.config/prestium/scale to every output (wlr-randr)
@@ -73,6 +78,16 @@ TOR_MODE = _test_env("PRESTIUM_WL_TOR_MODE", "/usr/local/sbin/prestium-tor-mode"
 # 127.0.0.1:4444) need AF_INET, which RestrictAddressFamilies takes from the broker. It runs as its own
 # transient service, as it ran under sudo before, with stdin/stdout piped back here. "" (tests): directly.
 TOR_RUNNER = _test_env("PRESTIUM_WL_TOR_RUNNER", "/usr/bin/systemd-run")
+# security review F-07: setting the clock by hand and reseeding I2P are no longer in sudoers either
+# (any unconfined program of the user could set the clock anywhere within the helper's bounds, or
+# reseed i2pd from a file it chose); this broker runs them after the person at the screen confirms.
+# Both run as their own transient service through TOR_RUNNER: this unit has ProtectClock=yes and no
+# AF_INET (the reseed downloads over Tor's SOCKS port).
+SET_CLOCK = _test_env("PRESTIUM_WL_SET_CLOCK", "/usr/local/sbin/prestium-set-clock")
+I2P_RESEED = _test_env("PRESTIUM_WL_I2P_RESEED", "/usr/local/sbin/prestium-i2p-reseed")
+CLOCK_RE = re.compile(r"\A([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}(?::[0-9]{2})?)\Z")
+RESEED_PATH_RE = re.compile(r"\A/[^\x00-\x1f\x7f]{1,4000}\Z")
+RESEED_BUDGET = 900                 # seconds: several reseed servers over Tor, then an i2pd restart
 TOR_STATE_DIR = _test_env("PRESTIUM_WL_TOR_STATE", "/run/prestium")   # tor-mode.json, tor-mode.prev/state
 TOR_TITLES = {"direct": "Direct connection", "snowflake": "Snowflake", "webtunnel": "WebTunnel bridges",
               "obfs4": "obfs4 bridges", "meek": "meek (Azure/CDN)"}
@@ -250,6 +265,7 @@ class Session:
         self.ctx_conn = None; self.close_w = None
         self.kids = {}; self.lock = threading.Lock(); self.pw_busy = threading.Lock()
         self.i2p_busy = threading.Lock(); self.tor_busy = threading.Lock()
+        self.clock_busy = threading.Lock(); self.reseed_busy = threading.Lock()
 
     def alive(self):
         return self.labwc is not None and proc_start(self.labwc) == self.labwc_start
@@ -499,6 +515,114 @@ class Session:
             return "error " + str(st.get("error") or "not applied").replace("\n", " ")[:300]
         finally:
             self.i2p_busy.release()
+
+    def run_root_helper(self, argv, unit, desc, budget, setenv=None, emit=None):
+        """Run a root helper as its own transient service (TOR_RUNNER; "" in tests: directly), pass its
+        output lines to the caller as "progress LINE", return (exit code, last lines)."""
+        if TOR_RUNNER:
+            argv = [TOR_RUNNER, "--quiet", "--pipe", "--wait", "--collect", "--service-type=exec",
+                    "--unit", "%s-%d" % (unit, time.time_ns()), "-p", "Description=" + desc,
+                    "-p", "RuntimeMaxSec=%d" % budget] + \
+                   ["--setenv=%s=%s" % kv for kv in sorted((setenv or {}).items())] + ["--"] + argv
+            env = None
+        else:
+            env = dict(os.environ, **(setenv or {}))
+        try:
+            p = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                 stderr=subprocess.STDOUT, text=True, errors="replace",
+                                 start_new_session=True, env=env)
+        except OSError as e:
+            return 1, ["ERROR: the helper did not start (%s)" % e.__class__.__name__]
+        timer = threading.Timer(budget + 30, p.kill); timer.daemon = True; timer.start()
+        lines = []
+        try:
+            for line in p.stdout:
+                line = printable(line.rstrip("\n"), 500)
+                lines.append(line); del lines[:-40]
+                if emit is not None:
+                    try:
+                        emit("progress " + line)
+                    except OSError:
+                        emit = None
+            rc = p.wait()
+        finally:
+            timer.cancel()
+        return rc, lines
+
+    def set_clock(self, raw, pid=0):
+        """Security review F-07: the clock is set by hand only after the person at the screen confirms
+        the exact UTC time in a dialog on the compositor's full socket (as Tor's and I2P's settings).
+        Before, any unconfined program of the user could run "sudo prestium-set-clock" and move the clock
+        (which decides whether Tor's consensus, TLS certificates and publisher keys look valid). The
+        helper still checks the bounds (not before the build date, at most 10 years after it)."""
+        m = CLOCK_RE.match(raw)
+        if not m:
+            return "error invalid request (YYYY-MM-DD HH:MM[:SS], UTC)"
+        day, hm = m.group(1), m.group(2)
+        now = time.strftime("%Y-%m-%d %H:%M", time.gmtime())
+        text = ("Set the computer's clock to %s %s UTC?\n\nIt is now %s UTC by this computer's clock.\n\n"
+                "A wrong clock can stop Tor and I2P from connecting and makes this computer stand out. "
+                "A safety notice stays on the desktop until you restart." % (day, hm, now))
+        text += "\n\nAsked for by: " + requester(pid)
+        text += "\n\nIf you didn't just ask to set the clock, choose Cancel."
+        if not self.clock_busy.acquire(blocking=False):
+            return "error a clock dialog is already open"
+        try:
+            rc, _ = self.dialog(["zenity", "--question", "--no-markup", "--width", "460",
+                                 "--title", "Set the Clock", "--icon", "preferences-system-time",
+                                 "--ok-label", "Set clock", "--cancel-label", "Cancel", "--text", text])
+            if rc != 0:
+                log("uid %d: clock change to %s %s UTC cancelled at the dialog" % (self.uid, day, hm))
+                return "error cancelled"
+            rc, lines = self.run_root_helper([SET_CLOCK, day, hm], "prestium-set-clock",
+                                             "Prestium: set the clock (confirmed at the screen)", 60)
+        finally:
+            self.clock_busy.release()
+        if rc == 0:
+            log("uid %d: clock set by hand to %s %s UTC (confirmed at the screen)" % (self.uid, day, hm), crit=True)
+            return "ok " + (lines[-1] if lines else "clock set")
+        log("uid %d: clock not set to %s %s UTC: %s" % (self.uid, day, hm, lines[-1] if lines else rc), crit=True)
+        return "error " + (lines[-1] if lines else "the clock was not set").replace("prestium-set-clock: ", "")[:300]
+
+    def i2p_reseed(self, raw, pid=0, emit=None):
+        """Security review F-07: an I2P reseed (over Tor, or from a file the user picked) only after the
+        person at the screen confirms it. Before, any unconfined program of the user could run
+        "sudo prestium-i2p-reseed --file /any/path" and have i2pd bootstrap from routers it chose (the
+        file mode accepts any signer). The helper reads the file as the user (SUDO_USER), as before."""
+        path = None
+        if raw.startswith("--file "):
+            path = raw[len("--file "):]
+            if not RESEED_PATH_RE.match(path) or "/../" in path + "/":
+                return "error invalid file name"
+        elif raw:
+            return "error invalid request"
+        if path:
+            text = ("Reseed I2P from this file?\n\n%s\n\nThe file decides which I2P routers this computer "
+                    "contacts first. Use only a file you downloaded yourself from a reseed server you trust."
+                    % printable(path, 300))
+        else:
+            text = ("Reseed I2P now?\n\nA fresh list of I2P routers is downloaded over Tor from the "
+                    "reseed servers, checked against their signing certificates, and given to i2pd.")
+        text += "\n\ni2pd restarts, and I2P connections drop for a minute or two."
+        text += "\n\nAsked for by: " + requester(pid)
+        text += "\n\nIf you didn't just choose %s, choose Cancel." % ("Reseed from file" if path else "Refresh I2P Reseed")
+        if not self.reseed_busy.acquire(blocking=False):
+            return "error an I2P reseed is already running"
+        try:
+            rc, _ = self.dialog(["zenity", "--question", "--no-markup", "--width", "460",
+                                 "--title", "I2P Reseed", "--icon", "i2pd",
+                                 "--ok-label", "Reseed", "--cancel-label", "Cancel", "--text", text])
+            if rc != 0:
+                log("uid %d: I2P reseed cancelled at the dialog%s" % (self.uid, " (file)" if path else ""))
+                return "error cancelled"
+            log("uid %d: I2P reseed confirmed%s" % (self.uid, " from a file" if path else " (over Tor)"))
+            rc, lines = self.run_root_helper([I2P_RESEED] + (["--file", path] if path else []),
+                                             "prestium-i2p-reseed", "Prestium: I2P reseed (confirmed at the screen)",
+                                             RESEED_BUDGET, setenv={"SUDO_USER": self.user}, emit=emit)
+        finally:
+            self.reseed_busy.release()
+        log("uid %d: I2P reseed finished, exit %d" % (self.uid, rc), crit=rc != 0)
+        return ("ok rc 0" if rc == 0 else "error rc %d" % rc)
 
     def tor_mode(self, cmd, raw="", pid=0, emit=None):
         """2.1 (review: Tor retarget without confirmation): Tor's connection changes only after the person
@@ -799,6 +923,10 @@ def dispatch(uid, cmd, pid=0, emit=None):
         return s.set_password()
     if cmd.startswith("i2p-apply "):
         return s.i2p_apply(cmd[len("i2p-apply "):], pid)
+    if cmd.startswith("set-clock "):
+        return s.set_clock(cmd[len("set-clock "):], pid)
+    if cmd == "i2p-reseed" or cmd.startswith("i2p-reseed "):
+        return s.i2p_reseed(cmd[len("i2p-reseed "):] if cmd != "i2p-reseed" else "", pid, emit)
     if cmd.startswith("tor-mode "):
         sub, _, raw = cmd[len("tor-mode "):].partition(" ")
         return s.tor_mode(sub, raw, pid, emit)

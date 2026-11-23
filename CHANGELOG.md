@@ -130,6 +130,17 @@ Each entry names the review finding (F-xx) it fixes.
   no longer reach other applications' files (the Gajim keys tool's keyring copies, LibreOffice and
   KeePassXC sockets, Feather's temporary files).
 
+- **Clock and I2P reseed need a confirmation at the screen (security review F-07).** The NOPASSWD
+  sudo rules for `prestium-set-clock` and `prestium-i2p-reseed` are gone: any program of the user
+  could run them silently (move the clock within the build-date bounds, or bootstrap i2pd from a
+  .su3 file it chose). Both now go through the Wayland broker like Tor's and I2P's settings: a dialog
+  on the compositor's full socket (accessibility off) shows the exact time, or the file, and who asked;
+  only after *Set clock* / *Reseed* does the broker run the helper as root in a transient service.
+  `sudo prestium-set-clock` is replaced by `prestium-wl set-clock YYYY-MM-DD HH:MM`; the I2P reseed
+  button works as before, with one extra confirmation. The helpers refuse to run without root and no
+  longer re-run themselves through sudo. Tests: `tests/test_broker_confirm_f07.py`, updated
+  `test_set_clock.sh` and `test_i2p_reseed.py`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build

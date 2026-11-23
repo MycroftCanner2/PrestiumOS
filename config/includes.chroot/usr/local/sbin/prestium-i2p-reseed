@@ -3,7 +3,9 @@
 #   prestium-i2p-reseed               download a fresh .su3 over Tor (StormyCloud first, then the other
 #                                     reseed servers i2pd knows, one after the other, until one passes)
 #   prestium-i2p-reseed --file PATH   use a .su3 the user downloaded (e.g. from https://reseed2.i2p.net/)
-# Runs as root (user may run exactly this script through sudo, /etc/sudoers.d/prestium-i2p-reseed).
+# Runs as root, started by the Wayland broker after the person at the screen confirms the reseed
+# (security review F-07: the sudo rule /etc/sudoers.d/prestium-i2p-reseed is gone; the broker passes
+# the desktop user's name as SUDO_USER, and a --file is read as that user).
 # Every file is checked by /usr/local/lib/prestium/verify-su3 against i2pd's reseed certificates
 # (/usr/share/i2pd/certificates/reseed/): SU3 format, signature, routerInfo entries, age (downloads:
 # at most 14 days old; a manual file older than that only gets a warning). Only then is it installed
@@ -86,8 +88,8 @@ curl_why(){ # a plain-language reason for a curl exit code
 }
 die(){ echo "ERROR: $2"; exit "$1"; }
 
-if [ "$(id -u)" -ne 0 ]; then exec sudo -n /usr/local/sbin/prestium-i2p-reseed "$@"; fi
-# sudo keeps the caller's working directory: never run (Python) code from it as root
+if [ "$(id -u)" -ne 0 ]; then die 1 "run it from the menu (Network > Refresh I2P Reseed), or: prestium-wl i2p-reseed [--file PATH]"; fi
+# never run (Python) code from the caller's working directory as root
 cd / || exit 1
 MODE=download
 case "$#:${1:-}" in
@@ -173,7 +175,10 @@ if [ "$MODE" = download ]; then
 else
   # the path comes from the user: never let root open it. Checks first, then the file is read as the
   # invoking user (so a symlink or a race can only reach what that user may read anyway), size-capped.
-  RU=${SUDO_USER:-root}
+  RU=${SUDO_USER:-}
+  # F-07: the file is never read as root; the broker always names the desktop user
+  case "$RU" in ''|root) die 1 "no desktop user to read the file as" ;; esac
+  getent passwd "$RU" >/dev/null || die 1 "no such user: $RU"
   case "$SRC" in /*) ;; *) die 1 "the file path must be absolute" ;; esac
   case "$SRC" in *$'\n'*) die 1 "bad file name" ;; esac
   [ -L "$SRC" ] && die 1 "$SRC is a symbolic link; choose the file itself"

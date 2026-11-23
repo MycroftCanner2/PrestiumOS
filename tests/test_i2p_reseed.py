@@ -102,7 +102,7 @@ stub("tor-bootstrap", 'echo "${TORPCT:-100}"\n')
 
 s = src
 for a, b in [
-    ('if [ "$(id -u)" -ne 0 ]; then exec sudo', 'if false; then exec sudo'),
+    ('if [ "$(id -u)" -ne 0 ]; then die 1', 'if false; then die 1'),
     ("PATH=/usr/sbin:/usr/bin:/sbin:/bin", "PATH=%s:/usr/sbin:/usr/bin:/sbin:/bin" % B),
     ("/usr/local/lib/prestium/safefile", os.path.join(B, "safefile")),
     ("VERIFY=/usr/local/lib/prestium/verify-su3", "VERIFY=" + os.path.join(B, "verify-su3")),
@@ -177,9 +177,23 @@ runs = [l for l in log.split("\n") if l.startswith("RUN ")]
 check(runs and all("User=prestium-htp" in l and "IPAddressAllow=127.0.0.1" in l and "IPAddressDeny=any" in l
                    for l in runs), "%d units, all as prestium-htp, IPv4 to 127.0.0.1 only" % len(runs))
 
+print("== F-07: a file is read as the desktop user named by the broker, never as root")
+src_f = os.path.join(W, "f.su3"); open(src_f, "w").write("x")
+e = dict(os.environ, LOG=LOG, VAR=VAR, NET="")
+e.pop("SUDO_USER", None)
+p = subprocess.run(["bash", H, "--file", src_f], capture_output=True, text=True, env=e, timeout=60)
+check(p.returncode != 0 and "no desktop user to read the file as" in p.stdout + p.stderr, "no SUDO_USER: refused (rc %d)" % p.returncode)
+p = subprocess.run(["bash", H, "--file", src_f], capture_output=True, text=True, env=dict(e, SUDO_USER="root"), timeout=60)
+check(p.returncode != 0 and "no desktop user" in p.stdout + p.stderr, "SUDO_USER=root: refused")
+check("exec sudo" not in code, "the helper no longer re-runs itself through sudo")
+check(not os.path.exists(os.path.join(I, "etc/sudoers.d/prestium-i2p-reseed")), "no sudoers rule for the helper (F-07)")
+check("/etc/sudoers.d/prestium-i2p-reseed" not in open(os.path.join(I, "usr/share/prestium/build/perms.txt")).read(), "perms.txt: no sudoers entry")
+
 print("== the GUI lists the reasons when every server failed")
 g = open(GUI).read()
 check('l.startswith("FAIL: ")' in g and "StormyCloud and reseed.onion.im" not in g, "rc 2 dialog shows the FAIL lines")
+check('[WL, "i2p-reseed"] + args' in g and '"sudo"' not in g, "F-07: the GUI asks the broker (prestium-wl i2p-reseed), not sudo")
+check("rc == 3" in g and '"error cancelled"' in g, "F-07: Cancel in the broker's dialog ends quietly")
 
 shutil.rmtree(W)
 print("%d failure(s)" % fails)
