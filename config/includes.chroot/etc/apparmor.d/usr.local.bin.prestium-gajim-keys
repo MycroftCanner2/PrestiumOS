@@ -1,0 +1,122 @@
+# Prestium 2.1: Gajim OpenPGP Keys (/usr/local/bin/prestium-gajim-keys), ENFORCED.
+# It reads and writes only Gajim's per-account keyrings (~/.local/share/gajim/openpgp/<JID>/), reads
+# Gajim's settings (to list the accounts) and Kleopatra's keyring (~/.gnupg, to import a key), and writes
+# a backup only as a new "*.gajim-key.asc" file in ~/Documents or on a volume under /media. It has no
+# network: no TCP/UDP, no session or system bus, only unix sockets (Wayland, the gpg-agent of Gajim's
+# keyrings). Its GnuPG runs in the child profile "gpg", which may not touch ~/.gnupg or Gajim's settings
+# at all: to import, the app copies ~/.gnupg's public keyring into a private /tmp/prestium-keys-*/
+# directory for gpg to read, and copies the (still passphrase-protected) secret key files itself. So
+# nothing writes, locks or starts anything in ~/.gnupg (no lock files, no agent, no keyboxd there).
+# A passphrase prompt runs in prestium_pinentry. Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile prestium_gajim_keys /usr/local/bin/prestium-gajim-keys {
+  include <abstractions/prestium-app-common>
+  include <abstractions/prestium-app-secrets>
+  include <abstractions/prestium-user-files>
+  include <abstractions/python>
+  include <abstractions/nameservice-strict>
+
+  network unix stream,
+  deny network inet,
+  deny network inet6,
+  deny network netlink,
+
+  /usr/local/bin/prestium-gajim-keys r,
+  /usr/bin/python3* ix,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.*/** mr,
+  /usr/local/lib/prestium-keys/ r,
+  /usr/local/lib/prestium-keys/*.py r,
+  # "is Gajim running?": the command lines of the user's own processes, nothing else of them
+  @{PROC}/ r,
+  owner @{PROC}/[0-9]*/cmdline r,
+
+  # Gajim's accounts: settings.sqlite is read into memory (no sqlite lock or journal next to it)
+  owner @{HOME}/.config/gajim/settings.sqlite r,
+  deny @{HOME}/.config/gajim/** w,
+  # Gajim's keyrings: create an account's folder, copy secret key files in, read them (passphrase or not)
+  owner @{HOME}/.local/ rw,
+  owner @{HOME}/.local/share/gajim/ rw,
+  owner @{HOME}/.local/share/gajim/openpgp/ rw,
+  owner @{HOME}/.local/share/gajim/openpgp/*/ rw,
+  owner @{HOME}/.local/share/gajim/openpgp/*/** rwk,
+  # never GnuPG's configuration files there (they can name helper programs), as in usr.bin.gajim
+  deny @{HOME}/.local/share/gajim/openpgp/*/*.conf{,.*} wl,
+  deny @{HOME}/.local/share/gajim/openpgp/*/common.conf wl,
+  # nor the plugin's own trust database, nor Gajim's messages
+  deny @{HOME}/.local/share/gajim/openpgp/*/contacts.db* rw,
+  deny @{HOME}/.local/share/gajim/*.db* rw,
+
+  # Kleopatra's keyring, read-only, and only what an import copies: the public keyring (pubring.kbx, or
+  # keyboxd's database when common.conf says use-keyboxd) and the secret key files
+  owner @{HOME}/.gnupg/ r,
+  owner @{HOME}/.gnupg/common.conf r,
+  owner @{HOME}/.gnupg/pubring.kbx r,
+  owner @{HOME}/.gnupg/pubring.gpg r,
+  owner @{HOME}/.gnupg/public-keys.d/ r,
+  owner @{HOME}/.gnupg/public-keys.d/pubring.db r,
+  owner @{HOME}/.gnupg/public-keys.d/pubring.db-wal r,
+  owner @{HOME}/.gnupg/private-keys-v1.d/ r,
+  owner @{HOME}/.gnupg/private-keys-v1.d/[0-9A-F]*.key r,
+  deny @{HOME}/.gnupg/** wl,
+
+  # the private copy gpg reads (also covered by prestium-app-common's /tmp rule; stated for the child)
+  owner /tmp/prestium-keys-*/ rw,
+  owner /tmp/prestium-keys-*/** rw,
+
+  # backups: a new file, only under this name, only in ~/Documents or on a volume (the file chooser
+  # lists the folders through prestium-user-files, which is read-only)
+  owner @{HOME}/Documents/ r,
+  owner @{HOME}/Documents/**.gajim-key.asc w,
+  /media/**.gajim-key.asc w,
+
+  /usr/bin/gpg Cx -> gpg,
+  /usr/bin/gpgconf Cx -> gpg,
+  /usr/bin/gpg-agent Cx -> gpg,
+  /usr/bin/gpg-connect-agent Cx -> gpg,
+  signal (send) set=(term, kill, hup) peer=prestium_gajim_keys//gpg,
+
+  profile gpg {
+    include <abstractions/base>
+    include <abstractions/prestium-no-admin>
+    network unix stream,
+    # gpg runs offline: no dirmngr and no inet/inet6 rule, so no TCP/UDP at all
+    signal (receive) set=(term, kill, hup) peer=prestium_gajim_keys,
+
+    /usr/bin/gpg mr,
+    /usr/bin/gpgconf mrix,
+    /usr/bin/gpg-connect-agent mrix,
+    /usr/bin/gpg-agent mrix,
+    /usr/lib/gnupg/* mrix,
+    /usr/share/gnupg/** r,
+    /etc/gcrypt/** r,
+    /etc/gnupg/** r,
+    @{PROC}/sys/crypto/** r,
+    owner @{PROC}/@{pid}/fd/ r,
+    owner @{PROC}/@{pid}/** r,
+
+    deny @{HOME}/.local/share/gajim/openpgp/*/*.conf{,.*} wl,
+    deny @{HOME}/.local/share/gajim/openpgp/*/common.conf wl,
+    owner @{HOME}/.local/share/gajim/openpgp/*/ rw,
+    owner @{HOME}/.local/share/gajim/openpgp/*/** rwkl,
+    deny @{HOME}/.local/share/gajim/openpgp/*/contacts.db* rw,
+    # the temporary copy of Kleopatra's public keyring (gpg, and keyboxd for a keyboxd keyring)
+    owner /tmp/prestium-keys-*/ rw,
+    owner /tmp/prestium-keys-*/** rwkl,
+    # the agent's sockets: $XDG_RUNTIME_DIR/gnupg/d.<hash>/ for a non-default home directory
+    owner @{run}/user/[0-9]*/gnupg/ rw,
+    owner @{run}/user/[0-9]*/gnupg/** rwk,
+    # never Kleopatra's keyring (not even read: the app hands gpg a copy) nor Gajim's settings and messages
+    deny @{HOME}/.gnupg/** rwlk,
+    deny @{HOME}/.config/gajim/** rw,
+    deny @{HOME}/.local/share/gajim/*.db* rw,
+
+    # the passphrase prompt, in its own profile (prestium.pinentry)
+    /etc/alternatives/pinentry{,-x11} r,
+    /usr/bin/pinentry* Px -> prestium_pinentry,
+  }
+
+  include if exists <local/usr.local.bin.prestium-gajim-keys>
+}

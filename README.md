@@ -38,8 +38,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Browser Updater:** install the latest publisher-signed Tor Browser or I2P Browser for this session,
   over Tor or the I2P outproxy, and reset to the copy on the image.
 - **Enforced AppArmor profiles** for the browsers and their launchers, Claws Mail, Gajim, OnionShare,
-  Feather, LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra, the
-  passphrase prompt, Tor's control-port filter and the programs that open downloaded files (Loupe,
+  Feather, LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra, Gajim
+  OpenPGP Keys, the passphrase prompt, Tor's control-port filter and the programs that open downloaded files (Loupe,
   Evince, VLC, File Roller, FeatherPad, mat2, Metadata Cleaner, Audacity); the helpers those viewers start in
   bubblewrap run in stricter inner profiles. The build fails if another profile could attach to a
   program a Prestium profile confines, and the boot checks the loaded set again. Neither Claws Mail's
@@ -93,6 +93,23 @@ modernization of the 2023 Prestium build, with tighter security and new features
   profiles, with Tor as the global default; choose another per account in Account Settings.
   Its menu entry is plain *Gajim*. OpenPGP (the OpenPGP plugin) keeps one keyring per account under
   `~/.local/share/gajim/openpgp/`, separate from `~/.gnupg`; its gpg runs offline in its own profile.
+- **Gajim OpenPGP Keys** (*Communication* menu, after Gajim): one window for the keys Gajim's OpenPGP
+  plugin uses. Pick an account (read from Gajim's settings, or type your address) to see its key: the
+  fingerprint, user IDs, expiry and a plain status (Ready, Missing xmpp: user ID, Expired, Revoked, Key
+  created in the future, No ownertrust, Multiple secret keys, No key). **Check** lists every test with
+  a fix: clock, folder permissions (700), one secret key, not revoked or expired, the exact
+  `xmpp:<address>` user ID Gajim reads, encryption and signing, ownertrust. **Generate key…** makes
+  a key the way Gajim does (Ed25519/Curve25519, no expiry, user ID `xmpp:<address>`; a passphrase is
+  optional). **Import from Kleopatra…** copies a key from `~/.gnupg` into Gajim's keyring and adds the
+  `xmpp:` user ID to the copy; Kleopatra's keyring is only read (gpg works on a temporary copy, the
+  secret key files are copied as they are, still protected by their passphrase). Each key card can add,
+  revoke or promote user IDs, mark the key as your own, delete it, or **Back up…** to a new
+  `*.gajim-key.asc` file in `~/Documents` or on a USB stick (a key without a passphrase is
+  encrypted with one you choose); **Import backup file…** restores it. Quit Gajim before changing
+  keys: the window warns when it is running. `prestium-gajim-keys --check [name@server]` prints the
+  same report in a terminal. Passphrases are typed only into GnuPG's own prompt. The tool runs under
+  its own enforced AppArmor profile with no network, and can't check that your server has your
+  public key (Gajim's XML console shows the publish).
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
   SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets and its own
@@ -351,7 +368,7 @@ went into it.
 - `Prestium-2.1-amd64.iso.torrent`: the torrent for the 2.1 release (the bare-metal image from `main`).
 - `tests/`: checks for the boot chain (dm-verity, boot menu lock, command line policy, Secure Boot),
   the firewall, sandboxes and AppArmor profiles, the Wayland broker and its dialogs, the MAC guard,
-  the Tor and I2P helpers, The Lounge, the Browser Updater and the desktop's design; `tests/ci.sh`
+  the Tor and I2P helpers, The Lounge, the Browser Updater, Gajim OpenPGP Keys and the desktop's design; `tests/ci.sh`
   runs the ones that don't need a live session.
 
 ## License

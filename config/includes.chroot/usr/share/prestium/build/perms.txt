@@ -546,3 +546,7 @@
 0755 root root /usr/local/sbin/prestium-cmdline-check
 0644 root root /etc/systemd/system/prestium-cmdline-check.service
 0644 root root /usr/lib/python3/dist-packages/libmat2/prestium_filetype.py
+0755 root root /usr/local/bin/prestium-gajim-keys
+0644 root root /usr/local/lib/prestium-keys/gajim_keys.py
+0644 root root /usr/share/applications/prestium-gajim-keys.desktop
+0644 root root /etc/apparmor.d/usr.local.bin.prestium-gajim-keys

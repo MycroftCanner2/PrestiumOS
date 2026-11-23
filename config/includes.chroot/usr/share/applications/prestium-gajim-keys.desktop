@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Gajim OpenPGP Keys
+Comment=See, check, generate, import and back up the OpenPGP keys of your Gajim accounts
+Exec=/usr/local/bin/prestium-gajim-keys
+Icon=dialog-password
+Terminal=false
+StartupNotify=true
+# the window's app_id, so the panel finds this file's name and icon
+StartupWMClass=org.prestium.GajimKeys
+Categories=Network;InstantMessaging;Security;
