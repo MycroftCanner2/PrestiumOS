@@ -1,0 +1,117 @@
+# Prestium 2.1: Prestium Translate (/usr/local/bin/prestium-translate), ENFORCED.
+# No network at all: no TCP/UDP, no netlink, no datagram or seqpacket sockets, no session or system bus;
+# the only socket is Wayland's (the restricted one, prestium-app-common), and the engine is fed through a
+# pipe. It reads nothing of the home folder but the desktop settings prestium-app-common allows, and
+# writes only its settings file (~/.config/prestium-translate/settings.json: mode, direction, strength,
+# two switches; never any text). No temporary files. The engine runs in bubblewrap (child profile
+# "engine"), and the engine program itself, under no_new_privs, in the stacked profile
+# prestium_translate_engine (prestium.translate-engine): read-only models, no network, no home, nothing written.
+# Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile prestium_translate /usr/local/bin/prestium-translate {
+  include <abstractions/prestium-app-common>
+  include <abstractions/prestium-app-secrets>
+  include <abstractions/python>
+  include <abstractions/nameservice-strict>
+
+  network unix stream,
+  deny network inet,
+  deny network inet6,
+  deny network netlink,
+  deny network unix dgram,
+  deny network unix seqpacket,
+  deny network packet,
+
+  /usr/local/bin/prestium-translate r,
+  /usr/bin/python3* ix,
+  /usr/lib/python3/** mr,
+  /usr/lib/python3.*/** mr,
+  /usr/local/lib/prestium-translate/ r,
+  /usr/local/lib/prestium-translate/*.py r,
+  # the engine and the models (read; mapped and run only inside the child profiles)
+  /usr/share/prestium-translate/ r,
+  /usr/share/prestium-translate/** r,
+
+  # its settings file only (written as settings.json.new, then renamed)
+  owner @{HOME}/.config/ r,
+  owner @{HOME}/.config/prestium-translate/ rw,
+  owner @{HOME}/.config/prestium-translate/settings.json rw,
+  owner @{HOME}/.config/prestium-translate/settings.json.new rw,
+
+  # nothing else in the home (the file folders included) and no temporary files
+  deny @{HOME}/[^.]* rwl,
+  deny @{HOME}/[^.]*/** rwl,
+  deny @{HOME}/.gnupg/** rw,
+  deny @{HOME}/**.kdbx rw,
+  deny /media/** rw,
+  deny /tmp/** w,
+  deny /var/tmp/** w,
+  deny @{HOME}/.local/share/recently-used.xbel* w,
+
+  /usr/bin/bwrap mrCx -> engine,
+  signal (send) set=(term, kill) peer=prestium_translate//engine,
+  signal (send) set=(term, kill) peer=prestium_translate//engine//&prestium_translate_engine,
+
+  profile engine flags=(attach_disconnected,mediate_deleted) {
+    # bubblewrap builds the engine's sandbox: own user, mount, PID, IPC, UTS and (empty) network namespaces
+    include <abstractions/base>
+    include <abstractions/prestium-no-admin>
+    include <abstractions/prestium-app-secrets>
+    userns,
+    capability sys_admin,
+    capability sys_chroot,
+    capability setpcap,
+    capability net_admin,
+    capability setuid,
+    capability setgid,
+    capability dac_override,
+    capability dac_read_search,
+    capability fowner,
+    mount,
+    remount,
+    umount,
+    pivot_root,
+    # only for bringing up "lo" in the engine's own, empty network namespace
+    network netlink raw,
+    deny network inet,
+    deny network inet6,
+    deny network unix dgram,
+    deny network unix seqpacket,
+    signal (receive) peer=prestium_translate,
+    signal (send, receive) peer=@{profile_name},
+
+    /usr/bin/bwrap mr,
+    # bubblewrap's own setup in its private mount namespace (a tmpfs base, /newroot, then pivot)
+    owner @{PROC}/ w,
+    /newroot/{,**} r,
+    owner /newroot/{,**} rw,
+    / r,
+    /usr/ r,
+    /usr/lib/@{multiarch}/** mr,
+    /usr/lib64/{,**} mr,
+    /usr/share/prestium-translate/ r,
+    /usr/share/prestium-translate/** r,
+    @{PROC}/ r,
+    @{PROC}/sys/** r,
+    owner @{PROC}/@{pid}/** r,
+    owner @{PROC}/@{pid}/{uid_map,gid_map,setgroups,oom_score_adj} rw,
+    /dev/ r,
+    /dev/{null,zero,full,random,urandom,tty} rw,
+    /dev/pts/ r,
+    owner /tmp/ rw,
+    owner /tmp/** rwl,
+    # the engine: stacked with its own profile (bubblewrap sets no_new_privs, so a plain Px is refused)
+    /usr/share/prestium-translate/bin/prestium-translate-engine mrix -> &prestium_translate_engine,
+
+    deny @{HOME}/** rwl,
+    deny /media/** rw,
+    deny @{run}/** rw,
+    deny /dev/snd/** rw,
+    deny /dev/video* rw,
+    deny /dev/hidraw* rw,
+  }
+
+  include if exists <local/usr.local.bin.prestium-translate>
+}

@@ -32,7 +32,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   over Tor or the I2P outproxy, and reset to the copy on the image.
 - **Enforced AppArmor profiles** for the browsers and their launchers, Claws Mail, Gajim, OnionShare,
   Feather, LibreOffice, The Lounge (both instances), the local-only Firefox, KeePassXC, Kleopatra, Gajim
-  OpenPGP Keys, the passphrase prompt, Tor's control-port filter and the programs that open downloaded files (Loupe,
+  OpenPGP Keys, Prestium Translate (and its engine), the passphrase prompt, Tor's control-port filter and the programs that open downloaded files (Loupe,
   Evince, VLC, File Roller, FeatherPad, mat2, Metadata Cleaner, Audacity); the helpers those viewers start in
   bubblewrap run in stricter inner profiles. The build fails if another profile could attach to a
   program a Prestium profile confines, and the boot checks the loaded set again. Neither Claws Mail's
@@ -103,6 +103,26 @@ modernization of the 2023 Prestium build, with tighter security and new features
   same report in a terminal. Passphrases are typed only into GnuPG's own prompt. The tool runs under
   its own enforced AppArmor profile with no network, and can't check that your server has your
   public key (Gajim's XML console shows the publish).
+- **Prestium Translate** (*Accessories* menu): offline English↔Russian translation and a rewriter that
+  hides how you write. Nothing leaves the computer: the engine is Bergamot (the one in Firefox
+  Translations) with Mozilla's English→Russian and Russian→English models on the image, run in
+  bubblewrap with no network, no home folder and read-only models. **Translate** turns the text
+  around as you pause (or on Ctrl+Enter); the direction button swaps languages, and *Detect from the
+  text* picks it from Cyrillic. **Rewrite** has two strengths: **Light** removes invisible characters,
+  look-alike letters from the other alphabet, emoji and emoticons, filler words, slang and
+  British spellings, and evens out punctuation, quotes, dashes, capitals and contractions (some
+  choices are random each time); **Strong** does that, translates the text to the other language and
+  back, and cleans it again, so the wording changes too. *Show changes* marks what was removed and
+  added. *Check before sending* lists what a rewrite can't hide (names, places, times, dates, numbers,
+  addresses, rare words you repeat). **Paste & go** (Ctrl+Shift+V) pastes and runs; **Copy & clear**
+  (Ctrl+Shift+C) copies the result and empties both boxes; the clipboard can be cleared after 60
+  seconds. No history and no temporary files: only the mode, direction, strength and two switches
+  are saved, and the boxes are emptied on Clear and on close. Rewriting lowers the chance that your
+  style is matched to you, but can't promise it; what you say can identify you more than how you say
+  it. `prestium-translate --translate en-ru|ru-en|auto` and `--rewrite light|strong` read stdin and
+  print the result. The engine needs a processor with SSE4.1 (Intel from 2008, AMD from 2011); about
+  0.5 seconds for a long paragraph on a recent processor, and about 300 MB of memory with both
+  models loaded.
 - **IRC over I2P and over Tor:** two separate The Lounge instances in the local-only Firefox, each
   signed in automatically. *IRC (I2P)* has IRC2P and Ilita. *IRC (Tor)* reaches IRC only through Tor's
   SOCKS port (the firewall allows its user nothing else, not even DNS), with onion presets and its own
@@ -219,7 +239,7 @@ went into it.
 - `Prestium-2.0-amd64.iso.torrent`: the torrent for the previous release.
 - `tests/`: checks for the boot chain (dm-verity, boot menu lock, command line policy, Secure Boot),
   the firewall, sandboxes and AppArmor profiles, the Wayland broker and its dialogs, the MAC guard,
-  the Tor and I2P helpers, The Lounge, the Browser Updater, Gajim OpenPGP Keys and the desktop's design; `tests/ci.sh`
+  the Tor and I2P helpers, The Lounge, the Browser Updater, Gajim OpenPGP Keys, Prestium Translate and the desktop's design; `tests/ci.sh`
   runs the ones that don't need a live session.
 
 ## License

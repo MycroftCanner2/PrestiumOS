@@ -143,6 +143,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |
 | `scripts/amo-latest.py` | newest uBlock Origin from addons.mozilla.org: AMO hash, Mozilla signature, id, version, `strict_min_version` |
 | `scripts/thelounge-themes.py` | regenerates The Lounge's 10 Theme Factory theme packages from `scripts/thelounge-theme.css.in` and checks their contrast (`--check` only verifies; the generated files are committed) |
+| `scripts/translate-models.py` | Prestium Translate's models: checks Mozilla's content signature over the Remote Settings collection `main/translations-models`, then downloads each pinned model file named by a signed record and checks its size and SHA-256 (run by `fetch-thirdparty.sh`) |
 | `build.sh` | the whole build |
 
 ### Hooks
@@ -154,6 +155,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `0010-prestium-optional-packages` | installs the earlier releases' dependency/recommends set (parity) and extra firmware, skipping names the archive no longer has |
 | `0100-prestium-users` | `user` (1000, autologin, empty password until a session password is set), `i2pd` moved to uid/gid 2000, `thelounge`, `thelounge-tor` (2.1, IRC (Tor)), `onion-grater`, `prestium-htp`, `prestium-ptdns` (2.0); groups `autologin`, `i2ptorrents`, `prestium-localweb`; root locked |
 | `0200-prestium-thirdparty` | Tor Browser in `/opt/tor-browser` (read-only, Prestium policies + the newest uBlock Origin, also for LibreWolf), Firefox in `/opt/firefox` (local pages only, no first-run screens), Node.js, The Lounge (+ offline patch, lobby text for networks that are not connected, connecting line only when a connection starts, 320s IRC ping timeout, and for the Tor instance every network through Tor's SOCKS port), Feather |
+| `0210-prestium-translate` | Prestium Translate: checks the staged engine source tar and the six model files against `SHA256SUMS` (exactly those files, the pinned SHA-256 of each), builds the engine (bergamot-translator + `thirdparty/translate/prestium-translate-engine.cpp`, CPU only, x86-64 with SSE4.1, no BLAS) with cmake/g++/make installed for the build and purged again, allows it to link only the C/C++ runtime, installs it and the models read-only in `/usr/share/prestium-translate/`, checks the installed models again and translates a test sentence both ways; any failure stops the build |
 | `0400-prestium-system` | the exact set of enabled/masked units carried over from earlier releases + PipeWire user units, gvfs network backends diverted, alternatives (iptables/ip6tables pinned to legacy, the backend ferm and `prestium-firewall-early` share), CA list (emSign roots distrusted), dconf, plymouth theme, locale, version strings |
 | `0405-prestium-verity` | live-boot mounts the image only through dm-verity: every image needs its hash tree and a root hash on the command line (`/usr/lib/live/boot/9989-prestium-verity.sh`), no plain-mount or root-hash-file fallback, no plain root, no `.fec`/`.fec.roots`/`.roothash`/`.roothash.p7s`/`*.module` next to the image; live-boot's initramfs hook stops sourcing `boot.conf` from the medium; the initramfs gets libcryptsetup (`/etc/initramfs-tools/hooks/prestium-verity`) |
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them); copies The Lounge's packages for the Tor instance (root:thelounge-tor, read-only) |
@@ -215,6 +217,21 @@ misreports as a missing package-lock.json). npm then runs with `--git=false`, an
 installed irc-framework file is still checked against a git checkout of the commit, and `dist/` must
 be absent. Hook 0200 then patches The Lounge in the image (no outbound fetches, lobby text for disconnected networks, a connecting line only when a connection starts, and a 320-second IRC ping timeout); those exact source strings must still be present, or the build stops. If upstream's file list changes, update `IRC_FRAMEWORK_FILES` with the commit. LibreWolf and Tor come from their
 signed apt repositories and are always the newest at build time; i2pd is the `.deb` pinned in `thirdparty/versions.sh`.
+
+Prestium Translate's engine and models are pinned in `thirdparty/versions.sh`. bergamot-translator publishes
+no release or signature and GitHub's tarballs leave out its submodules, so `fetch-thirdparty.sh` clones
+`BERGAMOT_COMMIT`, checks out the submodules in `BERGAMOT_MODULES` at the commits the parent records,
+exports each with `git archive` into one tar and checks it against `BERGAMOT_TAR_SHA256` (the pinned commit
+and that SHA-256 are the trust anchor). The models are Mozilla's Firefox Translations models: Firefox gets
+them from the Remote Settings collection `main/translations-models`, whose records carry Mozilla's content
+signature. `scripts/translate-models.py` checks that signature (the certificate chain to the pinned AMO root
+`thirdparty/keys/mozilla-amo-root.pem`, code-signing use, the signer name
+`remote-settings.content-signature.mozilla.org`, then the ECDSA P-384 signature over the canonical
+collection), picks the signed record for each file of `TR_ENRU_VERSION` and `TR_RUEN_VERSION`, downloads
+it over HTTPS and checks its size and SHA-256 against the record; `fetch-thirdparty.sh` then compares
+each SHA-256 with `TR_*_SHA256`. To update: change the commit or version, set the matching SHA-256 values
+to `""` and run `--repin`. The build needs to reach github.com, firefox.settings.services.mozilla.com,
+content-signature-2.cdn.mozilla.net and firefox-settings-attachments.cdn.mozilla.net.
 
 ## Tor Connection Assistant and DNS
 

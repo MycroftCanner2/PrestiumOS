@@ -1,0 +1,41 @@
+# Prestium 2.1: Prestium Translate's engine (/usr/share/prestium-translate/bin/prestium-translate-engine),
+# ENFORCED. Entered only by the stacked transition from prestium_translate//engine (bubblewrap), so the
+# engine runs under both profiles. It reads its models and the C/C++ runtime and talks over the pipe the
+# app gave it: no network of any kind, no user namespaces, no capabilities, no home, nothing written.
+# No attachment: entered only by explicit transitions. Not yet tested on a booted ISO.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile prestium_translate_engine {
+  include <abstractions/base>
+  include <abstractions/prestium-no-admin>
+  include <abstractions/prestium-app-secrets>
+  /usr/share/prestium-translate/bin/prestium-translate-engine mr,
+  /usr/share/prestium-translate/models/ r,
+  /usr/share/prestium-translate/models/** r,
+  /usr/lib/@{multiarch}/** mr,
+  /usr/lib/@{multiarch}/gconv/gconv-modules.cache r,
+  /usr/lib64/{,**} mr,
+  # CPU features and the number of cores (intgemm, Ruy's cpuinfo)
+  @{PROC}/cpuinfo r,
+  @{PROC}/sys/kernel/** r,
+  @{PROC}/sys/vm/overcommit_memory r,
+  owner @{PROC}/@{pid}/** r,
+  /sys/devices/system/cpu/** r,
+  /dev/{null,zero,urandom} rw,
+  signal (receive) set=(term, kill) peer=prestium_translate,
+  signal (receive) peer=prestium_translate//engine,
+
+  deny network,
+  deny userns,
+  deny mount,
+  deny umount,
+  deny pivot_root,
+  deny capability,
+  deny ptrace,
+  deny @{HOME}/** rwlk,
+  deny /media/** rwlk,
+  deny @{run}/** rwlk,
+  deny /tmp/** wl,
+  include if exists <local/prestium.translate-engine>
+}

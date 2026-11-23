@@ -1,0 +1,91 @@
+#!/bin/sh
+# Prestium 2.1: Prestium Translate's engine and models, read-only under /usr/share/prestium-translate/:
+#   bin/prestium-translate-engine   Bergamot (bergamot-translator, the engine of Firefox Translations) with
+#                                   Prestium's pipe front end, built here from the pinned source tar
+#   models/enru/, models/ruen/      Mozilla's English->Russian and Russian->English models (3 files each)
+# scripts/fetch-thirdparty.sh staged them in /usr/src/prestium-thirdparty/translate/ with SHA256SUMS, written
+# from the SHA-256 values pinned in thirdparty/versions.sh (the models were also checked against Mozilla's
+# signed Remote Settings records; bergamot-translator publishes no signature, its pinned tar is the anchor).
+# Fails closed: a missing, extra or changed file stops the build before anything is built or installed, the
+# installed copies are checked again, and the engine must translate a test sentence both ways.
+# Debian 13 has no package for it, so the build tools (cmake, g++, make) are installed for the build and
+# purged again with everything they pulled in. CPU only, built for x86-64 with SSE4.1 (-march=x86-64
+# -msse4.1; intgemm picks SSSE3/AVX2/AVX-512 code at run time), no BLAS library (Ruy for float GEMM).
+# PRESTIUM_HOOK_ROOT and PRESTIUM_TRANSLATE_VERIFY_ONLY=1 are only for tests/test_translate_hook.sh (a fake
+# staging tree; verify only); both are empty in the chroot.
+set -e
+R=${PRESTIUM_HOOK_ROOT:-}
+S=$R/usr/src/prestium-thirdparty/translate
+D=$R/usr/share/prestium-translate
+[ -s "$S/SHA256SUMS" ] || { echo "E: $S/SHA256SUMS missing: run scripts/fetch-thirdparty.sh before lb build"; exit 1; }
+
+# 1. exactly these files, each with its pinned SHA-256
+WANT="bergamot-translator.tar
+models/enru/lex.50.50.enru.s2t.bin
+models/enru/model.enru.intgemm.alphas.bin
+models/enru/vocab.enru.spm
+models/ruen/lex.50.50.ruen.s2t.bin
+models/ruen/model.ruen.intgemm.alphas.bin
+models/ruen/vocab.ruen.spm"
+[ "$(sed -n 's/^[0-9a-f]\{64\}  //p' "$S/SHA256SUMS" | LC_ALL=C sort)" = "$WANT" ] \
+	&& [ "$(grep -c . "$S/SHA256SUMS")" = 7 ] || { echo "E: $S/SHA256SUMS does not list exactly the engine source and the six model files"; exit 1; }
+[ "$(cd "$S" && find bergamot-translator.tar models -type f | LC_ALL=C sort)" = "$WANT" ] \
+	&& [ -z "$(cd "$S" && find models ! -type f ! -type d)" ] || { echo "E: $S holds other files than SHA256SUMS lists"; exit 1; }
+( cd "$S" && sha256sum --strict --quiet -c SHA256SUMS ) || { echo "E: a staged Prestium Translate file does not match its pinned SHA-256"; exit 1; }
+[ -s "$S/prestium-translate-engine.cpp" ] || { echo "E: prestium-translate-engine.cpp missing"; exit 1; }
+echo "P: Prestium Translate: engine source and models match their pins"
+[ "${PRESTIUM_TRANSLATE_VERIFY_ONLY:-}" = 1 ] && exit 0
+
+# 2. build the engine (tools installed here, purged at the end)
+export DEBIAN_FRONTEND=noninteractive
+BEFORE=$(mktemp); dpkg-query -W -f '${Package}\n' | LC_ALL=C sort > "$BEFORE"
+apt-get install -y --no-install-recommends cmake g++ make libpcre2-dev
+B=$(mktemp -d)
+tar -xf "$S/bergamot-translator.tar" -C "$B"
+T=$B/bergamot-translator
+# marian generates common/git_revision.h from its .git; the tar has none: write it, and give the rule an old input
+mkdir -p "$T/3rd_party/marian-dev/.git/logs"; touch -d @0 "$T/3rd_party/marian-dev/.git/logs/HEAD"
+read -r BC _ < "$S/translate.version"
+printf '#define GIT_REVISION "bergamot-translator %s"\n' "$BC" > "$T/3rd_party/marian-dev/src/common/git_revision.h"
+cp "$S/prestium-translate-engine.cpp" "$T/app/"
+printf 'add_executable(prestium-translate-engine prestium-translate-engine.cpp)\ntarget_link_libraries(prestium-translate-engine PRIVATE bergamot-translator)\n' >> "$T/app/CMakeLists.txt"
+mkdir "$T/build"
+( cd "$T/build" && cmake .. -DCMAKE_BUILD_TYPE=Release -DBUILD_ARCH=x86-64 -DUSE_MKL=OFF -DUSE_RUY=ON -DUSE_RUY_SGEMM=ON \
+	-DCOMPILE_TESTS=OFF -DCOMPILE_UNIT_TESTS=OFF -DGIT_SUBMODULE=OFF -DUSE_DOXYGEN=OFF -DUSE_CCACHE=OFF \
+	&& make -j"$(nproc)" prestium-translate-engine ) > "$B/build.log" 2>&1 \
+	|| { tail -n 40 "$B/build.log"; echo "E: building the translation engine failed"; exit 1; }
+E=$T/build/app/prestium-translate-engine
+[ -x "$E" ] || { echo "E: the translation engine was not built"; exit 1; }
+strip "$E"
+# only the C and C++ runtime: the app's bubblewrap sandbox binds nothing else
+L=$(ldd "$E" | awk '{print $1}' | sed 's|.*/||' | LC_ALL=C sort | tr '\n' ' ')
+[ "$L" = "ld-linux-x86-64.so.2 libc.so.6 libgcc_s.so.1 libm.so.6 libstdc++.so.6 linux-vdso.so.1 " ] \
+	|| { echo "E: the translation engine links other libraries: $L"; exit 1; }
+
+# 3. install read-only, root-owned
+rm -rf "$D"
+install -d -m 0755 "$D" "$D/bin" "$D/models" "$D/models/enru" "$D/models/ruen"
+install -m 0755 -o root -g root "$E" "$D/bin/prestium-translate-engine"
+for f in $(sed -n 's/^[0-9a-f]\{64\}  \(models\/.*\)$/\1/p' "$S/SHA256SUMS"); do
+	install -m 0644 -o root -g root "$S/$f" "$D/$f"
+done
+# the installed copies, again (closes the check-then-copy gap)
+grep '  models/' "$S/SHA256SUMS" | ( cd "$D" && sha256sum --strict --quiet -c - ) \
+	|| { echo "E: an installed model does not match its pinned SHA-256"; rm -rf "$D"; exit 1; }
+
+# 4. it must translate, both ways (the engine directly; the app adds the bubblewrap sandbox)
+tr1=$(printf 'en-ru 26\nThe weather is good today.' | "$D/bin/prestium-translate-engine" "$D/models" | tail -n +2)
+tr2=$(printf 'ru-en 43\n\320\241\320\265\320\263\320\276\320\264\320\275\321\217 \321\205\320\276\321\200\320\276\321\210\320\260\321\217 \320\277\320\276\320\263\320\276\320\264\320\260.' \
+	| "$D/bin/prestium-translate-engine" "$D/models" | tail -n +2)
+# "погод" / "weather" (grep without -i: the chroot's locale may not know Cyrillic case)
+printf '%s' "$tr1" | grep -q "$(printf '\320\276\320\263\320\276\320\264')" \
+	&& printf '%s' "$tr2" | grep -q 'eather' || { echo "E: the translation engine does not translate (got '$tr1' / '$tr2')"; rm -rf "$D"; exit 1; }
+echo "P: Prestium Translate: $tr1 / $tr2"
+
+# 5. remove the build tools again (only what this hook installed) and the build tree
+AFTER=$(mktemp); dpkg-query -W -f '${Package}\n' | LC_ALL=C sort > "$AFTER"
+NEW=$(comm -13 "$BEFORE" "$AFTER" | tr '\n' ' ')
+# shellcheck disable=SC2086 # a list of package names
+[ -z "$NEW" ] || apt-get purge -y $NEW
+rm -rf "$B" "$BEFORE" "$AFTER"
+echo "P: Prestium Translate engine $(du -sh "$D/bin" | cut -f1), models $(du -sh "$D/models" | cut -f1)"

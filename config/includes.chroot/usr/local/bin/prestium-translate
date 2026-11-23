@@ -1,0 +1,468 @@
+#!/usr/bin/python3 -I
+# Prestium 2.1: Prestium Translate (Accessories menu). English <-> Russian translation and a style rewriter,
+# offline, in one window.
+#   prestium-translate                                  the window
+#   prestium-translate --translate en-ru|ru-en|auto     translate stdin to stdout
+#   prestium-translate --rewrite light|strong [--leftovers]   rewrite stdin to stdout (leftovers to stderr)
+# Translate: two boxes side by side, a direction button (English → Russian / Russian → English), Cyrillic
+# text switches to Russian → English; it translates after a short pause in typing, or with Ctrl+Enter.
+# Rewrite: Light (rules only) or Strong (Light, then a round trip through the other language), "Show
+# changes" highlights what changed, and a panel lists what a rewrite can't hide (names, numbers, times).
+# Paste & go (Ctrl+Shift+V) pastes and runs; Copy copies the output; Copy & clear (Ctrl+Shift+C) copies
+# it and wipes both boxes; the clipboard can be cleared after 60 seconds. Nothing is saved but the choices
+# in ~/.config/prestium-translate/settings.json (never any text): no history, no temporary files.
+# The logic is /usr/local/lib/prestium-translate/core.py (no GTK). The engine (Bergamot, Mozilla's models in
+# /usr/share/prestium-translate) runs in bubblewrap without network. Confined by AppArmor
+# (usr.local.bin.prestium-translate: no network, no session bus, no home folder but its settings file).
+import os, sys, threading
+
+sys.dont_write_bytecode = True      # no __pycache__ next to the shipped library
+sys.pycache_prefix = "/nonexistent/prestium-pycache"   # and never read one from there
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib", "prestium-translate"))
+import core  # noqa: E402
+
+APP_ID = "org.prestium.Translate"
+TITLE = "Prestium Translate"
+DIR_LABEL = {"en-ru": "English → Russian", "ru-en": "Russian → English"}
+PAUSE_MS = 700
+CLIP_SECONDS = 60
+
+if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+    print(core.USAGE)
+    sys.exit(0)
+if len(sys.argv) > 1:
+    sys.exit(core.cli(sys.argv[1:]))
+
+# Prestium's GTK 3 style from the root-owned directory, as the Browser Updater (the user's ~/.config is not read)
+os.environ["XDG_CONFIG_HOME"] = "/usr/share/prestium/broker-style"
+import gi  # noqa: E402
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gtk, Gdk, GLib, Gio, Pango  # noqa: E402
+
+
+def wrap_label(text="", markup=False, selectable=False):
+    l = Gtk.Label(xalign=0)
+    l.set_line_wrap(True); l.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+    l.set_width_chars(10); l.set_max_width_chars(110)
+    if markup:
+        l.set_markup(text)
+    else:
+        l.set_text(text)
+    l.set_selectable(selectable)
+    return l
+
+
+def esc(s):
+    return GLib.markup_escape_text(s)
+
+
+def text_box(title, editable=True):
+    frame = Gtk.Frame(label=" %s " % title)
+    frame.get_style_context().add_class("prestium-section")
+    view = Gtk.TextView()
+    view.set_wrap_mode(Gtk.WrapMode.WORD_CHAR)
+    view.set_editable(editable)
+    view.set_left_margin(8); view.set_right_margin(8); view.set_top_margin(6); view.set_bottom_margin(6)
+    view.set_input_hints(Gtk.InputHints.NO_SPELLCHECK | Gtk.InputHints.NO_EMOJI)
+    sw = Gtk.ScrolledWindow()
+    sw.set_policy(Gtk.PolicyType.AUTOMATIC, Gtk.PolicyType.AUTOMATIC)
+    sw.set_min_content_height(220)
+    sw.add(view)
+    frame.add(sw)
+    return frame, view
+
+
+def get_text(view):
+    b = view.get_buffer()
+    return b.get_text(b.get_start_iter(), b.get_end_iter(), False)
+
+
+class Window(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Prestium Translate")
+        self.set_icon_name("accessories-dictionary")
+        self.set_default_size(980, 640)
+        self.set_border_width(12)
+        self.settings = core.load_settings()
+        self.engine = core.Engine()
+        self.gen = 0             # results of older runs are dropped
+        self.timer = None
+        self.clip_timer = None
+        self.clip_text = None
+        self.last_source = ""    # what the output was made from (for "Show changes")
+        self.last_output = ""
+        self.showing_diff = False
+        self.busy = False
+        self.clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+        self.connect("delete-event", self.on_close)
+        self.connect("key-press-event", self.on_key)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.add(outer)
+
+        # mode switch, then the controls of the mode
+        top = Gtk.Box(spacing=12)
+        modes = Gtk.Box(spacing=0)
+        modes.get_style_context().add_class("linked")
+        self.mode_tr = Gtk.RadioButton.new_with_label(None, "Translate")
+        self.mode_rw = Gtk.RadioButton.new_with_label_from_widget(self.mode_tr, "Rewrite")
+        for b in (self.mode_tr, self.mode_rw):
+            b.set_mode(False)
+            modes.pack_start(b, False, False, 0)
+        top.pack_start(modes, False, False, 0)
+
+        self.tr_box = Gtk.Box(spacing=8)
+        self.dir_btn = Gtk.Button(label="English → Russian")
+        self.dir_btn.set_tooltip_text("Switch the direction")
+        self.dir_btn.connect("clicked", lambda *_: self.flip_direction())
+        self.tr_box.pack_start(self.dir_btn, False, False, 0)
+        self.auto = Gtk.CheckButton(label="Detect from the text")
+        self.auto.set_tooltip_text("Cyrillic text is translated from Russian, Latin text from English")
+        self.tr_box.pack_start(self.auto, False, False, 0)
+        top.pack_start(self.tr_box, False, False, 0)
+
+        self.rw_box = Gtk.Box(spacing=8)
+        strengths = Gtk.Box(spacing=0)
+        strengths.get_style_context().add_class("linked")
+        self.light = Gtk.RadioButton.new_with_label(None, "Light")
+        self.light.set_tooltip_text("Rules only, instant: punctuation, spacing, capitals, emoji, hidden characters, "
+                                    "one spelling, filler words")
+        self.strong = Gtk.RadioButton.new_with_label_from_widget(self.light, "Strong")
+        self.strong.set_tooltip_text("Light, then a round trip through the other language: new wording and "
+                                     "sentence structure")
+        for b in (self.light, self.strong):
+            b.set_mode(False)
+            strengths.pack_start(b, False, False, 0)
+        self.rw_box.pack_start(strengths, False, False, 0)
+        self.diff_btn = Gtk.ToggleButton(label="Show changes")
+        self.diff_btn.set_tooltip_text("Highlight what the rewrite changed, to check that the meaning stayed")
+        self.diff_btn.connect("toggled", lambda *_: self.render_output())
+        self.rw_box.pack_start(self.diff_btn, False, False, 0)
+        top.pack_start(self.rw_box, False, False, 0)
+
+        self.run_btn = Gtk.Button(label="Translate")
+        self.run_btn.get_style_context().add_class("suggested-action")
+        self.run_btn.set_tooltip_text("Ctrl+Enter")
+        self.run_btn.connect("clicked", lambda *_: self.run_now())
+        top.pack_end(self.run_btn, False, False, 0)
+        outer.pack_start(top, False, False, 0)
+
+        # the two boxes
+        boxes = Gtk.Box(spacing=8, homogeneous=True)
+        self.in_frame, self.inp = text_box("English")
+        self.out_frame, self.out = text_box("Russian")
+        boxes.pack_start(self.in_frame, True, True, 0)
+        boxes.pack_start(self.out_frame, True, True, 0)
+        outer.pack_start(boxes, True, True, 0)
+        ob = self.out.get_buffer()
+        ob.create_tag("insert", background="#ffd166", foreground="#000000", underline=Pango.Underline.SINGLE)
+        ob.create_tag("delete", foreground="#a8a8a8", strikethrough=True)
+        self.inp.get_buffer().connect("changed", lambda *_: self.on_input_changed())
+
+        # rewrite: what's still risky, and the honest note
+        self.left_frame = Gtk.Frame(label=" Check before sending ")
+        self.left_frame.get_style_context().add_class("prestium-section")
+        lb = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        lb.set_border_width(8)
+        self.leftovers = wrap_label(selectable=True)
+        lb.pack_start(self.leftovers, False, False, 0)
+        note = wrap_label("<small>%s</small>" % esc(core.NOTE), markup=True)
+        lb.pack_start(note, False, False, 0)
+        self.left_frame.add(lb)
+        outer.pack_start(self.left_frame, False, False, 0)
+
+        # express buttons
+        acts = Gtk.Box(spacing=6)
+        self.paste_btn = Gtk.Button(label="Paste & go")
+        self.paste_btn.set_tooltip_text("Paste from the clipboard and run (Ctrl+Shift+V)")
+        self.paste_btn.connect("clicked", lambda *_: self.paste_and_go())
+        self.copy_btn = Gtk.Button(label="Copy")
+        self.copy_btn.set_tooltip_text("Copy the output")
+        self.copy_btn.connect("clicked", lambda *_: self.copy_output(clear=False))
+        self.copyclear_btn = Gtk.Button(label="Copy & clear")
+        self.copyclear_btn.set_tooltip_text("Copy the output, then wipe both boxes (Ctrl+Shift+C)")
+        self.copyclear_btn.connect("clicked", lambda *_: self.copy_output(clear=True))
+        self.clear_btn = Gtk.Button(label="Clear")
+        self.clear_btn.set_tooltip_text("Wipe both boxes")
+        self.clear_btn.connect("clicked", lambda *_: self.wipe())
+        for b in (self.paste_btn, self.copy_btn, self.copyclear_btn):
+            acts.pack_start(b, False, False, 0)
+        self.clip_chk = Gtk.CheckButton(label="Clear the clipboard after 60 seconds")
+        acts.pack_start(self.clip_chk, False, False, 12)
+        acts.pack_end(self.clear_btn, False, False, 0)
+        outer.pack_start(acts, False, False, 0)
+
+        # status line
+        st = Gtk.Box(spacing=6)
+        self.spinner = Gtk.Spinner()
+        st.pack_start(self.spinner, False, False, 0)
+        self.status = wrap_label()
+        st.pack_start(self.status, True, True, 0)
+        outer.pack_start(st, False, False, 0)
+
+        # the saved choices
+        s = self.settings
+        (self.mode_rw if s["mode"] == "rewrite" else self.mode_tr).set_active(True)
+        (self.strong if s["strength"] == "strong" else self.light).set_active(True)
+        self.auto.set_active(s["auto_detect"])
+        self.clip_chk.set_active(s["clear_clipboard"])
+        self.direction = s["direction"]
+        for w, sig in ((self.mode_tr, "toggled"), (self.light, "toggled"), (self.auto, "toggled"),
+                       (self.clip_chk, "toggled")):
+            w.connect(sig, lambda *_: self.on_option())
+        self.apply_mode()
+        self.set_status()
+
+    # ------------------------------------------------------------------------------------- state
+    def mode(self):
+        return "rewrite" if self.mode_rw.get_active() else "translate"
+
+    def strength(self):
+        return "strong" if self.strong.get_active() else "light"
+
+    def save(self):
+        self.settings.update(mode=self.mode(), direction=self.direction, strength=self.strength(),
+                             auto_detect=self.auto.get_active(), clear_clipboard=self.clip_chk.get_active())
+        try:
+            core.save_settings(self.settings)
+        except OSError:
+            pass                 # the choices are a convenience; nothing else depends on them
+
+    def on_option(self):
+        self.save()
+        self.apply_mode()
+        self.schedule(0)
+
+    def apply_mode(self):
+        rw = self.mode() == "rewrite"
+        self.tr_box.set_visible(not rw)
+        self.rw_box.set_visible(rw)
+        self.left_frame.set_visible(rw)
+        self.run_btn.set_label("Rewrite" if rw else "Translate")
+        self.dir_btn.set_label(DIR_LABEL[self.direction])
+        if rw:
+            self.in_frame.set_label(" Your text ")
+            self.out_frame.set_label(" Rewritten ")
+        else:
+            src, trg = ("English", "Russian") if self.direction == "en-ru" else ("Russian", "English")
+            self.in_frame.set_label(" %s " % src)
+            self.out_frame.set_label(" %s " % trg)
+        if not rw and self.diff_btn.get_active():
+            self.diff_btn.set_active(False)
+
+    def set_status(self, extra=None, busy=False):
+        self.busy = busy
+        (self.spinner.start if busy else self.spinner.stop)()
+        self.status.set_markup("<b>%s</b>%s" % (esc(core.STATUS), (" · " + esc(extra)) if extra else ""))
+
+    def flip_direction(self):
+        self.direction = "ru-en" if self.direction == "en-ru" else "en-ru"
+        text = get_text(self.inp)
+        if self.auto.get_active() and text.strip() and core.detect_direction(text, self.direction) != self.direction:
+            self.auto.set_active(False)      # the person overrides the detection for this text
+        self.save()
+        self.apply_mode()
+        self.schedule(0)
+
+    # ------------------------------------------------------------------------------------- running
+    def on_input_changed(self):
+        if self.mode() == "translate" and self.auto.get_active():
+            d = core.detect_direction(get_text(self.inp), self.direction)
+            if d != self.direction:
+                self.direction = d
+                self.save()
+                self.apply_mode()
+        self.schedule(PAUSE_MS)
+
+    def schedule(self, ms):
+        if self.timer:
+            GLib.source_remove(self.timer)
+        self.timer = GLib.timeout_add(ms, self.run_now) if ms else None
+        if not ms:
+            self.run_now()
+
+    def run_now(self, *_):
+        self.timer = None
+        text = get_text(self.inp)
+        self.gen += 1
+        gen = self.gen
+        if not text.strip():
+            self.set_output("", "")
+            self.set_status()
+            return False
+        mode, direction, strength = self.mode(), self.direction, self.strength()
+        if mode == "rewrite" and strength == "light":
+            self.finish(gen, text, core.light(text), None)      # instant, no engine
+            return False
+        self.set_status("Translating…" if mode == "translate" else "Rewriting…", busy=True)
+
+        def work():
+            try:
+                if mode == "translate":
+                    out = self.engine.translate(text, direction)
+                else:
+                    out = core.rewrite(text, strength, self.engine)
+                GLib.idle_add(self.finish, gen, text, out, None)
+            except core.EngineError as e:
+                GLib.idle_add(self.finish, gen, text, None, str(e))
+        threading.Thread(target=work, daemon=True).start()
+        return False
+
+    def finish(self, gen, src, out, err):
+        if gen != self.gen:
+            return False
+        if err:
+            self.set_status(err)
+            return False
+        self.set_output(src, out)
+        self.set_status()
+        return False
+
+    def set_output(self, src, out):
+        self.last_source, self.last_output = src, out
+        self.render_output()
+        if self.mode() == "rewrite":
+            items = core.leftovers(out) if out else []
+            if items:
+                lines = ["%s: %s%s" % (core.LEFTOVER_HINT[k].capitalize(), s, " (%d times)" % n if n > 1 else "")
+                         for k, s, n in items[:30]]
+                self.leftovers.set_text("Still in the text, change them yourself if they could point to you:\n"
+                                        + "\n".join(lines))
+            else:
+                self.leftovers.set_text("Nothing obvious left (names, numbers, times, addresses, repeated "
+                                        "rare words)." if out else "")
+
+    def render_output(self):
+        ob = self.out.get_buffer()
+        diff = self.mode() == "rewrite" and self.diff_btn.get_active() and self.last_output
+        ob.set_text("")
+        if diff:
+            self.out.set_editable(False)
+            for op, t in core.diff_words(self.last_source, self.last_output):
+                if op == "equal":
+                    ob.insert(ob.get_end_iter(), t)
+                else:
+                    ob.insert_with_tags_by_name(ob.get_end_iter(), t, op)
+        else:
+            self.out.set_editable(True)
+            ob.set_text(self.last_output)
+        self.showing_diff = bool(diff)
+
+    def output_text(self):
+        # with "Show changes" on, the box shows the removed words too: copy the rewrite itself
+        return self.last_output if self.showing_diff else get_text(self.out)
+
+    # ------------------------------------------------------------------------------------- express buttons
+    def paste_and_go(self):
+        def got(_clip, text):
+            if text:
+                self.inp.get_buffer().set_text(text)
+                self.schedule(0)
+            else:
+                self.set_status("The clipboard has no text")
+        self.clipboard.request_text(got)
+
+    def copy_output(self, clear):
+        text = self.output_text()
+        if not text:
+            self.set_status("Nothing to copy yet")
+            return
+        self.clipboard.set_text(text, -1)
+        self.clipboard.store()
+        self.clip_text = text
+        if self.clip_timer:
+            GLib.source_remove(self.clip_timer)
+            self.clip_timer = None
+        if self.clip_chk.get_active():
+            self.clip_timer = GLib.timeout_add_seconds(CLIP_SECONDS, self.clear_clipboard)
+            msg = "Copied; the clipboard is cleared in %d seconds" % CLIP_SECONDS
+        else:
+            msg = "Copied"
+        if clear:
+            self.wipe()
+        self.set_status(msg)
+
+    def clear_clipboard(self):
+        self.clip_timer = None
+        mine = self.clip_text
+        self.clip_text = None
+
+        def got(_clip, text):
+            if text is not None and text == mine:        # only if it still holds what this window copied
+                self.clipboard.set_text("", -1)
+                self.clipboard.clear()
+                if self.get_visible():
+                    self.set_status("Clipboard cleared")
+        self.clipboard.request_text(got)
+        return False
+
+    def wipe(self):
+        if self.timer:
+            GLib.source_remove(self.timer)
+            self.timer = None
+        self.gen += 1
+        self.inp.get_buffer().set_text("")
+        self.last_source = self.last_output = ""
+        self.out.get_buffer().set_text("")
+        self.leftovers.set_text("")
+        self.set_status()
+
+    def on_key(self, _w, ev):
+        ctrl = ev.state & Gdk.ModifierType.CONTROL_MASK
+        shift = ev.state & Gdk.ModifierType.SHIFT_MASK
+        k = Gdk.keyval_to_lower(ev.keyval)
+        if ctrl and k in (Gdk.KEY_Return, Gdk.KEY_KP_Enter):
+            self.schedule(0)
+            return True
+        if ctrl and shift and k == Gdk.KEY_v:
+            self.paste_and_go()
+            return True
+        if ctrl and shift and k == Gdk.KEY_c:
+            self.copy_output(clear=True)
+            return True
+        return False
+
+    def on_close(self, *_):
+        # nothing stays behind: both boxes wiped, the engine stopped, a pending clipboard clear done now
+        if self.clip_timer:
+            GLib.source_remove(self.clip_timer)
+            self.clip_timer = None
+            if self.clip_text is not None:
+                self.clipboard.set_text("", -1)
+                self.clipboard.clear()
+        self.clip_text = None
+        self.wipe()
+        self.engine.stop()
+        return False
+
+
+class App(Gtk.Application):
+    def __init__(self):
+        # no session bus for this tool (AppArmor): one window per start
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
+        self.win = None
+
+    def do_activate(self):
+        if self.win is None:
+            self.win = Window(self)
+            self.win.show_all()
+            self.win.apply_mode()
+            # load the models of the current direction in the background (about a second, once)
+            d = self.win.direction
+
+            def warm():
+                try:
+                    self.win.engine.load(d)
+                except (core.EngineError, OSError) as e:
+                    GLib.idle_add(self.win.set_status, str(e))
+            threading.Thread(target=warm, daemon=True).start()
+        self.win.present()
+
+
+def main():
+    return App().run(sys.argv[:1])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

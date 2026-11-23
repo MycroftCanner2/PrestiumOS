@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Prestium Translate
+Comment=Translate between English and Russian, and rewrite text in a plainer style, offline
+Exec=/usr/local/bin/prestium-translate
+Icon=accessories-dictionary
+Terminal=false
+StartupNotify=true
+# the window's app_id, so the panel finds this file's name and icon
+StartupWMClass=org.prestium.Translate
+Categories=Utility;Office;TextTools;
+Keywords=translate;translation;Russian;English;rewrite;style;
