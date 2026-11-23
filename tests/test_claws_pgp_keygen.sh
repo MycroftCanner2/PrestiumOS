@@ -29,11 +29,11 @@ D=$C/usr/local/share/applications/claws-mail.desktop
 grep -q 'MimeType=.*x-scheme-handler/mailto' "$D" && ok "desktop file keeps mailto" || no "desktop file mailto"
 grep -qx '0755 root root /usr/local/bin/claws-mail-i2p' "$C/usr/share/prestium/build/perms.txt" && ok "perms launcher" || no "perms launcher"
 grep -qx '0644 root root /usr/local/share/applications/claws-mail.desktop' "$C/usr/share/prestium/build/perms.txt" && ok "perms desktop" || no "perms desktop"
-grep -qx 'exec /usr/bin/claws-mail "\$@"' "$L" && ok "launcher execs the confined binary" || no "launcher exec"
+grep -qx 'exec /usr/local/lib/prestium/app-confine claws-mail "\$@"' "$L" && ok "launcher execs the confined binary through app-confine (review F-01)" || no "launcher exec"
 
 # launcher behaviour, with /usr/bin/claws-mail replaced by a stub that records its argv
 mkdir -p "$W/bin"; printf '#!/bin/sh\nfor a; do printf "%%s\\n" "$a"; done > "$HOME/argv"\n' > "$W/bin/claws"; chmod 755 "$W/bin/claws"
-sed "s#^exec /usr/bin/claws-mail #exec $W/bin/claws #" "$L" > "$W/launcher"; chmod 755 "$W/launcher"
+sed "s#^exec /usr/local/lib/prestium/app-confine claws-mail #exec $W/bin/claws #" "$L" > "$W/launcher"; chmod 755 "$W/launcher"
 mk(){ rm -rf "$W/h"; mkdir -p "$W/h/.claws-mail"; printf '%s\n' "$@" > "$W/h/.claws-mail/accountrc"; chmod 600 "$W/h/.claws-mail/accountrc"; }
 mk '[Account: 1]' 'account_name=mail.i2p' 'is_default=1' 'name=' 'address=username@mail.i2p' '[Account: 2]' 'account_name=' 'name=' 'name=Alice' 'nickname=' 'address=b@mail.i2p'
 HOME=$W/h "$W/launcher" --compose 'mailto:a b@mail.i2p' >/dev/null 2>&1
