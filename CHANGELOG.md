@@ -13,6 +13,14 @@ Each entry names the review finding (F-xx) it fixes.
   either setting is missing. Test: `tests/test_nm_dhcp_privacy.sh` (also checks NetworkManager's own
   merged configuration when it is installed).
 
+- **F-02: Gajim's GnuPG no longer gets Kleopatra's agent.** The `gpg` child profiles of `gajim` and
+  `prestium_gajim_keys` allowed every socket under `$XDG_RUNTIME_DIR/gnupg/`, including the sockets of
+  `~/.gnupg`'s agent (Kleopatra's and Claws Mail's secret keys). They now allow only their own
+  `gnupg/d.<hash>/` directory and deny `gnupg/S.*`. Because the 6.12 kernel does not mediate
+  `connect()` by socket path, the effective fix is app-confine (F-01): Gajim and the Gajim keys tool
+  get their own `$XDG_RUNTIME_DIR`, in which `~/.gnupg`'s agent does not exist. Tests:
+  `test_apparmor_gajim.sh` and `test_apparmor_gajim_keys.sh` (compiled-profile checks).
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build
