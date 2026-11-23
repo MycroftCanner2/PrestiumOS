@@ -1,2 +1,2 @@
-# signed-by: live-build installs prestium-librewolf.key.chroot (binary) as /etc/apt/trusted.gpg.d/<name>.gpg
-deb [signed-by=/etc/apt/trusted.gpg.d/prestium-librewolf.key.chroot.gpg] https://repo.librewolf.net librewolf main
+# security review F-06: signed-by a keyring outside trusted.gpg.d (config/apt-keyrings/prestium-librewolf.gpg, put in chroot/etc/apt/keyrings by build.sh), so this key is trusted for this source only, never for Debian's
+deb [signed-by=/etc/apt/keyrings/prestium-librewolf.gpg] https://repo.librewolf.net librewolf main

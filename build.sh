@@ -118,7 +118,17 @@ if [ -d "$SLD" ]; then
 	done
 fi
 run_lb bootstrap
+# security review F-06: the build-time keys of the Tor Project and LibreWolf repositories are not put in
+# /etc/apt/trusted.gpg.d (where live-build installs config/archives/*.key*), because apt trusts a key
+# there for every source, Debian's included. They go to /etc/apt/keyrings/, and each build-time list
+# names its own keyring with signed-by. They stay there (no list uses them in the image; the final
+# lists use the packages' keyrings in /usr/share/keyrings).
+ls config/archives/*.key* >/dev/null 2>&1 && { echo "config/archives has a .key file: live-build would trust it for every source (F-06)"; exit 1; }
+install -d -m 755 chroot/etc/apt/keyrings
+install -m 644 config/apt-keyrings/prestium-tor.gpg config/apt-keyrings/prestium-librewolf.gpg chroot/etc/apt/keyrings/
+rm -f chroot/etc/apt/trusted.gpg.d/prestium-*.key.chroot.gpg chroot/etc/apt/trusted.gpg.d/prestium-*.key.chroot.asc
 run_lb chroot
+if ls chroot/etc/apt/trusted.gpg.d/prestium-* >/dev/null 2>&1; then echo "a Prestium key is in trusted.gpg.d (F-06)"; exit 1; fi
 for f in config/archives/*.list.chroot; do
 	[ ! -e "chroot/etc/apt/sources.list.d/$(basename "$f" .chroot)" ] || { echo "build-time apt list $(basename "$f" .chroot) still in the chroot"; exit 1; }
 done

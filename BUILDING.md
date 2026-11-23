@@ -131,7 +131,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/package-lists/prestium.list.chroot` | the packages installed by hand in earlier Prestium releases (derived from their dpkg selections, build-only packages removed) |
 | `config/package-lists/prestium-2.0.list.chroot` | 2.0 additions: PipeWire/WirePlumber audio, pasystray, the assistant's GTK bindings |
 | `config/package-lists/live.list.chroot` | live-boot (no live-config: Prestium sets up its user itself) |
-| `config/archives/` | build-time apt sources and keys: Tor Project, LibreWolf, each `signed-by` its own key (live-build installs `<name>.key.chroot` as `/etc/apt/trusted.gpg.d/<name>.key.chroot.gpg`); origin pins limiting each repo to its own packages (quick_qubes: no firmware pin) |
+| `config/archives/` | build-time apt sources and keys: Tor Project, LibreWolf, each `signed-by` its own keyring in `/etc/apt/keyrings/` (the keys are in `config/apt-keyrings/`; build.sh installs them after `lb bootstrap`, never in `trusted.gpg.d`, where apt would trust them for Debian's sources too: review F-06); origin pins limiting each repo to its own packages (quick_qubes: no firmware pin) |
 | `config/preseed/` | non-interactive answers (locale, keyboard, ferm; quick_qubes: no firmware licences) |
 | `config/includes.chroot/` | Prestium's own files and the package files it changes, carried over from the earlier Prestium root filesystem as a diff against the packaged files (see below), plus the 2.0 changes |
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
