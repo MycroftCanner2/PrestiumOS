@@ -1,0 +1,492 @@
+#!/usr/bin/python3 -I
+# Prestium 2.1: Gajim OpenPGP Keys (Communication menu, after Gajim). One window for the keys of Gajim's
+# OpenPGP plugin: for each Gajim account it shows the key in the account's own keyring
+# (~/.local/share/gajim/openpgp/<JID>/), whether Gajim can use it and why not, and can generate a key
+# the way Gajim does, import one from Kleopatra (~/.gnupg, only read), add, revoke or promote user IDs,
+# mark the key as your own, delete one, back it up to a file and restore that file.
+#   prestium-gajim-keys                 the window
+#   prestium-gajim-keys --check [JID]   the same checks as text (every account without JID); exit 1 on a failure
+# It runs the system gpg (/usr/local/lib/prestium-keys/gajim_keys.py), has no network access and never
+# sees a passphrase: GnuPG asks in its own prompt. Confined by AppArmor (usr.local.bin.prestium-gajim-keys).
+import os, sys, threading
+
+sys.dont_write_bytecode = True      # no __pycache__ next to the shipped library
+sys.pycache_prefix = "/nonexistent/prestium-pycache"   # and never read one from there
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "lib", "prestium-keys"))
+import gajim_keys as gk  # noqa: E402
+
+APP_ID = "org.prestium.GajimKeys"
+TITLE = "Gajim OpenPGP Keys"
+INTRO = ("Gajim's OpenPGP encryption uses its own keyring for each account, separate from Kleopatra's. "
+         "It needs exactly one key whose user ID is xmpp: followed by your address. Pick an account to see "
+         "its key and what to fix.")
+LIVE_NOTE = ("Without persistence, keys made or imported here are lost when Prestium shuts down. Keep a "
+             "backup on a USB stick or an encrypted volume.")
+GAJIM_NOTE = ("Gajim is running. Quit Gajim before changing its keys: its OpenPGP plugin reads the keyring when "
+              "an account connects, and tries to delete keys it does not accept.")
+
+
+def cli(argv):
+    jids = argv[1:2]
+    if not jids:
+        jids = [j for j, _ in gk.gajim_accounts()]
+    if not jids:
+        print("No Gajim account found. Usage: prestium-gajim-keys --check name@server")
+        return 2
+    ok = True
+    for i, jid in enumerate(jids):
+        if not gk.valid_jid(jid):
+            print("%r is not an XMPP address (name@server)" % jid)
+            return 2
+        text, good = gk.report(jid)
+        print(("\n" if i else "") + text)
+        ok = ok and good
+    return 0 if ok else 1
+
+
+if len(sys.argv) > 1 and sys.argv[1] in ("--check", "-c"):
+    sys.exit(cli(sys.argv[1:]))
+if len(sys.argv) > 1 and sys.argv[1] in ("--help", "-h"):
+    print("usage: prestium-gajim-keys [--check [name@server]]")
+    sys.exit(0)
+
+# Prestium's GTK 3 style from the root-owned directory, as the Browser Updater (the user's ~/.config is not read)
+os.environ["XDG_CONFIG_HOME"] = "/usr/share/prestium/broker-style"
+import gi  # noqa: E402
+gi.require_version("Gtk", "3.0")
+from gi.repository import Gtk, GLib, Gio, Pango  # noqa: E402
+
+RESULT_TEXT = {"pass": "PASS", "fail": "FAIL", "warn": "NOTE", "info": "INFO"}
+
+
+def wrap_label(text="", markup=False, selectable=False):
+    l = Gtk.Label(xalign=0)
+    l.set_line_wrap(True); l.set_line_wrap_mode(Pango.WrapMode.WORD_CHAR)
+    l.set_width_chars(10); l.set_max_width_chars(70)
+    if markup:
+        l.set_markup(text)
+    else:
+        l.set_text(text)
+    l.set_selectable(selectable)
+    return l
+
+
+def esc(s):
+    return GLib.markup_escape_text(s)
+
+
+class Window(Gtk.ApplicationWindow):
+    def __init__(self, app):
+        super().__init__(application=app, title="Gajim OpenPGP Keys")
+        self.set_icon_name("dialog-password")
+        self.set_default_size(720, 760)
+        self.set_border_width(12)
+        self.busy = False
+        self.touched = set()
+        self.connect("delete-event", self.on_close)
+
+        outer = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        self.add(outer)
+        outer.pack_start(wrap_label(INTRO), False, False, 0)
+
+        row = Gtk.Box(spacing=6)
+        row.pack_start(Gtk.Label(label="Account"), False, False, 0)
+        self.account = Gtk.ComboBoxText.new_with_entry()
+        self.account.get_child().set_placeholder_text("name@server")
+        self.account.connect("changed", lambda *_: self.on_account_changed())
+        row.pack_start(self.account, True, True, 0)
+        self.refresh_btn = Gtk.Button(label="Refresh")
+        self.refresh_btn.connect("clicked", lambda *_: self.reload_accounts())
+        row.pack_start(self.refresh_btn, False, False, 0)
+        outer.pack_start(row, False, False, 0)
+
+        self.gajim_bar = Gtk.InfoBar(message_type=Gtk.MessageType.WARNING)
+        self.gajim_bar.set_no_show_all(True)
+        self.gajim_bar.get_content_area().pack_start(wrap_label(GAJIM_NOTE), True, True, 0)
+        self.gajim_bar.get_content_area().show_all()
+        outer.pack_start(self.gajim_bar, False, False, 0)
+
+        self.status = wrap_label()
+        outer.pack_start(self.status, False, False, 0)
+
+        scroll = Gtk.ScrolledWindow()
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        outer.pack_start(scroll, True, True, 0)
+        body = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        scroll.add(body)
+        self.cards = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        body.pack_start(self.cards, False, False, 0)
+        cf = Gtk.Frame(label=" Checks ")
+        cf.get_style_context().add_class("prestium-section")
+        self.results = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
+        self.results.set_border_width(8)
+        cf.add(self.results)
+        body.pack_start(cf, False, False, 0)
+
+        acts = Gtk.Box(spacing=6)
+        self.gen_btn = Gtk.Button(label="Generate key…")
+        self.gen_btn.connect("clicked", lambda *_: self.on_generate())
+        self.kleo_btn = Gtk.Button(label="Import from Kleopatra…")
+        self.kleo_btn.connect("clicked", lambda *_: self.on_import_kleopatra())
+        self.file_btn = Gtk.Button(label="Import backup file…")
+        self.file_btn.connect("clicked", lambda *_: self.on_import_file())
+        self.check_btn = Gtk.Button(label="Check")
+        self.check_btn.get_style_context().add_class("suggested-action")
+        self.check_btn.connect("clicked", lambda *_: self.refresh())
+        for b in (self.gen_btn, self.kleo_btn, self.file_btn):
+            acts.pack_start(b, False, False, 0)
+        acts.pack_end(self.check_btn, False, False, 0)
+        outer.pack_start(acts, False, False, 0)
+
+        self.work = Gtk.Box(spacing=6)
+        self.spinner = Gtk.Spinner()
+        self.work_label = wrap_label()
+        self.work.pack_start(self.spinner, False, False, 0)
+        self.work.pack_start(self.work_label, True, True, 0)
+        self.work.set_no_show_all(True)
+        self.spinner.show(); self.work_label.show()
+        outer.pack_start(self.work, False, False, 0)
+        outer.pack_start(wrap_label(LIVE_NOTE), False, False, 0)
+        self.reload_accounts()
+
+    # ------------------------------------------------------------------------------------- state
+    def jid(self):
+        t = (self.account.get_active_id() or self.account.get_child().get_text() or "").strip()
+        return t if gk.valid_jid(t) else None
+
+    def reload_accounts(self):
+        cur = self.jid()
+        self.account.remove_all()
+        accts = gk.gajim_accounts()
+        for jid, label in accts:
+            self.account.append(jid, jid if label in (jid, "") else "%s (%s)" % (jid, label))
+        if cur:
+            if not self.account.set_active_id(cur):
+                self.account.get_child().set_text(cur)
+        elif accts:
+            self.account.set_active(0)
+        self.refresh()
+
+    def on_account_changed(self):
+        if self.account.get_active_id():
+            self.account.get_child().set_text(self.account.get_active_id())
+        self.refresh()
+
+    def set_busy(self, busy, text=""):
+        self.busy = busy
+        for b in (self.gen_btn, self.kleo_btn, self.file_btn, self.check_btn, self.refresh_btn, self.account, self.cards):
+            b.set_sensitive(not busy)
+        self.work_label.set_text(text)
+        self.work.set_visible(busy)
+        (self.spinner.start if busy else self.spinner.stop)()
+
+    def refresh(self):
+        if self.busy:
+            return
+        self.gajim_bar.set_visible(gk.gajim_running())
+        for c in self.cards.get_children() + self.results.get_children():
+            c.destroy()
+        jid = self.jid()
+        has = jid is not None
+        for b in (self.gen_btn, self.kleo_btn, self.file_btn, self.check_btn):
+            b.set_sensitive(has)
+        if not has:
+            self.status.set_markup("<b>Choose a Gajim account, or type your address (name@server).</b>")
+            return
+        home = gk.homedir(jid)
+        if not gk.gajim_running():
+            self.touched.add(home)      # listing starts this keyring's gpg-agent: stopped again at close
+        try:
+            keys = gk.list_keys(home)
+        except gk.KeyError_ as e:
+            keys = []
+            self.status.set_markup("<b>%s</b>" % esc(str(e)))
+        st = gk.account_status(keys, jid)
+        self.status.set_markup("<b>%s: %s</b>" % (esc(jid), esc(st)))
+        for k in keys:
+            self.cards.pack_start(self.card(jid, home, k), False, False, 0)
+        for r, t, d in gk.checks(jid, home):
+            row = Gtk.Box(spacing=8)
+            tag = Gtk.Label(xalign=0)
+            tag.set_markup("<b>%s</b>" % RESULT_TEXT[r]); tag.set_width_chars(5)
+            tag.set_valign(Gtk.Align.START)
+            row.pack_start(tag, False, False, 0)
+            row.pack_start(wrap_label("<b>%s</b>%s" % (esc(t), ("\n" + esc(d)) if d else ""), markup=True,
+                                      selectable=True), True, True, 0)
+            self.results.pack_start(row, False, False, 0)
+        self.show_all()
+        self.gajim_bar.set_visible(gk.gajim_running())
+
+    def card(self, jid, home, k):
+        f = Gtk.Frame(label=" Key %s " % gk.short_fpr(k.fpr))
+        f.get_style_context().add_class("prestium-section")
+        b = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        b.set_border_width(8)
+        f.add(b)
+        b.pack_start(wrap_label("<b>%s</b>" % esc(gk.key_status(k, jid)), markup=True), False, False, 0)
+        b.pack_start(wrap_label("<tt>%s</tt>" % esc(gk.fmt_fpr(k.fpr)), markup=True, selectable=True), False, False, 0)
+        b.pack_start(wrap_label("Created %s UTC, expires %s" % (gk._date(k.created),
+                     (gk._date(k.expires) + " UTC") if k.expires else "never")), False, False, 0)
+        first = gk.gajim_uid(k)
+        for u in k.uids:
+            r = Gtk.Box(spacing=6)
+            note = " (revoked)" if u.revoked else (" (Gajim reads this one)" if u.text == first else "")
+            r.pack_start(wrap_label(u.text + note, selectable=True), True, True, 0)
+            if not u.revoked:
+                if u.text.startswith("xmpp:") and u.text != first:
+                    p = Gtk.Button(label="Make primary")
+                    p.connect("clicked", lambda _b, t=u.text: self.write(home, "Making %s the primary user ID…" % t,
+                                                                         gk.primary_uid, home, k.fpr, t))
+                    r.pack_end(p, False, False, 0)
+                rv = Gtk.Button(label="Revoke…")
+                rv.connect("clicked", lambda _b, t=u.text: self.on_revoke(jid, home, k, t))
+                r.pack_end(rv, False, False, 0)
+            b.pack_start(r, False, False, 0)
+        bb = Gtk.Box(spacing=6)
+        add = Gtk.Button(label="Add user ID…")
+        add.connect("clicked", lambda *_: self.on_add_uid(jid, home, k))
+        bb.pack_start(add, False, False, 0)
+        if k.ownertrust != "u":
+            t = Gtk.Button(label="Mark as my key")
+            t.connect("clicked", lambda *_: self.write(home, "Setting ownertrust…", gk.set_ultimate, home, k.fpr))
+            bb.pack_start(t, False, False, 0)
+        bk = Gtk.Button(label="Back up…")
+        bk.connect("clicked", lambda *_: self.on_backup(jid, home, k))
+        bb.pack_start(bk, False, False, 0)
+        dl = Gtk.Button(label="Delete…")
+        dl.get_style_context().add_class("destructive-action")
+        dl.connect("clicked", lambda *_: self.on_delete(jid, home, k))
+        bb.pack_end(dl, False, False, 0)
+        b.pack_start(bb, False, False, 0)
+        return f
+
+    # ------------------------------------------------------------------------------------- dialogs
+    def message(self, kind, text, secondary=""):
+        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=kind, buttons=Gtk.ButtonsType.CLOSE,
+                              text=text)
+        d.set_title(TITLE)
+        if secondary:
+            d.format_secondary_text(secondary)
+        d.run(); d.destroy()
+
+    def confirm(self, text, secondary, ok_label, destructive=False):
+        d = Gtk.MessageDialog(transient_for=self, modal=True, message_type=Gtk.MessageType.QUESTION, text=text)
+        d.set_title(TITLE)
+        d.format_secondary_text(secondary)
+        d.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        ok = d.add_button(ok_label, Gtk.ResponseType.OK)
+        ok.get_style_context().add_class("destructive-action" if destructive else "suggested-action")
+        r = d.run(); d.destroy()
+        return r == Gtk.ResponseType.OK
+
+    def gajim_ok(self):
+        """Before a change: Gajim must not be running (or the user goes on anyway)."""
+        if not gk.gajim_running():
+            return True
+        return self.confirm("Gajim is running", GAJIM_NOTE + " Quit Gajim (Ctrl+Q in Gajim), then continue.",
+                            "Continue anyway")
+
+    def write(self, home, text, fn, *args, done=None):
+        """Run a change in a thread (gpg may wait on its passphrase prompt), then refresh."""
+        if self.busy or not self.gajim_ok():
+            return
+        self.touched.add(home)
+        self.set_busy(True, text + " GnuPG may ask for a passphrase in its own window.")
+
+        def run():
+            try:
+                res, err = fn(*args), None
+            except gk.KeyError_ as e:
+                res, err = None, str(e)
+            except OSError as e:
+                res, err = None, "%s: %s" % (getattr(e, "filename", "") or "file", e.strerror or e)
+            GLib.idle_add(finish, res, err)
+
+        def finish(res, err):
+            self.set_busy(False)
+            self.refresh()
+            if err:
+                self.message(Gtk.MessageType.ERROR, "That did not work", err)
+            elif done:
+                done(res)
+            return False
+        threading.Thread(target=run, daemon=True).start()
+
+    def on_generate(self):
+        jid = self.jid()
+        home = gk.homedir(jid)
+        existing = gk.list_keys(home)
+        d = Gtk.Dialog(title="Generate Key", transient_for=self, modal=True)
+        box = d.get_content_area(); box.set_spacing(8); box.set_border_width(12)
+        box.pack_start(wrap_label("A new key for %s, as Gajim makes it: user ID xmpp:%s, GnuPG's default "
+                                  "algorithm (Ed25519 and Curve25519), no expiry." % (jid, jid)), False, False, 0)
+        if existing:
+            box.pack_start(wrap_label("This account already has a key. With two keys Gajim uses only the first; "
+                                      "delete the one you don't want afterwards."), False, False, 0)
+        pw = Gtk.CheckButton(label="Protect it with a passphrase (Gajim will then ask for it)")
+        box.pack_start(pw, False, False, 0)
+        d.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("Generate", Gtk.ResponseType.OK).get_style_context().add_class("suggested-action")
+        d.show_all()
+        r, protect = d.run(), pw.get_active()
+        d.destroy()
+        if r == Gtk.ResponseType.OK:
+            self.write(home, "Generating a key…", lambda: gk.generate(jid, passphrase=protect),
+                       done=lambda fpr: self.message(Gtk.MessageType.INFO, "Key generated", gk.fmt_fpr(fpr) + "\n\n"
+                                                     + LIVE_NOTE))
+
+    def on_import_kleopatra(self):
+        jid = self.jid()
+        try:
+            src = gk.source_keys()
+        except gk.KeyError_ as e:
+            return self.message(Gtk.MessageType.ERROR, "Could not read Kleopatra's keyring", str(e))
+        if not src:
+            return self.message(Gtk.MessageType.INFO, "No secret keys in Kleopatra",
+                                "%s holds no key with its secret part. Make one in Kleopatra first, or press "
+                                "Generate key… here." % gk.GNUPG)
+        d = Gtk.Dialog(title="Import from Kleopatra", transient_for=self, modal=True)
+        d.set_default_size(560, -1)
+        box = d.get_content_area(); box.set_spacing(8); box.set_border_width(12)
+        box.pack_start(wrap_label("Copies a key from Kleopatra's keyring (~/.gnupg) into Gajim's keyring for %s. "
+                                  "Kleopatra's keyring is only read, never changed; the copy keeps the key's "
+                                  "passphrase." % jid), False, False, 0)
+        group, radios = None, []
+        for k in src:
+            names = ", ".join(u.text for u in k.uids if not u.revoked) or "(no user ID)"
+            label = "%s\n%s%s" % (names, gk.fmt_fpr(k.fpr), "  (only a stub: can't be copied)" if k.secret == "#" else "")
+            rb = Gtk.RadioButton.new_with_label_from_widget(group, label)
+            group = group or rb
+            rb.set_sensitive(k.secret != "#")
+            box.pack_start(rb, False, False, 0)
+            radios.append((rb, k))
+        addu = Gtk.CheckButton(label="Add the user ID xmpp:%s to Gajim's copy if it is missing" % jid)
+        addu.set_active(True)
+        box.pack_start(addu, False, False, 0)
+        d.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("Import", Gtk.ResponseType.OK).get_style_context().add_class("suggested-action")
+        d.show_all()
+        r = d.run()
+        pick = [k for rb, k in radios if rb.get_active() and k.secret != "#"]
+        add_it = addu.get_active()
+        d.destroy()
+        if r != Gtk.ResponseType.OK or not pick:
+            return
+        home = gk.homedir(jid)
+        self.write(home, "Importing the key…", gk.import_from_source, jid, pick[0].fpr, None, add_it,
+                   done=lambda notes: self.message(Gtk.MessageType.INFO, "Key imported",
+                                                   "\n".join((notes or []) + [LIVE_NOTE])))
+
+    def on_import_file(self):
+        jid = self.jid()
+        d = Gtk.FileChooserDialog(title="Import a Key File", transient_for=self, action=Gtk.FileChooserAction.OPEN)
+        d.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("Import", Gtk.ResponseType.OK)
+        d.set_current_folder(os.path.join(gk.HOME, "Documents"))
+        r, path = d.run(), d.get_filename()
+        d.destroy()
+        if r != Gtk.ResponseType.OK or not path:
+            return
+        self.write(gk.homedir(jid), "Importing %s…" % os.path.basename(path), gk.import_file, jid, path,
+                   done=lambda new: self.message(Gtk.MessageType.INFO, "Imported" if new else "Nothing new imported",
+                                                 "\n".join(gk.fmt_fpr(f) for f in new) or
+                                                 "The file held no secret key that was not already here."))
+
+    def on_add_uid(self, jid, home, k):
+        d = Gtk.Dialog(title="Add a User ID", transient_for=self, modal=True)
+        box = d.get_content_area(); box.set_spacing(8); box.set_border_width(12)
+        box.pack_start(wrap_label("Gajim needs exactly xmpp:%s. Other user IDs (a name, an email address) are "
+                                  "allowed too." % jid), False, False, 0)
+        e = Gtk.Entry(); e.set_text("xmpp:" + jid); e.set_activates_default(True)
+        box.pack_start(e, False, False, 0)
+        d.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("Add", Gtk.ResponseType.OK).get_style_context().add_class("suggested-action")
+        d.set_default_response(Gtk.ResponseType.OK)
+        d.show_all()
+        r, uid = d.run(), e.get_text().strip()
+        d.destroy()
+        if r == Gtk.ResponseType.OK and uid:
+            self.write(home, "Adding %s…" % uid, gk.add_uid, home, k.fpr, uid)
+
+    def on_revoke(self, jid, home, k, uid):
+        extra = ""
+        if uid == "xmpp:" + jid:
+            extra = (" This is the user ID Gajim needs for this account: once it is revoked, your contacts' clients "
+                     "can refuse the key. Make a new key instead, or add a second xmpp: user ID first.")
+        if self.confirm("Revoke %s?" % uid, "A revoked user ID stays on the key, marked as no longer valid; it can't "
+                        "be undone." + extra, "Revoke", destructive=True):
+            self.write(home, "Revoking %s…" % uid, gk.revoke_uid, home, k.fpr, uid)
+
+    def on_delete(self, jid, home, k):
+        if self.confirm("Delete key %s?" % gk.short_fpr(k.fpr), "The secret and public key are removed from Gajim's "
+                        "keyring for %s. Messages encrypted to it can't be read any more unless you have a backup. "
+                        "Kleopatra's keyring is not changed." % jid, "Delete", destructive=True):
+            self.write(home, "Deleting the key…", gk.delete_key, home, k.fpr)
+
+    def on_backup(self, jid, home, k):
+        prot = gk.key_protected(home, k)
+        how = ("The file is protected by the key's own passphrase (GnuPG asks for it)." if prot else
+               "This key has no passphrase, so the file is encrypted with a new passphrase that GnuPG asks for. "
+               "Keep that passphrase: the backup can't be restored without it.")
+        d = Gtk.FileChooserDialog(title="Back Up Key", transient_for=self, action=Gtk.FileChooserAction.SAVE)
+        d.add_button("Cancel", Gtk.ResponseType.CANCEL)
+        d.add_button("Save backup", Gtk.ResponseType.OK)
+        d.set_do_overwrite_confirmation(False)     # never replaced: the backup refuses an existing file
+        d.set_current_folder(os.path.join(gk.HOME, "Documents"))
+        d.set_current_name(jid + gk.BACKUP_SUFFIX)
+        d.set_extra_widget(wrap_label(how + " Save it in Documents or on a USB stick (the name must end in %s)."
+                                      % gk.BACKUP_SUFFIX))
+        r, path = d.run(), d.get_filename()
+        d.destroy()
+        if r != Gtk.ResponseType.OK or not path:
+            return
+        if not path.endswith(gk.BACKUP_SUFFIX):
+            path += gk.BACKUP_SUFFIX
+        if self.busy:
+            return
+        self.set_busy(True, "Writing the backup… GnuPG may ask for a passphrase in its own window.")
+
+        def run():
+            try:
+                res, err = gk.backup(jid, k.fpr, path, home), None
+            except gk.KeyError_ as e:
+                res, err = None, str(e)
+            GLib.idle_add(finish, res, err)
+
+        def finish(wrapped, err):
+            self.set_busy(False)
+            if err:
+                self.message(Gtk.MessageType.ERROR, "The backup was not written", err)
+            else:
+                self.message(Gtk.MessageType.INFO, "Backup saved", "%s\n\nTo restore it, press Import backup "
+                             "file… here.%s" % (path, " You will need the passphrase you just chose." if wrapped else ""))
+            return False
+        threading.Thread(target=run, daemon=True).start()
+
+    def on_close(self, *_):
+        # the gpg-agents this window started (in its own profile); Gajim's gpg starts its own when needed
+        for h in self.touched:
+            gk.kill_agent(h)
+        return False
+
+
+class App(Gtk.Application):
+    def __init__(self):
+        # no session bus for this tool (AppArmor): one window per start
+        super().__init__(application_id=APP_ID, flags=Gio.ApplicationFlags.NON_UNIQUE)
+        self.win = None
+
+    def do_activate(self):
+        if self.win is None:
+            self.win = Window(self)
+            self.win.show_all()
+            self.win.refresh()
+        self.win.present()
+
+
+def main():
+    return App().run(sys.argv[:1])
+
+
+if __name__ == "__main__":
+    sys.exit(main())

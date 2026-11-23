@@ -95,6 +95,9 @@
     <item label="Gajim" icon="org.gajim.Gajim">
       <action name="Execute" command="prestium-run gajim" />
     </item>
+    <item label="Gajim OpenPGP Keys" icon="dialog-password">
+      <action name="Execute" command="prestium-run /usr/local/bin/prestium-gajim-keys" />
+    </item>
     <item label="IRC (I2P)" icon="irc-chat">
       <action name="Execute" command="prestium-run /usr/local/bin/prestium-irc" />
     </item>

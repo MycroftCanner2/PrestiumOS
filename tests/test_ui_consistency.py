@@ -240,7 +240,7 @@ for f in glob.glob(os.path.join(I, "usr/local/bin/*")) + glob.glob(os.path.join(
 check(not widths, "message, question and form dialogs are 460 px wide", "; ".join(widths))
 
 # ----------------------------------------------------------------------------------------- 4. copy
-PROPER = {"Tor", "I2P", "Prestium", "VeraCrypt", "BitLocker"}
+PROPER = {"Tor", "I2P", "Prestium", "VeraCrypt", "BitLocker", "Kleopatra", "Gajim", "OpenPGP"}
 def sentence_case(label):
     t = label.replace("_", "").replace("Display Settings…", "Display settings…")
     words = re.findall(r"[A-Za-z][\w'’-]*", t)
@@ -271,7 +271,7 @@ for f in glob.glob(os.path.join(I, "usr/local/bin/*")) + glob.glob(os.path.join(
 check(not noverb, "zenity questions and forms name their action (no bare OK)", "; ".join(noverb))
 menu = read("etc/xdg/labwc/menu.xml")
 items = re.findall(r'<item label="([^"]+)"(?: icon="([^"]*)")?>\s*<action name="Execute" command="([^"]+)"', menu)
-SMALL = {"and", "or", "of", "the", "a", "an", "to", "via", "on", "in", "for"}
+SMALL = {"and", "or", "of", "the", "a", "an", "to", "via", "on", "in", "for", "from"}
 def title_case(t):
     words = re.findall(r"[A-Za-z][\w'’-]*", re.sub(r"\([^)]*\)", "", t))
     return bool(words) and all(w[0].isupper() or w in SMALL or w[0].isdigit() for w in words)

@@ -473,6 +473,35 @@ done in).
   if anything still differs (the package's extra `certificates` symlink, which 0700 sets anyway, may
   stay). 0700's check and all the `.deb` checks are unchanged. Tested by `tests/test_i2pd_deb.sh`
   (a package with the same symlinks, and a `/var/lib/i2pd` that can't be put back stops the build).
+- **New: Gajim OpenPGP Keys** (`/usr/local/bin/prestium-gajim-keys`, *Communication* menu after Gajim),
+  a GTK 3 window for the keys of Gajim's OpenPGP plugin. gajim-openpgp keeps one keyring per account
+  (`~/.local/share/gajim/openpgp/<address>/`), uses its first secret key, accepts it only if its first
+  `xmpp:` user ID is exactly `xmpp:<address>`, and ignores (and asks GnuPG to delete) keys with no
+  `xmpp:` user ID, so a key made in Kleopatra could not be used and there was no way to see why. The
+  window lists Gajim's accounts (read from `settings.sqlite` in memory, never locked or written; any
+  address can be typed), shows each key's fingerprint, user IDs, expiry and status, and runs the checks
+  with a fix for each (clock, keyring folder 700, one secret key, revoked, expired, created in the future,
+  secret key present, the `xmpp:` user ID Gajim reads, encryption and signing, ownertrust; whether the
+  server has the key is not checked, the tool has no network). It generates a key as the plugin does
+  (GnuPG's default Ed25519/Curve25519, no expiry, optional passphrase), imports one from Kleopatra and
+  adds the `xmpp:` user ID to Gajim's copy, adds, revokes and promotes user IDs (with a warning before
+  revoking the `xmpp:` one), sets ultimate ownertrust, deletes a key, and backs a key up to a new
+  `*.gajim-key.asc` file (a key with no passphrase is wrapped in AES-256 with a passphrase GnuPG asks
+  for) and restores it. It warns before a change while Gajim is running. `--check [address]` prints
+  the same report. All of it is the system gpg with `--homedir` (no new crypto library; the logic is in
+  `/usr/local/lib/prestium-keys/gajim_keys.py`, no GTK) and a passphrase is only ever typed into
+  pinentry. The import never runs gpg on `~/.gnupg`: the public keyring (or keyboxd's database) is
+  copied into a private `/tmp/prestium-keys-*` directory for gpg, and the secret key files are copied
+  byte for byte, still protected by their passphrase, so nothing in `~/.gnupg` is written, locked or
+  started. Its enforced profile `usr.local.bin.prestium-gajim-keys` allows no TCP/UDP or bus, reads
+  `~/.gnupg`'s public keyring and secret key files only, reads and writes Gajim's keyrings (never their
+  `*.conf`, the plugin's `contacts.db` or Gajim's messages), reads Gajim's settings, and writes only new
+  `*.gajim-key.asc` files in `~/Documents` or under `/media`; its gpg runs in a child profile that may
+  not touch `~/.gnupg` at all, with pinentry in `prestium_pinentry`. Gajim's own profile is unchanged.
+  Tested by `tests/test_gajim_keys.py` (real gpg in temporary keyrings: every status, the Kleopatra
+  import from a `pubring.kbx` and a keyboxd keyring left unchanged, backups and restores, the command
+  line, and Gajim's own plugin backend accepting the keys) and `tests/test_apparmor_gajim_keys.sh`
+  (paths from an strace of every flow, against the compiled profile). Not yet tested on a booted ISO.
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):
