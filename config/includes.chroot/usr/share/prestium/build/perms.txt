@@ -393,6 +393,7 @@
 0755 root root /usr/local/bin/prestium-i2p-reseed-gui
 0755 root root /usr/local/lib/prestium/verify-su3
 0755 root root /usr/local/lib/prestium/file-picker
+0755 root root /usr/local/lib/prestium/app-confine
 0644 root root /usr/share/applications/prestium-i2p-reseed.desktop
 0644 root root /usr/share/applications/prestium-i2p-reseed-manual.desktop
 0644 root root /usr/share/prestium/tor-bridges-builtin.json

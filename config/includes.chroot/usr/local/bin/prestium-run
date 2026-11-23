@@ -6,6 +6,21 @@
 # If the restricted socket is missing, it gets no Wayland at all and falls back to Xwayland, where
 # it can't touch Wayland windows either.
 [ $# -gt 0 ] || { echo "usage: prestium-run COMMAND [ARG...]" >&2; exit 2; }
+# security review F-01, F-05: the confined desktop applications start through app-confine (no session
+# or system bus but a filtered one, no Wayland broker, their own /tmp and /dev/shm). The ones in
+# /usr/bin have a shim in /usr/local/bin (hook 0625), first in PATH; these are in /usr/local/bin
+# themselves, and a real path in /usr/bin is sent to its shim.
+case $1 in
+  feather|/usr/local/bin/feather|prestium-gajim-keys|/usr/local/bin/prestium-gajim-keys|prestium-translate|/usr/local/bin/prestium-translate)
+    n=${1##*/}; shift; exec /usr/local/lib/prestium/app-confine "$n" "$@" ;;
+  prestium-audacity|/usr/local/bin/prestium-audacity)
+    shift; exec /usr/local/lib/prestium/app-confine audacity "$@" ;;
+  /usr/bin/*)
+    n=${1##*/}
+    if [ -x "/usr/local/bin/$n" ] && grep -q '^exec /usr/local/lib/prestium/app-confine ' "/usr/local/bin/$n" 2>/dev/null; then
+      shift; exec "/usr/local/bin/$n" "$@"
+    fi ;;
+esac
 S=/run/prestium-wl/$(id -u)/apps
 if [ -S "$S" ]; then
   export WAYLAND_DISPLAY="$S"

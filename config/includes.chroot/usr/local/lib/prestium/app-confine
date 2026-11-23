@@ -1,0 +1,408 @@
+#!/usr/bin/python3 -I
+# Prestium (security review F-01, F-05): start a desktop application in its own mount namespace, so
+# it can't reach the session bus, the system bus or the Wayland broker, and has its own /tmp and
+# /dev/shm.
+#
+# Why: on the 6.12 kernel AppArmor does not mediate connect() on a Unix socket path, and it enforces
+# no D-Bus rules, so the "deny" rules in prestium-app-common for /run/user/*/bus, the system bus and
+# /run/prestium-wl/broker did not stop a confined application from talking to them (for example
+# systemd --user's StartTransientUnit, which runs any program outside every profile). Here those
+# sockets are not in the application's view of the file system at all:
+#   /run/user/<uid>   the group's own runtime directory ($XDG_RUNTIME_DIR/prestium-confine/<group>),
+#                     with only PulseAudio's and PipeWire's sockets and dconf's cache bound in, plus
+#                     the real gnupg/ for the apps that use ~/.gnupg (Kleopatra, Claws Mail). Gajim
+#                     and its keys tool get a private gnupg/ (F-02): ~/.gnupg's agent is not there.
+#   session bus       none, or a filtered xdg-dbus-proxy at /run/user/<uid>/prestium-bus: the app may
+#                     own its own names and talk to notifications and the panel's tray, nothing else
+#                     (no systemd, no portals, no dconf writes, no other application).
+#   /run/dbus         an empty tmpfs (no system bus)
+#   /run/prestium-wl  an empty tmpfs with only /run/prestium-wl/<uid> (the restricted Wayland socket)
+#                     bound back: the broker's socket is gone
+#   /tmp              /tmp/.prestium-confine-<uid>/<group> (shared by the instances of one group, for
+#                     single-instance sockets), with Xwayland's /tmp/.X11-unix bound in
+#   /dev/shm          a new tmpfs for each start
+# The user and group ids are unchanged (a user namespace maps only the user's own ids); the
+# application has no capabilities once it runs, and its AppArmor profile still applies (no
+# no_new_privs is set, so the profiles' Px/Cx transitions keep working, unlike under bubblewrap).
+#
+# Usage: app-confine NAME [ARGS...]   (NAME from APPS below; /usr/local/bin/NAME shims call this)
+#        app-confine --list           (NAME and program, one per line, for hook 0625)
+# Fails closed: if the namespace or a mount can't be set up, the application is not started.
+# Fixed paths only, nothing from the environment decides what is mounted.
+import ctypes
+import os
+import select
+import signal
+import stat
+import subprocess
+import sys
+
+N = "notify"   # talk to org.freedesktop.Notifications
+T = "tray"     # talk to org.kde.StatusNotifierWatcher (waybar's tray)
+
+# name: (program, group, bus, own names, gnupg)
+#   bus: None (no session bus at all) or a tuple of talk permissions (N, T)
+#   gnupg: "shared" (bind the real $XDG_RUNTIME_DIR/gnupg) or "private" / None (the group's own)
+APPS = {
+    "gajim": ("/usr/bin/gajim", "gajim", (N, T), ("org.gajim.Gajim", "org.gajim.Gajim.*"), "private"),
+    "prestium-gajim-keys": ("/usr/local/bin/prestium-gajim-keys", "gajim", None, (), "private"),
+    "claws-mail": ("/usr/bin/claws-mail", "claws-mail", (N, T), (), "shared"),
+    "kleopatra": ("/usr/bin/kleopatra", "kleopatra", (N, T), ("org.kde.kleopatra", "org.kde.kleopatra.*"), "shared"),
+    "kwatchgnupg": ("/usr/bin/kwatchgnupg", "kleopatra", (N,), ("org.kde.kwatchgnupg",), "shared"),
+    "keepassxc": ("/usr/bin/keepassxc", "keepassxc", (N, T), ("org.keepassxc.KeePassXC.*",), None),
+    "libreoffice": ("/usr/bin/libreoffice", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "soffice": ("/usr/bin/soffice", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "lowriter": ("/usr/bin/lowriter", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "localc": ("/usr/bin/localc", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "loimpress": ("/usr/bin/loimpress", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "lodraw": ("/usr/bin/lodraw", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "lomath": ("/usr/bin/lomath", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "lobase": ("/usr/bin/lobase", "libreoffice", (N,), ("org.libreoffice.*",), None),
+    "onionshare": ("/usr/bin/onionshare", "onionshare", (N, T), ("org.onionshare.*",), None),
+    "onionshare-cli": ("/usr/bin/onionshare-cli", "onionshare", None, (), None),
+    "feather": ("/usr/local/bin/feather", "feather", (N, T), (), None),
+    "featherpad": ("/usr/bin/featherpad", "featherpad", (N,), ("org.featherpad.*",), None),
+    "fpad": ("/usr/bin/fpad", "featherpad", (N,), ("org.featherpad.*",), None),
+    "evince": ("/usr/bin/evince", "evince", (N,), ("org.gnome.Evince", "org.gnome.Evince.*"), None),
+    "vlc": ("/usr/bin/vlc", "vlc", (N, T), ("org.mpris.MediaPlayer2.vlc", "org.mpris.MediaPlayer2.vlc.*", "org.videolan.*"), None),
+    "file-roller": ("/usr/bin/file-roller", "file-roller", (N,), ("org.gnome.FileRoller", "org.gnome.FileRoller.*", "org.gnome.ArchiveManager1"), None),
+    "loupe": ("/usr/bin/loupe", "loupe", (N,), ("org.gnome.Loupe", "org.gnome.Loupe.*"), None),
+    "metadata-cleaner": ("/usr/bin/metadata-cleaner", "metadata-cleaner", (N,), ("fr.romainvigier.MetadataCleaner", "fr.romainvigier.MetadataCleaner.*"), None),
+    "mat2": ("/usr/bin/mat2", "mat2", None, (), None),
+    "prestium-translate": ("/usr/local/bin/prestium-translate", "translate", None, (), None),
+    # Audacity's own wrapper (bubblewrap network namespace); /usr/bin/audacity is hook 0620's shim
+    "audacity": ("/usr/local/bin/prestium-audacity", "audacity", None, (), None),
+}
+# A second start of Audacity joins the running one (its single-instance check needs the same
+# network namespace). That namespace belongs to the first start's user namespace, which only a
+# process outside every app-confine namespace can enter, so the join is done from here, before a
+# new namespace is made; audacity-ns join also enters the first start's mount namespace and refuses
+# it if a hidden socket is visible there.
+JOIN = {"audacity": ("prestium-audacity/ns.sock", "/usr/local/lib/prestium/audacity-ns",
+                     "/usr/libexec/prestium-audacity")}
+TALK = {N: "org.freedesktop.Notifications", T: "org.kde.StatusNotifierWatcher"}
+
+RUN_USER = "/run/user"
+SYSBUS_DIR = "/run/dbus"
+WL_BASE = "/run/prestium-wl"
+TMP = "/tmp"
+SHM = "/dev/shm"
+PROXY = "/usr/bin/xdg-dbus-proxy"
+RT_BINDS = ("pulse", "pipewire-0", "pipewire-0-manager", "dconf")
+
+CLONE_NEWNS = 0x00020000
+CLONE_NEWUSER = 0x10000000
+MS_RDONLY, MS_NOSUID, MS_NODEV, MS_NOEXEC = 1, 2, 4, 8
+MS_BIND, MS_REC, MS_PRIVATE = 4096, 16384, 1 << 18
+O_PATH = getattr(os, "O_PATH", 0o10000000)
+
+_libc = ctypes.CDLL(None, use_errno=True)
+_libc.mount.argtypes = [ctypes.c_char_p] * 3 + [ctypes.c_ulong, ctypes.c_char_p]
+_libc.unshare.argtypes = [ctypes.c_int]
+
+
+class Fail(Exception):
+    pass
+
+
+def _err(what):
+    e = ctypes.get_errno()
+    raise Fail("%s: %s" % (what, os.strerror(e)))
+
+
+def mount(src, tgt, fstype, flags, data=None):
+    b = lambda s: None if s is None else s.encode()  # noqa: E731
+    if _libc.mount(b(src), b(tgt), b(fstype), flags, b(data)) != 0:
+        _err("mount %s on %s" % (src or fstype, tgt))
+
+
+def fdpath(fd):
+    return "/proc/self/fd/%d" % fd
+
+
+def safe_dir(path, uid, create=True):
+    """A directory owned by uid, mode 0700, not a symlink (created if missing)."""
+    try:
+        st = os.lstat(path)
+    except FileNotFoundError:
+        if not create:
+            raise Fail("%s is missing" % path)
+        os.mkdir(path, 0o700)
+        st = os.lstat(path)
+    if not stat.S_ISDIR(st.st_mode) or st.st_uid != uid:
+        raise Fail("%s is not a directory of user %d" % (path, uid))
+    if stat.S_IMODE(st.st_mode) != 0o700:
+        os.chmod(path, 0o700)
+    return path
+
+
+def mountpoint(path, is_dir):
+    """Make sure path is an empty directory or a regular file, never a symlink (the app can write
+    its runtime directory and /tmp and may have replaced one), and return an O_PATH fd on it."""
+    try:
+        st = os.lstat(path)
+        if stat.S_ISLNK(st.st_mode) or stat.S_ISDIR(st.st_mode) != is_dir \
+                or (not is_dir and not stat.S_ISREG(st.st_mode)):
+            if stat.S_ISDIR(st.st_mode) and not stat.S_ISLNK(st.st_mode):
+                os.rmdir(path)
+            else:
+                os.unlink(path)
+            raise FileNotFoundError
+    except FileNotFoundError:
+        if is_dir:
+            os.mkdir(path, 0o700)
+        else:
+            os.close(os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+    return os.open(path, O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC)
+
+
+MS_REMOUNT, MS_NOATIME, MS_NODIRATIME, MS_RELATIME = 32, 1024, 2048, 1 << 21
+
+
+def remount_ro(path):
+    """Read-only, keeping the mount's other flags: in a user namespace the kernel refuses a remount
+    that would drop a flag the mount was given outside (nosuid, nodev, noexec, atime)."""
+    f = os.statvfs(path).f_flag
+    keep = f & (MS_NOSUID | MS_NODEV | MS_NOEXEC | MS_NOATIME | MS_NODIRATIME)
+    if f & 4096:  # ST_RELATIME
+        keep |= MS_RELATIME
+    mount(None, path, None, MS_BIND | MS_REMOUNT | MS_RDONLY | keep)
+
+
+def bind(src_fd, tgt_fd, ro=False, path=None):
+    """Bind src onto the target fd (no symlink can redirect it). The read-only remount must name the
+    new mount, so it goes by path, which now ends on that mount."""
+    mount(fdpath(src_fd), fdpath(tgt_fd), None, MS_BIND)
+    os.close(tgt_fd)
+    if ro:
+        remount_ro(path)
+
+
+def open_src(path):
+    try:
+        return os.open(path, O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC)
+    except OSError:
+        return None
+
+
+def start_proxy(uid, rt_base, group, talk, own):
+    """xdg-dbus-proxy on a socket outside the app's view; returns (socket path, read end of its
+    sync pipe). The proxy exits when that read end is closed (this supervisor exits)."""
+    sock = os.path.join(rt_base, ".bus-%s-%d" % (group, os.getpid()))
+    try:
+        os.unlink(sock)
+    except FileNotFoundError:
+        pass
+    r, w = os.pipe()
+    args = [PROXY, "--fd=%d" % w, "unix:path=%s/%d/bus" % (RUN_USER, uid), sock, "--filter"]
+    args += ["--own=%s" % n for n in own]
+    args += ["--talk=%s" % TALK[t] for t in talk]
+    try:
+        p = subprocess.Popen(args, pass_fds=(w,), stdin=subprocess.DEVNULL, close_fds=True,
+                             env={"PATH": "/usr/bin:/bin"})
+    except OSError as e:
+        raise Fail("D-Bus filter: %s" % e)
+    os.close(w)
+    ready, _, _ = select.select([r], [], [], 10)
+    if not ready or os.read(r, 1) != b"x":
+        p.kill()
+        raise Fail("the D-Bus filter (xdg-dbus-proxy) did not start")
+    return sock, r
+
+
+def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg):
+    """In the child: new user and mount namespace, then the mounts. Raises Fail."""
+    if _libc.unshare(CLONE_NEWUSER | CLONE_NEWNS) != 0:
+        _err("unshare")
+    with open("/proc/self/setgroups", "w") as f:
+        f.write("deny")
+    with open("/proc/self/uid_map", "w") as f:
+        f.write("%d %d 1" % (uid, uid))
+    with open("/proc/self/gid_map", "w") as f:
+        f.write("%d %d 1" % (gid, gid))
+    mount(None, "/", None, MS_REC | MS_PRIVATE)
+    run = "%s/%d" % (RUN_USER, uid)
+    # sources, opened in this namespace before anything covers them
+    src = {n: open_src(os.path.join(run, n)) for n in RT_BINDS}
+    if gnupg == "shared":
+        src["gnupg"] = open_src(os.path.join(run, "gnupg"))
+    wl = open_src("%s/%d" % (WL_BASE, uid))
+    x11 = open_src(os.path.join(TMP, ".X11-unix"))
+    rt_fd = os.open(rt, O_PATH | os.O_NOFOLLOW | os.O_DIRECTORY | os.O_CLOEXEC)
+    tmp_fd = os.open(ptmp, O_PATH | os.O_NOFOLLOW | os.O_DIRECTORY | os.O_CLOEXEC)
+    bus_fd = open_src(proxy_sock) if proxy_sock else None
+    if proxy_sock and bus_fd is None:
+        raise Fail("the D-Bus filter's socket is missing")
+
+    # /run/user/<uid>: the group's runtime directory
+    mount(fdpath(rt_fd), run, None, MS_BIND)
+    for n, fd in src.items():
+        if fd is None:
+            continue
+        is_dir = stat.S_ISDIR(os.fstat(fd).st_mode)
+        bind(fd, mountpoint(os.path.join(run, n), is_dir))
+    if gnupg == "shared" and src.get("gnupg") is None:
+        raise Fail("%s/gnupg is missing" % run)
+    for n in ("bus", "prestium-bus"):  # never a stale or planted socket of the app's own
+        p = os.path.join(run, n)
+        if os.path.lexists(p) and not (n == "prestium-bus" and bus_fd is not None):
+            if os.path.isdir(p) and not os.path.islink(p):
+                os.rmdir(p)
+            else:
+                os.unlink(p)
+    if bus_fd is not None:
+        bind(bus_fd, mountpoint(os.path.join(run, "prestium-bus"), False))
+    with open(os.path.join(run, ".prestium-confined"), "w") as f:
+        f.write(name + "\n")
+
+    # no system bus, no broker
+    if os.path.isdir(SYSBUS_DIR):
+        mount("tmpfs", SYSBUS_DIR, "tmpfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0755,size=16k")
+    if os.path.isdir(WL_BASE):
+        mount("tmpfs", WL_BASE, "tmpfs", MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=0755,size=16k")
+        if wl is not None:
+            os.mkdir("%s/%d" % (WL_BASE, uid), 0o755)
+            t = os.open("%s/%d" % (WL_BASE, uid), O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC)
+            bind(wl, t, ro=True, path="%s/%d" % (WL_BASE, uid))
+        remount_ro(WL_BASE)
+
+    # /tmp and /dev/shm
+    mount(fdpath(tmp_fd), TMP, None, MS_BIND)
+    if x11 is not None:
+        bind(x11, mountpoint(os.path.join(TMP, ".X11-unix"), True), ro=True, path=os.path.join(TMP, ".X11-unix"))
+    if os.path.isdir(SHM):
+        mount("tmpfs", SHM, "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777")
+    for fd in list(src.values()) + [wl, x11, rt_fd, tmp_fd, bus_fd]:
+        if fd is not None:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+
+def environment(uid, has_bus):
+    env = dict(os.environ)
+    run = "%s/%d" % (RUN_USER, uid)
+    for k in ("DBUS_SYSTEM_BUS_ADDRESS", "AT_SPI_BUS_ADDRESS", "SESSION_MANAGER", "TMPDIR",
+              "GNOME_KEYRING_CONTROL", "SSH_AUTH_SOCK", "GPG_AGENT_INFO", "LD_PRELOAD",
+              "LD_LIBRARY_PATH", "PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP"):
+        env.pop(k, None)
+    env["XDG_RUNTIME_DIR"] = run
+    # no session bus: an address that does not exist, so nothing autolaunches one
+    env["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=%s/%s" % (run, "prestium-bus" if has_bus else "no-bus")
+    s = "%s/%d/apps" % (WL_BASE, uid)
+    if os.path.exists(s):
+        env["WAYLAND_DISPLAY"] = s
+    else:  # as prestium-run: no Wayland at all, Xwayland only
+        env.update(WAYLAND_DISPLAY="prestium-no-wayland", GDK_BACKEND="x11", QT_QPA_PLATFORM="xcb",
+                   MOZ_ENABLE_WAYLAND="0")
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PRESTIUM_CONFINED"] = "1"
+    return env
+
+
+def notify_fail(msg):
+    sys.stderr.write("app-confine: %s\n" % msg)
+    try:
+        subprocess.run(["/usr/bin/notify-send", "-a", "Prestium", "-i", "dialog-error", "-u", "critical",
+                        "Application not started", msg], timeout=5, stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def main(argv):
+    if len(argv) == 2 and argv[1] == "--list":
+        for n in sorted(APPS):
+            print(n, APPS[n][0])
+        return 0
+    if len(argv) < 2 or argv[1] not in APPS:
+        sys.stderr.write("usage: app-confine NAME [ARGS...] | --list\n")
+        return 2
+    name, args = argv[1], argv[2:]
+    prog, group, talk, own, gnupg = APPS[name]
+    uid, gid = os.getuid(), os.getgid()
+    run = "%s/%d" % (RUN_USER, uid)
+    # already confined (an app of a confined group starting another): its mounts already apply
+    if os.path.exists(os.path.join(run, ".prestium-confined")) and not os.path.exists("%s/broker" % WL_BASE):
+        os.execve(prog, [prog] + args, environment(uid, os.path.exists(os.path.join(run, "prestium-bus"))))
+    try:
+        if uid == 0:
+            raise Fail("not as root")
+        safe_dir(run, uid, create=False)
+        base = safe_dir(os.path.join(run, "prestium-confine"), uid)
+        rt = safe_dir(os.path.join(base, group), uid)
+        tbase = safe_dir(os.path.join(TMP, ".prestium-confine-%d" % uid), uid)
+        ptmp = safe_dir(os.path.join(tbase, group), uid)
+        if name in JOIN:
+            rel, ns_helper, real = JOIN[name]
+            js = os.path.join(rt, rel)
+            try:
+                is_sock = stat.S_ISSOCK(os.lstat(js).st_mode)
+            except OSError:
+                is_sock = False
+            if is_sock and subprocess.run([ns_helper, "check", js], stdin=subprocess.DEVNULL,
+                                          stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                          env={"PATH": "/usr/bin:/bin"}).returncode == 0:
+                os.execve(ns_helper, [ns_helper, "join", js, "--", real] + args, environment(uid, False))
+        sock, sync = (None, None)
+        if talk is not None:
+            if not os.path.exists(os.path.join(run, "bus")):
+                raise Fail("no session bus")
+            sock, sync = start_proxy(uid, base, group, talk, own)
+        env = environment(uid, sock is not None)
+        r, w = os.pipe()
+        pid = os.fork()
+        if pid == 0:
+            os.close(r)
+            try:
+                try:
+                    cwd = os.getcwd()
+                except OSError:
+                    cwd = "/"
+                setup(name, uid, gid, rt, ptmp, sock, gnupg)
+                # look the working directory up again: the old one could be in the host's /tmp
+                try:
+                    os.chdir(cwd)
+                except OSError:
+                    os.chdir(os.environ.get("HOME") or "/")
+            except (Fail, OSError) as e:
+                os.write(w, str(e).encode()[:900] or b"setup failed")
+                os._exit(127)
+            os.close(w)  # close-on-exec would do; an empty read means "set up"
+            try:
+                os.execve(prog, [prog] + args, env)
+            except OSError:
+                os._exit(127)
+        os.close(w)
+        err = b""
+        while True:
+            c = os.read(r, 1024)
+            if not c:
+                break
+            err += c
+        os.close(r)
+        if err:
+            os.waitpid(pid, 0)
+            raise Fail(err.decode(errors="replace"))
+        for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            signal.signal(s, lambda n, _f: os.kill(pid, n))
+        while True:
+            try:
+                _, status = os.waitpid(pid, 0)
+                break
+            except InterruptedError:
+                continue
+        if sock:
+            try:
+                os.unlink(sock)
+            except OSError:
+                pass
+        return os.waitstatus_to_exitcode(status) if status else 0
+    except (Fail, OSError) as e:
+        notify_fail("%s was not started: %s" % (name, e))
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

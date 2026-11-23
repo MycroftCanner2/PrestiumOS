@@ -2,10 +2,14 @@
 # Prestium: start or join Audacity's empty network namespace without ptrace.
 #
 # serve SOCK -- REAL [args...]
-#   Already in the namespace (called from bubblewrap). Publish the user and
-#   network namespace file descriptors on SOCK, then exec REAL.
+#   Already in the namespace (called from bubblewrap). Publish the user, mount
+#   and network namespace file descriptors on SOCK, then exec REAL.
+#   (Security review F-01: the mount namespace too, because Audacity runs in
+#   app-confine, whose mounts hide the session and system buses and the Wayland
+#   broker; a second start must get the same view, and join checks that it does.)
 # check SOCK
-#   Connect to SOCK, enter those namespaces, require only loopback, then
+#   Connect to SOCK, enter those namespaces, require only loopback (and none of
+#   the sockets app-confine hides), then
 #   exit 0 (the wrapper execs join only after this succeeds).
 # join SOCK -- REAL [args...]
 #   Connect to SOCK, enter those namespaces, require that the only interface
@@ -26,6 +30,7 @@ import socket
 import struct
 import sys
 
+CLONE_NEWNS = 0x00020000
 CLONE_NEWUSER = 0x10000000
 CLONE_NEWNET = 0x40000000
 PR_SET_PDEATHSIG = 1
@@ -69,6 +74,32 @@ def only_loopback():
             if name:
                 names.append(name)
     return names == ["lo"]
+
+
+# what app-confine hides (security review F-01): a joined start must not see any of these
+HIDDEN = ("/run/dbus/system_bus_socket", "/run/prestium-wl/broker")
+
+
+def confined_view():
+    for p in HIDDEN + ("/run/user/%d/bus" % os.getuid(),):
+        if os.path.lexists(p):
+            return False
+    return True
+
+
+def enter(user_fd, mnt_fd, net_fd):
+    """user, then mount (the working directory is looked up again in it), then network"""
+    try:
+        cwd = os.getcwd()
+    except OSError:
+        cwd = "/"
+    setns(user_fd, CLONE_NEWUSER)
+    setns(mnt_fd, CLONE_NEWNS)
+    try:
+        os.chdir(cwd)
+    except OSError:
+        os.chdir(os.environ.get("HOME") or "/")
+    setns(net_fd, CLONE_NEWNET)
 
 
 def peer_uid(conn):
@@ -124,11 +155,13 @@ def serve_loop(lsock):
                 continue
             net = os.open("/proc/self/ns/net", os.O_RDONLY)
             user = os.open("/proc/self/ns/user", os.O_RDONLY)
+            mnt = os.open("/proc/self/ns/mnt", os.O_RDONLY)
             try:
-                send_fds(conn, [user, net])
+                send_fds(conn, [user, mnt, net])
             finally:
                 os.close(net)
                 os.close(user)
+                os.close(mnt)
         except OSError:
             pass
         try:
@@ -179,7 +212,7 @@ def join(path, real, args):
         sock.connect(path)
         if peer_uid(sock) != os.getuid():
             _die()
-        user_fd, net_fd = recv_fds(sock, 2)
+        user_fd, mnt_fd, net_fd = recv_fds(sock, 3)
     except OSError:
         _die()
     finally:
@@ -188,20 +221,16 @@ def join(path, real, args):
         except OSError:
             pass
     try:
-        setns(user_fd, CLONE_NEWUSER)
-        setns(net_fd, CLONE_NEWNET)
+        enter(user_fd, mnt_fd, net_fd)
     except OSError:
         _die()
     finally:
-        try:
-            os.close(user_fd)
-        except OSError:
-            pass
-        try:
-            os.close(net_fd)
-        except OSError:
-            pass
-    if not only_loopback():
+        for fd in (user_fd, mnt_fd, net_fd):
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+    if not only_loopback() or not confined_view():
         _die()
     _exec(real, args)
 
@@ -216,7 +245,7 @@ def check(path):
         sock.connect(path)
         if peer_uid(sock) != os.getuid():
             _die()
-        user_fd, net_fd = recv_fds(sock, 2)
+        user_fd, mnt_fd, net_fd = recv_fds(sock, 3)
     except OSError:
         _die()
     finally:
@@ -225,20 +254,16 @@ def check(path):
         except OSError:
             pass
     try:
-        setns(user_fd, CLONE_NEWUSER)
-        setns(net_fd, CLONE_NEWNET)
+        enter(user_fd, mnt_fd, net_fd)
     except OSError:
         _die()
     finally:
-        try:
-            os.close(user_fd)
-        except OSError:
-            pass
-        try:
-            os.close(net_fd)
-        except OSError:
-            pass
-    if not only_loopback():
+        for fd in (user_fd, mnt_fd, net_fd):
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+    if not only_loopback() or not confined_view():
         _die()
     sys.exit(0)
 
