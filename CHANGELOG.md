@@ -32,6 +32,14 @@ Each entry names the review finding (F-xx) it fixes.
   logical CPU count, as `mds=full,nosmt` already did on affected Intel CPUs. Test:
   `tests/test_cmdline_hardening.sh`.
 
+- **F-06: third-party apt keys are trusted for their own repository only.** live-build put the Tor
+  Project and LibreWolf build-time keys (`config/archives/*.key.chroot`) in `/etc/apt/trusted.gpg.d`,
+  where apt trusts a key for every source, Debian's included, during the build. The keys moved to
+  `config/apt-keyrings/`; `build.sh` installs them in `/etc/apt/keyrings/` after `lb bootstrap`, the
+  build-time lists name them with `signed-by`, and the build stops if a `.key` file reappears in
+  `config/archives` or a Prestium key lands in `trusted.gpg.d`. The final image's sources were already
+  scoped (`/usr/share/keyrings`). Test: `tests/test_apt_keyrings.sh` (also pins both fingerprints).
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build
