@@ -19,7 +19,6 @@ require systemd.gpt_auto=0
 require noprompt
 require block.events_dfl_poll_msecs=1000
 require slab_nomerge
-require slub_debug=FZP
 require mce=0
 require vsyscall=none
 require ia32_emulation=0
@@ -29,6 +28,7 @@ require init_on_free=1
 require page_alloc.shuffle=1
 require randomize_kstack_offset=on
 require pti=on
+require mitigations=auto,nosmt
 require mds=full,nosmt
 require spec_store_bypass_disable=on
 require debugfs=off

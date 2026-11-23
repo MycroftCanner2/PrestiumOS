@@ -80,6 +80,17 @@ Each entry names the review finding (F-xx) it fixes.
   get their own `$XDG_RUNTIME_DIR`, in which `~/.gnupg`'s agent does not exist. Tests:
   `test_apparmor_gajim.sh` and `test_apparmor_gajim_keys.sh` (compiled-profile checks).
 
+- **F-04: kernel pointers are hashed again.** `slub_debug=FZP` made the 6.12 kernel switch off
+  pointer hashing (`no_hash_pointers` is forced by slub_debug before 6.17), so `%p` printed real kernel
+  addresses. It is gone from APPEND, `cmdline.policy` and `config/binary`. Its hardening is still covered
+  by `slab_nomerge`, `init_on_alloc=1`, `init_on_free=1` and `page_poison=1`; the slab consistency checks
+  (`F`) and red zones (`Z`) are lost. Test: `tests/test_cmdline_hardening.sh`.
+- **F-15: all CPU mitigations, SMT off.** `mitigations=auto,nosmt` is added to APPEND and required by
+  `cmdline.policy` (the per-issue options such as `mds=full,nosmt` stay), so every mitigation the kernel
+  knows is on and SMT is disabled for all the issues that need it. On CPUs with SMT this halves the
+  logical CPU count, as `mds=full,nosmt` already did on affected Intel CPUs. Test:
+  `tests/test_cmdline_hardening.sh`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build
