@@ -288,6 +288,9 @@ publicsuffix
 python3-pil
 qrencode
 qt5-gtk-platformtheme
+# security review F-01: Qt 5 and Qt 6 file dialogs through the desktop portal (app-confine's "env qt-portal")
+qt5-xdgdesktopportal-platformtheme
+qt6-xdgdesktopportal-platformtheme
 qtqr
 # 2.1: QtQR's webcam view is Qt Multimedia (QCamera); its GStreamer camera service is a Recommends
 # (libqt5multimedia5-plugins), which --apt-recommends false left out, so "Decode from webcam" found no camera.
@@ -339,6 +342,11 @@ x11-xserver-utils
 xauth
 xbitmaps
 xdg-dbus-proxy
+# security review F-01: the desktop portal for app-confine's applications: the file chooser (GTK back end;
+# files reach the application through the document portal) and links (Prestium's portal-open). The -wlr
+# back end is not needed (no screen sharing). The Qt plugins send Qt applications' file dialogs to it.
+xdg-desktop-portal
+xdg-desktop-portal-gtk
 xdg-user-dirs
 xdg-utils
 xfconf

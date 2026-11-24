@@ -1,0 +1,4 @@
+[Default Applications]
+x-scheme-handler/http=prestium-portal-open.desktop
+x-scheme-handler/https=prestium-portal-open.desktop
+x-scheme-handler/mailto=prestium-portal-open.desktop
