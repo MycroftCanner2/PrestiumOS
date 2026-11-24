@@ -46,6 +46,14 @@ modernization of the 2023 Prestium build, with tighter security and new features
   program a Prestium profile confines, and the boot checks the loaded set again. Neither Claws Mail's
   or Gajim's GnuPG nor Kleopatra may write or hard-link GnuPG's `*.conf` files, which can name helper programs.
   Audacity runs in an empty network namespace.
+- **One filtered session bus per application:** each confined desktop application (the AppArmor list
+  above) runs in its own mount namespace with no system bus, no Wayland broker, its own `/tmp`, and
+  either no session bus or an `xdg-dbus-proxy` that allows only what its policy file lists (security
+  review F-01): its own names, notifications and the tray, and for some the desktop portal's file
+  chooser and links. Never systemd, dconf or another application. A file picked in the portal's file
+  chooser (Gajim, OnionShare, FeatherPad, VLC) reaches the application through the document portal,
+  one file at a time, without widening its AppArmor profile; a link opened through the portal (Gajim)
+  opens in Tor Browser, a mail link in Claws Mail, and nothing else runs.
 - **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail
   and Gajim) and `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity,
   Kleopatra and Feather). Only three folders are app-specific: the I2P Browser's
@@ -338,6 +346,10 @@ Other notes:
   AppArmor, bubblewrap and Landlock alike. The fix, `CONFIG_MSEAL_SYSTEM_MAPPINGS` (system mappings
   sealed with `mseal`), needs kernel 6.15 or later; Debian 13's 6.12 doesn't have it. `vsyscall=none`
   and `ia32_emulation=0` remove the legacy mappings and the 32-bit entry points, not this one.
+- **Confined applications don't save GSettings changes or see the system bus.** dconf writes would let
+  any application change every other application's settings, so they stay blocked; KeePassXC can't see
+  the screen lock (use its idle timeout); GTK 3 applications (Claws Mail, Evince, LibreOffice, Audacity)
+  keep their own file dialogs, limited to the folders their profiles allow.
 - The ISO itself isn't signed (`SHA256SUMS` is), and builds are not yet bit-for-bit reproducible.
 - More, with details, in the CHANGELOG's Known security limits.
 

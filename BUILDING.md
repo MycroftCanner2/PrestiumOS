@@ -167,6 +167,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `0405-prestium-verity` | live-boot mounts the image only through dm-verity: every image needs its hash tree and a root hash on the command line (`/usr/lib/live/boot/9989-prestium-verity.sh`), no plain-mount or root-hash-file fallback, no plain root, no `.fec`/`.fec.roots`/`.roothash`/`.roothash.p7s`/`*.module` next to the image; live-boot's initramfs hook stops sourcing `boot.conf` from the medium; the initramfs gets libcryptsetup (`/etc/initramfs-tools/hooks/prestium-verity`) |
 | `0500-prestium-permissions` | restores owners/modes of every included file (git does not store them); copies The Lounge's packages for the Tor instance (root:thelounge-tor, read-only) |
 | `0600-prestium-apparmor` | enforces all Prestium profiles (LibreWolf included) and compiles them to catch errors |
+| `0625-prestium-app-confine` | every start of a confined desktop application goes through `app-confine` (shims in `/usr/local/bin`, desktop-file, autostart and D-Bus activation overrides; the build stops on anything it can't redirect); checks every per-application bus policy (`app-confine --check`), the portals and setuid `fusermount3`, links the GTK portal back end into Prestium's back-end directory, and refuses a `/.flatpak-info` in the image (security review F-01) |
 | `0700-prestium-i2pd` | i2pd's real config in `/var/lib/i2pd`, owned by uid 2000; `tunnels.conf.d` root:i2pd 0750 (written by root helpers only through `/usr/local/lib/prestium/safefile`); Prestium's dark theme inlined into the torrent web UI |
 | `9980-prestium-vm-no-firmware` | quick_qubes: stops the build if any `firmware-*`, `*-microcode`, `iucode-tool` or `atmel-firmware` package is installed |
 | `9990-prestium-cleanup` | final apt sources with signed-by keyrings, package list record, removes build-only files |
@@ -277,6 +278,53 @@ instead, which works on 6.12. Revisit when AppArmor 5 reaches trixie(-backports)
 packages also moved the kernel to `/usr/lib/modules/<version>/vmlinuz` (`linux-binary-*`), copied to
 `/boot` only by `linux-base` 4.16 or later, so hook 9040's check that `/boot/vmlinuz-*` belongs to a signed
 `linux-image-*` package must learn that layout too.
+
+### Confined applications: per-application session bus and portals (security review F-01)
+
+`/usr/local/lib/prestium/app-confine` starts each AppArmor-confined desktop application (its table:
+Gajim, Claws Mail, Kleopatra, KeePassXC, LibreOffice, OnionShare, Feather, FeatherPad, Evince, VLC,
+File Roller, Loupe, Metadata Cleaner, mat2, Audacity, Prestium Translate, Prestium Keys) in its own
+mount namespace. What it may reach on the session bus is its policy file in
+`config/includes.chroot/usr/share/prestium/app-confine/<policy>.policy`: an allowlist, default deny,
+for an `xdg-dbus-proxy` run for that one start. The directives (`talk`, `own`, `call`, `broadcast`,
+`include`, `documents`, `env`, `own-if`, `bus none`) and their rules are in app-confine's header; it
+refuses (the application doesn't start, the build stops in hook 0625) any name of systemd, logind,
+dconf, the bus driver, Flatpak, a portal back end, the keyring or Prestium itself, any `talk` other
+than notifications and the tray, and any portal call outside its fixed list. To change what an
+application may do, edit its policy file and run `tests/test_app_confine_policy.py`, which also holds
+the expected matrix (which applications get no bus, the file chooser, links, the Qt portal plugin).
+
+The proxy runs outside the application's namespace, in a small user and mount namespace of its own
+whose root holds `/usr`, `/etc`, the session bus socket, app-confine's socket directory and a
+`/.flatpak-info` naming the application (`org.prestium.Confined.<policy>`). xdg-desktop-portal identifies
+a caller by reading `/proc/<pid>/root/.flatpak-info` of the bus peer, which is the proxy, so it treats the
+application as sandboxed: its file chooser hands the picked file over through the document portal
+(`/run/user/<uid>/doc/by-app/<app id>`, bound at `/run/user/<uid>/doc` in the application's view;
+`abstractions/prestium-app-documents` allows that path only to the profiles of the applications with
+`documents`), not by widening an AppArmor profile. app-confine writes
+`$XDG_RUNTIME_DIR/.flatpak/<instance>/bwrapinfo.json` (the application's pid, for the portal's checks)
+and removes it when the application exits. The application's own namespace has no `/.flatpak-info`, so
+GLib, GTK and Qt don't switch into Flatpak mode; GTK 4 uses the portals it can see, Qt uses them through
+`QT_QPA_PLATFORMTHEME=xdgdesktopportal` (`env qt-portal`), GTK 3 applications keep their own dialogs
+(`GTK_USE_PORTAL` would also send GIO's file launches to the portal's `OpenFile`, which no policy
+allows). `prestium.xdg-dbus-proxy` is the proxy's AppArmor profile (no network, runs nothing).
+
+The portal side: `xdg-desktop-portal`, `xdg-desktop-portal-gtk` and the Qt 5 and Qt 6 portal plugins are
+in the package list (`-wlr` is not: no screen sharing). Its systemd drop-in
+(`etc/systemd/user/xdg-desktop-portal.service.d/prestium.conf`) makes it read back ends only from
+`usr/share/prestium/portal/portals` (`portals.conf`: no back end by default; GTK's for the file chooser,
+the application chooser and the settings) and look link handlers up only in
+`usr/share/prestium/portal/open`, whose one handler, `usr/local/lib/prestium/portal-open`, opens http and
+https in Tor Browser and mailto in Claws Mail (address, subject, body, cc, bcc only) and refuses anything
+else. Desktop files and `mimeapps.list` in the home are never used by the portal.
+
+Not reachable, on purpose: the system bus (no policy needs it, logind included); dconf writes
+(`ca.desrt.dconf`: xdg-dbus-proxy can't limit them to one application's keys, and a write could change
+any application's or the desktop's settings, the GIO proxy settings included; a shared keyfile backend
+has the same problem); screen-lock signals for KeePassXC (labwc has no ScreenSaver service). Checks:
+`tests/test_app_confine_policy.py` (static), `tests/test_app_confine_portal.py` (a private bus with the
+real portals and a fake back end: identity, document portal, links, refusals; skips without the
+portals), `tests/test_app_confine.py` and `tests/test_app_confine_hook.sh`.
 
 ## Tor Connection Assistant and DNS
 

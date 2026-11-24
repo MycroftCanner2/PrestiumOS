@@ -189,6 +189,42 @@ Each entry names the review finding (F-xx) it fixes.
   is spoofed and guarded like an emulated card. A qube with a custom `mac` loses its network unless
   started with *MAC address spoofing off*. Tests: `test_mac_spoof_udev.sh`, `test_mac_guard_policy.py`,
   `test_mac_guard_dbus.py`.
+- **F-01 (follow-up): each confined application gets its own filtered session bus, and the desktop
+  portal's file chooser and links come back.** app-confine's bus permissions moved from a table in the
+  script to one policy file per application (`/usr/share/prestium/app-confine/<policy>.policy`, an
+  allowlist for `xdg-dbus-proxy`, default deny; `bus none` for no bus at all). app-confine refuses any
+  policy that names systemd, logind, dconf, the bus driver, Flatpak, a portal back end, the keyring or
+  Prestium's own services, talks to anything but notifications and the tray, or calls a portal method
+  outside a fixed list (FileChooser OpenFile/SaveFile/SaveFiles, OpenURI.OpenURI, Settings, Request,
+  `Properties.Get`, the document portal's GetMountPoint); hook 0625 checks every policy at build time.
+  Never allowed: OpenURI's OpenFile and OpenDirectory, Background, Camera, ScreenCast, RemoteDesktop,
+  Screenshot, Inhibit, Print, Email, Trash, DynamicLauncher, Secret, FileTransfer, `Properties.Set`,
+  `Documents.Add`. Per application: Gajim (GTK 4) gets the file chooser and links; OnionShare,
+  FeatherPad and VLC (Qt, through `qt5/qt6-xdgdesktopportal-platformtheme`) the file chooser; Claws Mail,
+  Kleopatra, KeePassXC, LibreOffice, Feather, Evince, File Roller, Loupe, Metadata Cleaner and kwatchgnupg
+  keep notifications, the tray and their own names (single instance) as before; KeePassXC may own
+  `org.freedesktop.secrets` only while its own Secret Service setting is on; the Gajim keys tool, mat2,
+  onionshare-cli, Prestium Translate and Audacity get no bus. Each proxy now runs in a small user and
+  mount namespace of its own (its own root: `/usr`, `/etc`, the bus socket, its socket directory and a
+  `/.flatpak-info` naming the application), so xdg-desktop-portal treats the application as sandboxed
+  (`org.prestium.Confined.<policy>`) and hands a picked file over through the document portal
+  (`/run/user/<uid>/doc/by-app/<app id>`, bound into the application's view; AppArmor
+  `abstractions/prestium-app-documents`, only for those four applications) instead of a path; the
+  application itself sees no `/.flatpak-info`. New AppArmor profile for xdg-dbus-proxy
+  (`prestium.xdg-dbus-proxy`: no network, runs nothing). New packages: `xdg-desktop-portal`,
+  `xdg-desktop-portal-gtk`, `qt5-xdgdesktopportal-platformtheme`, `qt6-xdgdesktopportal-platformtheme`.
+  The portal reads back ends only from `/usr/share/prestium/portal/portals` (`portals.conf`: none by
+  default; GTK's for the file chooser, the application chooser and the settings) and link handlers only
+  from `/usr/share/prestium/portal/open` (systemd drop-in), whose one handler, `portal-open`, opens http
+  and https in Tor Browser (through `prestium-run`) and mailto in Claws Mail (address, subject, body, cc,
+  bcc: never `attach`), and refuses everything else; a desktop file or `mimeapps.list` in the home is
+  never used. Still blocked, on purpose: the system bus, dconf writes (no per-key filter in
+  xdg-dbus-proxy), the screen-lock signals KeePassXC listens for (labwc has no ScreenSaver service).
+  Tests: `test_app_confine_policy.py` (every policy, crafted bad policies, portal configuration,
+  portal-open), `test_app_confine_portal.py` (a private bus with the real xdg-desktop-portal, document
+  portal and permission store and a fake back end: identity, a picked file read through the document
+  portal, another document invisible, an https link reaching the handler and nothing else, every
+  forbidden call refused), `test_app_confine.py` and `test_app_confine_hook.sh` updated.
 
 ## 2.1: changes since Prestium 2.0
 
