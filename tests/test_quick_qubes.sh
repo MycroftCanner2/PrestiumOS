@@ -76,8 +76,8 @@ sed -e 's|@PRESTIUM_VERSION@|@PRESTIUM_VERSION@|' "$R/config/bootloaders/grub-pc
 sed -e 's|@APPEND_LIVE@|APPEND|' "$R/config/bootloaders/syslinux_common/live.cfg.in" > "$T/w/binary/isolinux/live.cfg"
 before=$(grep -hE '^[[:space:]]*(linux|append)' "$T/w/binary/boot/grub/grub.cfg" "$T/w/binary/isolinux/live.cfg")
 (cd "$T/w/binary" && sh "$H/9000-prestium-boot-menu.hook.binary") >/dev/null 2>&1 && ok "hook 9000 runs" || bad "hook 9000 failed"
-grep -q 'menuentry "Prestium 2.1 quick_qubes (MAC address spoofing off)"' "$T/w/binary/boot/grub/grub.cfg" && ok "GRUB labels: Prestium 2.1 quick_qubes" || bad "GRUB labels: $(grep menuentry "$T/w/binary/boot/grub/grub.cfg" | head -2)"
-grep -q 'menu label ^Prestium 2.1 quick_qubes$' "$T/w/binary/isolinux/live.cfg" && ok "isolinux labels: Prestium 2.1 quick_qubes" || bad "isolinux labels"
+grep -q 'menuentry "Prestium 2.1 quick_qubes, VM only (MAC address spoofing off)"' "$T/w/binary/boot/grub/grub.cfg" && ok "GRUB labels: Prestium 2.1 quick_qubes, VM only" || bad "GRUB labels: $(grep menuentry "$T/w/binary/boot/grub/grub.cfg" | head -2)"
+grep -q 'menu label ^Prestium 2.1 quick_qubes, VM only$' "$T/w/binary/isolinux/live.cfg" && ok "isolinux labels: Prestium 2.1 quick_qubes, VM only" || bad "isolinux labels"
 after=$(grep -hE '^[[:space:]]*(linux|append)' "$T/w/binary/boot/grub/grub.cfg" "$T/w/binary/isolinux/live.cfg")
 [ "$before" = "$after" ] && ok "hook 9000 changes labels only, not kernel command lines" || bad "hook 9000 changed a command line"
 # the command line is main's (the cmdline guard and its policy are unchanged; test_boot_cmdline_guard.sh checks the match)

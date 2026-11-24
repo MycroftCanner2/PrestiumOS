@@ -175,6 +175,13 @@ Each entry names the review finding (F-xx) it fixes.
   7.3 kernel would need AppArmor 5 (not in trixie) for Unix-socket path mediation.
   Test: `tests/test_release_docs.sh`.
 
+- **quick_qubes warns on real hardware (security review F-08, quick_qubes only).** This build has no
+  CPU microcode or hardware firmware, which is right in a VM (the hypervisor loads the microcode) but
+  leaves a real computer without its CPU security fixes. `prestium-bare-metal.service`
+  (`ConditionVirtualization=!vm`, root without capabilities, writes only the safety-flag directory)
+  raises a *Protection NOT active* warning for the session when no VM is found, and the boot menu
+  labels read "Prestium 2.1 quick_qubes, VM only". Test: `tests/test_quick_qubes_bare_metal.sh`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build

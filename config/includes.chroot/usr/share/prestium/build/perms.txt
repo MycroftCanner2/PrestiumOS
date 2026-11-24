@@ -73,6 +73,7 @@
 0644 root root /etc/systemd/system/prestium-bootclock.service
 0644 root root /etc/systemd/system/prestium-usb-watchdog.service
 0644 root root /etc/systemd/system/prestium-vm-netcheck.service
+0644 root root /etc/systemd/system/prestium-bare-metal.service
 0644 root root /etc/systemd/system/prestium-wipe-session.service
 0644 root root /etc/systemd/system/thelounge.service
 0644 root root /etc/systemd/system/thelounge.service.d/prestium-191.conf

@@ -1,0 +1,38 @@
+# Prestium 2.1 quick_qubes (security review F-08): this build has no CPU microcode and no hardware
+# firmware (hook 9980; in a VM the hypervisor loads the microcode). Booted on real hardware, it raises a
+# safety flag that prestium-safety-notify shows as "Protection NOT active" for the whole session.
+# Never runs in a virtual machine.
+[Unit]
+Description=Prestium quick_qubes: warn when started on real hardware (no CPU microcode)
+ConditionVirtualization=!vm
+After=systemd-tmpfiles-setup.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/lib/prestium/safety-flag set bare-metal "This is the quick_qubes build of Prestium, made for virtual machines and Qubes OS: it has no CPU microcode updates and no hardware firmware. No virtual machine was found, so this computer runs without the CPU security fixes its microcode would bring (Spectre-class bugs, Downfall, Zenbleed and others), and Wi-Fi or graphics may not work. Use the standard Prestium ISO on real hardware."
+# root only to write the root-owned flag directory; no capabilities, nothing else writable
+ProtectSystem=strict
+ReadWritePaths=/run/prestium/safety
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictNamespaces=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target

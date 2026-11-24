@@ -193,7 +193,10 @@ Removed (a VM never touches the hardware these drive):
   the firmware licence preseeds and the `non-free-firmware` archive area. The host loads microcode for
   the real CPU, and the virtual devices need no firmware. live-build's `--firmware-chroot` and
   `--firmware-binary` stay explicitly `false`, and the new hook 9980 stops the build if a firmware or
-  microcode package gets installed anyway.
+  microcode package gets installed anyway. Don't boot this image on real hardware: it would run without
+  the CPU's microcode security fixes. The boot menu says "VM only", and started outside a VM it shows a
+  *Protection NOT active* warning for the whole session (`prestium-bare-metal.service`, security review
+  F-08). Use the standard ISO from `main` on a computer.
 - **Wi-Fi** (`wpasupplicant`, `wireless-tools`). A VM gets a virtual Ethernet card, and the host
   handles Wi-Fi.
 - **Mobile broadband and phone tethering** (`modemmanager`, `ppp`, `usb-modeswitch`,

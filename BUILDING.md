@@ -138,7 +138,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/includes.chroot/` | Prestium's own files and the package files it changes, carried over from the earlier Prestium root filesystem as a diff against the packaged files (see below), plus the 2.0 changes |
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
 | `config/hooks/live/*.hook.chroot` | setup steps, in order (below) |
-| `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels ("Prestium 2.1 quick_qubes": version and os-release `VARIANT_ID`) |
+| `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels ("Prestium 2.1 quick_qubes, VM only": version and os-release `VARIANT_ID`; review F-08) |
 | `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash, exported for submenus, also in the EFI image's and per-platform grub.cfg; needs mtools), every entry `--unrestricted`; isolinux `allowoptions 0`; every kernel line checked against a banned list (shells, init, security modules, debug, persistence, findiso=) and must have exactly one `lockdown=confidentiality` (review F-16); findiso= and loopback.cfg removed |
 | `scripts/grub-pbkdf2.py` | makes the GRUB password hash (`--random` for one nobody knows) |
 | `scripts/efi-inspect.py` | read-only facts about an EFI file for hook 9040: SBAT, a built-in certificate (shim's vendor CA), a GRUB image's built-in modules, prefix and objects |

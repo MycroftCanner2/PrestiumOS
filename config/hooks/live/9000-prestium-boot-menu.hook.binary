@@ -11,6 +11,9 @@ VAR=$(. ../chroot/etc/os-release 2>/dev/null && printf %s "$VARIANT_ID")
 [ -n "$VAR" ] || VAR=$(sed -n 's/^VARIANT_ID=\([a-z0-9_]*\)$/\1/p' ../config/hooks/live/0400-prestium-system.hook.chroot 2>/dev/null | head -1)
 case "$VAR" in *[!a-z0-9_]*) echo "E: bad VARIANT_ID $VAR"; exit 1 ;; esac
 [ -z "$VAR" ] || V="$V $VAR"
+# quick_qubes (security review F-08): the menu says the image is for virtual machines (no CPU microcode or
+# hardware firmware); booted on real hardware, prestium-bare-metal.service also warns on the desktop
+[ "$VAR" != quick_qubes ] || V="$V, VM only"
 for f in boot/grub/*.cfg isolinux/*.cfg; do
 	[ -f "$f" ] || continue
 	sed -i -e "s/Live system (amd64 fail-safe mode)/Prestium $V (nomodeset)/g" \
