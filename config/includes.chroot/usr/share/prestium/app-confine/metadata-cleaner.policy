@@ -3,3 +3,5 @@
 include notify
 own fr.romainvigier.MetadataCleaner
 own fr.romainvigier.MetadataCleaner.*
+# GTK's own file chooser: local mounts only, no GVfs monitors (they are not on its bus)
+env gio-local

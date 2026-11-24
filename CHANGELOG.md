@@ -63,6 +63,23 @@ run it is in the README's quick_qubes section.
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **Launch check: every menu application opens, three start-up errors fixed.** All 55 menu, panel and
+  desktop entries were started the way the menu does in a booted image chroot (labwc session, the
+  Wayland broker, PipeWire, the portals, app-confine), with a window check and screenshot each, and every
+  file each one opened was compared with its compiled AppArmor profile (denials replayed as EACCES to see
+  which ones matter). All open. Fixed:
+  - *Gajim:* its profile's rule for GStreamer's plugin scanner had the wrong path (Debian installs it in
+    `/usr/lib/<multiarch>/gstreamer1.0/gstreamer-1.0/`), so GStreamer loaded every plugin inside Gajim
+    itself instead; that path is now allowed (ix, nothing else there).
+  - *Local Firefox (I2P console, I2P Torrents, IRC pages):* Firefox's Wayland proxy needs a socket in
+    `$XDG_RUNTIME_DIR` its profile does not allow and printed a `bind() error` at every start;
+    `prestium-localfox` now turns the proxy off (`MOZ_DISABLE_WAYLAND_PROXY=1`, as the browser sandbox
+    already does). The profile is unchanged.
+  - *Metadata Cleaner:* GTK's file chooser asked each GVfs volume monitor, D-Bus services app-confine keeps
+    off its bus, and printed five D-Bus errors at every start; its policy now sets `env gio-local`
+    (`GVFS_REMOTE_VOLUME_MONITOR_IGNORE=1`: local mounts only). `org.gtk.vfs.*` stays forbidden.
+  Test: `tests/test_app_launch_check.py`.
+
 - **Gajim stores account passwords in its own settings, never in GNOME Keyring.** With `use_keyring` on
   (Gajim's default) Gajim could not save a password at all, since app-confine keeps
   `org.freedesktop.secrets` out of its bus, and asked for it at every start. `/etc/gajim/app-overrides.json`

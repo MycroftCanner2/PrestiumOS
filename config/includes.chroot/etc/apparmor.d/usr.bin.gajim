@@ -29,6 +29,9 @@ profile gajim /usr/bin/gajim {
   /usr/lib/python3.*/** mr,
   /usr/local/lib/python3*/** r,
   /usr/lib/@{multiarch}/gstreamer-1.0/gst-plugin-scanner ix,
+  # launch check: Debian's scanner is in gstreamer1.0/gstreamer-1.0/ (the rule above never matched it,
+  # so GStreamer fell back to loading every plugin inside Gajim itself)
+  /usr/lib/@{multiarch}/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner ix,
   /usr/libexec/gstreamer-1.0/gst-plugin-scanner ix,
 
   # Prestium's fixed app settings (use_keyring off: account passwords in settings.sqlite, never

@@ -150,7 +150,11 @@ FORBIDDEN = ("org.freedesktop.DBus", "org.freedesktop.systemd1", "org.freedeskto
 # policies do not allow, so no policy uses it)
 ENV_SETS = {"qt-portal": {"QT_QPA_PLATFORMTHEME": "xdgdesktopportal"},
             # Gajim's links (GIO's default handler): Tor Browser, see /usr/share/prestium/links-tor
-            "links-tor": {"XDG_CONFIG_DIRS": "/usr/share/prestium/links-tor:/etc/xdg"}}
+            "links-tor": {"XDG_CONFIG_DIRS": "/usr/share/prestium/links-tor:/etc/xdg"},
+            # launch check: no GVfs volume monitors (gvfs's GIO module skips them when this is set), so
+            # GTK's in-app file chooser lists the local mounts only. They are D-Bus services
+            # (org.gtk.vfs.*, FORBIDDEN here): asking each one printed five D-Bus errors at every start
+            "gio-local": {"GVFS_REMOTE_VOLUME_MONITOR_IGNORE": "1"}}
 # conditional names: KeePassXC's Secret Service (FdoSecrets) only while the user has turned it on in
 # KeePassXC's own settings ([FdoSecrets] Enabled=true in ~/.config/keepassxc/keepassxc.ini)
 OWN_IF = {"keepassxc-secret-service": ("org.freedesktop.secrets",)}
