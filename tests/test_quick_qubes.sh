@@ -82,7 +82,7 @@ after=$(grep -hE '^[[:space:]]*(linux|append)' "$T/w/binary/boot/grub/grub.cfg" 
 [ "$before" = "$after" ] && ok "hook 9000 changes labels only, not kernel command lines" || bad "hook 9000 changed a command line"
 # the command line is main's (the cmdline guard and its policy are unchanged; test_boot_cmdline_guard.sh checks the match)
 A=$(sed -n 's/^APPEND="\(.*\)"$/\1/p' "$R/auto/config")
-for t in modprobe.blacklist=libata module.sig_enforce=1 lockdown=integrity apparmor=1 security=apparmor init_on_free=1; do
+for t in modprobe.blacklist=libata module.sig_enforce=1 lockdown=confidentiality apparmor=1 security=apparmor init_on_free=1; do
   printf '%s\n' $A | grep -qx "$t" && ok "command line keeps $t" || bad "command line lost $t"; done
 
 ## live-boot: optical drivers early in a VM

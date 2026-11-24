@@ -238,7 +238,7 @@ Kept on purpose:
   the host powers the VM off, like pulling the USB stick. Booted with `toram`, it stays off as before.
 - **Secure Boot through shim, GRUB and the kernel:** it works in UEFI VMs with Secure Boot keys (OVMF
   `*.ms.fd`, VMware, VirtualBox 7). It doesn't matter in Qubes OS, whose HVMs boot SeaBIOS (isolinux),
-  but it does no harm. `lockdown=integrity` holds either way.
+  but it does no harm. `lockdown=confidentiality` holds either way.
 - **The internal-disk blacklist** (`ahci`, `libata`, `nvme` and the patched live-boot fallback), the
   full kernel command line and its guard, dm-verity, AppArmor, bubblewrap, Landlock, the ferm firewall,
   time over Tor, the shutdown memory wipe, the camera/microphone-off entry, PipeWire audio, `pcscd` (for
