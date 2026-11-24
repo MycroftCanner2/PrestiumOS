@@ -124,16 +124,31 @@ run_lb bootstrap
 # names its own keyring with signed-by. They stay there (no list uses them in the image; the final
 # lists use the packages' keyrings in /usr/share/keyrings).
 ls config/archives/*.key* >/dev/null 2>&1 && { echo "config/archives has a .key file: live-build would trust it for every source (F-06)"; exit 1; }
-install -d -m 755 chroot/etc/apt/keyrings
-install -m 644 config/apt-keyrings/prestium-tor.gpg config/apt-keyrings/prestium-librewolf.gpg chroot/etc/apt/keyrings/
-rm -f chroot/etc/apt/trusted.gpg.d/prestium-*.key.chroot.gpg chroot/etc/apt/trusted.gpg.d/prestium-*.key.chroot.asc
+# PRE-5: also into live-build's bootstrap cache. "lb installer" (installer_chroot) and "lb binary"
+# (binary_chroot) build their tool chroot from a fresh copy of cache/bootstrap and run
+# "chroot_archives chroot install" there, which copies config/archives/*.list.chroot and runs apt-get
+# update: without the keyrings in that copy apt refused both repositories ("Failed to parse keyring
+# /etc/apt/keyrings/prestium-*.gpg", "not signed") and the build stopped after the chroot stage.
+# Every run (a --resume too), since an older cache/bootstrap lacks them.
+for root in chroot cache/bootstrap; do
+	[ -d "$root/etc/apt" ] || continue
+	install -d -m 755 "$root/etc/apt/keyrings"
+	install -m 644 config/apt-keyrings/prestium-tor.gpg config/apt-keyrings/prestium-librewolf.gpg "$root/etc/apt/keyrings/"
+	rm -f "$root"/etc/apt/trusted.gpg.d/prestium-*.key.chroot.gpg "$root"/etc/apt/trusted.gpg.d/prestium-*.key.chroot.asc
+done
+[ -s chroot/etc/apt/keyrings/prestium-tor.gpg ] || { echo "no chroot to put the apt keyrings in"; exit 1; }
 run_lb chroot
 if ls chroot/etc/apt/trusted.gpg.d/prestium-* >/dev/null 2>&1; then echo "a Prestium key is in trusted.gpg.d (F-06)"; exit 1; fi
 for f in config/archives/*.list.chroot; do
 	[ ! -e "chroot/etc/apt/sources.list.d/$(basename "$f" .chroot)" ] || { echo "build-time apt list $(basename "$f" .chroot) still in the chroot"; exit 1; }
 done
 install -m 644 "$APTF"/* chroot/etc/apt/sources.list.d/
+# PRE-5: the tool chroots of the next two stages are copies of cache/bootstrap (see above)
+if [ ! -s cache/bootstrap/etc/apt/keyrings/prestium-tor.gpg ] || [ ! -s cache/bootstrap/etc/apt/keyrings/prestium-librewolf.gpg ]; then
+	echo "cache/bootstrap lacks the apt keyrings: lb installer and lb binary would fail (PRE-5)"; exit 1
+fi
 run_lb installer
+if ls chroot/etc/apt/trusted.gpg.d/prestium-* >/dev/null 2>&1; then echo "a Prestium key is in trusted.gpg.d (F-06)"; exit 1; fi
 run_lb binary
 run_lb source   # no-op unless sources are enabled (same stages as "lb build")
 

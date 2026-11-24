@@ -4,6 +4,17 @@
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **PRE-5: the build stopped after the chroot stage ("Failed to parse keyring /etc/apt/keyrings/prestium-*.gpg").**
+  `lb installer` and `lb binary` build their tool chroot from a fresh copy of live-build's bootstrap cache
+  (`cache/bootstrap`) and run `chroot_archives chroot install` there, which copies the build-time lists
+  (`config/archives/*.list.chroot`) and runs `apt-get update`. F-06 put the Tor Project and LibreWolf
+  keyrings only in the image chroot, so apt refused both repositories as unsigned in that copy. build.sh now
+  installs the same pinned keyrings in `cache/bootstrap/etc/apt/keyrings` too (on every run, so
+  `--resume` repairs an older cache) and checks for them before `lb installer`. The keys stay scoped
+  with signed-by, none goes to `trusted.gpg.d` (build.sh checks again after `lb installer`), and the image's
+  final lists are unchanged. Test: `tests/test_apt_keyrings.sh` runs build.sh's keyring block on a stand-in
+  tree, makes the tool chroots the way live-build does, and checks every signed-by file in each one.
+
 - **Launch check: every menu application opens, three start-up errors fixed.** All 55 menu, panel and
   desktop entries were started the way the menu does in a booted image chroot (labwc session, the
   Wayland broker, PipeWire, the portals, app-confine), with a window check and screenshot each, and every

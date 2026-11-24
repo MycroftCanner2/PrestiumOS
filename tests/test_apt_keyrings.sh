@@ -19,10 +19,40 @@ for f in "$R"/config/archives/*.list.chroot "$R"/config/archives/*.sources.chroo
   done
 done | tee "$R/.apt-keyrings.out"; grep -q '^FAIL' "$R/.apt-keyrings.out" && fail=1; rm -f "$R/.apt-keyrings.out"
 B=$R/build.sh
+# PRE-5: every keyring a build-time list names must exist in every chroot live-build runs
+# "chroot_archives chroot install" (copy config/archives/*.list.chroot, apt-get update) in: the image
+# chroot ("lb chroot") and the tool chroots of "lb installer" (installer_chroot) and "lb binary"
+# (binary_chroot), which are fresh copies of cache/bootstrap. Run build.sh's own keyring block on a
+# stand-in tree, make the tool chroots the way live-build does, and look for each signed-by file.
 b=$(grep -n '^run_lb bootstrap$' "$B" | cut -d: -f1); c=$(grep -n '^run_lb chroot$' "$B" | cut -d: -f1)
-i=$(grep -n 'install -m 644 config/apt-keyrings/prestium-tor.gpg config/apt-keyrings/prestium-librewolf.gpg chroot/etc/apt/keyrings/' "$B" | cut -d: -f1)
-[ -n "$b" ] && [ -n "$c" ] && [ -n "$i" ] && [ "$b" -lt "$i" ] && [ "$i" -lt "$c" ] && ok "build.sh installs the keyrings between bootstrap and chroot" \
-  || bad "build.sh: keyrings not installed between lb bootstrap and lb chroot"
+in=$(grep -n '^run_lb installer$' "$B" | cut -d: -f1); bi=$(grep -n '^run_lb binary$' "$B" | cut -d: -f1)
+k=$(grep -n '^for root in chroot cache/bootstrap; do$' "$B" | cut -d: -f1)
+[ -n "$b" ] && [ -n "$c" ] && [ -n "$k" ] && [ -n "$in" ] && [ -n "$bi" ] && [ "$b" -lt "$k" ] && [ "$k" -lt "$c" ] && [ "$c" -lt "$in" ] && [ "$in" -lt "$bi" ] \
+  && ok "build.sh installs the keyrings (image chroot and bootstrap cache) between lb bootstrap and lb chroot" \
+  || bad "build.sh: no keyring block for chroot and cache/bootstrap between lb bootstrap and lb chroot"
+T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
+mkdir -p "$T/config" "$T/chroot/etc/apt/trusted.gpg.d" "$T/cache/bootstrap/etc/apt/trusted.gpg.d"
+cp -r "$R/config/apt-keyrings" "$T/config/"
+touch "$T/cache/bootstrap/etc/apt/trusted.gpg.d/prestium-tor.key.chroot.gpg"   # a stale pre-F-06 copy
+if [ -n "$k" ]; then
+  awk -v s="$k" 'NR>=s{print} NR>s && /^done$/{exit}' "$B" > "$T/block.sh"
+  (cd "$T" && bash -eu block.sh) || bad "build.sh's keyring block failed on a stand-in tree"
+fi
+cp -a "$T/cache/bootstrap" "$T/installer-tool"     # installer_chroot: cp -a cache/bootstrap chroot
+cp -a "$T/cache/bootstrap" "$T/binary-tool"        # binary_chroot (bootstrap cached): the same
+for f in "$R"/config/archives/*.list.chroot "$R"/config/archives/*.sources.chroot; do
+  [ -e "$f" ] || continue; n=$(basename "$f")
+  for key in $(grep -vE '^\s*(#|$)' "$f" | sed -n 's/.*signed-by=\([^] ]*\).*/\1/p'); do
+    for st in chroot:"lb chroot" installer-tool:"lb installer" binary-tool:"lb binary"; do
+      d=${st%%:*}; [ -s "$T/$d$key" ] && cmp -s "$T/$d$key" "$R/config/apt-keyrings/$(basename "$key")" \
+        && ok "$n: $key there for ${st#*:}" || bad "$n: $key missing when ${st#*:} runs apt-get update"
+    done
+  done
+done
+for d in chroot installer-tool binary-tool; do
+  ls "$T/$d"/etc/apt/trusted.gpg.d/prestium-* >/dev/null 2>&1 && bad "$d: a Prestium key in trusted.gpg.d" || ok "$d: no Prestium key in trusted.gpg.d"
+done
+grep -q 'cache/bootstrap lacks the apt keyrings' "$B" && ok "build.sh checks the bootstrap cache before lb installer" || bad "no bootstrap-cache check before lb installer"
 grep -q 'a Prestium key is in trusted.gpg.d' "$B" && ok "build.sh fails on a Prestium key in trusted.gpg.d" || bad "no trusted.gpg.d check"
 # the keys themselves: binary OpenPGP certificates, the same fingerprints as before (moved, not changed)
 if command -v gpg >/dev/null; then
