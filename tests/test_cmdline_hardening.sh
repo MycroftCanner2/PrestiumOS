@@ -25,4 +25,9 @@ grep -qx 'require mitigations=auto,nosmt' "$P" && ok "F-15: policy requires it" 
 [ "$(grep -o 'mitigations=auto,nosmt' "$R/config/binary" | wc -l)" = 2 ] && ok "F-15: config/binary (live and failsafe)" || bad "F-15: config/binary"
 printf '%s\n' $A | grep -Eq '^(mitigations|pti|mds|spectre_v2|spectre_bhi|spec_store_bypass_disable|l1tf|tsx_async_abort|mmio_stale_data|retbleed|srbds|gather_data_sampling|reg_file_data_sampling)=off$|^nospectre|^nopti$' && bad "a mitigation is turned off" || ok "no mitigation turned off"
 for t in mds=full,nosmt pti=on spec_store_bypass_disable=on; do has "$t" && ok "kept $t" || bad "$t missing"; done
+# F-16: lockdown=confidentiality everywhere, and the docs don't still promise integrity
+has lockdown=confidentiality && ! has lockdown=integrity && ok "F-16: APPEND has lockdown=confidentiality" || bad "F-16: APPEND lockdown"
+grep -qx 'require lockdown=confidentiality' "$P" && ok "F-16: policy requires it" || bad "F-16: policy"
+[ "$(grep -o 'lockdown=confidentiality' "$R/config/binary" | wc -l)" = 2 ] && ! grep -q 'lockdown=integrity' "$R/config/binary" && ok "F-16: config/binary (live and failsafe)" || bad "F-16: config/binary"
+grep -n 'lockdown=integrity' "$R/README.md" "$R/BUILDING.md" && bad "F-16: README/BUILDING still say lockdown=integrity" || ok "F-16: docs say confidentiality"
 exit $fail
