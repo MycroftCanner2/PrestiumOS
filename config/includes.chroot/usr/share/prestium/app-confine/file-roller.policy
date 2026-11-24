@@ -1,0 +1,7 @@
+# File Roller (GTK 4): notifications and its own names. No portals at all (GTK 4 keeps its own dialog
+# when it can't see them): it extracts next to the archive and adds whole folders, which the document
+# portal (one file per pick) can't give it.
+include notify
+own org.gnome.FileRoller
+own org.gnome.FileRoller.*
+own org.gnome.ArchiveManager1

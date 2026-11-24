@@ -1,0 +1,5 @@
+# Loupe (GTK 4): notifications and its own names. No portals: through the document portal it would
+# only see the one picked image, not the others in its folder (next and previous).
+include notify
+own org.gnome.Loupe
+own org.gnome.Loupe.*

@@ -9,6 +9,8 @@ profile vlc /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} {
   include <abstractions/audio>
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-home-read>
+  # security review F-01: files picked in the portal's file chooser (app-confine's "documents")
+  include <abstractions/prestium-app-documents>
   /{,usr/}bin/{sh,dash,bash} ix,
   /usr/bin/{vlc,cvlc,nvlc,qvlc,rvlc,svlc} mr,
   /usr/lib/@{multiarch}/vlc/** mr,

@@ -1,0 +1,7 @@
+# Kleopatra: notifications, tray, its KDBusService name (single instance). No portal file chooser:
+# it writes the decrypted or encrypted result next to the input, which the document portal (one file
+# per pick) can't give it; its own dialogs see the folders its profile allows.
+include notify
+include tray
+own org.kde.kleopatra
+own org.kde.kleopatra.*

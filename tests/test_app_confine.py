@@ -45,15 +45,16 @@ def chk(cond, good, fail):
 
 
 def load_table():
-    ns = {}
+    ns = {"re": re}
     src = open(AC).read()
-    start = src.index("N = \"notify\"")
+    start = src.index("# name: (program, group, policy, gnupg)")
     end = src.index("RUN_USER = ")
     exec(src[start:end], ns)
-    return ns["APPS"], ns["TALK"]
+    return ns["APPS"], ns["TALK_OK"]
 
 
-APPS, TALK = load_table()
+APPS, TALK_OK = load_table()
+POL = os.path.join(I, "usr/share/prestium/app-confine")
 
 # --- static -----------------------------------------------------------------------------------
 # applications with a profile including prestium-app-common (directly or through the viewer and
@@ -101,25 +102,23 @@ for prof, att in sorted(profiles.items()):
     else:
         bad("profile %s (%s) is neither in app-confine's table nor exempt" % (prof, att))
 
-for n, (prog, group, talk, own, gnupg) in sorted(APPS.items()):
+for n, (prog, group, policy, gnupg) in sorted(APPS.items()):
     if not prog.startswith("/") or not re.match(r"^[a-z0-9-]+$", group):
         bad("%s: bad program or group" % n)
-    if talk is not None and not set(talk) <= set(TALK):
-        bad("%s: unknown talk permission" % n)
-    for o in own:
-        if not re.match(r"^[A-Za-z0-9_.-]+(\.\*)?$", o) or o.startswith("org.freedesktop"):
-            bad("%s: may not own %s" % (n, o))
+    if not os.path.isfile(os.path.join(POL, policy + ".policy")):
+        bad("%s: no policy file %s.policy" % (n, policy))
     if gnupg not in (None, "shared", "private"):
         bad("%s: gnupg %r" % (n, gnupg))
-for v in TALK.values():
+for v in TALK_OK:
     if v in ("org.freedesktop.systemd1", "org.freedesktop.portal.Desktop", "ca.desrt.dconf", "org.freedesktop.DBus"):
         bad("may talk to %s" % v)
-ok("table: %d programs, talk only %s" % (len(APPS), ", ".join(sorted(TALK.values()))))
+ok("table: %d programs, each with a policy file; talk only %s (the policies: test_app_confine_policy.py)"
+   % (len(APPS), ", ".join(sorted(TALK_OK))))
 # the gpg rule of F-02: Gajim's group never binds the real gnupg/; Kleopatra's and Claws' do
 for n in ("gajim", "prestium-gajim-keys"):
-    chk(APPS[n][4] == "private" and APPS[n][1] == "gajim", "%s: private gnupg/ (F-02)" % n, "%s gnupg" % n)
+    chk(APPS[n][3] == "private" and APPS[n][1] == "gajim", "%s: private gnupg/ (F-02)" % n, "%s gnupg" % n)
 for n in ("kleopatra", "claws-mail"):
-    chk(APPS[n][4] == "shared", "%s: the user's gnupg/" % n, "%s gnupg" % n)
+    chk(APPS[n][3] == "shared", "%s: the user's gnupg/" % n, "%s gnupg" % n)
 
 src = open(AC).read()
 chk("no_new_privs" in src and "PR_SET_NO_NEW_PRIVS" not in src, "no no_new_privs (profile transitions keep working)", "no_new_privs")
@@ -283,7 +282,7 @@ if r["proxy_bus"]:
     def own(n):
         try: return int(b.request_name(n))
         except dbus.DBusException as e: return e.get_dbus_name()
-    r["own_mine"] = own("org.prestium.Probe"); r["own_other"] = own("org.example.Other")
+    r["own_mine"] = own("org.example.Probe"); r["own_other"] = own("org.example.Other")
 print("PROBE " + json.dumps(r))
 ''' % {"run": run, "T": T})
     os.chmod(probe, 0o755)
@@ -292,8 +291,15 @@ print("PROBE " + json.dumps(r))
     s = s.replace('SYSBUS_DIR = "/run/dbus"', 'SYSBUS_DIR = "%s/run/dbus"' % T)
     s = s.replace('WL_BASE = "/run/prestium-wl"', 'WL_BASE = "%s/run/prestium-wl"' % T)
     s = s.replace('TMP = "/tmp"', 'TMP = "%s/tmp"' % T)
-    s = s.replace("APPS = {\n", 'APPS = {\n    "probe": ("%s", "probe", (N,), ("org.prestium.Probe",), None),\n'
-                  '    "probe-gpg": ("%s", "probe2", None, (), "shared"),\n' % (probe, probe), 1)
+    s = s.replace("APPS = {\n", 'APPS = {\n    "probe": ("%s", "probe", "probe", None),\n'
+                  '    "probe-gpg": ("%s", "probe2", "probe-gpg", "shared"),\n' % (probe, probe), 1)
+    # the probes' policies next to copies of the image's fragments (owned by this user, not root)
+    pd = T + "/policies"
+    shutil.copytree(POL, pd)
+    open(pd + "/probe.policy", "w").write("include notify\nown org.example.Probe\n")
+    open(pd + "/probe-gpg.policy", "w").write("bus none\n")
+    s = s.replace('POLICY_DIR = "/usr/share/prestium/app-confine"', 'POLICY_DIR = "%s"' % pd)
+    s = s.replace("st.st_uid != 0 or", "st.st_uid not in (0, os.getuid()) or")
     pc = T + "/app-confine"
     open(pc, "w").write(s)
     os.chmod(pc, 0o755)

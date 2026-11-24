@@ -1,0 +1,5 @@
+# Evince (GTK 3): notifications and its own names. GTK 3's file dialogs stay in the process (see
+# claws-mail.policy for why not GTK_USE_PORTAL).
+include notify
+own org.gnome.Evince
+own org.gnome.Evince.*

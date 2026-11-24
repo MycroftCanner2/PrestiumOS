@@ -1,0 +1,2 @@
+# Prestium Translate: offline translation, no session bus (nothing to notify, open or pick).
+bus none

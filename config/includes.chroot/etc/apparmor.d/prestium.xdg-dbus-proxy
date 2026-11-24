@@ -1,0 +1,29 @@
+# Prestium (security review F-01): xdg-dbus-proxy, the per-application D-Bus filter app-confine starts
+# (the only user of xdg-dbus-proxy in the image; the browsers' bubblewrap sandboxes get no bus). It
+# runs outside the application's namespace, in a small root of its own (/usr and /etc read-only, the
+# session bus socket, app-confine's socket directory, a /.flatpak-info naming the application for the
+# desktop portal). It needs the session bus, its own listening socket and nothing else: no network,
+# no home, no programs.
+abi <abi/4.0>,
+include <tunables/global>
+
+profile prestium_xdg_dbus_proxy /usr/bin/xdg-dbus-proxy flags=(attach_disconnected) {
+  include <abstractions/base>
+  include <abstractions/prestium-no-admin>
+
+  /usr/bin/xdg-dbus-proxy mr,
+  /etc/machine-id r,
+  # the session bus, and the filter's socket that app-confine binds into the application's view
+  owner @{run}/user/[0-9]*/bus rw,
+  owner @{run}/user/[0-9]*/prestium-confine/ r,
+  owner @{run}/user/[0-9]*/prestium-confine/.bus-* rw,
+  unix (create, bind, listen, accept, connect, send, receive, getattr, getopt, setopt, shutdown) type=stream,
+  # the desktop and document portals (unconfined) read /proc/<pid>/root/.flatpak-info of their peer,
+  # which is this process
+  ptrace (readby) peer=unconfined,
+  signal (receive) set=(term, kill, int, hup) peer=unconfined,
+
+  deny network inet,
+  deny network inet6,
+  deny @{HOME}/** rwx,
+}

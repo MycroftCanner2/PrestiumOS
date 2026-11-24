@@ -1,0 +1,7 @@
+# OnionShare (Qt 6): notifications, tray, its own names, the portal's file chooser (files and folders
+# to share, the folder received files go to; a picked folder is handed over whole).
+include notify
+include tray
+own org.onionshare.*
+include portal-files
+env qt-portal

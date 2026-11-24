@@ -1,0 +1,6 @@
+# Claws Mail (GTK 3): notifications and tray. Its file dialogs are GTK 3's own (in the process, the
+# AppArmor profile decides); GTK 3 would only use the portal with GTK_USE_PORTAL, which would also send
+# attachments (GIO file launches) to the portal's OpenFile, which no policy allows. Links: its own
+# browser command (the profile's Tor Browser and LibreWolf transitions).
+include notify
+include tray

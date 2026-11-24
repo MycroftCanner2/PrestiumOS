@@ -1,0 +1,5 @@
+# LibreOffice (GTK 3): notifications and its own names (single instance: the second start hands its
+# documents to the first through org.libreoffice.* and its pipe in the group's /tmp). No portal file
+# chooser: it keeps a lock file (.~lock.*#) next to each open document.
+include notify
+own org.libreoffice.*

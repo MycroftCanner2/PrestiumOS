@@ -1,0 +1,9 @@
+# VLC (Qt 5): notifications, tray, MPRIS and its own names, the portal's file chooser (open a media
+# file anywhere the user picks).
+include notify
+include tray
+own org.mpris.MediaPlayer2.vlc
+own org.mpris.MediaPlayer2.vlc.*
+own org.videolan.*
+include portal-files
+env qt-portal

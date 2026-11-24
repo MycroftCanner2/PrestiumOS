@@ -8,6 +8,8 @@ include <tunables/global>
 
 profile onionshare /usr/bin/onionshare{,-cli} {
   include <abstractions/prestium-app-base>
+  # security review F-01: files picked in the portal's file chooser (app-confine's "documents")
+  include <abstractions/prestium-app-documents>
   include <abstractions/python>
   include <abstractions/nameservice>
 

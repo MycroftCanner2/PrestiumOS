@@ -9,6 +9,8 @@ profile featherpad /usr/bin/{featherpad,fpad} {
   include <abstractions/prestium-viewer>
   include <abstractions/prestium-viewer-home-read>
   include <abstractions/prestium-viewer-write>
+  # security review F-01: files picked in the portal's file chooser (app-confine's "documents")
+  include <abstractions/prestium-app-documents>
   # 2.1 (L-5): the shared ~/Documents folder is the only folder in the home it may write
   owner @{HOME}/Documents/ rw,
   owner @{HOME}/Documents/** rwkl,

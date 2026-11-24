@@ -11,6 +11,8 @@ include <tunables/global>
 
 profile gajim /usr/bin/gajim {
   include <abstractions/prestium-app-base>
+  # security review F-01: files picked in the portal's file chooser (app-confine's "documents")
+  include <abstractions/prestium-app-documents>
   include <abstractions/python>
   include if exists <abstractions/enchant>
   include if exists <abstractions/aspell>
