@@ -241,6 +241,43 @@ each SHA-256 with `TR_*_SHA256`. To update: change the commit or version, set th
 to `""` and run `--repin`. The build needs to reach github.com, firefox.settings.services.mozilla.com,
 content-signature-2.cdn.mozilla.net and firefox-settings-attachments.cdn.mozilla.net.
 
+### Release checklist (security review F-12, F-13)
+
+"Newest at build time" trusts a publisher's signature plus a version floor: whoever controls the answer
+of the Tor Project's update service or of GitHub's API can choose any validly signed release at or above
+the floor (a controlled rollback), and two builds of one commit can ship different versions. Before each
+Prestium release:
+
+1. Raise `TB_MIN_VERSION` and `FEATHER_MIN_VERSION` in `thirdparty/versions.sh` to the versions current
+   on the publishers' own pages that day (never lower them). For a release build, pin both with
+   `PRESTIUM_TB_VERSION`/`PRESTIUM_TB_SHA256` and `PRESTIUM_FEATHER_VERSION`/`PRESTIUM_FEATHER_SHA256`,
+   after checking the versions against a second source (torproject.org's download page, the Feather
+   site), so the release is reproducible from its commit.
+2. Check that the build log's `OK TB`/`OK FEATHER` lines and the image manifest name the versions you expect.
+3. i2pd has no signature, only the SHA-256 in `versions.sh`. When re-pinning it: compare the SHA-256
+   that `--repin` prints with the asset digest on PurpleI2P's GitHub release page and, if you can, with a
+   second download (another network or mirror); inspect its maintainer scripts, which run as root in the
+   chroot (`dpkg-deb -e i2pd_*.deb ctl && cat ctl/*inst ctl/*rm`), and diff them against the previous
+   version; and add a CHANGELOG line naming the version and SHA-256.
+4. Sign `SHA256SUMS` with `scripts/sign-release.sh` and publish the full fingerprint in README.md
+   (*Verify a download*, F-11).
+
+### Kernel: why Debian 13's 6.12 line stays (security review follow-up, November 2026)
+
+trixie-backports has newer signed kernels (on 23 November 2026, `linux-image-amd64` 7.3.4-1~bpo13+1,
+from `linux-signed-amd64`, its vmlinuz signed by "Debian Secure Boot Signer 2022 - linux" under the
+Debian Secure Boot CA that Debian's shim trusts). It is not used, because the reason to switch, AppArmor
+mediating `connect()` on Unix socket paths (kernel 6.17 and later), needs AppArmor 5 userspace and
+profiles written for `abi/5.0`; Debian 13 has AppArmor 4.1.0 and trixie-backports has no newer one.
+AppArmor 4.1 doesn't support the upstream 6.17+ Unix mediation, and its downgrade of network and Unix
+rules on those kernels has known bugs (unix sockets refused for profiles with `network,`, `deny unix`
+ignored; apparmor issues #561, #564). The switch would add that risk without the protection.
+`app-confine` (F-01, F-05) hides the session bus, the broker and other apps' sockets by mount namespace
+instead, which works on 6.12. Revisit when AppArmor 5 reaches trixie(-backports): the backports kernel
+packages also moved the kernel to `/usr/lib/modules/<version>/vmlinuz` (`linux-binary-*`), copied to
+`/boot` only by `linux-base` 4.16 or later, so hook 9040's check that `/boot/vmlinuz-*` belongs to a signed
+`linux-image-*` package must learn that layout too.
+
 ## Tor Connection Assistant and DNS
 
 See the "Tor Connection Assistant" section of [README.md](README.md).

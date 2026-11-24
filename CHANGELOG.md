@@ -163,6 +163,18 @@ Each entry names the review finding (F-xx) it fixes.
   kernel is locked down only to integrity. Tests: `test_boot_lock.sh`, `test_boot_cmdline_guard.sh`,
   `test_secure_boot.sh`, `test_safety_notify_apparmor.sh`.
 
+- **Release checklist and documented limits (security review F-12, F-13, F-14).** BUILDING.md has a
+  *Release checklist*: raise `TB_MIN_VERSION` and `FEATHER_MIN_VERSION` each release and pin both for
+  release builds after a second-source check (the "newest at build time" floor otherwise allows a
+  signed rollback chosen by whoever answers the update query); re-pin i2pd only after comparing
+  GitHub's asset digest, ideally a second download, and reading its maintainer scripts. Known limit
+  (F-14): options the kernel consumes itself (`rdinit=`, `init=`) act before the initramfs
+  command-line guard; hook 9020 bans them at build time and getting one onto the command line needs
+  the GRUB password or write access to the stick (the USB-writer limit; the fix is a signed UKI).
+  BUILDING.md also records why the kernel stays on Debian 13's 6.12 line: trixie-backports' signed
+  7.3 kernel would need AppArmor 5 (not in trixie) for Unix-socket path mediation.
+  Test: `tests/test_release_docs.sh`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build
