@@ -26,9 +26,16 @@ fi
 # pins it with a permanent neighbour entry in the net qube), so a spoofed one cuts the network, and in
 # Qubes OS the address never leaves the computer (the outside world sees sys-net's card). Emulated cards
 # (e1000, rtl8139, virtio-net, vmxnet3...) are still spoofed. prestium-mac-guard makes the same exception.
+# Security review F-09: only for an address in Qubes OS's range (00:16:3e:5e:6c:<qid>). On another Xen host
+# (XCP-ng, bridged networking) the host-assigned address would reach the LAN and link sessions, so it is
+# spoofed like any card (if that host then drops the frames, boot "MAC address spoofing off").
 if [ "$(basename "$(readlink -f "$SYS/$dev/device/subsystem" 2>/dev/null)")" = xen ]; then
-  logger -t prestium-spoof-mac "$dev: Xen paravirtual network card (Qubes OS): host-assigned MAC address kept"
-  exit 0
+  case "$(tr 'A-F' 'a-f' < "$SYS/$dev/address" 2>/dev/null)" in
+    00:16:3e:5e:6c:[0-9a-f][0-9a-f])
+      logger -t prestium-spoof-mac "$dev: Xen paravirtual network card with a Qubes OS address: host-assigned MAC address kept"
+      exit 0 ;;
+  esac
+  logger -t prestium-spoof-mac "$dev: Xen paravirtual network card outside Qubes OS's address range: spoofed like any card"
 fi
 old=$(cat "$SYS/$dev/address" 2>/dev/null)
 # iproute2 reports "permaddr" only when the current address differs from the permanent one.

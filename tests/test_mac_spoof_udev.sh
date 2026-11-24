@@ -51,8 +51,16 @@ ln -s "$T/sys/bus/xen" "$T/sys/devices/vif-0/subsystem"; ln -s "$T/sys/devices/v
 echo 3 > "$T/sys/class/net/eth0/ifindex"; echo 00:16:3e:5e:6c:00 > "$T/sys/class/net/eth0/address"
 : > "$T/log"
 "$T/spoof" 3
-grep -q 'eth0: Xen paravirtual network card (Qubes OS): host-assigned MAC address kept' "$T/log" || { echo "FAIL: Xen card"; cat "$T/log"; exit 1; }
+grep -q 'eth0: Xen paravirtual network card with a Qubes OS address: host-assigned MAC address kept' "$T/log" || { echo "FAIL: Xen card"; cat "$T/log"; exit 1; }
 [ "$(cat "$T/sys/class/net/eth0/address")" = 00:16:3e:5e:6c:00 ] || { echo "FAIL: Xen card spoofed"; exit 1; }
+# security review F-09: a Xen card outside Qubes OS's range (another Xen host, bridged) is spoofed
+mkdir -p "$T/sys/class/net/eth1" "$T/sys/devices/vif-1"
+ln -s "$T/sys/bus/xen" "$T/sys/devices/vif-1/subsystem"; ln -s "$T/sys/devices/vif-1" "$T/sys/class/net/eth1/device"
+echo 4 > "$T/sys/class/net/eth1/ifindex"; echo 00:16:3e:12:34:56 > "$T/sys/class/net/eth1/address"
+: > "$T/log"
+PERM="" "$T/spoof" 4
+grep -q 'eth1: Xen paravirtual network card outside Qubes OS' "$T/log" && grep -q 'eth1: MAC address spoofed' "$T/log" \
+  || { echo "FAIL: non-Qubes Xen card not spoofed (F-09)"; cat "$T/log"; exit 1; }
 # a PCI card is still spoofed
 mkdir -p "$T/sys/bus/pci" "$T/sys/devices/0000:01:00.0"; ln -s "$T/sys/bus/pci" "$T/sys/devices/0000:01:00.0/subsystem"
 ln -s "$T/sys/devices/0000:01:00.0" "$T/sys/class/net/enp1s0/device"; echo 52:54:00:12:34:56 > "$T/sys/class/net/enp1s0/address"

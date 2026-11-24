@@ -135,6 +135,8 @@ class Guard(dbusmock.DBusTestCase):
         os.symlink(os.path.join(sysfs, "bus", "xen"), os.path.join(sysfs, "devices", "vif-0", "subsystem"))
         os.makedirs(os.path.join(sysfs, "class", "net", "eth0"))
         os.symlink(os.path.join(sysfs, "devices", "vif-0"), os.path.join(sysfs, "class", "net", "eth0", "device"))
+        with open(os.path.join(sysfs, "class", "net", "eth0", "address"), "w") as f:
+            f.write("00:16:3e:5e:6c:0a\n")      # Qubes OS's range (security review F-09)
         dev = self.add_eth(DeviceState.ACTIVATED)          # HwAddress == PermHwAddress
         self.start_guard()
         time.sleep(1)

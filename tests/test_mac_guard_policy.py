@@ -78,14 +78,17 @@ class XenPV(unittest.TestCase):
     def setUp(self):
         import tempfile
         self.t = tempfile.mkdtemp()
-        def card(name, bus):
+        def card(name, bus, addr=None):
             os.makedirs(os.path.join(self.t, "bus", bus), exist_ok=True)
             d = os.path.join(self.t, "devices", name)
             os.makedirs(d)
             os.symlink(os.path.join(self.t, "bus", bus), os.path.join(d, "subsystem"))
             os.makedirs(os.path.join(self.t, "class", "net", name))
             os.symlink(d, os.path.join(self.t, "class", "net", name, "device"))
-        card("eth0", "xen"); card("enp1s0", "pci")
+            with open(os.path.join(self.t, "class", "net", name, "address"), "w") as f:
+                f.write((addr or "52:54:00:12:34:56") + "\n")
+        card("eth0", "xen", "00:16:3e:5e:6c:0a"); card("enp1s0", "pci")
+        card("eth1", "xen", "00:16:3e:12:34:56"); card("eth2", "xen", "00:16:3E:5E:6C:0B")
         os.makedirs(os.path.join(self.t, "class", "net", "lo"))
 
     def tearDown(self):
@@ -94,6 +97,11 @@ class XenPV(unittest.TestCase):
 
     def test_xen_card(self):
         self.assertTrue(g.host_assigned_mac("eth0", self.t))
+        self.assertTrue(g.host_assigned_mac("eth2", self.t))     # upper case in sysfs is still Qubes' range
+
+    def test_xen_card_outside_qubes_range(self):
+        # security review F-09: another Xen host's address (XCP-ng, bridged) is not exempt
+        self.assertFalse(g.host_assigned_mac("eth1", self.t))
 
     def test_pci_and_virtual_cards(self):
         self.assertFalse(g.host_assigned_mac("enp1s0", self.t))

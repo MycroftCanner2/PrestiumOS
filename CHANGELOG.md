@@ -182,6 +182,14 @@ Each entry names the review finding (F-xx) it fixes.
   raises a *Protection NOT active* warning for the session when no VM is found, and the boot menu
   labels read "Prestium 2.1 quick_qubes, VM only". Test: `tests/test_quick_qubes_bare_metal.sh`.
 
+- **The Xen MAC exemption is limited to Qubes OS (security review F-09, quick_qubes only).** The MAC
+  spoofing script and the MAC guard kept the host-assigned address of every Xen paravirtual card; on
+  XCP-ng or another Xen host with bridged networking that persistent address reached the LAN and linked
+  sessions. They now keep it only when it is in Qubes OS's range (`00:16:3e:5e:6c:xx`); any other Xen card
+  is spoofed and guarded like an emulated card. A qube with a custom `mac` loses its network unless
+  started with *MAC address spoofing off*. Tests: `test_mac_spoof_udev.sh`, `test_mac_guard_policy.py`,
+  `test_mac_guard_dbus.py`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build

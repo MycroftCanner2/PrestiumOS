@@ -221,7 +221,11 @@ Changed:
 - **Qubes OS network cards keep their address.** Spoofing a Xen paravirtual card's MAC address (every
   network card of a Qubes HVM) cuts the network: the net qube pins the address Qubes assigned, and in
   Qubes that address never leaves the computer anyway. The outside world sees sys-net's card. For those
-  cards only, the MAC spoofing script and the MAC guard keep the host's address. Emulated cards
+  cards only, and only when the address is in Qubes OS's range (`00:16:3e:5e:6c:xx`, the default
+  `qvm-prefs mac`), the MAC spoofing script and the MAC guard keep the host's address. A Xen card with
+  another address (XCP-ng or another Xen host, where a bridged network shows the address on your LAN) is
+  spoofed like any card (security review F-09); if that host then drops the traffic, or a qube has a
+  custom `mac`, boot *MAC address spoofing off*. Emulated cards
   (e1000, rtl8139, virtio-net, vmxnet3) in KVM, VirtualBox and VMware are still spoofed. With a bridged
   VM network, the VM's MAC address does reach your LAN.
 - **A faster boot from a virtual CD:** live-boot hides SATA/IDE disks and normally waits 8 seconds for

@@ -16,9 +16,11 @@ address) would make NetworkManager put the card's real address back. This root s
 
 Boot option "nomacspoof" turns MAC spoofing off on purpose; then this service does nothing.
 
-quick_qubes: a Xen paravirtual network card (on the "xen" bus; every NIC of a Qubes OS HVM) keeps the
-address the host assigned, as in prestium-spoof-mac: the host only delivers frames to that address, and
-in Qubes OS it never leaves the computer. Such a device gets no egress filter and is not disconnected
+quick_qubes: a Xen paravirtual network card (on the "xen" bus; every NIC of a Qubes OS HVM) with an
+address in Qubes OS's range (00:16:3e:5e:6c:xx, security review F-09) keeps the address the host
+assigned, as in prestium-spoof-mac: the host only delivers frames to that address, and in Qubes OS it
+never leaves the computer. A Xen card with any other address (XCP-ng, a plain Xen host with bridged
+networking, where the host's address would reach the LAN) is handled like any other card. Such a device gets no egress filter and is not disconnected
 for using its permanent address; connection settings are still checked (1) for every device.
 """
 import os, re, subprocess, sys, syslog
@@ -41,6 +43,8 @@ NFT_TABLE = "prestium_mac"
 DEV_ACTIVATING = 40   # NM_DEVICE_STATE_PREPARE and above: about to send frames
 MAC_RE = re.compile(r"^[0-9a-f]{2}(:[0-9a-f]{2}){5}$")
 IFNAME_RE = re.compile(r"^[A-Za-z0-9_.-]{1,15}$")
+# security review F-09: Qubes OS gives every qube 00:16:3e:5e:6c:<qid> (qvm-prefs mac); other Xen hosts don't
+QUBES_MAC_RE = re.compile(r"^00:16:3e:5e:6c:[0-9a-f]{2}$")
 
 def log(msg, crit=False):
     syslog.syslog(syslog.LOG_CRIT if crit else syslog.LOG_INFO, msg)
@@ -95,13 +99,22 @@ def is_real_mac(current, permanent):
     return bool(MAC_RE.match(p)) and p != "00:00:00:00:00:00" and c == p
 
 def host_assigned_mac(ifname, sysfs=None):
-    """quick_qubes: True for a Xen paravirtual network card (its device is on the "xen" bus), whose
-    host-assigned address prestium-spoof-mac keeps on purpose."""
+    """quick_qubes: True for a Xen paravirtual network card (its device is on the "xen" bus) whose
+    address is in Qubes OS's range: prestium-spoof-mac keeps that host-assigned address on purpose.
+    Security review F-09: a Xen card outside that range (another Xen host) is not exempt."""
     if not IFNAME_RE.match(ifname or ""):
         return False
     sysfs = sysfs or _test_env("PRESTIUM_SYSFS", "/sys")
-    sub = os.path.realpath(os.path.join(sysfs, "class", "net", ifname, "device", "subsystem"))
-    return os.path.basename(sub) == "xen" and os.path.isdir(sub)
+    d = os.path.join(sysfs, "class", "net", ifname)
+    sub = os.path.realpath(os.path.join(d, "device", "subsystem"))
+    if not (os.path.basename(sub) == "xen" and os.path.isdir(sub)):
+        return False
+    try:
+        with open(os.path.join(d, "address")) as f:
+            addr = f.read(64).strip().lower()
+    except OSError:
+        return False
+    return bool(QUBES_MAC_RE.match(addr))
 
 def nft_rules(ifname, permanent):
     """nft script that drops frames with the permanent source address on ifname (egress)."""
@@ -249,7 +262,7 @@ def main():
         if host_assigned_mac(iface):
             if iface not in xen_logged:
                 xen_logged.add(iface)
-                log("%s: Xen paravirtual network card (Qubes OS): host-assigned MAC address kept" % iface)
+                log("%s: Xen paravirtual network card with a Qubes OS address: host-assigned MAC address kept" % iface)
             return
         perm = prop(dev, NM + sub, "PermHwAddress")
         # Device.HwAddress (NM >= 1.24); the per-type interfaces still carry it too
