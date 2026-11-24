@@ -93,6 +93,10 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Messenger (Gajim):** Tor and I2P proxies ready to use. Gajim ships Tor
   (SOCKS5 127.0.0.1:9050) plus I2P (SOCKS5 127.0.0.1:4447 and HTTP 127.0.0.1:4444) proxy
   profiles, with Tor as the global default; choose another per account in Account Settings.
+  Gajim keeps a saved account password in its own settings (`~/.config/gajim/settings.sqlite`, not
+  encrypted), never in GNOME Keyring, which its sandbox can't reach: `/etc/gajim/app-overrides.json`
+  turns `use_keyring` off for every profile. Untick *Save password* in the account settings to type it
+  at each start instead.
   Its menu entry is plain *Gajim*. OpenPGP (the OpenPGP plugin) keeps one keyring per account under
   `~/.local/share/gajim/openpgp/`, separate from `~/.gnupg`; its gpg runs offline in its own profile.
 - **Gajim OpenPGP Keys** (*Communication* menu, after Gajim): one window for the keys Gajim's OpenPGP

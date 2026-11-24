@@ -4,6 +4,7 @@
 0644 root root /etc/NetworkManager/conf.d/30-ipv6-privacy.conf
 0644 root root /etc/NetworkManager/conf.d/40-prestium-privacy.conf
 0644 root root /etc/NetworkManager/conf.d/45-prestium-dhcp.conf
+0644 root root /etc/gajim/app-overrides.json
 0644 root root /etc/NetworkManager/conf.d/50-prestium-191.conf
 0644 root root /etc/X11/Xwrapper.config
 0644 root root /etc/apparmor.d/torbrowser.Browser.firefox
