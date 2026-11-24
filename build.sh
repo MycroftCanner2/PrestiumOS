@@ -117,6 +117,15 @@ if [ -d "$SLD" ]; then
 		if [ -e "$t" ] && grep -q 'signed-by=/usr/share/keyrings/' "$t"; then rm -f "$t"; fi
 	done
 fi
+# PRE-5: "lb bootstrap" on a tree that already has its chroot (a --resume, or build.sh run again
+# without --clean) must not replace it. Its bootstrap_cache step restores cache/bootstrap over
+# chroot/ (rm -rf chroot) whenever that cache exists and its "restore" stage file does not, and a
+# fresh build never writes that file (it saves the cache, nothing to restore). The chroot stage's own
+# stage files then skip the package install, so the image was the bare bootstrap (lb binary failed
+# at binary_linux-image: no vmlinuz). The bootstrap stage is done: mark the restore done too.
+if [ -e .build/bootstrap ] && [ -d chroot/etc ] && [ -d cache/bootstrap ]; then
+	touch .build/bootstrap_cache.restore
+fi
 run_lb bootstrap
 # security review F-06: the build-time keys of the Tor Project and LibreWolf repositories are not put in
 # /etc/apt/trusted.gpg.d (where live-build installs config/archives/*.key*), because apt trusts a key
