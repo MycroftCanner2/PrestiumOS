@@ -147,6 +147,13 @@ Each entry names the review finding (F-xx) it fixes.
   password dialog once when the session starts; *Not now* skips it (Lock Screen… or Super+L asks
   again, and the automatic locks keep notifying). Test: `tests/test_session_lock.sh`.
 
+- **The README points at the 2.1 torrent and says what is verifiable (security review F-11).** It
+  named `Prestium-2.0-amd64.iso.torrent`, which is no longer in the repository, while
+  `Prestium-2.1-amd64.iso.torrent` was undocumented. *Verify a download* now has a *Release key
+  fingerprint* line, marked *not yet published* until the key holder publishes the full fingerprint
+  with `SHA256SUMS.asc` (`scripts/sign-release.sh`); until then the torrent is described as unverified.
+  Test: `tests/test_readme_release.sh`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build

@@ -17,7 +17,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
 - **Download:** the 2.1 ISO (the bare-metal image from `main`) is available through
   [`Prestium-2.1-amd64.iso.torrent`](Prestium-2.1-amd64.iso.torrent), or build it yourself with
   [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). The quick_qubes ISO has no published download yet:
-  build it from this branch.
+  build it from this branch. Check a download as [Verify a download](#verify-a-download) says
+  before you write it to a USB stick.
 - **What changed:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Highlights
@@ -372,6 +373,14 @@ Check a download before you write it to a USB stick.
 
   The first command must say "Good signature" from that fingerprint; a warning that the key is not
   certified is normal. The second must say `OK` for the ISO.
+- **Release key** (security review F-11): a release is only verifiable once its signing key's full
+  40-hex fingerprint is published here and on prestium.org, and `SHA256SUMS` and `SHA256SUMS.asc` are
+  published next to the ISO or torrent. No fingerprint has been published for 2.1 yet, so the 2.1
+  torrent can't be checked against a signature: the torrent's piece hashes only check that the data
+  matches the torrent file in this repository, not who made it. Until a fingerprint is listed here, treat
+  the torrent as unverified, or build the ISO yourself.
+
+  Release key fingerprint: *not yet published*
 - **2.0** has no signed checksum file. Compare `sha256sum Prestium-2.0-amd64.iso` with the SHA-256 on
   prestium.org. Its torrent is no longer in this repository (it was replaced by
   `Prestium-2.1-amd64.iso.torrent`). A torrent's piece hashes check the data as it downloads, but don't
