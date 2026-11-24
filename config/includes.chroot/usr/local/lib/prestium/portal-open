@@ -1,0 +1,95 @@
+#!/usr/bin/python3 -I
+"""Prestium (security review F-01): the only link handler the desktop portal knows (OpenURI; see
+/etc/systemd/user/xdg-desktop-portal.service.d/prestium.conf). A confined application's link comes
+here, and only these run:
+  http, https   Tor Browser (prestium-run tor-browser URL)
+  mailto        Claws Mail (claws-mail-i2p mailto:...), with only the address(es), subject, body, cc
+                and bcc: never "attach" or other headers, so a link can't attach a file
+Anything else (file:, a scheme of another program, a malformed link) is refused with a notice.
+The portal's own environment (its read-only XDG directories) is not passed on.
+Usage: portal-open URI
+"""
+import os
+import re
+import subprocess
+import sys
+from urllib.parse import parse_qsl, quote, urlencode, urlsplit
+
+TOR_BROWSER = "/usr/local/bin/tor-browser"
+CLAWS = "/usr/local/bin/claws-mail-i2p"
+PRESTIUM_RUN = "/usr/local/bin/prestium-run"
+MAX = 8192
+KEEP = ("HOME", "USER", "LOGNAME", "LANG", "LANGUAGE", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS",
+        "WAYLAND_DISPLAY", "DISPLAY", "XAUTHORITY", "XDG_CURRENT_DESKTOP", "XDG_SESSION_TYPE",
+        "XDG_SESSION_DESKTOP", "XDG_ACTIVATION_TOKEN", "DESKTOP_STARTUP_ID", "GDK_BACKEND", "QT_QPA_PLATFORM",
+        "MOZ_ENABLE_WAYLAND", "XCURSOR_THEME", "XCURSOR_SIZE", "GTK_CSD", "QT_STYLE_OVERRIDE",
+        "QT_WAYLAND_DISABLE_WINDOWDECORATION", "MOZ_GTK_TITLEBAR_DECORATION")
+MAIL_KEYS = ("subject", "body", "cc", "bcc")
+
+
+def clean_env():
+    env = {k: v for k, v in os.environ.items() if k in KEEP or k.startswith("LC_")}
+    env["PATH"] = "/usr/local/bin:/usr/bin:/bin"
+    return env
+
+
+def web(uri):
+    """An absolute http(s) URL with a host, nothing that could read as an option or a second word."""
+    try:
+        u = urlsplit(uri)
+        u.port  # noqa: B018  (raises on a bad port)
+    except ValueError:
+        return None
+    if u.scheme.lower() not in ("http", "https") or not u.hostname:
+        return None
+    return uri
+
+
+def mail(uri):
+    try:
+        u = urlsplit(uri)
+    except ValueError:
+        return None
+    if u.scheme.lower() != "mailto" or u.netloc:
+        return None
+    to = u.path
+    # plain addresses only: no percent escapes (a "%3F" Claws might decode into a second "?")
+    if not re.match(r"^[A-Za-z0-9.!#$&'*+/=^_`{|}~@,;-]*$", to):
+        return None
+    q = [(k.lower(), v) for k, v in parse_qsl(u.query, keep_blank_values=True)]
+    q = [(k, v) for k, v in q if k in MAIL_KEYS]
+    if not to and not q:
+        return None
+    return "mailto:" + to + ("?" + urlencode(q, quote_via=quote) if q else "")
+
+
+def refuse(uri):
+    msg = "Prestium opens only web links (in Tor Browser) and mail links (in Claws Mail) from applications."
+    sys.stderr.write("portal-open: refused %r\n" % uri[:200])
+    try:
+        subprocess.run(["/usr/bin/notify-send", "-a", "Prestium", "-i", "dialog-warning", "Link not opened", msg],
+                       timeout=5, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       env=clean_env())
+    except (OSError, subprocess.SubprocessError):
+        pass
+    return 1
+
+
+def main(argv):
+    if len(argv) != 2:
+        sys.stderr.write("usage: portal-open URI\n")
+        return 2
+    uri = argv[1]
+    if not uri or len(uri) > MAX or any(ord(c) < 0x21 or ord(c) == 0x7f for c in uri) or uri.startswith("-"):
+        return refuse(uri)
+    w = web(uri)
+    if w:
+        os.execve(PRESTIUM_RUN, [PRESTIUM_RUN, TOR_BROWSER, w], clean_env())
+    m = mail(uri)
+    if m:
+        os.execve(CLAWS, [CLAWS, m], clean_env())
+    return refuse(uri)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))

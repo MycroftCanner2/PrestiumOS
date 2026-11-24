@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Prestium link handler
+Comment=Opens links from the desktop portal: web links in Tor Browser, mail links in Claws Mail
+Exec=/usr/local/lib/prestium/portal-open %u
+NoDisplay=true
+Terminal=false
+MimeType=x-scheme-handler/http;x-scheme-handler/https;x-scheme-handler/mailto;
