@@ -18,6 +18,10 @@ case "$URL" in
   *) echo "prestium-localfox: only Prestium's local pages (127.0.0.1:7070, 7685, 9000, 9010)" >&2; exit 2 ;;
 esac
 case "$URL" in *[!A-Za-z0-9:/._#?=%@-]*) echo "prestium-localfox: bad URL" >&2; exit 2 ;; esac
+# launch check: no Wayland proxy (Firefox 13x+). Its socket in $XDG_RUNTIME_DIR is not in the AppArmor
+# profile, so it printed "StartProxyServer(): bind() error" at every start; the browsers' sandbox
+# (browser-sandbox.sh) turns it off the same way
+MOZ_DISABLE_WAYLAND_PROXY=1; export MOZ_DISABLE_WAYLAND_PROXY
 P="$HOME/.local/share/prestium-localfox"
 mkdir -p "$P" && chmod 700 "$P" || exit 1
 cp -f /usr/local/share/prestium-localfox/user.js "$P/user.js"

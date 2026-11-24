@@ -116,7 +116,10 @@ links = {n for n, p in pols.items() if any("OpenURI.OpenURI" in a for a in p["ar
 chk(links == EXPECT_LINKS, "OpenURI (links): %s" % ", ".join(sorted(links)), "OpenURI: %s" % sorted(links))
 qt = {n for n, p in pols.items() if p["env"].get("QT_QPA_PLATFORMTHEME") == "xdgdesktopportal"}
 chk(qt == EXPECT_QT, "Qt portal plugin: %s" % ", ".join(sorted(qt)), "qt-portal: %s" % sorted(qt))
-chk(all(set(p["env"]) <= {"QT_QPA_PLATFORMTHEME"} for n, p in pols.items() if n != "gajim"), "env: only the Qt platform theme", "env")
+chk(all(set(p["env"]) <= {"QT_QPA_PLATFORMTHEME"} for n, p in pols.items() if n not in ("gajim", "metadata-cleaner")),
+    "env: only the Qt platform theme", "env")
+chk(pols["metadata-cleaner"]["env"] == {"GVFS_REMOTE_VOLUME_MONITOR_IGNORE": "1"},
+    "env: Metadata Cleaner's gio-local (no GVfs volume monitors)", "metadata-cleaner env: %r" % pols["metadata-cleaner"]["env"])
 # compatibility audit: Gajim's GIO link handler (Tor Browser), nothing else
 chk(pols["gajim"]["env"] == {"XDG_CONFIG_DIRS": "/usr/share/prestium/links-tor:/etc/xdg"},
     "env: Gajim's links-tor (GIO's default for links: Tor Browser)", "gajim env: %r" % pols["gajim"]["env"])
