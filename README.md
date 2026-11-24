@@ -45,8 +45,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
   review F-01): its own names, notifications and the tray, and for some the desktop portal's file
   chooser and links. Never systemd, dconf or another application. A file picked in the portal's file
   chooser (Gajim, OnionShare, FeatherPad, VLC) reaches the application through the document portal,
-  one file at a time, without widening its AppArmor profile; a link opened through the portal (Gajim)
-  opens in Tor Browser, a mail link in Claws Mail, and nothing else runs.
+  one file at a time, without widening its AppArmor profile. A web link clicked in Gajim opens in Tor
+  Browser (GIO's default inside Gajim's namespace; its AppArmor profile may start nothing else).
 - **Shared folders:** the apps share two folders, `~/Downloads` (the local Firefox, Claws Mail
   and Gajim) and `~/Documents` (LibreOffice, FeatherPad, Evince, File Roller, Audacity,
   Kleopatra and Feather). Only three folders are app-specific: the I2P Browser's

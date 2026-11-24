@@ -56,6 +56,12 @@ profile gajim /usr/bin/gajim {
   /{,usr/}bin/{sh,dash,bash,which,sed,grep,cat,readlink,dirname,basename,head,tr,cut} ix,
   # 2.1 (review): Px into the launcher profile, not Ux (see prestium.browser-launcher)
   /usr/local/bin/tor-browser Px -> prestium_tor_browser_launcher,
+  # (compatibility audit) Gajim opens links with GIO (Gio.AppInfo.launch_default_for_uri): GIO reads the
+  # handler's .desktop file and starts it through its gio-launch-desktop wrapper. "env links-tor"
+  # (app-confine) makes Tor Browser the default; without these three, clicking a link did nothing.
+  /usr/lib/@{multiarch}/glib-[0-9]*/gio-launch-desktop ix,
+  /usr/local/share/applications/ r,
+  /usr/local/share/applications/torbrowser.desktop r,
 
   # 2.1 (late): OpenPGP. Without these GPGME couldn't run gpg ("gpg --version" for the engine check) and
   # gajim-openpgp failed at account connect with "GPGMEError: GPGME: Invalid crypto engine". GPGME's

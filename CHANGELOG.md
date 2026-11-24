@@ -4,6 +4,35 @@
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **Compatibility audit of the F-01/F-05 namespaces: passphrase prompts, Qt tray icons, later volumes and
+  Gajim's links work again.** A second review ran the applications under app-confine on a test system:
+  - *GnuPG passphrase prompts.* gpg passes the application's `DBUS_SESSION_BUS_ADDRESS`
+    (`$XDG_RUNTIME_DIR/prestium-bus`, which existed only inside the namespace) to gpg-agent for
+    pinentry-gnome3. Claws Mail and Kleopatra use the session's agent, outside every namespace, so signing,
+    decrypting with a protected key or creating a key with a passphrase failed with "pinentry error".
+    app-confine now also links `prestium-bus` to `bus` in the real runtime directory (the pinentry
+    profile may read it). Gajim and the Gajim keys tool run their own agent inside: their filtered bus
+    may now talk to GCR's prompter only (`pinentry.inc`: `talk org.gnome.keyring.SystemPrompter`; the
+    keyring and `org.freedesktop.secrets` stay refused, and no other policy may name the prompter). The
+    keys tool therefore has a bus again (that one name), so keys with a passphrase can be made, backed up
+    and edited.
+  - *Qt 5 tray icons (VLC, KeePassXC).* Qt 5 registers `org.kde.StatusNotifierItem-<pid>-<n>`, which no
+    policy allowed, so the icon was missing (KeePassXC set to start minimised to the tray had no window
+    and no icon). `tray.inc` adds `tray-items`: the proxy, now started after the application's process
+    exists, may own those names for that process id only (n = 1..16).
+  - *Volumes mounted after an application started* (USB stick, VeraCrypt) were invisible in it: the
+    namespace's mounts are now slaves of the host's (`MS_SLAVE`, still nothing propagates back).
+  - *Links in Gajim did nothing.* Gajim opens links with GIO, which outside Flatpak does not use the
+    OpenURI portal; its only web handler was the I2P Browser, which Gajim's profile may not start, and the
+    profile could not read the entry or run GIO's `gio-launch-desktop`. `env links-tor` makes Tor Browser
+    GIO's default for Gajim (`/usr/share/prestium/links-tor/mimeapps.list`), and the profile allows that
+    one entry and the wrapper.
+  Not changed (security tradeoffs): Gajim cannot store account passwords in GNOME Keyring (the Secret
+  Service cannot be filtered per item; turn off "use keyring" in Gajim or type the password), KeePassXC's
+  SSH agent integration (no `SSH_AUTH_SOCK`), dconf writes, the accessibility bus.
+  Tests: `tests/test_app_confine_compat.py` (policy refusals, a real `xdg-dbus-proxy` and gpg-agent
+  with a stand-in prompter, mount propagation, GIO's link handler), `tests/test_app_confine_policy.py`.
+
 - **F-03: DHCP no longer sends the hostname.** NetworkManager sent `prestium` to every DHCP server
   (DHCPv4 option 12/FQDN, DHCPv6), naming Prestium on the local network. The new global defaults in
   `NetworkManager/conf.d/45-prestium-dhcp.conf` set `ipv4.dhcp-send-hostname=false` and
