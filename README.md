@@ -9,8 +9,9 @@ support: the current Debian release, kernel line and firmware set, with Secure B
 **Status:** Prestium **2.1** is the current release. It builds on **Prestium 2.0**, a full
 modernization of the 2023 Prestium build, with tighter security and new features.
 
-- **Download:** build the 2.1 ISO with [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). The previous
-  2.0 ISO is still available through [`Prestium-2.0-amd64.iso.torrent`](Prestium-2.0-amd64.iso.torrent).
+- **Download:** the 2.1 ISO through [`Prestium-2.1-amd64.iso.torrent`](Prestium-2.1-amd64.iso.torrent),
+  or build it yourself with [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). Check it as
+  [Verify a download](#verify-a-download) says before you write it to a USB stick.
 - **What changed:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Highlights
@@ -224,6 +225,14 @@ Check a download before you write it to a USB stick.
 
   The first command must say "Good signature" from that fingerprint; a warning that the key is not
   certified is normal. The second must say `OK` for the ISO.
+- **Release key** (security review F-11): a release is only verifiable once its signing key's full
+  40-hex fingerprint is published here and on prestium.org, and `SHA256SUMS` and `SHA256SUMS.asc` are
+  published next to the ISO or torrent. No fingerprint has been published for 2.1 yet, so the 2.1
+  torrent can't be checked against a signature: the torrent's piece hashes only check that the data
+  matches the torrent file in this repository, not who made it. Until a fingerprint is listed here, treat
+  the torrent as unverified, or build the ISO yourself.
+
+  Release key fingerprint: *not yet published*
 - **2.0** has no signed checksum file. Compare `sha256sum Prestium-2.0-amd64.iso` with the SHA-256 on
   prestium.org, and get the torrent from this repository: the torrent's piece hashes check the data
   as it downloads, but neither proves who made the image.
@@ -236,7 +245,7 @@ went into it.
 - `auto/`, `config/`, `build.sh`, `scripts/`, `thirdparty/`: the live-build configuration
   (see [BUILDING.md](BUILDING.md)); `thirdparty/` holds the pinned versions, hashes and publisher keys.
 - `i2pseeds.su3`: the signed I2P reseed file the build ships.
-- `Prestium-2.0-amd64.iso.torrent`: the torrent for the previous release.
+- `Prestium-2.1-amd64.iso.torrent`: the torrent for the 2.1 ISO (see Verify a download).
 - `tests/`: checks for the boot chain (dm-verity, boot menu lock, command line policy, Secure Boot),
   the firewall, sandboxes and AppArmor profiles, the Wayland broker and its dialogs, the MAC guard,
   the Tor and I2P helpers, The Lounge, the Browser Updater, Gajim OpenPGP Keys, Prestium Translate and the desktop's design; `tests/ci.sh`
