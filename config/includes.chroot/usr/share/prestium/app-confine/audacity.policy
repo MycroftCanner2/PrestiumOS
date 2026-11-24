@@ -1,0 +1,3 @@
+# Audacity: no session bus. Its file dialogs are wxWidgets' GTK 3 ones (in the process, no portal);
+# a second start joins the first through app-confine's JOIN (its network namespace), not D-Bus.
+bus none

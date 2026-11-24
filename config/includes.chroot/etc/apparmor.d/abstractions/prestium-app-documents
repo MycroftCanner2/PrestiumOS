@@ -1,0 +1,8 @@
+# Prestium (security review F-01): the files the user picked for this application in the desktop
+# portal's file chooser. app-confine binds the document portal's view of this one application
+# (/run/user/<uid>/doc/by-app/<app id>) at /run/user/<uid>/doc in its namespace, so only the documents
+# granted to it are there; the profile is not widened anywhere else. Saving through the portal writes
+# a temporary file in the document's directory and renames it, hence w and k. Only the profiles of
+# applications whose app-confine policy says "documents" include this.
+  owner @{run}/user/[0-9]*/doc/ r,
+  owner @{run}/user/[0-9]*/doc/** rwk,

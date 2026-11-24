@@ -12,9 +12,15 @@
 #                     with only PulseAudio's and PipeWire's sockets and dconf's cache bound in, plus
 #                     the real gnupg/ for the apps that use ~/.gnupg (Kleopatra, Claws Mail). Gajim
 #                     and its keys tool get a private gnupg/ (F-02): ~/.gnupg's agent is not there.
-#   session bus       none, or a filtered xdg-dbus-proxy at /run/user/<uid>/prestium-bus: the app may
-#                     own its own names and talk to notifications and the panel's tray, nothing else
-#                     (no systemd, no portals, no dconf writes, no other application).
+#   session bus       none, or a filtered xdg-dbus-proxy at /run/user/<uid>/prestium-bus. What each
+#                     application may reach is its policy file (POLICY_DIR/<policy>.policy, an
+#                     allowlist, default deny): its own names, notifications, the panel's tray and,
+#                     for some, a few desktop portal calls (file chooser, links, settings). Never
+#                     systemd, dconf, the bus driver beyond what the proxy itself allows, the
+#                     broker or another application's names.
+#   doc               for the applications whose policy says "documents": the document portal's
+#                     view for that application only (/run/user/<uid>/doc/by-app/<app id>), where
+#                     the files the user picks in the portal's file chooser appear
 #   /run/dbus         an empty tmpfs (no system bus)
 #   /run/prestium-wl  an empty tmpfs with only /run/prestium-wl/<uid> (the restricted Wayland socket)
 #                     bound back: the broker's socket is gone
@@ -27,51 +33,54 @@
 #
 # Usage: app-confine NAME [ARGS...]   (NAME from APPS below; /usr/local/bin/NAME shims call this)
 #        app-confine --list           (NAME and program, one per line, for hook 0625)
+#        app-confine --check          (every policy file parses and passes the rules; hook 0625)
 # Fails closed: if the namespace or a mount can't be set up, the application is not started.
 # Fixed paths only, nothing from the environment decides what is mounted.
 import ctypes
+import json
 import os
+import platform
+import pwd
+import re
 import select
 import signal
 import stat
 import subprocess
 import sys
 
-N = "notify"   # talk to org.freedesktop.Notifications
-T = "tray"     # talk to org.kde.StatusNotifierWatcher (waybar's tray)
-
-# name: (program, group, bus, own names, gnupg)
-#   bus: None (no session bus at all) or a tuple of talk permissions (N, T)
-#   gnupg: "shared" (bind the real $XDG_RUNTIME_DIR/gnupg) or "private" / None (the group's own)
+# name: (program, group, policy, gnupg)
+#   policy: the file POLICY_DIR/<policy>.policy, which says whether the application gets a session
+#           bus at all and what it may reach on it (see parse_policy)
+#   gnupg:  "shared" (bind the real $XDG_RUNTIME_DIR/gnupg) or "private" / None (the group's own)
 APPS = {
-    "gajim": ("/usr/bin/gajim", "gajim", (N, T), ("org.gajim.Gajim", "org.gajim.Gajim.*"), "private"),
-    "prestium-gajim-keys": ("/usr/local/bin/prestium-gajim-keys", "gajim", None, (), "private"),
-    "claws-mail": ("/usr/bin/claws-mail", "claws-mail", (N, T), (), "shared"),
-    "kleopatra": ("/usr/bin/kleopatra", "kleopatra", (N, T), ("org.kde.kleopatra", "org.kde.kleopatra.*"), "shared"),
-    "kwatchgnupg": ("/usr/bin/kwatchgnupg", "kleopatra", (N,), ("org.kde.kwatchgnupg",), "shared"),
-    "keepassxc": ("/usr/bin/keepassxc", "keepassxc", (N, T), ("org.keepassxc.KeePassXC.*",), None),
-    "libreoffice": ("/usr/bin/libreoffice", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "soffice": ("/usr/bin/soffice", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "lowriter": ("/usr/bin/lowriter", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "localc": ("/usr/bin/localc", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "loimpress": ("/usr/bin/loimpress", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "lodraw": ("/usr/bin/lodraw", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "lomath": ("/usr/bin/lomath", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "lobase": ("/usr/bin/lobase", "libreoffice", (N,), ("org.libreoffice.*",), None),
-    "onionshare": ("/usr/bin/onionshare", "onionshare", (N, T), ("org.onionshare.*",), None),
-    "onionshare-cli": ("/usr/bin/onionshare-cli", "onionshare", None, (), None),
-    "feather": ("/usr/local/bin/feather", "feather", (N, T), (), None),
-    "featherpad": ("/usr/bin/featherpad", "featherpad", (N,), ("org.featherpad.*",), None),
-    "fpad": ("/usr/bin/fpad", "featherpad", (N,), ("org.featherpad.*",), None),
-    "evince": ("/usr/bin/evince", "evince", (N,), ("org.gnome.Evince", "org.gnome.Evince.*"), None),
-    "vlc": ("/usr/bin/vlc", "vlc", (N, T), ("org.mpris.MediaPlayer2.vlc", "org.mpris.MediaPlayer2.vlc.*", "org.videolan.*"), None),
-    "file-roller": ("/usr/bin/file-roller", "file-roller", (N,), ("org.gnome.FileRoller", "org.gnome.FileRoller.*", "org.gnome.ArchiveManager1"), None),
-    "loupe": ("/usr/bin/loupe", "loupe", (N,), ("org.gnome.Loupe", "org.gnome.Loupe.*"), None),
-    "metadata-cleaner": ("/usr/bin/metadata-cleaner", "metadata-cleaner", (N,), ("fr.romainvigier.MetadataCleaner", "fr.romainvigier.MetadataCleaner.*"), None),
-    "mat2": ("/usr/bin/mat2", "mat2", None, (), None),
-    "prestium-translate": ("/usr/local/bin/prestium-translate", "translate", None, (), None),
+    "gajim": ("/usr/bin/gajim", "gajim", "gajim", "private"),
+    "prestium-gajim-keys": ("/usr/local/bin/prestium-gajim-keys", "gajim", "prestium-gajim-keys", "private"),
+    "claws-mail": ("/usr/bin/claws-mail", "claws-mail", "claws-mail", "shared"),
+    "kleopatra": ("/usr/bin/kleopatra", "kleopatra", "kleopatra", "shared"),
+    "kwatchgnupg": ("/usr/bin/kwatchgnupg", "kleopatra", "kwatchgnupg", "shared"),
+    "keepassxc": ("/usr/bin/keepassxc", "keepassxc", "keepassxc", None),
+    "libreoffice": ("/usr/bin/libreoffice", "libreoffice", "libreoffice", None),
+    "soffice": ("/usr/bin/soffice", "libreoffice", "libreoffice", None),
+    "lowriter": ("/usr/bin/lowriter", "libreoffice", "libreoffice", None),
+    "localc": ("/usr/bin/localc", "libreoffice", "libreoffice", None),
+    "loimpress": ("/usr/bin/loimpress", "libreoffice", "libreoffice", None),
+    "lodraw": ("/usr/bin/lodraw", "libreoffice", "libreoffice", None),
+    "lomath": ("/usr/bin/lomath", "libreoffice", "libreoffice", None),
+    "lobase": ("/usr/bin/lobase", "libreoffice", "libreoffice", None),
+    "onionshare": ("/usr/bin/onionshare", "onionshare", "onionshare", None),
+    "onionshare-cli": ("/usr/bin/onionshare-cli", "onionshare", "onionshare-cli", None),
+    "feather": ("/usr/local/bin/feather", "feather", "feather", None),
+    "featherpad": ("/usr/bin/featherpad", "featherpad", "featherpad", None),
+    "fpad": ("/usr/bin/fpad", "featherpad", "featherpad", None),
+    "evince": ("/usr/bin/evince", "evince", "evince", None),
+    "vlc": ("/usr/bin/vlc", "vlc", "vlc", None),
+    "file-roller": ("/usr/bin/file-roller", "file-roller", "file-roller", None),
+    "loupe": ("/usr/bin/loupe", "loupe", "loupe", None),
+    "metadata-cleaner": ("/usr/bin/metadata-cleaner", "metadata-cleaner", "metadata-cleaner", None),
+    "mat2": ("/usr/bin/mat2", "mat2", "mat2", None),
+    "prestium-translate": ("/usr/local/bin/prestium-translate", "translate", "prestium-translate", None),
     # Audacity's own wrapper (bubblewrap network namespace); /usr/bin/audacity is hook 0620's shim
-    "audacity": ("/usr/local/bin/prestium-audacity", "audacity", None, (), None),
+    "audacity": ("/usr/local/bin/prestium-audacity", "audacity", "audacity", None),
 }
 # A second start of Audacity joins the running one (its single-instance check needs the same
 # network namespace). That namespace belongs to the first start's user namespace, which only a
@@ -80,7 +89,61 @@ APPS = {
 # it if a hidden socket is visible there.
 JOIN = {"audacity": ("prestium-audacity/ns.sock", "/usr/local/lib/prestium/audacity-ns",
                      "/usr/libexec/prestium-audacity")}
-TALK = {N: "org.freedesktop.Notifications", T: "org.kde.StatusNotifierWatcher"}
+
+# --- bus policies ---------------------------------------------------------------------------------
+# A policy file is a list of directives, one per line ("#" starts a comment):
+#   bus none                    no session bus at all (the only directive then)
+#   include FRAGMENT            the directives of POLICY_DIR/FRAGMENT.inc
+#   talk NAME                   only the names in TALK_OK (notifications, the tray)
+#   own NAME                    the application's own names (single instance, MPRIS); NAME or NAME.*
+#   call NAME RULE              a portal method call: only the exact (NAME, RULE) pairs in PORTAL_RULES
+#   broadcast NAME RULE         a portal signal: the same
+#   documents                   bind the document portal's view of this application (file chooser)
+#   env SET                     a fixed environment set from ENV_SETS (how a toolkit finds the portal)
+#   own-if CONDITION NAME       own NAME only while CONDITION (OWN_IF) holds
+# Anything else, and any name in FORBIDDEN, makes the application not start (fails closed).
+TALK_OK = ("org.freedesktop.Notifications", "org.kde.StatusNotifierWatcher")
+DESKTOP, DOCUMENTS = "org.freedesktop.portal.Desktop", "org.freedesktop.portal.Documents"
+_D, _R = "@/org/freedesktop/portal/desktop", "@/org/freedesktop/portal/desktop/request/*"
+# Only these portals: the file chooser, OpenURI (links only: not OpenFile or OpenDirectory, which
+# hand a file to whatever handler the portal picks), the desktop settings (colour scheme, fonts) and
+# the Request objects their answers come on. Not Background, Camera, ScreenCast, RemoteDesktop,
+# Screenshot, Inhibit, Print, Email, DynamicLauncher, Trash, Location, Secret, GlobalShortcuts,
+# InputCapture, Usb, Account, Wallpaper, Realtime, GameMode, the monitors or ProxyResolver: their
+# methods are never in a --call rule, so the proxy drops them. DBus.Properties is Get/GetAll only
+# (toolkits read each portal's "version" before using it), never Set.
+PORTAL_RULES = {
+    ("call", DESKTOP, "org.freedesktop.DBus.Properties.Get" + _D),
+    ("call", DESKTOP, "org.freedesktop.DBus.Properties.GetAll" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.Settings.Read" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.Settings.ReadAll" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.Settings.ReadOne" + _D),
+    ("broadcast", DESKTOP, "org.freedesktop.portal.Settings.SettingChanged" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.Request.Close" + _R),
+    ("broadcast", DESKTOP, "org.freedesktop.portal.Request.Response" + _R),
+    ("call", DESKTOP, "org.freedesktop.portal.FileChooser.OpenFile" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.FileChooser.SaveFile" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.FileChooser.SaveFiles" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.OpenURI.OpenURI" + _D),
+    ("call", DESKTOP, "org.freedesktop.portal.OpenURI.SchemeSupported" + _D),
+    ("call", DOCUMENTS, "org.freedesktop.portal.Documents.GetMountPoint@/org/freedesktop/portal/documents"),
+}
+# never, in any directive (exact name or, for the ones ending in ".", a prefix)
+FORBIDDEN = ("org.freedesktop.DBus", "org.freedesktop.systemd1", "org.freedesktop.login1", "ca.desrt.dconf",
+             "org.freedesktop.Flatpak", "org.freedesktop.portal.Flatpak", "org.freedesktop.impl.",
+             "org.freedesktop.PolicyKit1", "org.freedesktop.PackageKit", "org.freedesktop.Accounts",
+             "org.freedesktop.UDisks2", "org.freedesktop.FileManager1", "org.freedesktop.ScreenSaver",
+             "org.gnome.SessionManager", "org.gnome.keyring", "org.gtk.vfs.", "org.a11y.", "org.prestium.",
+             "org.freedesktop.secrets")
+# the toolkit settings that send an application's file dialogs to the portal (GTK 4 does it by itself
+# once it can see the portal; GTK 3's GTK_USE_PORTAL would also send GIO's file launches, which the
+# policies do not allow, so no policy uses it)
+ENV_SETS = {"qt-portal": {"QT_QPA_PLATFORMTHEME": "xdgdesktopportal"}}
+# conditional names: KeePassXC's Secret Service (FdoSecrets) only while the user has turned it on in
+# KeePassXC's own settings ([FdoSecrets] Enabled=true in ~/.config/keepassxc/keepassxc.ini)
+OWN_IF = {"keepassxc-secret-service": ("org.freedesktop.secrets",)}
+NAME_RX = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)+(\.\*)?$")
+APP_ID_PREFIX = "org.prestium.Confined."
 
 RUN_USER = "/run/user"
 SYSBUS_DIR = "/run/dbus"
@@ -88,6 +151,8 @@ WL_BASE = "/run/prestium-wl"
 TMP = "/tmp"
 SHM = "/dev/shm"
 PROXY = "/usr/bin/xdg-dbus-proxy"
+POLICY_DIR = "/usr/share/prestium/app-confine"
+DBUS_SEND = "/usr/bin/dbus-send"
 RT_BINDS = ("pulse", "pipewire-0", "pipewire-0-manager", "dconf")
 
 CLONE_NEWNS = 0x00020000
@@ -99,6 +164,8 @@ O_PATH = getattr(os, "O_PATH", 0o10000000)
 _libc = ctypes.CDLL(None, use_errno=True)
 _libc.mount.argtypes = [ctypes.c_char_p] * 3 + [ctypes.c_ulong, ctypes.c_char_p]
 _libc.unshare.argtypes = [ctypes.c_int]
+_libc.umount2.argtypes = [ctypes.c_char_p, ctypes.c_int]
+_libc.syscall.restype = ctypes.c_long
 
 
 class Fail(Exception):
@@ -185,32 +252,261 @@ def open_src(path):
         return None
 
 
-def start_proxy(uid, rt_base, group, talk, own):
-    """xdg-dbus-proxy on a socket outside the app's view; returns (socket path, read end of its
-    sync pipe). The proxy exits when that read end is closed (this supervisor exits)."""
+def _forbidden(name):
+    return any(name == f or (f.endswith(".") and name.startswith(f)) or name.startswith(f + ".")
+               for f in FORBIDDEN)
+
+
+def _read_fixed(path, limit=65536):
+    """A root-owned file of the image that no one else can write (the policies are not the user's)."""
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+    try:
+        st = os.fstat(fd)
+        if not stat.S_ISREG(st.st_mode) or st.st_uid != 0 or st.st_mode & 0o022:
+            raise Fail("%s is not a root-owned file" % path)
+        return os.read(fd, limit + 1).decode()
+    finally:
+        os.close(fd)
+
+
+def parse_policy(policy, _depth=0):
+    """POLICY_DIR/<policy>.policy (or .inc): a dict with "bus" (False: no session bus), the proxy's
+    arguments, "documents", "env" and "own_if". Raises Fail on anything not allowed."""
+    if not re.match(r"^[a-z0-9-]+$", policy or "") or _depth > 3:
+        raise Fail("bad policy name %r" % policy)
+    path = os.path.join(POLICY_DIR, policy + (".inc" if _depth else ".policy"))
+    try:
+        text = _read_fixed(path)
+    except OSError as e:
+        raise Fail("policy %s: %s" % (path, e.strerror))
+    pol = {"bus": True, "args": [], "documents": False, "env": {}, "own_if": [], "none": False}
+    for ln, line in enumerate(text.splitlines(), 1):
+        w = line.split("#", 1)[0].split()
+        if not w:
+            continue
+        where = "%s:%d" % (path, ln)
+        d, rest = w[0], w[1:]
+        if d == "bus" and rest == ["none"] and not _depth:
+            pol["none"] = True
+        elif d == "include" and len(rest) == 1:
+            sub = parse_policy(rest[0], _depth + 1)
+            for k in ("args", "own_if"):
+                pol[k] += [x for x in sub[k] if x not in pol[k]]
+            pol["documents"] |= sub["documents"]
+            pol["env"].update(sub["env"])
+        elif d in ("talk", "own") and len(rest) == 1:
+            n = rest[0]
+            if not NAME_RX.match(n) or _forbidden(n):
+                raise Fail("%s: %s %s is not allowed" % (where, d, n))
+            if d == "talk" and n not in TALK_OK:
+                raise Fail("%s: talk %s is not allowed (only %s)" % (where, n, ", ".join(TALK_OK)))
+            if d == "own" and (n.startswith("org.freedesktop.") or n.endswith(".*") and n.count(".") < 2):
+                raise Fail("%s: own %s is not allowed" % (where, n))
+            a = "--%s=%s" % (d, n)
+            if a not in pol["args"]:
+                pol["args"].append(a)
+        elif d in ("call", "broadcast") and len(rest) == 2:
+            if (d, rest[0], rest[1]) not in PORTAL_RULES:
+                raise Fail("%s: %s %s %s is not allowed" % (where, d, rest[0], rest[1]))
+            a = "--%s=%s=%s" % (d, rest[0], rest[1])
+            if a not in pol["args"]:
+                pol["args"].append(a)
+        elif d == "documents" and not rest:
+            pol["documents"] = True
+        elif d == "env" and len(rest) == 1 and rest[0] in ENV_SETS:
+            pol["env"].update(ENV_SETS[rest[0]])
+        elif d == "own-if" and len(rest) == 2 and rest[0] in OWN_IF and rest[1] in OWN_IF[rest[0]]:
+            if (rest[0], rest[1]) not in pol["own_if"]:
+                pol["own_if"].append((rest[0], rest[1]))
+        else:
+            raise Fail("%s: unknown or malformed directive %r" % (where, line.strip()))
+    if pol["none"]:
+        if pol["args"] or pol["documents"] or pol["env"] or pol["own_if"]:
+            raise Fail("%s: \"bus none\" and other directives" % path)
+        pol["bus"] = False
+    if pol["documents"] and not any(a.startswith("--call=%s=org.freedesktop.portal.FileChooser." % DESKTOP) for a in pol["args"]):
+        raise Fail("%s: \"documents\" without the file chooser" % path)
+    return pol
+
+
+def own_if_holds(cond, uid):
+    """Read from the user's home by the user's own fixed path (not $HOME); any doubt: no."""
+    if cond != "keepassxc-secret-service":
+        return False
+    try:
+        home = pwd.getpwuid(uid).pw_dir
+        fd = os.open(os.path.join(home, ".config/keepassxc/keepassxc.ini"), os.O_RDONLY | os.O_NOFOLLOW | os.O_CLOEXEC)
+        try:
+            text = os.read(fd, 1 << 20).decode(errors="replace")
+        finally:
+            os.close(fd)
+    except (OSError, KeyError):
+        return False
+    sect = None
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("[") and line.endswith("]"):
+            sect = line[1:-1]
+        elif sect == "FdoSecrets" and line.replace(" ", "").lower() == "enabled=true":
+            return True
+    return False
+
+
+def app_id(policy):
+    return APP_ID_PREFIX + policy.replace("-", "_")
+
+
+MNT_DETACH = 2
+_SYS_PIVOT_ROOT = {"x86_64": 155, "aarch64": 41, "i686": 217, "i386": 217, "armv7l": 218}
+
+
+def _pivot_root(new, old):
+    nr = _SYS_PIVOT_ROOT.get(platform.machine())
+    if nr is None:
+        raise Fail("pivot_root: unknown architecture %s" % platform.machine())
+    if _libc.syscall(ctypes.c_long(nr), ctypes.c_char_p(new.encode()), ctypes.c_char_p(old.encode())) != 0:
+        _err("pivot_root")
+
+
+def proxy_root(uid, rt_base, info):
+    """In the proxy's child, before exec: a new user and mount namespace whose root is a small tmpfs
+    with /usr, /etc (read-only), the session bus socket, app-confine's socket directory and a
+    /.flatpak-info naming the application. The desktop portal reads that file through
+    /proc/<proxy pid>/root (the bus tells it the proxy's pid, not the application's), so it treats
+    the caller as a sandboxed application with that id: the file chooser hands it the picked file
+    through the document portal instead of a path, and its permissions are per application. The
+    application's own namespace has no /.flatpak-info (GLib, GTK and Qt would change behaviour)."""
+    run = "%s/%d" % (RUN_USER, uid)
+    gid = os.getgid()
+    if _libc.unshare(CLONE_NEWUSER | CLONE_NEWNS) != 0:
+        _err("unshare")
+    with open("/proc/self/setgroups", "w") as f:
+        f.write("deny")
+    with open("/proc/self/uid_map", "w") as f:
+        f.write("%d %d 1" % (uid, uid))
+    with open("/proc/self/gid_map", "w") as f:
+        f.write("%d %d 1" % (gid, gid))
+    mount(None, "/", None, MS_REC | MS_PRIVATE)
+    srcs = {"bus": open_src(os.path.join(run, "bus")), "base": open_src(rt_base)}
+    if srcs["bus"] is None or srcs["base"] is None:
+        raise Fail("the session bus or %s is missing" % rt_base)
+    R = TMP  # any directory: in this namespace only, it becomes the new root
+    mount("tmpfs", R, "tmpfs", MS_NOSUID | MS_NODEV, "mode=0755,size=1m")
+    for d in ("usr", "etc"):
+        os.mkdir(os.path.join(R, d), 0o755)
+        mount("/" + d, os.path.join(R, d), None, MS_BIND | MS_REC)
+        remount_ro(os.path.join(R, d))
+    for d in ("bin", "sbin", "lib", "lib64", "lib32", "libx32"):
+        if os.path.islink("/" + d):
+            os.symlink(os.readlink("/" + d), os.path.join(R, d))
+        elif os.path.isdir("/" + d):
+            os.mkdir(os.path.join(R, d), 0o755)
+            mount("/" + d, os.path.join(R, d), None, MS_BIND | MS_REC)
+            remount_ro(os.path.join(R, d))
+    os.makedirs(R + run, 0o755)
+    os.makedirs(R + rt_base, 0o700)
+    bind(srcs["base"], os.open(R + rt_base, O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC))
+    os.close(os.open(R + run + "/bus", os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600))
+    bind(srcs["bus"], os.open(R + run + "/bus", O_PATH | os.O_NOFOLLOW | os.O_CLOEXEC))
+    fd = os.open(os.path.join(R, ".flatpak-info"), os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o444)
+    os.write(fd, info.encode())
+    os.close(fd)
+    os.chdir(R)
+    _pivot_root(".", ".")
+    if _libc.umount2(b".", MNT_DETACH) != 0:
+        _err("umount the old root")
+    os.chdir("/")
+    remount_ro("/")
+
+
+def start_proxy(uid, rt_base, group, pol, aid, instance):
+    """xdg-dbus-proxy on a socket outside the app's view, in its own namespace (proxy_root); returns
+    (socket path, read end of its sync pipe). The proxy exits when that read end is closed (this
+    supervisor exits)."""
     sock = os.path.join(rt_base, ".bus-%s-%d" % (group, os.getpid()))
     try:
         os.unlink(sock)
     except FileNotFoundError:
         pass
+    args = list(pol["args"])
+    for cond, n in pol["own_if"]:
+        if own_if_holds(cond, uid):
+            args.append("--own=%s" % n)
+    info = "[Application]\nname=%s\n\n[Instance]\ninstance-id=%s\n" % (aid, instance)
     r, w = os.pipe()
-    args = [PROXY, "--fd=%d" % w, "unix:path=%s/%d/bus" % (RUN_USER, uid), sock, "--filter"]
-    args += ["--own=%s" % n for n in own]
-    args += ["--talk=%s" % TALK[t] for t in talk]
-    try:
-        p = subprocess.Popen(args, pass_fds=(w,), stdin=subprocess.DEVNULL, close_fds=True,
-                             env={"PATH": "/usr/bin:/bin"})
-    except OSError as e:
-        raise Fail("D-Bus filter: %s" % e)
+    er, ew = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        try:
+            os.close(r)
+            os.close(er)
+            proxy_root(uid, rt_base, info)
+            os.set_inheritable(w, True)
+            os.execve(PROXY, [PROXY, "--fd=%d" % w, "unix:path=%s/%d/bus" % (RUN_USER, uid), sock, "--filter"] + args,
+                      {"PATH": "/usr/bin:/bin"})
+        except (Fail, OSError) as e:
+            try:
+                os.write(ew, str(e).encode()[:900] or b"failed")
+            except OSError:
+                pass
+        os._exit(127)
     os.close(w)
+    os.close(ew)
     ready, _, _ = select.select([r], [], [], 10)
-    if not ready or os.read(r, 1) != b"x":
-        p.kill()
-        raise Fail("the D-Bus filter (xdg-dbus-proxy) did not start")
-    return sock, r
+    ok = bool(ready) and os.read(r, 1) == b"x"
+    if not ok:
+        err = b""
+        try:
+            if select.select([er], [], [], 0)[0]:
+                err = os.read(er, 1024)
+        except OSError:
+            pass
+        os.close(er)
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+        os.waitpid(pid, 0)
+        raise Fail("the D-Bus filter (xdg-dbus-proxy) did not start%s" % (": " + err.decode(errors="replace") if err else ""))
+    os.close(er)
+    return sock, r, pid
 
 
-def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg):
+def start_documents(uid):
+    """Start the document portal (D-Bus activation) so its FUSE view exists before the mounts."""
+    if not os.path.exists(DBUS_SEND):
+        return
+    try:
+        subprocess.run([DBUS_SEND, "--session", "--print-reply", "--reply-timeout=5000",
+                        "--dest=" + DOCUMENTS, "/org/freedesktop/portal/documents",
+                        DOCUMENTS + ".GetMountPoint"], timeout=10, stdin=subprocess.DEVNULL,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                       env={"PATH": "/usr/bin:/bin", "DBUS_SESSION_BUS_ADDRESS": "unix:path=%s/%d/bus" % (RUN_USER, uid)})
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def write_instance(uid, instance, child_pid):
+    """$XDG_RUNTIME_DIR/.flatpak/<instance>/bwrapinfo.json: the portal finds the application's own
+    process (its namespaces) through it. Returns the directory (removed when the app exits)."""
+    run = "%s/%d" % (RUN_USER, uid)
+    d = safe_dir(os.path.join(run, ".flatpak"), uid)
+    d = safe_dir(os.path.join(d, instance), uid)
+    fd = os.open(os.path.join(d, "bwrapinfo.json"), os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW | os.O_CLOEXEC, 0o600)
+    os.write(fd, json.dumps({"child-pid": child_pid}).encode())
+    os.close(fd)
+    return d
+
+
+def remove_instance(d):
+    try:
+        os.unlink(os.path.join(d, "bwrapinfo.json"))
+        os.rmdir(d)
+    except OSError:
+        pass
+
+
+def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg, doc_app=None):
     """In the child: new user and mount namespace, then the mounts. Raises Fail."""
     if _libc.unshare(CLONE_NEWUSER | CLONE_NEWNS) != 0:
         _err("unshare")
@@ -231,6 +527,11 @@ def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg):
     rt_fd = os.open(rt, O_PATH | os.O_NOFOLLOW | os.O_DIRECTORY | os.O_CLOEXEC)
     tmp_fd = os.open(ptmp, O_PATH | os.O_NOFOLLOW | os.O_DIRECTORY | os.O_CLOEXEC)
     bus_fd = open_src(proxy_sock) if proxy_sock else None
+    # the document portal's view for this application only (its FUSE file system checks the
+    # caller's user id, which the identity map keeps)
+    doc_fd = open_src(os.path.join(run, "doc", "by-app", doc_app)) if doc_app else None
+    if doc_app and doc_fd is None:
+        sys.stderr.write("app-confine: no document portal; the file chooser can't hand files over\n")
     if proxy_sock and bus_fd is None:
         raise Fail("the D-Bus filter's socket is missing")
 
@@ -252,6 +553,14 @@ def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg):
                 os.unlink(p)
     if bus_fd is not None:
         bind(bus_fd, mountpoint(os.path.join(run, "prestium-bus"), False))
+    p = os.path.join(run, "doc")
+    if doc_fd is not None:
+        bind(doc_fd, mountpoint(p, True))
+    elif os.path.lexists(p):  # never a planted directory or link where the portal's files would be
+        if os.path.isdir(p) and not os.path.islink(p):
+            os.rmdir(p)
+        else:
+            os.unlink(p)
     with open(os.path.join(run, ".prestium-confined"), "w") as f:
         f.write(name + "\n")
 
@@ -272,7 +581,7 @@ def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg):
         bind(x11, mountpoint(os.path.join(TMP, ".X11-unix"), True), ro=True, path=os.path.join(TMP, ".X11-unix"))
     if os.path.isdir(SHM):
         mount("tmpfs", SHM, "tmpfs", MS_NOSUID | MS_NODEV, "mode=1777")
-    for fd in list(src.values()) + [wl, x11, rt_fd, tmp_fd, bus_fd]:
+    for fd in list(src.values()) + [wl, x11, rt_fd, tmp_fd, bus_fd, doc_fd]:
         if fd is not None:
             try:
                 os.close(fd)
@@ -280,7 +589,7 @@ def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg):
                 pass
 
 
-def environment(uid, has_bus):
+def environment(uid, has_bus, extra=None):
     env = dict(os.environ)
     run = "%s/%d" % (RUN_USER, uid)
     for k in ("DBUS_SYSTEM_BUS_ADDRESS", "AT_SPI_BUS_ADDRESS", "SESSION_MANAGER", "TMPDIR",
@@ -298,6 +607,8 @@ def environment(uid, has_bus):
                    MOZ_ENABLE_WAYLAND="0")
     env["PYTHONNOUSERSITE"] = "1"
     env["PRESTIUM_CONFINED"] = "1"
+    if has_bus:
+        env.update(extra or {})
     return env
 
 
@@ -311,22 +622,41 @@ def notify_fail(msg):
         pass
 
 
+def check_all():
+    """Every application's policy parses (hook 0625 runs this at build time)."""
+    bad = 0
+    for n in sorted(APPS):
+        try:
+            pol = parse_policy(APPS[n][2])
+            print("%s %s %s" % (n, APPS[n][2], " ".join(pol["args"]) if pol["bus"] else "no-bus"))
+        except Fail as e:
+            print("E: %s: %s" % (n, e))
+            bad = 1
+    return bad
+
+
 def main(argv):
     if len(argv) == 2 and argv[1] == "--list":
         for n in sorted(APPS):
             print(n, APPS[n][0])
         return 0
+    if len(argv) == 2 and argv[1] == "--check":
+        return check_all()
     if len(argv) < 2 or argv[1] not in APPS:
-        sys.stderr.write("usage: app-confine NAME [ARGS...] | --list\n")
+        sys.stderr.write("usage: app-confine NAME [ARGS...] | --list | --check\n")
         return 2
     name, args = argv[1], argv[2:]
-    prog, group, talk, own, gnupg = APPS[name]
+    prog, group, policy, gnupg = APPS[name]
     uid, gid = os.getuid(), os.getgid()
     run = "%s/%d" % (RUN_USER, uid)
-    # already confined (an app of a confined group starting another): its mounts already apply
-    if os.path.exists(os.path.join(run, ".prestium-confined")) and not os.path.exists("%s/broker" % WL_BASE):
-        os.execve(prog, [prog] + args, environment(uid, os.path.exists(os.path.join(run, "prestium-bus"))))
+    inst_dir = None
+    sock = None
     try:
+        pol = parse_policy(policy)
+        # already confined (an app of a confined group starting another): its mounts already apply
+        if os.path.exists(os.path.join(run, ".prestium-confined")) and not os.path.exists("%s/broker" % WL_BASE):
+            has = os.path.exists(os.path.join(run, "prestium-bus"))
+            os.execve(prog, [prog] + args, environment(uid, has, pol["env"]))
         if uid == 0:
             raise Fail("not as root")
         safe_dir(run, uid, create=False)
@@ -345,22 +675,27 @@ def main(argv):
                                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                           env={"PATH": "/usr/bin:/bin"}).returncode == 0:
                 os.execve(ns_helper, [ns_helper, "join", js, "--", real] + args, environment(uid, False))
-        sock, sync = (None, None)
-        if talk is not None:
+        aid = app_id(policy)
+        instance = "prestium-%s-%d" % (group, os.getpid())
+        if pol["bus"]:
             if not os.path.exists(os.path.join(run, "bus")):
                 raise Fail("no session bus")
-            sock, sync = start_proxy(uid, base, group, talk, own)
-        env = environment(uid, sock is not None)
+            if pol["documents"]:
+                start_documents(uid)
+            sock, _sync, _ppid = start_proxy(uid, base, group, pol, aid, instance)
+        env = environment(uid, sock is not None, pol["env"])
         r, w = os.pipe()
+        gr, gw = os.pipe()
         pid = os.fork()
         if pid == 0:
             os.close(r)
+            os.close(gw)
             try:
                 try:
                     cwd = os.getcwd()
                 except OSError:
                     cwd = "/"
-                setup(name, uid, gid, rt, ptmp, sock, gnupg)
+                setup(name, uid, gid, rt, ptmp, sock, gnupg, aid if pol["documents"] else None)
                 # look the working directory up again: the old one could be in the host's /tmp
                 try:
                     os.chdir(cwd)
@@ -370,11 +705,16 @@ def main(argv):
                 os.write(w, str(e).encode()[:900] or b"setup failed")
                 os._exit(127)
             os.close(w)  # close-on-exec would do; an empty read means "set up"
+            # wait until the portal can find this process (bwrapinfo.json), then run the application
+            if os.read(gr, 1) != b"g":
+                os._exit(127)
+            os.close(gr)
             try:
                 os.execve(prog, [prog] + args, env)
             except OSError:
                 os._exit(127)
         os.close(w)
+        os.close(gr)
         err = b""
         while True:
             c = os.read(r, 1024)
@@ -383,25 +723,33 @@ def main(argv):
             err += c
         os.close(r)
         if err:
+            os.close(gw)
             os.waitpid(pid, 0)
             raise Fail(err.decode(errors="replace"))
-        for s in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-            signal.signal(s, lambda n, _f: os.kill(pid, n))
+        if sock:
+            inst_dir = write_instance(uid, instance, pid)
+        os.write(gw, b"g")
+        os.close(gw)
+        for s_ in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+            signal.signal(s_, lambda n, _f: os.kill(pid, n))
         while True:
             try:
                 _, status = os.waitpid(pid, 0)
                 break
             except InterruptedError:
                 continue
+        return os.waitstatus_to_exitcode(status) if status else 0
+    except (Fail, OSError) as e:
+        notify_fail("%s was not started: %s" % (name, e))
+        return 1
+    finally:
+        if inst_dir:
+            remove_instance(inst_dir)
         if sock:
             try:
                 os.unlink(sock)
             except OSError:
                 pass
-        return os.waitstatus_to_exitcode(status) if status else 0
-    except (Fail, OSError) as e:
-        notify_fail("%s was not started: %s" % (name, e))
-        return 1
 
 
 if __name__ == "__main__":

@@ -1,0 +1,3 @@
+# Prestium Keys (Gajim's OpenPGP key): no session bus. It holds Gajim's private key; its own
+# file dialogs (GTK 3, in the process) only see what its AppArmor profile allows.
+bus none

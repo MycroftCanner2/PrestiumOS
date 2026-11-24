@@ -1,0 +1,10 @@
+# KeePassXC: notifications, tray, its own names (single instance, the browser integration's
+# org.keepassxc.KeePassXC.MainWindow). The Secret Service (org.freedesktop.secrets) only while it is
+# turned on in KeePassXC's own settings (FdoSecrets). No portal file chooser: it saves a database
+# by writing a temporary file and a backup next to it. Screen-lock detection: labwc has no
+# org.freedesktop.ScreenSaver or org.gnome.ScreenSaver and logind is on the system bus (blocked), so
+# KeePassXC's idle timeout and lock-on-minimise are what lock it.
+include notify
+include tray
+own org.keepassxc.KeePassXC.*
+own-if keepassxc-secret-service org.freedesktop.secrets

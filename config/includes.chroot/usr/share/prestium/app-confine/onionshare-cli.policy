@@ -1,0 +1,2 @@
+# onionshare-cli: a terminal program, no session bus.
+bus none

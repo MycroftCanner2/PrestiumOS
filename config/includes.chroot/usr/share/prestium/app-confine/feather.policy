@@ -1,0 +1,4 @@
+# Feather (Monero wallet, its own Qt build): notifications and tray. No portal file chooser: a
+# wallet is several files side by side (the wallet, .keys, .address.txt).
+include notify
+include tray

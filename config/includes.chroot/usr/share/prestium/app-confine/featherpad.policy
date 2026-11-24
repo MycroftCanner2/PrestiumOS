@@ -1,0 +1,7 @@
+# FeatherPad (Qt 6): notifications, its own names (single instance), the portal's file chooser
+# (open and save one file anywhere the user picks; its profile still lets it open the usual folders
+# from its command line).
+include notify
+own org.featherpad.*
+include portal-files
+env qt-portal

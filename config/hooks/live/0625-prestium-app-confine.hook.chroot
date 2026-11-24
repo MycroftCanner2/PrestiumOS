@@ -16,6 +16,28 @@ set -e
 AC=/usr/local/lib/prestium/app-confine
 [ -x "$AC" ] || { echo "E: $AC is missing"; exit 1; }
 [ -x /usr/bin/xdg-dbus-proxy ] || { echo "E: xdg-dbus-proxy is missing (app-confine's D-Bus filter)"; exit 1; }
+# security review F-01 (per-application buses): every policy file parses and passes app-confine's rules
+# (no systemd, dconf, bus driver, portal back end or other application's name; only the allowed
+# portal calls), and what the policies use is installed: the desktop and document portals, the GTK back
+# end (file chooser), the Qt portal plugins, setuid fusermount3 (the document portal's FUSE mount),
+# dbus-send (app-confine starts the document portal before the mounts)
+"$AC" --check >/tmp/app-confine-check || { grep '^E:' /tmp/app-confine-check; echo "E: app-confine's bus policies"; exit 1; }
+rm -f /tmp/app-confine-check
+for f in /usr/libexec/xdg-desktop-portal /usr/libexec/xdg-document-portal /usr/libexec/xdg-desktop-portal-gtk \
+	/usr/share/xdg-desktop-portal/portals/gtk.portal /usr/bin/fusermount3 /usr/bin/dbus-send \
+	/usr/local/lib/prestium/portal-open /etc/systemd/user/xdg-desktop-portal.service.d/prestium.conf \
+	/usr/share/prestium/portal/portals/portals.conf; do
+	[ -e "$f" ] || { echo "E: $f is missing (portal file chooser and links)"; exit 1; }
+done
+dpkg -s qt5-xdgdesktopportal-platformtheme qt6-xdgdesktopportal-platformtheme >/dev/null 2>&1 \
+	|| { echo "E: the Qt portal plugins are missing"; exit 1; }
+[ -u /usr/bin/fusermount3 ] || { echo "E: fusermount3 is not setuid: the document portal can't mount"; exit 1; }
+# the portal reads back ends only from Prestium's directory (XDG_DESKTOP_PORTAL_DIR): the GTK one
+ln -sfn /usr/share/xdg-desktop-portal/portals/gtk.portal /usr/share/prestium/portal/portals/gtk.portal
+# app-confine gives each proxy (never the host, never the application) its own /.flatpak-info
+if [ -e /.flatpak-info ] || [ -L /.flatpak-info ]; then
+	echo "E: /.flatpak-info exists: the portals and toolkits would treat every program as sandboxed"; exit 1
+fi
 /usr/bin/python3 -I - <<'PY'
 import os, re, subprocess, sys
 AC = "/usr/local/lib/prestium/app-confine"

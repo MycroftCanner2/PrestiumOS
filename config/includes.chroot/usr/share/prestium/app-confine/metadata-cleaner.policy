@@ -1,0 +1,5 @@
+# Metadata Cleaner (GTK 4): notifications and its own names. No portals: it writes the cleaned copy
+# next to the original, which the document portal can't give it.
+include notify
+own fr.romainvigier.MetadataCleaner
+own fr.romainvigier.MetadataCleaner.*
