@@ -31,6 +31,9 @@ profile gajim /usr/bin/gajim {
   /usr/lib/@{multiarch}/gstreamer-1.0/gst-plugin-scanner ix,
   /usr/libexec/gstreamer-1.0/gst-plugin-scanner ix,
 
+  # Prestium's fixed app settings (use_keyring off: account passwords in settings.sqlite, never
+  # GNOME Keyring, which app-confine keeps out of reach). Gajim opens it unguarded at every start.
+  /etc/gajim/app-overrides.json r,
   owner @{HOME}/.config/gajim/ rw,
   owner @{HOME}/.config/gajim/** rwk,
   owner @{HOME}/.local/share/gajim/ rw,

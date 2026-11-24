@@ -63,6 +63,15 @@ run it is in the README's quick_qubes section.
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **Gajim stores account passwords in its own settings, never in GNOME Keyring.** With `use_keyring` on
+  (Gajim's default) Gajim could not save a password at all, since app-confine keeps
+  `org.freedesktop.secrets` out of its bus, and asked for it at every start. `/etc/gajim/app-overrides.json`
+  (`{"use_keyring": false}`, Gajim's own override mechanism) now applies to every profile at each start,
+  new and existing, without rewriting their other settings; Gajim's profile may read it. A saved password
+  is in `~/.config/gajim/settings.sqlite` (account settings, not encrypted; the other confined apps' profiles
+  don't allow reading it, unconfined programs of the desktop user can). Test: `tests/test_gajim_no_keyring.py`
+  (Gajim's own settings and password code on a profile with `use_keyring` on).
+
 - **Compatibility audit of the F-01/F-05 namespaces: passphrase prompts, Qt tray icons, later volumes and
   Gajim's links work again.** A second review ran the applications under app-confine on a test system:
   - *GnuPG passphrase prompts.* gpg passes the application's `DBUS_SESSION_BUS_ADDRESS`
@@ -86,9 +95,9 @@ Each entry names the review finding (F-xx) it fixes.
     profile could not read the entry or run GIO's `gio-launch-desktop`. `env links-tor` makes Tor Browser
     GIO's default for Gajim (`/usr/share/prestium/links-tor/mimeapps.list`), and the profile allows that
     one entry and the wrapper.
-  Not changed (security tradeoffs): Gajim cannot store account passwords in GNOME Keyring (the Secret
-  Service cannot be filtered per item; turn off "use keyring" in Gajim or type the password), KeePassXC's
-  SSH agent integration (no `SSH_AUTH_SOCK`), dconf writes, the accessibility bus.
+  Not changed (security tradeoffs): GNOME Keyring stays out of Gajim's bus (the Secret Service cannot be
+  filtered per item; see the next entry), KeePassXC's SSH agent integration (no `SSH_AUTH_SOCK`), dconf
+  writes, the accessibility bus.
   Tests: `tests/test_app_confine_compat.py` (policy refusals, a real `xdg-dbus-proxy` and gpg-agent
   with a stand-in prompter, mount propagation, GIO's link handler), `tests/test_app_confine_policy.py`.
 
