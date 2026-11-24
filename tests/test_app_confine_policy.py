@@ -58,7 +58,9 @@ FORBIDDEN_RULES = ("OpenURI.OpenFile", "OpenURI.OpenDirectory", "portal.Backgrou
                    "portal.Email", "portal.DynamicLauncher", "portal.Secret", "portal.Location", "portal.Account",
                    "portal.GlobalShortcuts", "portal.InputCapture", "portal.Usb", "portal.Wallpaper", "portal.Notification",
                    "portal.FileTransfer", "Properties.Set", "Documents.Add", "portal.Device", "portal.Realtime")
-EXPECT_NO_BUS = {"prestium-gajim-keys", "onionshare-cli", "mat2", "prestium-translate", "audacity"}
+# compatibility audit: the Gajim keys tool has a bus with GCR's prompter only (its gpg-agent's pinentry)
+EXPECT_NO_BUS = {"onionshare-cli", "mat2", "prestium-translate", "audacity"}
+PROMPTER_OK = {"gajim", "prestium-gajim-keys"}
 EXPECT_DOCS = {"gajim", "onionshare", "featherpad", "fpad", "vlc"}
 EXPECT_LINKS = {"gajim"}
 EXPECT_QT = {"onionshare", "featherpad", "fpad", "vlc"}
@@ -79,9 +81,12 @@ for n, (prog, group, policy, gnupg) in sorted(ac.APPS.items()):
             bad("%s: odd proxy argument %s" % (n, a))
             continue
         kind, name, rule = m.group(1), m.group(2), m.group(4) or ""
-        if any(name == f or name.startswith(f + ".") for f in FORBIDDEN_NAMES):
+        # compatibility audit: GCR's passphrase prompter (not the keyring) for the two applications with
+        # a gpg-agent of their own (test_app_confine_compat.py)
+        prompter = kind == "talk" and name == "org.gnome.keyring.SystemPrompter" and policy in PROMPTER_OK
+        if any(name == f or name.startswith(f + ".") for f in FORBIDDEN_NAMES) and not prompter:
             bad("%s: %s" % (n, a))
-        if kind == "talk" and name not in ("org.freedesktop.Notifications", "org.kde.StatusNotifierWatcher"):
+        if kind == "talk" and name not in ("org.freedesktop.Notifications", "org.kde.StatusNotifierWatcher") and not prompter:
             bad("%s: talks to %s" % (n, name))
         if kind in ("talk", "own") and name.startswith("org.freedesktop.portal"):
             bad("%s: %s a portal name (only --call/--broadcast rules)" % (n, kind))
@@ -111,7 +116,10 @@ links = {n for n, p in pols.items() if any("OpenURI.OpenURI" in a for a in p["ar
 chk(links == EXPECT_LINKS, "OpenURI (links): %s" % ", ".join(sorted(links)), "OpenURI: %s" % sorted(links))
 qt = {n for n, p in pols.items() if p["env"].get("QT_QPA_PLATFORMTHEME") == "xdgdesktopportal"}
 chk(qt == EXPECT_QT, "Qt portal plugin: %s" % ", ".join(sorted(qt)), "qt-portal: %s" % sorted(qt))
-chk(all(set(p["env"]) <= {"QT_QPA_PLATFORMTHEME"} for p in pols.values()), "env: only the Qt platform theme", "env")
+chk(all(set(p["env"]) <= {"QT_QPA_PLATFORMTHEME"} for n, p in pols.items() if n != "gajim"), "env: only the Qt platform theme", "env")
+# compatibility audit: Gajim's GIO link handler (Tor Browser), nothing else
+chk(pols["gajim"]["env"] == {"XDG_CONFIG_DIRS": "/usr/share/prestium/links-tor:/etc/xdg"},
+    "env: Gajim's links-tor (GIO's default for links: Tor Browser)", "gajim env: %r" % pols["gajim"]["env"])
 chk(not any("GTK_USE_PORTAL" in str(p["env"]) for p in pols.values()), "no GTK_USE_PORTAL (GIO file launches stay off the portal)", "GTK_USE_PORTAL")
 kp = pols.get("keepassxc")
 chk(kp and kp["own_if"] == [("keepassxc-secret-service", "org.freedesktop.secrets")] and "--own=org.freedesktop.secrets" not in kp["args"],

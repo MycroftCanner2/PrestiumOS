@@ -94,15 +94,25 @@ JOIN = {"audacity": ("prestium-audacity/ns.sock", "/usr/local/lib/prestium/audac
 # A policy file is a list of directives, one per line ("#" starts a comment):
 #   bus none                    no session bus at all (the only directive then)
 #   include FRAGMENT            the directives of POLICY_DIR/FRAGMENT.inc
-#   talk NAME                   only the names in TALK_OK (notifications, the tray)
+#   talk NAME                   only the names in TALK_OK (notifications, the tray, GnuPG's prompter)
 #   own NAME                    the application's own names (single instance, MPRIS); NAME or NAME.*
 #   call NAME RULE              a portal method call: only the exact (NAME, RULE) pairs in PORTAL_RULES
 #   broadcast NAME RULE         a portal signal: the same
 #   documents                   bind the document portal's view of this application (file chooser)
 #   env SET                     a fixed environment set from ENV_SETS (how a toolkit finds the portal)
 #   own-if CONDITION NAME       own NAME only while CONDITION (OWN_IF) holds
+#   tray-items                  own org.kde.StatusNotifierItem-<pid>-<n> (n = 1..TRAY_ITEMS) for the
+#                               application's own process id only: Qt 5's tray icon (VLC, KeePassXC)
+#                               registers under that name and shows no icon at all if it can't
 # Anything else, and any name in FORBIDDEN, makes the application not start (fails closed).
-TALK_OK = ("org.freedesktop.Notifications", "org.kde.StatusNotifierWatcher")
+TALK_OK = ("org.freedesktop.Notifications", "org.kde.StatusNotifierWatcher", "org.gnome.keyring.SystemPrompter")
+# Compatibility audit: GnuPG's passphrase prompt. Gajim and its keys tool have a gpg-agent of their own
+# (F-02), started inside their namespace, so its pinentry (pinentry-gnome3) runs there too and asks
+# GCR's system prompter (gcr-prompter, outside) to show the dialog. Without it there is no prompt
+# (pinentry-gnome3 falls back to a terminal there is none of) and every protected key fails. Talking to
+# the prompter only opens a passphrase dialog whose answer comes back to the caller; it is not the
+# keyring (org.gnome.keyring and org.freedesktop.secrets stay forbidden, and "own" of it is refused).
+TALK_EXEMPT = ("org.gnome.keyring.SystemPrompter",)
 DESKTOP, DOCUMENTS = "org.freedesktop.portal.Desktop", "org.freedesktop.portal.Documents"
 _D, _R = "@/org/freedesktop/portal/desktop", "@/org/freedesktop/portal/desktop/request/*"
 # Only these portals: the file chooser, OpenURI (links only: not OpenFile or OpenDirectory, which
@@ -138,10 +148,19 @@ FORBIDDEN = ("org.freedesktop.DBus", "org.freedesktop.systemd1", "org.freedeskto
 # the toolkit settings that send an application's file dialogs to the portal (GTK 4 does it by itself
 # once it can see the portal; GTK 3's GTK_USE_PORTAL would also send GIO's file launches, which the
 # policies do not allow, so no policy uses it)
-ENV_SETS = {"qt-portal": {"QT_QPA_PLATFORMTHEME": "xdgdesktopportal"}}
+ENV_SETS = {"qt-portal": {"QT_QPA_PLATFORMTHEME": "xdgdesktopportal"},
+            # Gajim's links (GIO's default handler): Tor Browser, see /usr/share/prestium/links-tor
+            "links-tor": {"XDG_CONFIG_DIRS": "/usr/share/prestium/links-tor:/etc/xdg"}}
 # conditional names: KeePassXC's Secret Service (FdoSecrets) only while the user has turned it on in
 # KeePassXC's own settings ([FdoSecrets] Enabled=true in ~/.config/keepassxc/keepassxc.ini)
 OWN_IF = {"keepassxc-secret-service": ("org.freedesktop.secrets",)}
+# Compatibility audit: Qt 5 (QDBusTrayIcon) registers each tray icon as the well-known name
+# org.kde.StatusNotifierItem-<its pid>-<counter> before handing it to the panel's watcher; when that
+# name is refused it prints "failed to register service" and shows no icon (KeePassXC set to start
+# minimised to the tray then has no window and no icon). The names are made for the application's own
+# process id (app-confine starts the filter once that id is known), never a wildcard.
+TRAY_ITEM = "org.kde.StatusNotifierItem-%d-%d"
+TRAY_ITEMS = 16
 NAME_RX = re.compile(r"^[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*)+(\.\*)?$")
 APP_ID_PREFIX = "org.prestium.Confined."
 
@@ -158,7 +177,7 @@ RT_BINDS = ("pulse", "pipewire-0", "pipewire-0-manager", "dconf")
 CLONE_NEWNS = 0x00020000
 CLONE_NEWUSER = 0x10000000
 MS_RDONLY, MS_NOSUID, MS_NODEV, MS_NOEXEC = 1, 2, 4, 8
-MS_BIND, MS_REC, MS_PRIVATE = 4096, 16384, 1 << 18
+MS_BIND, MS_REC, MS_PRIVATE, MS_SLAVE = 4096, 16384, 1 << 18, 1 << 19
 O_PATH = getattr(os, "O_PATH", 0o10000000)
 
 _libc = ctypes.CDLL(None, use_errno=True)
@@ -279,7 +298,7 @@ def parse_policy(policy, _depth=0):
         text = _read_fixed(path)
     except OSError as e:
         raise Fail("policy %s: %s" % (path, e.strerror))
-    pol = {"bus": True, "args": [], "documents": False, "env": {}, "own_if": [], "none": False}
+    pol = {"bus": True, "args": [], "documents": False, "env": {}, "own_if": [], "none": False, "tray_items": False}
     for ln, line in enumerate(text.splitlines(), 1):
         w = line.split("#", 1)[0].split()
         if not w:
@@ -293,14 +312,18 @@ def parse_policy(policy, _depth=0):
             for k in ("args", "own_if"):
                 pol[k] += [x for x in sub[k] if x not in pol[k]]
             pol["documents"] |= sub["documents"]
+            pol["tray_items"] |= sub["tray_items"]
             pol["env"].update(sub["env"])
         elif d in ("talk", "own") and len(rest) == 1:
             n = rest[0]
-            if not NAME_RX.match(n) or _forbidden(n):
+            if not NAME_RX.match(n) or (_forbidden(n) and not (d == "talk" and n in TALK_EXEMPT)):
                 raise Fail("%s: %s %s is not allowed" % (where, d, n))
             if d == "talk" and n not in TALK_OK:
                 raise Fail("%s: talk %s is not allowed (only %s)" % (where, n, ", ".join(TALK_OK)))
-            if d == "own" and (n.startswith("org.freedesktop.") or n.endswith(".*") and n.count(".") < 2):
+            # (and never the panel's tray names: the watcher, or another process's tray item; Qt 5's
+            # own items come from "tray-items" only, for the application's process id)
+            if d == "own" and (n.startswith("org.freedesktop.") or n.endswith(".*") and n.count(".") < 2
+                               or n in TALK_OK or n.startswith("org.kde.StatusNotifier")):
                 raise Fail("%s: own %s is not allowed" % (where, n))
             a = "--%s=%s" % (d, n)
             if a not in pol["args"]:
@@ -313,6 +336,8 @@ def parse_policy(policy, _depth=0):
                 pol["args"].append(a)
         elif d == "documents" and not rest:
             pol["documents"] = True
+        elif d == "tray-items" and not rest:
+            pol["tray_items"] = True
         elif d == "env" and len(rest) == 1 and rest[0] in ENV_SETS:
             pol["env"].update(ENV_SETS[rest[0]])
         elif d == "own-if" and len(rest) == 2 and rest[0] in OWN_IF and rest[1] in OWN_IF[rest[0]]:
@@ -321,7 +346,7 @@ def parse_policy(policy, _depth=0):
         else:
             raise Fail("%s: unknown or malformed directive %r" % (where, line.strip()))
     if pol["none"]:
-        if pol["args"] or pol["documents"] or pol["env"] or pol["own_if"]:
+        if pol["args"] or pol["documents"] or pol["env"] or pol["own_if"] or pol["tray_items"]:
             raise Fail("%s: \"bus none\" and other directives" % path)
         pol["bus"] = False
     if pol["documents"] and not any(a.startswith("--call=%s=org.freedesktop.portal.FileChooser." % DESKTOP) for a in pol["args"]):
@@ -419,11 +444,15 @@ def proxy_root(uid, rt_base, info):
     remount_ro("/")
 
 
-def start_proxy(uid, rt_base, group, pol, aid, instance):
+def proxy_sock(rt_base, group):
+    return os.path.join(rt_base, ".bus-%s-%d" % (group, os.getpid()))
+
+
+def start_proxy(uid, rt_base, group, pol, aid, instance, app_pid):
     """xdg-dbus-proxy on a socket outside the app's view, in its own namespace (proxy_root); returns
     (socket path, read end of its sync pipe). The proxy exits when that read end is closed (this
-    supervisor exits)."""
-    sock = os.path.join(rt_base, ".bus-%s-%d" % (group, os.getpid()))
+    supervisor exits). app_pid: the application's process id (its tray icons' names)."""
+    sock = proxy_sock(rt_base, group)
     try:
         os.unlink(sock)
     except FileNotFoundError:
@@ -432,6 +461,8 @@ def start_proxy(uid, rt_base, group, pol, aid, instance):
     for cond, n in pol["own_if"]:
         if own_if_holds(cond, uid):
             args.append("--own=%s" % n)
+    if pol["tray_items"]:
+        args += ["--own=" + TRAY_ITEM % (app_pid, i) for i in range(1, TRAY_ITEMS + 1)]
     info = "[Application]\nname=%s\n\n[Instance]\ninstance-id=%s\n" % (aid, instance)
     r, w = os.pipe()
     er, ew = os.pipe()
@@ -486,6 +517,29 @@ def start_documents(uid):
         pass
 
 
+def link_host_bus(run):
+    """Compatibility audit: in an application's view $XDG_RUNTIME_DIR/prestium-bus is its D-Bus filter,
+    and DBUS_SESSION_BUS_ADDRESS names it. gpg hands that address to the session's gpg-agent (socket
+    started by systemd, outside every namespace) for the pinentry it starts there, which then reached no
+    bus and failed: no passphrase prompt for Claws Mail or Kleopatra. Outside the namespaces the same
+    name is a link to the session bus, so that pinentry gets the session's bus, as before app-confine.
+    The applications never see it (their /run/user/<uid> is their group's own directory)."""
+    p = os.path.join(run, "prestium-bus")
+    try:
+        if os.readlink(p) == "bus":
+            return
+    except OSError:
+        pass
+    try:
+        if os.path.isdir(p) and not os.path.islink(p):
+            os.rmdir(p)
+        elif os.path.lexists(p):
+            os.unlink(p)
+        os.symlink("bus", p)
+    except OSError as e:
+        sys.stderr.write("app-confine: %s: %s (GnuPG's passphrase prompt may fail)\n" % (p, e))
+
+
 def write_instance(uid, instance, child_pid):
     """$XDG_RUNTIME_DIR/.flatpak/<instance>/bwrapinfo.json: the portal finds the application's own
     process (its namespaces) through it. Returns the directory (removed when the app exits)."""
@@ -516,7 +570,11 @@ def setup(name, uid, gid, rt, ptmp, proxy_sock, gnupg, doc_app=None):
         f.write("%d %d 1" % (uid, uid))
     with open("/proc/self/gid_map", "w") as f:
         f.write("%d %d 1" % (gid, gid))
-    mount(None, "/", None, MS_REC | MS_PRIVATE)
+    # slave, not private (compatibility audit): what the host mounts later (a USB stick, an unlocked
+    # VeraCrypt or LUKS volume under /media) still appears in a running application, as it did before
+    # app-confine; nothing mounted in here goes back out. A host mount under a path covered below
+    # (/run/user/<uid>, /tmp, /run/dbus, /run/prestium-wl) lands under the cover, out of sight.
+    mount(None, "/", None, MS_REC | MS_SLAVE)
     run = "%s/%d" % (RUN_USER, uid)
     # sources, opened in this namespace before anything covers them
     src = {n: open_src(os.path.join(run, n)) for n in RT_BINDS}
@@ -660,6 +718,7 @@ def main(argv):
         if uid == 0:
             raise Fail("not as root")
         safe_dir(run, uid, create=False)
+        link_host_bus(run)
         base = safe_dir(os.path.join(run, "prestium-confine"), uid)
         rt = safe_dir(os.path.join(base, group), uid)
         tbase = safe_dir(os.path.join(TMP, ".prestium-confine-%d" % uid), uid)
@@ -682,14 +741,20 @@ def main(argv):
                 raise Fail("no session bus")
             if pol["documents"]:
                 start_documents(uid)
-            sock, _sync, _ppid = start_proxy(uid, base, group, pol, aid, instance)
+            sock = proxy_sock(base, group)
         env = environment(uid, sock is not None, pol["env"])
         r, w = os.pipe()
         gr, gw = os.pipe()
+        pr, pw = os.pipe()
         pid = os.fork()
         if pid == 0:
             os.close(r)
             os.close(gw)
+            os.close(pw)
+            # wait for the D-Bus filter (started for this process id, see TRAY_ITEM)
+            if os.read(pr, 1) != b"p":
+                os._exit(127)
+            os.close(pr)
             try:
                 try:
                     cwd = os.getcwd()
@@ -715,6 +780,18 @@ def main(argv):
                 os._exit(127)
         os.close(w)
         os.close(gr)
+        os.close(pr)
+        try:
+            if sock:
+                sock, _sync, _ppid = start_proxy(uid, base, group, pol, aid, instance, pid)
+            os.write(pw, b"p")
+        except (Fail, OSError):
+            os.close(pw)
+            os.close(r)
+            os.close(gw)
+            os.waitpid(pid, 0)
+            raise
+        os.close(pw)
         err = b""
         while True:
             c = os.read(r, 1024)

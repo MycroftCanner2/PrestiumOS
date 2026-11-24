@@ -1,3 +1,6 @@
-# Prestium Keys (Gajim's OpenPGP key): no session bus. It holds Gajim's private key; its own
-# file dialogs (GTK 3, in the process) only see what its AppArmor profile allows.
-bus none
+# Prestium Keys (Gajim's OpenPGP key): a session bus with one name only, GnuPG's passphrase prompter
+# (compatibility audit: with no bus at all, its gpg-agent's pinentry could not show a prompt, so
+# generating a protected key, a backup's new passphrase, importing from Kleopatra with an added user
+# ID and editing a protected key all failed). It holds Gajim's private key; its own file dialogs
+# (GTK 3, in the process) only see what its AppArmor profile allows.
+include pinentry

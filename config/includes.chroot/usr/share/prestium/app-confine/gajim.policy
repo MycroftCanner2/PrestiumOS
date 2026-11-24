@@ -1,10 +1,15 @@
 # Gajim (GTK 4): notifications, tray, its own GApplication names (single instance).
 # GTK 4 uses the portals it can see: the file chooser (send a file, avatar, save a received file:
-# one file each, so the document portal fits) and links (Tor Browser, through the portal's handler;
-# GTK 4 would not fall back to opening them itself once it sees the OpenURI portal).
+# one file each, so the document portal fits). Links: Gajim opens them with GIO, which outside Flatpak
+# does not use the OpenURI portal; "env links-tor" makes GIO's default Tor Browser (which Gajim's AppArmor
+# profile starts, Px) instead of the I2P Browser, which it may not start. portal-links stays for GTK's
+# own launchers, which may use the portal.
 include notify
 include tray
 own org.gajim.Gajim
 own org.gajim.Gajim.*
 include portal-files
 include portal-links
+env links-tor
+# its gpg-agent's passphrase prompt (OpenPGP keys with a passphrase, e.g. imported from Kleopatra)
+include pinentry

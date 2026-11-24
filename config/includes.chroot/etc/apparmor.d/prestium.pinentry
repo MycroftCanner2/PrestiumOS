@@ -42,6 +42,9 @@ profile prestium_pinentry /usr/bin/pinentry{,-gnome3,-gtk2,-gtk-2,-curses,-x11} 
   deny network inet6,
   deny network netlink,
 
+  # compatibility audit: the session bus by the name app-confine's applications pass on (inside Gajim's
+  # namespace their filtered bus, which allows only the prompter; outside, a link to the session bus)
+  owner @{run}/user/[0-9]*/prestium-bus rw,
   # the GNOME prompter (gcr) asks, then calls back on this connection
   dbus (send) bus=session peer=(name=org.gnome.keyring.SystemPrompter),
   dbus (send) bus=session peer=(name=org.gnome.keyring.PrivatePrompter),

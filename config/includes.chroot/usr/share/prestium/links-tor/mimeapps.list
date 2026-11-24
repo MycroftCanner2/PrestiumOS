@@ -1,0 +1,7 @@
+# Prestium: web links from Gajim open in Tor Browser (app-confine "env links-tor" puts this folder first in
+# XDG_CONFIG_DIRS). GIO opens links itself, outside Flatpak it does not use the OpenURI portal, and the
+# image's only other web handler is the I2P Browser (librewolf.desktop), which Gajim's AppArmor profile
+# may not start; Gajim's profile allows /usr/local/bin/tor-browser (Px into the launcher's profile).
+[Default Applications]
+x-scheme-handler/http=torbrowser.desktop
+x-scheme-handler/https=torbrowser.desktop
