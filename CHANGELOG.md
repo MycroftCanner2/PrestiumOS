@@ -63,6 +63,14 @@ run it is in the README's quick_qubes section.
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **PRE-5 (2): `build.sh --resume` (or a second run without `--clean`) threw the built chroot away.**
+  `lb bootstrap`'s cache step puts `cache/bootstrap` back over `chroot/` whenever that cache exists and
+  its "restore" stage file does not, and a fresh build never writes that file. The chroot stage's stage
+  files then skipped the package install, so the image was the bare Debian bootstrap (found resuming the
+  failed build above: `lb binary` stopped at `binary_linux-image`, no kernel). build.sh now marks the
+  restore done when the bootstrap stage is complete and the chroot exists. Test:
+  `tests/test_build_resume_bootstrap.sh`.
+
 - **PRE-5: the build stopped after the chroot stage ("Failed to parse keyring /etc/apt/keyrings/prestium-*.gpg").**
   `lb installer` and `lb binary` build their tool chroot from a fresh copy of live-build's bootstrap cache
   (`cache/bootstrap`) and run `chroot_archives chroot install` there, which copies the build-time lists
