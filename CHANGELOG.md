@@ -154,6 +154,15 @@ Each entry names the review finding (F-xx) it fixes.
   with `SHA256SUMS.asc` (`scripts/sign-release.sh`); until then the torrent is described as unverified.
   Test: `tests/test_readme_release.sh`.
 
+- **Kernel lockdown is confidentiality, not integrity (security review F-16).** `lockdown=confidentiality`
+  replaces `lockdown=integrity` on every live entry (`auto/config`, `config/binary`, the command-line
+  policy and hook 9020, which accepts no other value). On top of integrity's refusals it stops root
+  reading kernel memory (`/proc/kcore`, kprobes, BPF and perf reads of kernel memory, tracefs), which
+  protects for example the keys of unlocked volumes after a root compromise. Prestium has no swap or
+  hibernation and uses none of these. The safety notifier now raises *Protection NOT active* when the
+  kernel is locked down only to integrity. Tests: `test_boot_lock.sh`, `test_boot_cmdline_guard.sh`,
+  `test_secure_boot.sh`, `test_safety_notify_apparmor.sh`.
+
 ## 2.1: changes since Prestium 2.0
 
 Prestium 2.1 is a security and features release on top of Prestium 2.0, still built with live-build

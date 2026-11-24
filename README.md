@@ -144,7 +144,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   themselves are not covered yet; see the CHANGELOG's Known security limits).
 - **UEFI Secure Boot:** boots with Secure Boot on, through Debian's signed boot chain:
   Debian's shim (signed by Microsoft), Debian's signed GRUB and Debian's signed kernel. The kernel
-  command line includes `lockdown=integrity`, so the kernel is locked down even with Secure Boot off
+  command line includes `lockdown=confidentiality`, so the kernel is locked down even with Secure Boot off
   or on BIOS. The build stops if any of the signed boot files isn't Debian's signed file. The
   initramfs and the boot menus (and so the kernel command line) are not signed, as on Debian live images; a signed
   unified kernel image is future work. Booting with Secure Boot off, or on BIOS, works as before, and

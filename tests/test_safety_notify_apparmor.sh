@@ -28,7 +28,7 @@ chmod +x "$T/bin/"*
 # The notifier raises a "Protection NOT active" alert when lockdown is [none] or the file is
 # missing (since 8959166). A fake locked-down file keeps these AppArmor cases independent of the
 # host, the same way test_secure_boot.sh and test_boot_cmdline_guard.sh do.
-printf 'none [integrity] confidentiality\n' > "$T/lockdown"
+printf 'none integrity [confidentiality]\n' > "$T/lockdown"
 run(){ # enabled-flag aastate [profiles-file]
   printf '%s\n' "$1" > "$T/enabled"; rm -f "$T/alerts"
   env -i PATH="$T/bin:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" AASTATE="$2" PRESTIUM_AA_ENABLED="$T/enabled" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_LOCKDOWN="$T/lockdown" PRESTIUM_CMDLINE_CHECK=true \

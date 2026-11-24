@@ -8,9 +8,9 @@
 # 2.1 (Secure Boot): once per session, for information (not a "Protection NOT active" alert): when a UEFI
 # computer started Prestium with Secure Boot off. Logged either way; nothing is shown for Secure Boot on
 # or BIOS.
-# 2.1 (kernel lockdown): lockdown=integrity is on the command line, so the kernel must be locked down at
-# least to integrity whether Secure Boot is on or off. [none] or a missing lockdown file is a
-# "Protection NOT active" alert.
+# 2.1 (kernel lockdown): lockdown=confidentiality is on the command line (security review F-16; it was
+# integrity), so the kernel must be locked down to confidentiality whether Secure Boot is on or off.
+# [none], [integrity] or a missing lockdown file is a "Protection NOT active" alert.
 D=/run/prestium/safety
 declare -A shown
 alert() {   # $1 key, $2 text
@@ -88,11 +88,13 @@ while :; do
         || alert "aa:$pr" "The AppArmor profile \"$pr\" is not loaded in enforce mode. That application may run unconfined. Restart Prestium."
     done
   fi
-  # 2.1 (kernel lockdown): lockdown=integrity is on the command line, so the kernel must be locked
-  # down at least to integrity (Secure Boot on or off). confidentiality is stricter and is accepted.
+  # 2.1 (kernel lockdown): lockdown=confidentiality is on the command line (security review F-16), so the
+  # kernel must be locked down to confidentiality (Secure Boot on or off); integrity alone means the
+  # command line was not Prestium's.
   ld=$(grep -o '\[[a-z]*\]' "$LOCKDOWN" 2>/dev/null | tr -d '[]')
   case "$ld" in
-    integrity|confidentiality) ;;
+    confidentiality) ;;
+    integrity) alert unit:lockdown "The kernel is locked down only to integrity, not confidentiality: root could read kernel memory (for example keys of unlocked volumes). Restart Prestium." ;;
     *) alert unit:lockdown "The kernel is not locked down (${ld:-unavailable}). Unsigned modules, /dev/mem and kexec of unsigned kernels may be allowed. Restart Prestium." ;;
   esac
   # 2.1 (boot command line): the initramfs and prestium-cmdline-check.service refuse to start with a

@@ -24,7 +24,7 @@ package set, the archive areas and the output names differ, as described below.
   `linux-signed-amd64`). live-build sets this up (`--uefi-secure-boot enable`); hook 9040 stops the
   build when any of the three is not Debian's signed file (see Secure Boot below). Kernel command line: hardening options, the
   internal-disk (ahci/libata) blacklist with the patched live-boot fallback, `module.sig_enforce=1`,
-  `lockdown=integrity` and AppArmor. The live image is mounted through dm-verity (root hash on the command line).
+  `lockdown=confidentiality` and AppArmor. The live image is mounted through dm-verity (root hash on the command line).
 
 ## Requirements
 
@@ -82,9 +82,11 @@ Microsoft UEFI CA 2011 or 2023 and has Debian's Secure Boot CA built in; GRUB is
 every `live/vmlinuz*` is the chroot's kernel from a `linux-signed-*` package (not `-unsigned`), matches
 dpkg's MD5 and is signed by Debian's `linux` key; there are no other EFI programs. With Secure Boot on,
 the firmware checks shim, shim checks GRUB, and GRUB has shim check the kernel. The kernel command line
-includes `lockdown=integrity`, so the kernel is locked down (integrity) even with Secure Boot off:
-unsigned modules, `/dev/mem`, kexec of unsigned kernels and hibernation are refused (Prestium needs
-none of them; `module.sig_enforce=1` already refused unsigned modules). Not signed and not checked by
+includes `lockdown=confidentiality`, so the kernel is locked down (confidentiality, security review F-16)
+even with Secure Boot off: unsigned modules, `/dev/mem`, kexec of unsigned kernels and hibernation are
+refused, and so are the interfaces that let root read kernel memory (`/proc/kcore`, kprobes, BPF and
+perf reads of kernel memory, tracefs). Prestium needs none of them; `module.sig_enforce=1` already
+refused unsigned modules. Not signed and not checked by
 the firmware: the initramfs, the GRUB configs (menu, root hash, password hash) and so the kernel
 command line, as on Debian live images. A signed unified kernel image (UKI) would cover them; it is future
 work. Booting with Secure Boot off still works (shim then checks nothing; the kernel is still locked

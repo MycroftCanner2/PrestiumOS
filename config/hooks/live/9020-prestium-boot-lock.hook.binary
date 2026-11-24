@@ -17,7 +17,7 @@
 #    per-platform ones (boot/grub/<platform>/grub.cfg). If they can't find or load grub.cfg, GRUB's
 #    command line still needs the superuser.
 #  - every kernel line (GRUB linux, isolinux append, in every config above) is checked token by token:
-#    apparmor=1 security=apparmor panic=10 lockdown=integrity must be there; nothing may open a shell,
+#    apparmor=1 security=apparmor panic=10 lockdown=confidentiality must be there; nothing may open a shell,
 #    change init or the security modules, or load the system from elsewhere: init= rdinit= lsm=
 #    selinux= enforcing= single s S 1 -b emergency rescue break break= rd.break* rd.shell*
 #    rd.emergency* rd.debug* rd.systemd.* systemd.unit= systemd.debug_shell/-shell systemd.wants=
@@ -106,7 +106,7 @@ kcheck() { # $1: label, $2: the config (default: stdin)
 			if (t ~ /^apparmor=/) { if (t == "apparmor=1") aa = 1; else bad(t, "AppArmor off") }
 			if (t ~ /^security=/) { if (t == "security=apparmor") sec = 1; else bad(t, "other security module") }
 			if (t ~ /^panic=/) { if (t == "panic=10") pn++; else bad(t, "panic= other than 10") }
-			if (t ~ /^lockdown=/) { if (t == "lockdown=integrity") ld++; else bad(t, "lockdown= other than integrity") }
+			if (t ~ /^lockdown=/) { if (t == "lockdown=confidentiality") ld++; else bad(t, "lockdown= other than confidentiality") }
 			if (t ~ /^dm-verity-oncorruption=/ && t != "dm-verity-oncorruption=panic") bad(t, "dm-verity corruption not fatal")
 			if (t == "single" || t == "s" || t == "S" || t == "1" || t == "-b" || t == "emergency" || t == "rescue" || t == "break" || t == "debug") bad(t, "shell or debug mode")
 			if (t ~ /^(init|rdinit|lsm|selinux|enforcing|break|debug|systemd\.unit|systemd\.wants|systemd\.mask|systemd\.setenv|findiso|fromiso|live-media|bootfrom)=/) bad(t, "banned option")
@@ -115,7 +115,7 @@ kcheck() { # $1: label, $2: the config (default: stdin)
 		}
 		if (live && !(aa && sec)) bad($0, "a live entry without apparmor=1 security=apparmor")
 		if (live && pn != 1) bad($0, "a live entry without exactly one panic=10")
-		if (live && ld != 1) bad($0, "a live entry without exactly one lockdown=integrity")
+		if (live && ld != 1) bad($0, "a live entry without exactly one lockdown=confidentiality")
 	}
 	END { exit err }' "${2:--}"
 }

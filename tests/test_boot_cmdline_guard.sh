@@ -40,7 +40,7 @@ grep -qx 'DefaultDependencies=no' "$U" && grep -qE '^Before=.*\bapparmor\.servic
 grep -qx 'FailureAction=reboot-force' "$U" && grep -qx 'ExecStart=/usr/local/sbin/prestium-cmdline-check --enforce' "$U" \
   && ok "a mismatch restarts the computer (FailureAction=reboot-force)" || bad "unit does not enforce"
 grep -qx 'panic=10' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires panic=10" || bad "policy lacks panic=10"
-grep -qx 'lockdown=integrity' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires lockdown=integrity" || bad "policy lacks lockdown=integrity"
+grep -qx 'lockdown=confidentiality' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires lockdown=confidentiality" || bad "policy lacks lockdown=confidentiality"
 # 2.1 (Phrack 73): no 32-bit syscall entry (nothing 32-bit ships)
 grep -qx 'ia32_emulation=0' <(awk '$1=="require"{print $2}' "$POL") && ok "policy requires ia32_emulation=0" || bad "policy lacks ia32_emulation=0"
 
@@ -75,12 +75,12 @@ for s in $SHELLS; do command -v "$s" >/dev/null || [ "$s" = busybox ] || { skip 
     o=$(chk "$s" "$c") || { bad "$s: refused a real entry: $o"; g=1; }; done
   [ $g = 0 ] && ok "$s: every real boot entry passes"
   r=0
-  for c in "${LIVE/apparmor=1 /}" "${LIVE/security=apparmor /}" "${LIVE/panic=10 /}" "${LIVE/lockdown=integrity /}" "${LIVE/ia32_emulation=0 /}" "$LIVE ia32_emulation=1" "${LIVE/ia32_emulation=0/ia32_emulation=1}" "${LIVE/ module.sig_enforce=1/}" "${LIVE/boot=live /}" \
+  for c in "${LIVE/apparmor=1 /}" "${LIVE/security=apparmor /}" "${LIVE/panic=10 /}" "${LIVE/lockdown=confidentiality /}" "${LIVE/ia32_emulation=0 /}" "$LIVE ia32_emulation=1" "${LIVE/ia32_emulation=0/ia32_emulation=1}" "${LIVE/ module.sig_enforce=1/}" "${LIVE/boot=live /}" \
            "${LIVE/dm-verity-oncorruption=panic /}" "${LIVE/$V /}" "$LIVE apparmor=0" "$LIVE security=selinux" "$LIVE lsm=landlock" \
            "$LIVE init=/bin/sh" "$LIVE rdinit=/bin/sh" "$LIVE break=top" "$LIVE break" "$LIVE debug" "$LIVE single" "$LIVE emergency" \
            "$LIVE systemd.unit=rescue.target" "$LIVE persistence" "$LIVE findiso=/x.iso" "$LIVE fetch=http://x/y" "$LIVE live-media=/dev/sdb" \
            "$LIVE toram=filesystem.squashfs" "$LIVE root=/dev/sda1" "$LIVE module.sig_enforce=0" "$LIVE panic=0" "$LIVE panic=10" \
-           "$LIVE lockdown=none" "$LIVE lockdown=confidentiality" "$LIVE lockdown=integrity" \
+           "$LIVE lockdown=none" "$LIVE lockdown=integrity" "$LIVE lockdown=confidentiality" \
            "$LIVE nomodeset nomodeset" "$LIVE apparmor=1" "${LIVE/$HASH/${HASH}0}" "${LIVE/$HASH/${HASH^^}}" "${LIVE/$HASH/${HASH:1}}" \
            "$LIVE dm-verity-root-hash=filesystem.squashfs:$HASH" "$LIVE dm-verity-root-hash=other.squashfs:$HASH" \
            "BOOT_IMAGE=/boot/vmlinuz $LIVE" "BOOT_IMAGE=/live/vmlinuz BOOT_IMAGE=/live/vmlinuz $LIVE" "BOOT_IMAGE=/live/vmlinuz/../../x $LIVE" \
@@ -238,7 +238,7 @@ printf '#!/bin/sh\necho "$@" >> "$ALERTS"\n' > "$T/nb/notify-send"; printf '#!/b
 printf '#!/bin/sh\n[ "$1" = 20 ] && kill -TERM $PPID\nexit 0\n' > "$T/nb/sleep"
 printf '#!/bin/sh\necho "unexpected boot option: apparmor=0"\necho "missing boot option: apparmor=1"\nexit 1\n' > "$T/nb/cl-bad"
 chmod +x "$T/nb/"*; echo Y > "$T/aa"
-printf 'none [integrity] confidentiality\n' > "$T/lockdown"
+printf 'none integrity [confidentiality]\n' > "$T/lockdown"
 nrun(){ rm -f "$T/alerts"; env -i PATH="$T/nb:/usr/bin:/bin" HOME="$T" ALERTS="$T/alerts" CLSTATE="$2" PRESTIUM_AA_ENABLED="$T/aa" \
   PRESTIUM_AA_PROFILES="$T/none" PRESTIUM_EFI_DIR="$T/no-efi" PRESTIUM_LOCKDOWN="$T/lockdown" PRESTIUM_CMDLINE_CHECK="$1" timeout 10 bash "$N" >/dev/null 2>&1; cat "$T/alerts" 2>/dev/null; }
 o=$(nrun true active); [ -z "$o" ] && ok "notifier: own command line, check ran: no alert" || bad "notifier false alert: $o"
