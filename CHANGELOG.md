@@ -4,6 +4,19 @@
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **PRE-6: Feather said a new wallet "already exists", then "wallet_1.keys is opened by another wallet program".**
+  Two Feather processes were running. Feather's own single-instance check (a lock file plus a socket in
+  /tmp) races when two starts overlap: the later start finds the lock before the first has its socket,
+  calls the lock invalid, takes it over and runs too. One then created wallet_1 under the other, and the
+  other held monero's lock on the keys file. The confined start (F-01) is slower, so a second click on the
+  launcher made the overlap common (reproduced: two starts at once gave two Feather windows). The earlier
+  fix (AppArmor rules for Feather's config and the ring database) was about something else, so it did not
+  cover this. app-confine now serialises Feather's starts. The first start holds a lock in the confine
+  base directory, which no app can see, for as long as Feather runs. A later start waits until the
+  running Feather listens on its socket, so the Feather it starts hands over (the window is raised) and
+  exits. If the first never listens, the later start refuses. Nothing in the confinement changes. Test:
+  `tests/test_feather_single_instance.py`.
+
 - **PRE-5 (2): `build.sh --resume` (or a second run without `--clean`) threw the built chroot away.**
   `lb bootstrap`'s cache step puts `cache/bootstrap` back over `chroot/` whenever that cache exists and
   its "restore" stage file does not, and a fresh build never writes that file. The chroot stage's stage

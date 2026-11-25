@@ -37,6 +37,7 @@
 # Fails closed: if the namespace or a mount can't be set up, the application is not started.
 # Fixed paths only, nothing from the environment decides what is mounted.
 import ctypes
+import fcntl
 import json
 import os
 import platform
@@ -44,9 +45,11 @@ import pwd
 import re
 import select
 import signal
+import socket
 import stat
 import subprocess
 import sys
+import time
 
 # name: (program, group, policy, gnupg)
 #   policy: the file POLICY_DIR/<policy>.policy, which says whether the application gets a session
@@ -82,6 +85,51 @@ APPS = {
     # Audacity's own wrapper (bubblewrap network namespace); /usr/bin/audacity is hook 0620's shim
     "audacity": ("/usr/local/bin/prestium-audacity", "audacity", "audacity", None),
 }
+
+# Apps with their own single-instance check (a lock file plus a socket in /tmp) that races when two
+# starts overlap: the later one finds the lock but no socket yet, takes the lock over and runs too,
+# and both then use the same wallet files ("File already exists" when one creates wallet_1, then
+# "wallet_1.keys is opened by another wallet program" on open; PRE-6). The slower confined start
+# makes the overlap likely (a second click on the launcher). The value is the app's socket in /tmp.
+SINGLE = {"feather": "feather-%(user)s.socket"}
+SINGLE_WAIT = 60.0
+
+
+def listening(path):
+    """True if something accepts connections on the unix socket path (a stale one refuses)."""
+    s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM | socket.SOCK_CLOEXEC)
+    try:
+        s.settimeout(2)
+        s.connect(path)
+        return True
+    except OSError:
+        return False
+    finally:
+        s.close()
+
+
+def single_instance(name, base, ptmp, wait=SINGLE_WAIT):
+    """Serialise the starts of a SINGLE app. The first start takes a lock in base (the parent of the
+    runtime directories, which no app sees) and keeps it (this process lives as long as the app); the fd is returned. A later start waits
+    until the running app listens on its socket and returns None: the app it then starts finds that
+    socket, hands over (the running window is raised) and exits, instead of racing it."""
+    fd = os.open(os.path.join(base, ".single-%s" % name),
+                 os.O_RDWR | os.O_CREAT | os.O_CLOEXEC | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fd
+    except BlockingIOError:
+        os.close(fd)
+    user = os.environ.get("USER") or os.environ.get("USERNAME") or ""
+    path = os.path.join(ptmp, SINGLE[name] % {"user": user})
+    end = time.monotonic() + wait
+    while time.monotonic() < end:
+        if listening(path):
+            return None
+        time.sleep(0.25)
+    raise Fail("it is already starting")
+
+
 # A second start of Audacity joins the running one (its single-instance check needs the same
 # network namespace). That namespace belongs to the first start's user namespace, which only a
 # process outside every app-confine namespace can enter, so the join is done from here, before a
@@ -727,6 +775,8 @@ def main(argv):
         rt = safe_dir(os.path.join(base, group), uid)
         tbase = safe_dir(os.path.join(TMP, ".prestium-confine-%d" % uid), uid)
         ptmp = safe_dir(os.path.join(tbase, group), uid)
+        if name in SINGLE:
+            single_instance(name, base, ptmp)  # a first start keeps the lock fd until it exits
         if name in JOIN:
             rel, ns_helper, real = JOIN[name]
             js = os.path.join(rt, rel)
