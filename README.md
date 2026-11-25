@@ -85,7 +85,8 @@ modernization of the 2023 Prestium build, with tighter security and new features
   design: median of three, Tor consensus check, never before the build date), re-synced at random
   intervals, and moved by a random offset at boot. No NTP and no clearnet time sources.
 - **I2P:** i2pd with a per-boot port, signature-checked reseeding (over Tor or from a file), I2P mail
-  (Claws Mail, which asks for your postman account on first start), IRC, torrents and Feather on I2P.
+  (Claws Mail, which asks for your postman account on first start and generates Ed25519/Curve25519
+  OpenPGP keys), IRC, torrents and Feather on I2P.
   The **I2P Connection Assistant** sets tunnel hops (1 to 7, default 3), the share level and the
   outproxy (Acetone by default, StormyCloud, or your own), each change confirmed at the screen, and
   reseeds. To get the browser going sooner after boot, i2pd keeps only 38 tunnels ready: 2+2 for the browser proxy, 1+1 for most other services, and i2pd's

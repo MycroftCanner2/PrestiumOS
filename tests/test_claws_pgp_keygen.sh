@@ -3,7 +3,8 @@
 # name and its "Generate a new key pair" passes that to gpg as an empty Name-Real, which gpg rejects
 # ("Couldn't generate a new key pair: General error"). There is no shipped account: the launcher writes
 # it from a first-start form, drops an empty name line (Claws writes it back on save) and keeps the
-# @mail.i2p privacy settings before each start, and every way into Claws goes through the launcher. Unprivileged; needs gpg for the key-generation part.
+# @mail.i2p privacy settings before each start, and every way into Claws goes through the launcher.
+# The key it generates is Ed25519 + Curve25519 (hook 0470). Unprivileged; needs gpg and python3-gpg for the key-generation part.
 set -u; T=$(cd "$(dirname "$0")/.." && pwd); C=$T/config/includes.chroot; fail=0
 ok(){ echo "OK $1"; }; no(){ echo "FAIL $1"; fail=1; }
 L=$C/usr/local/bin/claws-mail-i2p
@@ -89,11 +90,56 @@ fs ZA1='a\nb\nc@mail.i2p' ZA2='ok\nc@mail.i2p'; [ "$(cat "$W/zn")" = 2 ] && [ "$
   && ok "form: an extra line (injection) is refused" || no "line injection"
 fs ZA1=CANCEL; [ ! -e "$R" ] && [ ! -f "$W/h/argv" ] && ok "form cancelled: no account, Mail not started" || no "cancel"
 
-# the gpg side: the parameters Claws builds (sgpgme.c), empty name vs. the address it falls back to
-if command -v gpg >/dev/null; then
-  kg(){ G=$(mktemp -d "$W/g.XXXX"); printf 'Key-Type: RSA\nKey-Length: 2048\nSubkey-Type: RSA\nSubkey-Length: 2048\nName-Real: %s\nName-Email: username@mail.i2p\nExpire-Date: 0\n%%no-protection\n' "$1" \
-      | gpg --homedir "$G" --batch --gen-key 2>/dev/null; r=$?; gpgconf --homedir "$G" --kill all 2>/dev/null; return $r; }
+# the key Claws generates: hook 0470 patches pgpcore.so (Debian's own, or a stand-in with the same
+# parameter list) so "Generate a new key pair" makes Ed25519 + Curve25519 instead of RSA-2048
+H=$T/config/hooks/live/0470-prestium-claws-keygen.hook.chroot; PL=usr/lib/x86_64-linux-gnu/claws-mail/plugins/pgpcore.so
+[ -x "$H" ] && ls "$T/config/hooks/live" | grep -q '^0400-' && ok "hook 0470 present, executable" || no "hook 0470 missing"
+grep -q -- "--local --rename --divert \"\$P.debian\" --add \"\$P\"" "$H" && ok "hook keeps Debian's pgpcore.so diverted (dpkg-divert)" || no "hook dpkg-divert"
+RSA=$'<GnupgKeyParms format="internal">\nKey-Type: RSA\nKey-Length: 2048\nSubkey-Type: RSA\nSubkey-Length: 2048\nName-Real: %s\nName-Email: %s\nExpire-Date: 0\n%s%s%s</GnupgKeyParms>\n'
+fake(){ rm -rf "$W/r"; mkdir -p "$W/r/${PL%/*}"; { printf 'ELF\0'; for n in $(seq "$1"); do printf '%s\0' "$RSA"; done; printf 'Couldn'"'"'t generate a new key pair: %%s\0'; } > "$W/r/$PL"; }
+hk(){ PRESTIUM_CLAWS_ROOT=$W/r sh "$H" >/dev/null 2>&1; }
+fake 0; hk && no "hook accepts a plugin without the RSA list" || ok "hook fails the build when Claws' parameter list is not found"
+fake 2; hk && no "hook accepts two RSA lists" || ok "hook fails the build on more than one match"
+if [ -f "/$PL" ]; then mkdir -p "$W/r2/${PL%/*}"; cp "/$PL" "$W/r2/$PL"; SRC="Debian's pgpcore.so ($(dpkg-query -W -f '${Version}' claws-mail-pgpmime 2>/dev/null))"
+else fake 1; mv "$W/r" "$W/r2"; SRC="a stand-in pgpcore.so"; fi
+PRESTIUM_CLAWS_ROOT=$W/r2 sh "$H" >/dev/null 2>&1 && PRESTIUM_CLAWS_ROOT=$W/r2 sh "$H" >/dev/null 2>&1 && ok "hook patches $SRC (and again on a second run)" || no "hook on $SRC"
+O=$W/r2/$PL.debian; N=$W/r2/$PL
+[ "$(stat -c %s "$O")" = "$(stat -c %s "$N")" ] && [ "$(cmp -l "$O" "$N" | wc -l)" -le 112 ] && ok "same size, only the parameter list changed" || no "patched plugin size/changes"
+grep -aq 'Key-Type: RSA' "$N" && no "patched plugin still asks for RSA" || ok "patched plugin no longer asks for RSA"
+grep -aq 'Key-Type: RSA' "$O" && ok "Debian's original kept as pgpcore.so.debian" || no "original"
+
+# the gpg side: the exact list the patched plugin hands gpgme (sgpgme.c: name, address, and no
+# passphrase lines with gpg 2, whose agent asks for the passphrase), empty name vs. the address
+if command -v gpg >/dev/null && python3 -c 'import gpg' 2>/dev/null; then
+  kg(){ G=$(mktemp -d "$W/g.XXXX"); KG_HOME=$G python3 -I - "$N" "$1" > "$G/out" 2>/dev/null <<'PY'
+import gpg, os, re, sys
+d = open(sys.argv[1], "rb").read()
+fmt = re.search(rb'<GnupgKeyParms format="internal">\n.*?</GnupgKeyParms>\n', d, re.S).group(0).decode()
+parms = fmt % (sys.argv[2], "username@mail.i2p", "", "", "")
+c = gpg.Context(home_dir=os.environ["KG_HOME"], armor=True, pinentry_mode=gpg.constants.PINENTRY_MODE_LOOPBACK)
+c.set_passphrase_cb(lambda *a: "pw")
+r = c.op_genkey(parms, None, None)
+k = c.get_key(c.op_genkey_result().fpr, secret=False)
+for s in k.subkeys:
+    print("key", s.pubkey_algo, gpg.core.pubkey_algo_name(s.pubkey_algo), s.curve, "S" if s.can_sign else "", "C" if s.can_certify else "",
+          "E" if s.can_encrypt else "", "A" if s.can_authenticate else "", s.expires)
+print("uid", k.uids[0].uid)
+plain = b"hello over I2P\n"
+ct, _, sr = c.encrypt(plain, recipients=[k], sign=True, always_trust=True)
+pt, dr, vr = c.decrypt(ct, verify=True)
+assert pt == plain and vr.signatures[0].status == 0 and vr.signatures[0].fpr == k.fpr
+print("roundtrip ok")
+PY
+    r=$?; gpgconf --homedir "$G" --kill all 2>/dev/null; return $r; }
   kg '' && no "gpg accepts an empty Name-Real (premise changed)" || ok "gpg rejects an empty Name-Real (the bug)"
-  kg 'username@mail.i2p' && ok "gpg accepts the address as Name-Real (the fix)" || no "address as Name-Real"
-else echo "SKIP gpg missing"; fi
+  if kg 'username@mail.i2p'; then
+    ok "gpg accepts the address as Name-Real (the fix) with the new parameters"
+    o=$(cat "$G/out")
+    printf '%s\n' "$o" | grep -qx 'key 303 EdDSA ed25519 S C   0' && ok "primary key: Ed25519, sign + certify, no expiry" || no "primary key: $o"
+    printf '%s\n' "$o" | grep -qx 'key 302 ECDH cv25519   E  0' && ok "subkey: Curve25519, encrypt, no expiry" || no "subkey: $o"
+    [ "$(printf '%s\n' "$o" | grep -c '^key ')" = 2 ] && ! printf '%s\n' "$o" | grep -q RSA && ok "no RSA keys" || no "key list: $o"
+    printf '%s\n' "$o" | grep -qx 'uid username@mail.i2p <username@mail.i2p>' && ok "user ID from the address" || no "uid: $o"
+    printf '%s\n' "$o" | grep -qx 'roundtrip ok' && ok "sign + encrypt, decrypt + verify work" || no "sign/encrypt round trip"
+  else no "address as Name-Real"; fi
+else echo "SKIP gpg or python3-gpg missing"; fi
 exit $fail
