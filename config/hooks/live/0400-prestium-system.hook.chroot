@@ -3,7 +3,7 @@
 # CA list, dconf, plymouth, locale, version strings) plus the 2.0 audio stack.
 set -e
 B=/usr/share/prestium/build
-VERSION=2.1
+VERSION=2.1.1
 
 ## services: exactly the units earlier releases enabled (+ PipeWire for 2.0); everything else package
 ## postinsts enabled is disabled again

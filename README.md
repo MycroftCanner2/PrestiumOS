@@ -6,7 +6,9 @@ PrestiumOS is a privacy-focused live operating system for USB sticks, with Tor a
 is built with Debian's **live-build** on Debian 13 "trixie" (amd64), with broad hardware
 support: the current Debian release, kernel line and firmware set, with Secure Boot through shim and GRUB.
 
-**Status:** Prestium **2.1** is the current release. It builds on **Prestium 2.0**, a full
+**Status:** Prestium **2.1.1** is the current version: Prestium **2.1** with the fixes of the November
+2026 security review and the changes listed in the [CHANGELOG](CHANGELOG.md). The ISO published below is
+still 2.1 until a 2.1.1 ISO is published. Prestium 2.1 builds on **Prestium 2.0**, a full
 modernization of the 2023 Prestium build, with tighter security and new features.
 
 - **Download:** the 2.1 ISO through [`Prestium-2.1-amd64.iso.torrent`](Prestium-2.1-amd64.iso.torrent),
@@ -172,7 +174,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   `/run` (bridge lines, Tor's control cookie, IRC sign-in tokens and more) are deleted and checked; a
   failure is logged as "session wipe FAILED", never as success.
 - **Network Logs, only when you ask:** in the default boot Tor and i2pd keep no logs. The boot menu
-  entry *Prestium 2.1 (Network Logs)* turns on their logs and *Network > Network Logs*, a read-only
+  entry *Prestium 2.1.1 (Network Logs)* turns on their logs and *Network > Network Logs*, a read-only
   view of the Tor, I2P and control-port filter logs of that boot.
 - **Apps:** besides the above, OnionShare, KeePassXC, Kleopatra, LibreOffice, Evince (Document Viewer,
   the default for PDF, PostScript, DjVu, XPS and comic books), Audacity, VLC, Loupe, Metadata Cleaner, Feather (Monero, on I2P) and *Unlock Encrypted Volume* for LUKS, VeraCrypt,

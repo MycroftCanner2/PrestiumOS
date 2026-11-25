@@ -63,7 +63,7 @@ which works but is several times slower.
    Browser Updater, and keeps `/usr/share/prestium/opt-overlay`; when a key or `sigcheck.sh` changes,
    update both copies; `tests/test_browser_install.py` and `tests/test_sigcheck.sh` compare them)
 2. runs `lb config` (options in `auto/config`);
-3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-amd64.iso`, `Prestium-2.1-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
+3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1.1-amd64.iso`, `Prestium-2.1.1-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
 
 **Secure Boot.** The UEFI boot chain is Debian's signed one, the same as Debian's live images:
 firmware → shim → GRUB → kernel. live-build installs `shim-signed` and `grub-efi-amd64-signed`
@@ -140,7 +140,7 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/hooks/live/9010-prestium-verity-boot.hook.binary` | checks the image against its dm-verity hash tree and puts the root hash and `panic=10` (no initramfs shell) on every boot entry |
 | `config/hooks/live/9030-prestium-boot-cmdline.hook.binary` | only the image's own kernel command line: GRUB's EFI config searches for this build's `/.disk/prestium-<id>` on the boot disk first (no other disk's `/.disk/info`), reboots when it's missing; every boot entry checked against `cmdline.policy` with the initramfs's own code; no chainloader/loopback/load_env/foreign search or kernel; policy = `LB_BOOTAPPEND_LIVE`; no built-in kernel command line; the initrd runs the guard (needs mtools) |
 | `config/hooks/live/9040-prestium-secure-boot.hook.binary` | Secure Boot chain: `LB_UEFI_SECURE_BOOT="enable"`; the only EFI programs are `EFI/boot/bootx64.efi` and `grubx64.efi`, the same in the ISO tree and efi.img; shim signed for Microsoft's UEFI CA with Debian's CA built in, GRUB and every `live/vmlinuz*` signed by Debian (sbverify, CA certificates in `thirdparty/keys/secure-boot/`), GRUB's built-in modules, the kernel from `linux-signed-*` (needs sbsigntool, mtools) |
-| `config/bootloaders/` | boot menu entries: Prestium 2.1, nomodeset, camera and microphone off |
+| `config/bootloaders/` | boot menu entries: Prestium 2.1.1, nomodeset, camera and microphone off |
 | `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile, the Secure Boot CA certificates (`keys/secure-boot/`: Microsoft UEFI CA 2011 and 2023, Debian Secure Boot CA; pinned in hook 9040) |
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |
 | `scripts/amo-latest.py` | newest uBlock Origin from addons.mozilla.org: AMO hash, Mozilla signature, id, version, `strict_min_version` |

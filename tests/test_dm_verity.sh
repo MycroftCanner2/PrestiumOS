@@ -98,7 +98,7 @@ if [ -n "$VS" ] && "$VS" --version >/dev/null 2>&1; then
   RH=$("$VS" format "$T/b/binary/live/filesystem.squashfs" "$T/b/binary/live/filesystem.squashfs.verity" | awk -F: '$1=="Root hash"{print $2}' | tr -d '[:space:]')
   printf %s "$RH" > "$T/b/binary/live/filesystem.squashfs.roothash"
   cp -a "$T/b/binary/live" "$T/live.orig"
-  printf 'menuentry "Prestium 2.1" {\n\tlinux\t/live/vmlinuz boot=live quiet apparmor=1\n\tinitrd\t/live/initrd.img\n}\nmenuentry "x" {\n\tlinux\t/live/vmlinuz boot=live nomacspoof\n}\n' > "$T/b/binary/boot/grub/grub.cfg"
+  printf 'menuentry "Prestium 2.1.1" {\n\tlinux\t/live/vmlinuz boot=live quiet apparmor=1\n\tinitrd\t/live/initrd.img\n}\nmenuentry "x" {\n\tlinux\t/live/vmlinuz boot=live nomacspoof\n}\n' > "$T/b/binary/boot/grub/grub.cfg"
   printf 'label live\n\tlinux /live/vmlinuz\n\tappend boot=live quiet\n' > "$T/b/binary/isolinux/live.cfg"
   printf 'set default=0\n' > "$T/b/binary/boot/grub/config.cfg"
   if (cd "$T/b/binary" && PATH=$T/bin:$PATH sh "$H9010") >/dev/null; then ok "9010 on an intact image"; else bad "9010 failed on an intact image"; fi
