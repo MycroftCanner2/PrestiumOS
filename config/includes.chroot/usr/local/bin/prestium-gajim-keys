@@ -3,7 +3,8 @@
 # OpenPGP plugin: for each Gajim account it shows the key in the account's own keyring
 # (~/.local/share/gajim/openpgp/<JID>/), whether Gajim can use it and why not, and can generate a key
 # the way Gajim does, import one from Kleopatra (~/.gnupg, only read), add, revoke or promote user IDs,
-# mark the key as your own, delete one, back it up to a file and restore that file.
+# mark the key as your own, delete one, back it up to a file and restore that file. It also lists the
+# contacts' keys Gajim has received, with Gajim's trust in each, and can mark one Verified (PRE-7).
 #   prestium-gajim-keys                 the window
 #   prestium-gajim-keys --check [JID]   the same checks as text (every account without JID); exit 1 on a failure
 # It runs the system gpg (/usr/local/lib/prestium-keys/gajim_keys.py), has no network access and never
@@ -75,6 +76,22 @@ def esc(s):
     return GLib.markup_escape_text(s)
 
 
+NEEDED_NOTE = ("Gajim encrypts only with a key whose user ID is exactly xmpp: and your address, so this user ID "
+               "can't be revoked here: the key would stop working in Gajim. To stop using the key, make a new "
+               "one (Generate key…) and delete this one with Delete key….")
+
+
+def uid_needed(jid, u):
+    """The user ID Gajim needs for this account: xmpp:<jid>, not revoked (gnupg can't revoke the last one
+    either). Its Revoke button is not shown; revoking another one leaves the key working."""
+    return not u.revoked and u.text == "xmpp:" + jid
+
+
+TRUST_HELP = ("Gajim encrypts only to a contact's current key once it is Blind Trust or Verified; otherwise it "
+              "says \"Not Trusted: There was no trusted and active key found\". Gajim trusts a contact's first "
+              "key by itself (Blind Trust). A key that replaces an earlier one is Not Decided until you mark it.")
+
+
 class Window(Gtk.ApplicationWindow):
     def __init__(self, app):
         super().__init__(application=app, title="Gajim OpenPGP Keys")
@@ -116,6 +133,12 @@ class Window(Gtk.ApplicationWindow):
         scroll.add(body)
         self.cards = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
         body.pack_start(self.cards, False, False, 0)
+        kf = Gtk.Frame(label=" Contacts' keys ")
+        kf.get_style_context().add_class("prestium-section")
+        self.contacts = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=6)
+        self.contacts.set_border_width(8)
+        kf.add(self.contacts)
+        body.pack_start(kf, False, False, 0)
         cf = Gtk.Frame(label=" Checks ")
         cf.get_style_context().add_class("prestium-section")
         self.results = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=4)
@@ -184,7 +207,7 @@ class Window(Gtk.ApplicationWindow):
         if self.busy:
             return
         self.gajim_bar.set_visible(gk.gajim_running())
-        for c in self.cards.get_children() + self.results.get_children():
+        for c in self.cards.get_children() + self.contacts.get_children() + self.results.get_children():
             c.destroy()
         jid = self.jid()
         has = jid is not None
@@ -205,6 +228,7 @@ class Window(Gtk.ApplicationWindow):
         self.status.set_markup("<b>%s: %s</b>" % (esc(jid), esc(st)))
         for k in keys:
             self.cards.pack_start(self.card(jid, home, k), False, False, 0)
+        self.fill_contacts(jid, home)
         for r, t, d in gk.checks(jid, home):
             row = Gtk.Box(spacing=8)
             tag = Gtk.Label(xalign=0)
@@ -228,9 +252,13 @@ class Window(Gtk.ApplicationWindow):
         b.pack_start(wrap_label("Created %s UTC, expires %s" % (gk._date(k.created),
                      (gk._date(k.expires) + " UTC") if k.expires else "never")), False, False, 0)
         first = gk.gajim_uid(k)
+        b.pack_start(wrap_label("<b>User IDs</b> (names on this one key; revoking one leaves the key itself "
+                                "working)", markup=True), False, False, 0)
         for u in k.uids:
             r = Gtk.Box(spacing=6)
-            note = " (revoked)" if u.revoked else (" (Gajim reads this one)" if u.text == first else "")
+            needed = uid_needed(jid, u)
+            note = " (revoked)" if u.revoked else (" (Gajim needs this one)" if needed else
+                                                   (" (Gajim reads this one)" if u.text == first else ""))
             r.pack_start(wrap_label(u.text + note, selectable=True), True, True, 0)
             if not u.revoked:
                 if u.text.startswith("xmpp:") and u.text != first:
@@ -238,9 +266,11 @@ class Window(Gtk.ApplicationWindow):
                     p.connect("clicked", lambda _b, t=u.text: self.write(home, "Making %s the primary user ID…" % t,
                                                                          gk.primary_uid, home, k.fpr, t))
                     r.pack_end(p, False, False, 0)
-                rv = Gtk.Button(label="Revoke…")
-                rv.connect("clicked", lambda _b, t=u.text: self.on_revoke(jid, home, k, t))
-                r.pack_end(rv, False, False, 0)
+                if not needed:      # the user ID Gajim needs is never offered (see uid_needed)
+                    rv = Gtk.Button(label="Revoke user ID…")
+                    rv.set_tooltip_text("Revoke only the user ID %s; the key and its other user IDs stay" % u.text)
+                    rv.connect("clicked", lambda _b, t=u.text: self.on_revoke(jid, home, k, t))
+                    r.pack_end(rv, False, False, 0)
             b.pack_start(r, False, False, 0)
         bb = Gtk.Box(spacing=6)
         add = Gtk.Button(label="Add user ID…")
@@ -253,12 +283,62 @@ class Window(Gtk.ApplicationWindow):
         bk = Gtk.Button(label="Back up…")
         bk.connect("clicked", lambda *_: self.on_backup(jid, home, k))
         bb.pack_start(bk, False, False, 0)
-        dl = Gtk.Button(label="Delete…")
+        dl = Gtk.Button(label="Delete key…")
+        dl.set_tooltip_text("Remove this whole key (secret and public) from Gajim's keyring")
         dl.get_style_context().add_class("destructive-action")
         dl.connect("clicked", lambda *_: self.on_delete(jid, home, k))
         bb.pack_end(dl, False, False, 0)
         b.pack_start(bb, False, False, 0)
         return f
+
+    def fill_contacts(self, jid, home):
+        c = self.contacts
+        c.pack_start(wrap_label(TRUST_HELP), False, False, 0)
+        try:
+            keys = gk.contact_keys(jid, home)
+        except gk.KeyError_ as e:
+            c.pack_start(wrap_label("<b>%s</b>" % esc(str(e)), markup=True), False, False, 0)
+            return
+        if not keys:
+            c.pack_start(wrap_label(gk.NO_CONTACT_KEYS), False, False, 0)
+            return
+        running = gk.gajim_running()
+        for who in sorted({k.jid for k in keys}, key=str.lower):
+            ks = [k for k in keys if k.jid == who]
+            ok = any(k.usable for k in ks)
+            c.pack_start(wrap_label("<b>%s</b>: %s" % (esc(who), "Gajim can encrypt to this contact" if ok else
+                                    "Gajim will say Not Trusted"), markup=True), False, False, 0)
+            for k in ks:
+                r = Gtk.Box(spacing=6)
+                notes = [k.trust_name]
+                if not k.active:
+                    notes.append("old key, no longer published")
+                if not k.in_keyring:
+                    notes.append("public key not received yet")
+                r.pack_start(wrap_label("<tt>%s</tt>  %s" % (esc(gk.fmt_fpr(k.fpr)), esc(", ".join(notes))),
+                                        markup=True, selectable=True), True, True, 0)
+                if k.active and k.trust not in gk.TRUST_USABLE:
+                    t = Gtk.Button(label="Trust…")
+                    t.set_sensitive(not running)
+                    t.set_tooltip_text("Quit Gajim first, or use the shield button next to Gajim's message box"
+                                       if running else "Mark this key Verified after comparing its fingerprint")
+                    t.connect("clicked", lambda _b, w=who, kk=k: self.on_trust(jid, home, w, kk))
+                    r.pack_end(t, False, False, 0)
+                c.pack_start(r, False, False, 0)
+        if running:
+            c.pack_start(wrap_label("Gajim is running: to change trust, quit Gajim, or in Gajim open the chat, press "
+                                    "the shield button next to the message box and pick Verified on the key."),
+                         False, False, 0)
+
+    def on_trust(self, jid, home, who, k):
+        if not self.confirm("Trust this key of %s?" % who,
+                            "%s\n\nCompare this fingerprint with the one your contact sees for their own key (in "
+                            "their Gajim OpenPGP Keys window), over a way you trust: in person, or a call. Marking it "
+                            "Verified lets Gajim encrypt messages to %s with it." % (gk.fmt_fpr(k.fpr), who),
+                            "Mark Verified"):
+            return
+        self.write(home, "Marking the key of %s Verified…" % who, gk.set_contact_trust, jid, who, k.fpr,
+                   gk.TRUST_VERIFIED, home)
 
     # ------------------------------------------------------------------------------------- dialogs
     def message(self, kind, text, secondary=""):
@@ -409,12 +489,16 @@ class Window(Gtk.ApplicationWindow):
             self.write(home, "Adding %s…" % uid, gk.add_uid, home, k.fpr, uid)
 
     def on_revoke(self, jid, home, k, uid):
+        if any(u.text == uid and uid_needed(jid, u) for u in k.uids):
+            self.message(Gtk.MessageType.WARNING, "Gajim needs %s" % uid, NEEDED_NOTE)
+            return
         extra = ""
-        if uid == "xmpp:" + jid:
-            extra = (" This is the user ID Gajim needs for this account: once it is revoked, your contacts' clients "
-                     "can refuse the key. Make a new key instead, or add a second xmpp: user ID first.")
-        if self.confirm("Revoke %s?" % uid, "A revoked user ID stays on the key, marked as no longer valid; it can't "
-                        "be undone." + extra, "Revoke", destructive=True):
+        if uid.startswith("xmpp:"):
+            extra = " Contacts who know you by that address will see it as no longer valid."
+        if self.confirm("Revoke the user ID %s?" % uid, "Only this user ID is revoked: the key keeps working "
+                        "for %s in Gajim. A revoked user ID stays on the key, marked as no longer valid; it can't be "
+                        "undone. Gajim publishes the change when the account next connects." % jid + extra,
+                        "Revoke user ID", destructive=True):
             self.write(home, "Revoking %s…" % uid, gk.revoke_uid, home, k.fpr, uid)
 
     def on_delete(self, jid, home, k):

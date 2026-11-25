@@ -330,6 +330,7 @@ def checks(jid, home=None, now=None, gajim_is_running=None):
     if not keys:
         add("fail", "Secret key", "There is no secret key for %s. Press Generate key… or import one." % jid)
         add("info", "Published to the server", PUBLISH_NOTE)
+        res.extend(contact_checks(jid, home))
         return res
     if len(keys) > 1:
         add("fail", "Exactly one secret key", "There are %d secret keys. Gajim uses only the first one it lists "
@@ -396,6 +397,7 @@ def checks(jid, home=None, now=None, gajim_is_running=None):
         add("info", "Gajim is running", "Gajim reads its keyring when an account connects. After a change "
             "here, quit Gajim and start it again.")
     add("info", "Published to the server", PUBLISH_NOTE)
+    res.extend(contact_checks(jid, home))
     return res
 
 
@@ -690,3 +692,133 @@ def tree_digest(path):
                     h = hashlib.sha256(f.read()).hexdigest()
             out[os.path.relpath(p, path)] = (st.st_mode, st.st_size, st.st_mtime_ns, h)
     return out
+
+
+# ------------------------------------------------------------------------------------ contacts' keys
+# PRE-7. gajim-openpgp keeps its own record of contacts' keys, contacts.db in the account's folder: one
+# row per key it has seen in a contact's published key list (XEP-0373), whether that key is still in
+# the list (active) and Gajim's trust in it. Gajim encrypts only to a contact's active keys with Blind
+# Trust or Verified; with none it refuses to send: "Not Trusted: There was no trusted and active key
+# found" (pgpplugin.py _before_sendmessage). The first key Gajim sees for a contact gets Blind Trust
+# by itself. A key that comes after another one (the contact made or imported a new key, e.g. here)
+# gets Not Decided, and stays unusable until it is marked Verified: in Gajim (the shield button next to
+# the message box, then the key's icon) or here with Trust…. The plugin has no setting for this.
+TRUST_NAMES = {0: "Not Trusted", 1: "Not Decided", 2: "Blind Trust", 3: "Verified"}
+TRUST_VERIFIED = 3
+TRUST_USABLE = (2, 3)
+FPR_RE = re.compile(r"[0-9A-F]{40}|[0-9A-F]{64}")
+
+
+class ContactKey:
+    def __init__(self, jid, fpr, active, trust, timestamp, in_keyring):
+        self.jid, self.fpr, self.active, self.trust = jid, fpr, bool(active), trust
+        self.timestamp, self.in_keyring = timestamp, in_keyring
+
+    @property
+    def usable(self):
+        """What Gajim encrypts to (key_store.py get_keys)."""
+        return self.active and self.trust in TRUST_USABLE
+
+    @property
+    def trust_name(self):
+        return TRUST_NAMES.get(self.trust, "unknown (%r)" % (self.trust,))
+
+
+def contacts_db(home):
+    return os.path.join(home, "contacts.db")
+
+
+def contact_keys(jid, home=None):
+    """[ContactKey] from the plugin's contacts.db, sorted by contact. The file is read into memory (as
+    settings.sqlite), so this works while Gajim runs and never locks it or leaves a journal."""
+    home = home or homedir(jid)
+    try:
+        with open(contacts_db(home), "rb") as f:
+            data = f.read()
+    except FileNotFoundError:
+        return []
+    except OSError as e:
+        raise KeyError_("Gajim's record of contacts' keys can't be read: %s" % e)
+    if not data:
+        return []
+    con = sqlite3.connect(":memory:")
+    try:
+        con.deserialize(data)
+        rows = con.execute("SELECT jid, fingerprint, active, trust, timestamp FROM contacts").fetchall()
+    except (sqlite3.Error, AttributeError) as e:
+        raise KeyError_("Gajim's record of contacts' keys can't be read: %s" % e)
+    finally:
+        con.close()
+    try:
+        pub = {k.fpr for k in list_keys(home, secret=False)}
+    except KeyError_:
+        pub = set()
+    out = [ContactKey(str(j), str(f), a, t, ts or 0, f in pub) for j, f, a, t, ts in rows
+           if j and f and str(j) != jid]
+    out.sort(key=lambda k: (k.jid.lower(), not k.active, -(k.timestamp or 0)))
+    return out
+
+
+def set_contact_trust(jid, contact, fpr, trust=TRUST_VERIFIED, home=None, gajim_is_running=None):
+    """Mark one contact key in the plugin's contacts.db (Verified by default), as Gajim's own key dialog
+    does (backend/sql.py set_trust). Only while Gajim is not running: it keeps the record in memory and
+    would write its own copy back over the change."""
+    home = home or homedir(jid)
+    if gajim_is_running is None:
+        gajim_is_running = gajim_running()
+    if gajim_is_running:
+        raise KeyError_("Gajim is running. Quit Gajim first (it keeps its record of contacts' keys in memory "
+                        "and would undo the change), or mark the key in Gajim itself.")
+    if not valid_jid(contact) or not FPR_RE.fullmatch(fpr or "") or trust not in TRUST_NAMES:
+        raise KeyError_("not a contact key")
+    path = contacts_db(home)
+    if not os.path.isfile(path):
+        raise KeyError_("Gajim has no record of contacts' keys for %s yet" % jid)
+    uri = "file:%s?mode=rw" % path.replace("%", "%25").replace("?", "%3f").replace("#", "%23")
+    con = sqlite3.connect(uri, uri=True, timeout=5)     # mode=rw: never creates the file
+    try:
+        n = con.execute("UPDATE contacts SET trust = ? WHERE jid = ? AND fingerprint = ?",
+                        (trust, contact, fpr)).rowcount
+        if n != 1:
+            con.rollback()
+            raise KeyError_("Gajim has no key %s for %s" % (short_fpr(fpr), contact))
+        con.commit()
+    except sqlite3.Error as e:
+        raise KeyError_("Gajim's record of contacts' keys was not changed: %s" % e)
+    finally:
+        con.close()
+
+
+NO_CONTACT_KEYS = ("Gajim has not received any contact's key for this account yet. It asks for a contact's "
+                   "key when you pick OpenPGP in a chat with them; that works only if they have set up "
+                   "OpenPGP (XEP-0373, e.g. Gajim's OpenPGP plugin) and you share presence (each is in the "
+                   "other's contact list). Then wait a moment (I2P is slow) and send again.")
+
+
+def contact_checks(jid, home=None):
+    """[(result, title, detail)] for the contacts' keys: why Gajim would say "Not Trusted"."""
+    try:
+        keys = contact_keys(jid, home)
+    except KeyError_ as e:
+        return [("warn", "Contacts' keys", str(e))]
+    if not keys:
+        return [("info", "Contacts' keys", NO_CONTACT_KEYS)]
+    res = []
+    for c in sorted({k.jid for k in keys}):
+        ks = [k for k in keys if k.jid == c]
+        if any(k.usable for k in ks):
+            res.append(("pass", "Contact %s" % c, "Gajim can encrypt to %s (%s)." % (
+                ", ".join(short_fpr(k.fpr) for k in ks if k.usable),
+                ", ".join(k.trust_name for k in ks if k.usable))))
+            continue
+        act = [k for k in ks if k.active]
+        if act:
+            res.append(("warn", "Contact %s" % c, "Gajim will say \"Not Trusted\": the key they publish now (%s) "
+                        "is %s. Compare its fingerprint with your contact, then mark it Verified: in Gajim with "
+                        "the shield button next to the message box, or here with Trust… (Gajim closed)." % (
+                            ", ".join(fmt_fpr(k.fpr) for k in act), " / ".join(sorted({k.trust_name for k in act})))))
+        else:
+            res.append(("warn", "Contact %s" % c, "Gajim will say \"Not Trusted\": the keys it knows for this "
+                        "contact are no longer published by them. They need to set up OpenPGP in their client again; "
+                        "Gajim then receives the new key."))
+    return res

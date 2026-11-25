@@ -107,7 +107,10 @@ allow $M $K/private-keys-v1.d/$GR.key rw
 deny $M $K/gpg.conf w
 deny $M $K/gpg-agent.conf l
 deny $M $K/common.conf w
-deny $M $K/contacts.db r
+# PRE-7: the plugin's contacts.db (contacts' keys list, Trust…): the app only, never its gpg
+allow $M $K/contacts.db rwk
+allow $M $K/contacts.db-journal rw
+deny $C $K/contacts.db-journal w
 deny $M $H/.local/share/gajim/logs.db r
 deny $M $H/.local/share/gajim/cache.db r
 # Kleopatra's keyring: read the public keyring and secret key files, nothing else, never write

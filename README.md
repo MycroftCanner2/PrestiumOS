@@ -122,7 +122,15 @@ modernization of the 2023 Prestium build, with tighter security and new features
   keys: the window warns when it is running. `prestium-gajim-keys --check [name@server]` prints the
   same report in a terminal. Passphrases are typed only into GnuPG's own prompt. The tool runs under
   its own enforced AppArmor profile with no network, and can't check that your server has your
-  public key (Gajim's XML console shows the publish).
+  public key (Gajim's XML console shows the publish). **Contacts' keys** lists the contacts' keys
+  Gajim has received and Gajim's trust in each. When Gajim says *"Not Trusted: There was no trusted
+  and active key found"*, look there. Either the contact has not published a key yet (they must set up
+  OpenPGP, and you must be in each other's contact list), or their current key is *Not Decided*.
+  Gajim trusts only a contact's first key by itself; a key that replaces an earlier one waits for
+  you. Compare the fingerprint with your contact, then press **Trust…** (with Gajim closed). In Gajim
+  itself, press the shield button next to the message box, click the key's icon and pick
+  *Verified*. User ID buttons read **Revoke user ID…** (the key keeps working). The `xmpp:` user ID
+  Gajim needs has none. **Delete key…** removes the whole key.
 - **Prestium Translate** (*Accessories* menu): offline English↔Russian translation and a rewriter that
   hides how you write. Nothing leaves the computer: the engine is Bergamot (the one in Firefox
   Translations) with Mozilla's English→Russian and Russian→English models on the image, run in

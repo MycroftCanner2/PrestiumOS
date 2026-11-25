@@ -350,6 +350,138 @@ class CommandLine(Base):
         self.assertEqual(mod.APP_ID, "org.prestium.GajimKeys")
 
 
+# gajim-openpgp 1.7's contacts.db (backend/sql.py TABLE_LAYOUT, user_version 1)
+PLUGIN_SCHEMA = """CREATE TABLE contacts (jid TEXT, fingerprint TEXT, active BOOLEAN, trust INTEGER,
+    timestamp INTEGER, comment TEXT);
+CREATE UNIQUE INDEX jid_fingerprint ON contacts (jid, fingerprint);
+PRAGMA user_version=1;"""
+F = {n: (c * 40) for n, c in (("bob", "B"), ("carol_old", "C"), ("carol_new", "D"), ("dave", "E"), ("own", "A"))}
+
+
+class ContactKeys(Base):
+    """PRE-7: "Not Trusted: There was no trusted and active key found". Gajim encrypts only to a contact's
+    active keys with Blind Trust or Verified; a key that replaces an earlier one gets Not Decided."""
+    def make_db(self, rows):
+        h = gk.ensure_home(JID)
+        con = sqlite3.connect(os.path.join(h, "contacts.db"))
+        con.executescript(PLUGIN_SCHEMA)
+        con.executemany("INSERT INTO contacts(jid, fingerprint, active, trust, timestamp) VALUES (?,?,?,?,?)", rows)
+        con.commit(); con.close()
+        return h
+
+    def standard(self):
+        return self.make_db([
+            ("bob@example.org", F["bob"], True, 2, 100),           # first key: Blind Trust (works)
+            ("carol@example.org", F["carol_old"], False, 2, 100),  # carol made a new key:
+            ("carol@example.org", F["carol_new"], True, 1, 200),   #   the new one is Not Decided
+            ("dave@example.org", F["dave"], True, 0, 100),         # marked Not Trusted in Gajim
+            (JID, F["own"], True, 2, 100)])                        # (own address: not a contact)
+
+    def test_list_and_checks(self):
+        h = self.standard()
+        keys = gk.contact_keys(JID, h)
+        self.assertEqual([(k.jid, k.fpr, k.usable, k.trust_name) for k in keys], [
+            ("bob@example.org", F["bob"], True, "Blind Trust"),
+            ("carol@example.org", F["carol_new"], False, "Not Decided"),
+            ("carol@example.org", F["carol_old"], False, "Blind Trust"),
+            ("dave@example.org", F["dave"], False, "Not Trusted")])
+        self.assertFalse(any(k.in_keyring for k in keys))
+        r = {t: (res, d) for res, t, d in gk.contact_checks(JID, h)}
+        self.assertEqual(r["Contact bob@example.org"][0], "pass")
+        self.assertEqual(r["Contact carol@example.org"][0], "warn")
+        self.assertIn("Not Trusted", r["Contact carol@example.org"][1])
+        self.assertIn(gk.fmt_fpr(F["carol_new"]), r["Contact carol@example.org"][1])
+        self.assertIn("shield button", r["Contact carol@example.org"][1])
+        self.assertEqual(r["Contact dave@example.org"][0], "warn")
+        self.assertNotIn("Contact " + JID, r)
+        # in the full checks (window and --check) too
+        self.assertEqual(self.results()["Contact carol@example.org"], "warn")
+
+    def test_no_record_yet(self):
+        h = gk.ensure_home(JID)
+        self.assertEqual(gk.contact_keys(JID, h), [])
+        self.assertEqual(gk.contact_checks(JID, h), [("info", "Contacts' keys", gk.NO_CONTACT_KEYS)])
+        with self.assertRaises(gk.KeyError_):
+            gk.set_contact_trust(JID, "bob@example.org", F["bob"], home=h, gajim_is_running=False)
+        self.assertFalse(os.path.exists(os.path.join(h, "contacts.db")), "Trust created a database")
+
+    def test_trust_marks_verified_only_that_row(self):
+        h = self.standard()
+        db = os.path.join(h, "contacts.db")
+        with self.assertRaises(gk.KeyError_) as e:
+            gk.set_contact_trust(JID, "carol@example.org", F["carol_new"], home=h, gajim_is_running=True)
+        self.assertIn("Quit Gajim", str(e.exception))
+        gk.set_contact_trust(JID, "carol@example.org", F["carol_new"], home=h, gajim_is_running=False)
+        con = sqlite3.connect(db)
+        rows = dict(((j, f), (a, t)) for j, f, a, t in con.execute("SELECT jid, fingerprint, active, trust FROM contacts"))
+        con.close()
+        self.assertEqual(rows[("carol@example.org", F["carol_new"])], (1, 3))
+        self.assertEqual(rows[("carol@example.org", F["carol_old"])], (0, 2))
+        self.assertEqual(rows[("dave@example.org", F["dave"])], (1, 0))
+        self.assertTrue([k for k in gk.contact_keys(JID, h) if k.fpr == F["carol_new"]][0].usable)
+        self.assertEqual(gk.contact_checks(JID, h)[1][0], "pass")
+        self.assertFalse(os.path.exists(db + "-journal"))
+        for who, fpr in (("carol@example.org", F["bob"]), ("nobody@example.org", F["bob"]),
+                         ("bob@example.org", "B" * 39), ("bob@example.org", F["bob"].lower()), ("../x", F["bob"])):
+            with self.assertRaises(gk.KeyError_):
+                gk.set_contact_trust(JID, who, fpr, home=h, gajim_is_running=False)
+
+    def test_read_while_locked(self):
+        """The list is read into memory: a write lock (Gajim writing) does not block or fail it."""
+        h = self.standard()
+        con = sqlite3.connect(os.path.join(h, "contacts.db"))
+        con.execute("BEGIN EXCLUSIVE")
+        try:
+            self.assertEqual(len(gk.contact_keys(JID, h)), 4)
+        finally:
+            con.rollback(); con.close()
+
+
+class RevokeButtons(unittest.TestCase):
+    """PRE-7: one "Revoke…" per user ID looked like two ways to revoke the key. Per user ID it is now
+    "Revoke user ID…", the user ID Gajim needs (xmpp:<account>) has none, and the whole key is "Delete key…"."""
+    def test_labels(self):
+        with open(BIN) as f:
+            src = f.read()
+        self.assertNotIn('label="Revoke…"', src)
+        self.assertIn('label="Revoke user ID…"', src)
+        self.assertIn('label="Delete key…"', src)
+        self.assertIn("if not needed:", src)
+        self.assertIn("uid_needed(jid, u)", src[src.index("def on_revoke"):src.index("def on_delete")])
+
+    def test_needed_uid(self):
+        try:
+            import gi
+            gi.require_version("Gtk", "3.0")
+        except (ImportError, ValueError):
+            self.skipTest("GTK 3 introspection not installed")
+        mod = load_gui()
+
+        class U:
+            def __init__(self, text, revoked=False):
+                self.text, self.revoked = text, revoked
+        self.assertTrue(mod.uid_needed(JID, U("xmpp:" + JID)))
+        self.assertFalse(mod.uid_needed(JID, U("Alice <alice@example.org>")))
+        self.assertFalse(mod.uid_needed(JID, U("xmpp:other@example.org")))
+        self.assertFalse(mod.uid_needed(JID, U("xmpp:" + JID, revoked=True)))
+
+
+def load_gui():
+    saved = sys.argv[:], os.environ.get("XDG_CONFIG_HOME")
+    try:
+        sys.argv = [BIN]
+        loader = importlib.machinery.SourceFileLoader("prestium_gajim_keys_gui", BIN)
+        mod = importlib.util.module_from_spec(importlib.util.spec_from_loader(loader.name, loader))
+        loader.exec_module(mod)
+    finally:
+        sys.argv = saved[0]
+        if saved[1] is None:
+            os.environ.pop("XDG_CONFIG_HOME", None)
+        else:
+            os.environ["XDG_CONFIG_HOME"] = saved[1]
+    return mod
+
+
 PLUGINS = "/usr/share/gajim/plugins"
 
 
@@ -402,6 +534,50 @@ print(json.dumps({"own": own, "keys": [i.fingerprint for i in items],
         # it also asks GnuPG to delete it; without force a secret key needs gpg-agent's confirmation
         # prompt, which a test can't answer, so the key stays here (on the desktop the prompt appears)
         self.assertEqual(self.status(), gk.MISSING_UID)
+
+    STORE = r"""
+import json, sqlite3, sys, types
+PD = %r + "/openpgp"
+for pkg in ("openpgp", "openpgp.modules", "openpgp.backend"):
+    m = types.ModuleType(pkg); m.__path__ = [PD + pkg[len("openpgp"):].replace(".", "/")]; sys.modules[pkg] = m
+from pathlib import Path
+from nbxmpp.protocol import JID
+from nbxmpp.structs import PGPKeyMetadata
+sqlite3.register_adapter(JID, str)
+sqlite3.register_converter("jid", lambda b: JID.from_string(b.decode()))
+from openpgp.backend.sql import Storage
+from openpgp.backend.gpgme import GPGMe
+from openpgp.modules.key_store import PGPContacts
+jid, home, step = sys.argv[1], Path(sys.argv[2]), sys.argv[3]
+c = PGPContacts(GPGMe(jid, home), Storage(home))
+bob = JID.from_string("bob@example.org")
+if step == "first":
+    c.process_keylist(bob, [PGPKeyMetadata(bob, "B" * 40, 100)])
+elif step == "new":
+    c.process_keylist(bob, [PGPKeyMetadata(bob, "C" * 40, 200)])
+print(json.dumps([[k.fingerprint, int(k.trust), k.active] for k in c.get_keys(bob, only_trusted=False)]
+                 + [len(c.get_keys(bob))]))
+""" % PLUGINS
+
+    def store(self, step):
+        p = subprocess.run([sys.executable, "-c", self.STORE, JID, gk.ensure_home(JID), step],
+                           capture_output=True, text=True)
+        self.assertEqual(p.returncode, 0, p.stderr)
+        return json.loads(p.stdout.strip().splitlines()[-1])
+
+    def test_new_contact_key_not_trusted_until_trust(self):
+        """PRE-7 with the plugin's own key store: a contact's second key is Not Decided (Gajim: "Not
+        Trusted"); Trust… here makes Gajim's store hand it out for encryption."""
+        gk.generate(JID)
+        self.assertEqual(self.store("first")[-1], 1)                 # first key: Blind Trust, usable
+        r = self.store("new")
+        self.assertEqual(r[-1], 0)                                   # the "Not Trusted" dialog
+        self.assertIn(["C" * 40, 1, True], r[:-1])
+        self.assertEqual([c.jid for c in gk.contact_keys(JID) if not c.usable and c.active], ["bob@example.org"])
+        gk.set_contact_trust(JID, "bob@example.org", "C" * 40, gajim_is_running=False)
+        r = self.store("load")                                       # Gajim started again
+        self.assertIn(["C" * 40, 3, True], r[:-1])
+        self.assertEqual(r[-1], 1)
 
 
 if __name__ == "__main__":
