@@ -4,6 +4,18 @@
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **PRE-9: Claws Mail's "Generate a new key pair" makes Ed25519 and Curve25519 keys instead of RSA-2048.**
+  Claws (4.3.1, pgpcore plugin) hands gpg a fixed parameter list that asks for RSA-2048. That list
+  names the key type, so no gpg.conf setting can change it. The new build hook
+  `0470-prestium-claws-keygen.hook.chroot` replaces the list in `pgpcore.so` with one of the same
+  length: an Ed25519 primary key (sign and certify) and a Curve25519 encryption subkey, with no expiry
+  date as before. Debian's file stays recorded by dpkg as `pgpcore.so.debian` (dpkg-divert, so
+  `dpkg -V` is clean). The build fails if the old list is not found exactly once, so a new Claws
+  version can't ship unpatched or wrongly patched. The empty-name fix (the launcher drops an empty
+  `name=`, so Claws uses the address) is unchanged. Checked with the image's gpg 2.4.7 and gpgme,
+  using the exact list from the patched plugin: ed25519 + cv25519 keys, user ID from the address, and
+  sign + encrypt then decrypt + verify work. Test: `tests/test_claws_pgp_keygen.sh`.
+
 - **PRE-8: Prestium Translate said "The translation engine stopped." on a live boot and never
   translated.** The engine runs in bubblewrap, and bubblewrap's AppArmor child profile
   (`prestium_translate//engine`) denied AF_UNIX datagram sockets. Bubblewrap brings up `lo` in the

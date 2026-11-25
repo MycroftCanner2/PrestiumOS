@@ -1,0 +1,40 @@
+#!/bin/sh
+# Prestium 2.1: Claws Mail's "Generate a new key pair" (pgpcore plugin, sgpgme.c) makes an Ed25519
+# signing/certification key with a Curve25519 encryption subkey instead of RSA-2048. Claws passes gpg
+# an explicit "Key-Type: RSA" parameter list, which no gpg.conf option overrides, so this hook replaces
+# that list in pgpcore.so with one of the same length (algorithm 22 = EdDSA, 18 = ECDH; no Expire-Date,
+# which for gpg's parameter files means the key never expires, as before). Debian's file stays recorded
+# by dpkg as pgpcore.so.debian (dpkg-divert). Fails the build unless the old list appears exactly once,
+# so a new Claws version is noticed instead of shipping an unpatched or wrongly patched plugin.
+# PRESTIUM_CLAWS_ROOT (tests only) patches a copy under that directory without dpkg.
+set -e
+P=/usr/lib/x86_64-linux-gnu/claws-mail/plugins/pgpcore.so
+R=${PRESTIUM_CLAWS_ROOT-}; F=$R$P
+if [ -n "$R" ]; then
+	[ -f "$F.debian" ] || cp -p "$F" "$F.debian"
+else
+	[ -f "$F" ] || [ -f "$F.debian" ] || { echo "E: $P is missing (claws-mail-pgpmime)"; exit 1; }
+	dpkg-divert --list "$P" | grep -q "$P.debian" || dpkg-divert --quiet --local --rename --divert "$P.debian" --add "$P"
+fi
+python3 -I - "$F.debian" "$F" <<'PY' || { echo "E: Claws Mail's key parameters were not found as expected in $P.debian"; exit 1; }
+import os, sys
+src, dst = sys.argv[1:]
+H = b'<GnupgKeyParms format="internal">\n'
+T = b'%s%s%s</GnupgKeyParms>\n\x00'
+OLD = H + b'Key-Type: RSA\nKey-Length: 2048\nSubkey-Type: RSA\nSubkey-Length: 2048\nName-Real: %s\nName-Email: %s\nExpire-Date: 0\n' + T
+NEW = H + b'Key-Type:22\nKey-Curve:ed25519\nKey-Usage:sign\nSubkey-Type:18\nSubkey-Curve:cv25519\nName-Real:%s\nName-Email:%s\n#  \n' + T
+assert len(OLD) == len(NEW)
+d = open(src, "rb").read()
+if d.count(OLD) != 1 or d.count(b"Key-Type") != 1 or d.count(b"<GnupgKeyParms") != 1:
+    sys.exit("expected exactly one RSA key parameter list, found %d (%d Key-Type)" % (d.count(OLD), d.count(b"Key-Type")))
+p = d.replace(OLD, NEW)
+assert len(p) == len(d) and p.count(NEW) == 1 and OLD not in p
+tmp = dst + ".prestium-tmp"
+with open(tmp, "wb") as f:
+    f.write(p)
+os.chmod(tmp, 0o644)
+os.replace(tmp, dst)
+assert open(dst, "rb").read() == p
+PY
+[ -n "$R" ] || chown root:root "$F"
+echo "P: Claws Mail generates Ed25519/Curve25519 keys"
