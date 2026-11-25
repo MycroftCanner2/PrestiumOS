@@ -4,6 +4,20 @@
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **PRE-8: Prestium Translate said "The translation engine stopped." on a live boot and never
+  translated.** The engine runs in bubblewrap, and bubblewrap's AppArmor child profile
+  (`prestium_translate//engine`) denied AF_UNIX datagram sockets. Bubblewrap brings up `lo` in the
+  engine's new, empty network namespace, and glibc's `if_nametoindex("lo")` needs such a socket for
+  its ioctl. So every start ended with "bwrap: loopback: Failed to look up lo" before the engine ran.
+  The app hides the engine's stderr, so only "stopped" showed. The build's own test translation runs the
+  engine without bubblewrap or AppArmor, so it passed. This was not caused by app-confine (F-01): it
+  failed the same way without it. The child profile now allows `network unix dgram` (as the viewers'
+  bubblewrap abstraction does). Inet and inet6 stay denied there, and the engine's own profile still
+  denies all networking. Reproduced and verified on the image's Debian 13 kernel (6.12, AppArmor
+  enforcing, the image's profiles loaded) in a VM: before, a translation failed with and without
+  app-confine; after, "The weather is good today." → "Погода сегодня хорошая." both with and without it. Test:
+  `tests/test_apparmor_translate.sh`.
+
 - **PRE-7: Gajim said "Not Trusted: There was no trusted and active key found" when sending OpenPGP, and Gajim
   OpenPGP Keys showed two "Revoke…" buttons.** Prestium did not cause the Gajim message. Checked with the
   shipped gajim-openpgp 1.7.1: the key store and GnuPG import and encrypt for two local accounts, with an
