@@ -4,6 +4,26 @@
 
 Each entry names the review finding (F-xx) it fixes.
 
+- **PRE-7: Gajim said "Not Trusted: There was no trusted and active key found" when sending OpenPGP, and Gajim
+  OpenPGP Keys showed two "Revoke…" buttons.** Prestium did not cause the Gajim message. Checked with the
+  shipped gajim-openpgp 1.7.1: the key store and GnuPG import and encrypt for two local accounts, with an
+  strace replayed against usr.bin.gajim and its gpg child profile, gave no denial. A key with a second,
+  non-xmpp user ID is accepted. The plugin encrypts only to a contact's published keys that it trusts. It
+  trusts a contact's first key by itself (Blind Trust). A key that replaces an earlier one (the contact
+  made or imported a new key) is "Not Decided" until it is marked Verified. A contact that never
+  published a key, or whose key Gajim has not fetched yet, has none. Gajim's own place to fix it is the
+  shield button next to the message box (Public Keys for the contact; click the key's icon, Verified).
+  The plugin has no "blind trust" setting, so nothing is shipped for it. Gajim OpenPGP Keys now has a
+  **Contacts' keys** section. It lists every contact key Gajim has received, with Gajim's trust, whether
+  the key is still published and whether the public key arrived. It explains why Gajim would refuse a
+  contact, and its **Trust…** button marks a current key Verified after a fingerprint comparison (only
+  while Gajim is closed, because Gajim keeps that record in memory). The same appears in the checks and
+  in `--check`. Its AppArmor profile may now read and update the plugin's contacts.db (and its sqlite
+  journal); its gpg child still may not. The user ID buttons now read **Revoke user ID…**. The user ID
+  Gajim needs (`xmpp:` plus the account) has none, and revoking it is refused. The whole-key action is
+  **Delete key…**. Tests: `tests/test_gajim_keys.py` (ContactKeys, RevokeButtons, and the plugin's own
+  key store), `tests/test_apparmor_gajim_keys.sh`.
+
 - **PRE-6: Feather said a new wallet "already exists", then "wallet_1.keys is opened by another wallet program".**
   Two Feather processes were running. Feather's own single-instance check (a lock file plus a socket in
   /tmp) races when two starts overlap: the later start finds the lock before the first has its socket,

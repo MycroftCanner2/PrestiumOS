@@ -1,5 +1,6 @@
 # Prestium 2.1: Gajim OpenPGP Keys (/usr/local/bin/prestium-gajim-keys), ENFORCED.
-# It reads and writes only Gajim's per-account keyrings (~/.local/share/gajim/openpgp/<JID>/), reads
+# It reads and writes only Gajim's per-account keyrings (~/.local/share/gajim/openpgp/<JID>/, including the
+# plugin's contacts.db: the contacts' keys list and Trust…, PRE-7), reads
 # Gajim's settings (to list the accounts) and Kleopatra's keyring (~/.gnupg, to import a key), and writes
 # a backup only as a new "*.gajim-key.asc" file in ~/Documents or on a volume under /media. It has no
 # network: no TCP/UDP, no session or system bus, only unix sockets (Wayland, the gpg-agent of Gajim's
@@ -45,8 +46,10 @@ profile prestium_gajim_keys /usr/local/bin/prestium-gajim-keys {
   # never GnuPG's configuration files there (they can name helper programs), as in usr.bin.gajim
   deny @{HOME}/.local/share/gajim/openpgp/*/*.conf{,.*} wl,
   deny @{HOME}/.local/share/gajim/openpgp/*/common.conf wl,
-  # nor the plugin's own trust database, nor Gajim's messages
-  deny @{HOME}/.local/share/gajim/openpgp/*/contacts.db* rw,
+  # PRE-7: the plugin's record of contacts' keys (contacts.db, under the rule above) for the Contacts' keys
+  # list (read into memory) and Trust… (one UPDATE, only while Gajim is not running; sqlite's lock and
+  # rollback journal next to it). Its gpg (child profile below) still never touches it. Gajim's messages:
+  # never.
   deny @{HOME}/.local/share/gajim/*.db* rw,
 
   # Kleopatra's keyring, read-only, and only what an import copies: the public keyring (pubring.kbx, or
