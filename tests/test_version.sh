@@ -13,6 +13,6 @@ grep -qF "\`$N-amd64.iso\`" "$R/BUILDING.md" && ok "BUILDING.md names $N-amd64.i
 grep -qF "*Prestium $V" "$R/README.md" && grep -qF "Prestium **$V**" "$R/README.md" && ok "README: status and boot entry say $V" || bad "README version"
 h=$(grep -m1 -E '^## [0-9]' "$R/CHANGELOG.md")
 [[ $h == "## $V:"* ]] && ok "CHANGELOG: newest release section is $V" || bad "CHANGELOG newest section: $h"
-[ "$(grep -c -E "^## $V[: ]" "$R/CHANGELOG.md")" = 1 ] && ok "CHANGELOG: one $V section" || bad "CHANGELOG: $V sections"
+[ "$(grep -c -E "^## ${V}[: ]" "$R/CHANGELOG.md")" = 1 ] && ok "CHANGELOG: one $V section" || bad "CHANGELOG: $V sections"
 grep -q '^## Unreleased' "$R/CHANGELOG.md" && bad "CHANGELOG still has an Unreleased section" || ok "CHANGELOG: no Unreleased section left"
 exit $fail
