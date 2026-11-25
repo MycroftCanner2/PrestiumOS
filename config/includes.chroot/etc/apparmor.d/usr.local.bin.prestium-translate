@@ -73,11 +73,17 @@ profile prestium_translate /usr/local/bin/prestium-translate {
     remount,
     umount,
     pivot_root,
-    # only for bringing up "lo" in the engine's own, empty network namespace
+    # only for bringing up "lo" in the engine's own, empty network namespace: netlink to set it up, and
+    # an AF_UNIX datagram socket, which glibc's if_nametoindex("lo") opens for its SIOCGIFINDEX ioctl.
+    # PRE-8: without "unix dgram" bubblewrap stopped with "loopback: Failed to look up lo" on every
+    # start, so the app only ever said "The translation engine stopped." (reproduced on a booted
+    # Debian 13 kernel with these profiles enforced). The socket is made after bubblewrap has entered
+    # the new, empty network namespace; the engine itself (prestium_translate_engine) still has no
+    # network at all.
     network netlink raw,
+    network unix dgram,
     deny network inet,
     deny network inet6,
-    deny network unix dgram,
     deny network unix seqpacket,
     signal (receive) peer=prestium_translate,
     signal (send, receive) peer=@{profile_name},

@@ -28,7 +28,12 @@ grep -Eq '^\s*network (inet|inet6)|^\s*network\s*,|^\s*network (tcp|udp|stream|d
 grep -Eq '^\s*network ' <<<"$(grep -v '^\s*deny' <<<"$parent")" && [ "$(grep -E '^\s*network ' <<<"$(grep -v '^\s*deny' <<<"$parent")")" = "  network unix stream," ] \
   && ok "parent: unix stream only (Wayland)" || no "parent: other networking"
 for d in inet inet6 netlink "unix dgram" packet; do grep -qx "  deny network $d," <<<"$parent" || no "parent: no deny network $d"; done; ok "parent: inet, inet6, netlink, unix dgram, packet denied"
-[ "$(grep -E '^\s*network ' <<<"$(grep -v '^\s*deny' <<<"$child")")" = "    network netlink raw," ] && ok "bwrap child: netlink raw only (lo in its empty namespace)" || no "bwrap child networking"
+# PRE-8: bubblewrap brings up "lo" in the engine's empty network namespace: netlink, and the AF_UNIX
+# datagram socket glibc's if_nametoindex() needs ("loopback: Failed to look up lo" without it)
+[ "$(grep -E '^\s*network ' <<<"$(grep -v '^\s*deny' <<<"$child")")" = "$(printf '    network netlink raw,\n    network unix dgram,')" ] \
+  && ok "bwrap child: netlink raw and unix dgram only (lo in its empty namespace)" || no "bwrap child networking"
+grep -qx '    deny network unix dgram,' <<<"$child" && no "bwrap child: unix dgram denied (bwrap can't set up lo, PRE-8)" || ok "bwrap child: unix dgram not denied"
+grep -qx '    deny network inet,' <<<"$child" && grep -qx '    deny network inet6,' <<<"$child" && ok "bwrap child: inet and inet6 denied" || no "bwrap child: inet deny"
 grep -qx '  deny network,' <<<"$eng" && ! grep -Eq '^\s*network' <<<"$eng" && ok "engine: deny network (all of it)" || no "engine networking"
 for r in userns mount umount pivot_root capability ptrace; do grep -qx "  deny $r," <<<"$eng" || no "engine: no deny $r"; done; ok "engine: no userns, mount, pivot_root, capabilities or ptrace"
 grep -q 'dbus' <<<"$parent$child$eng" && no "D-Bus rules" || ok "no D-Bus rules (the session bus stays denied by prestium-app-common)"
