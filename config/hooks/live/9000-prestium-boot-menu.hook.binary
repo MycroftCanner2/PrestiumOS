@@ -5,7 +5,7 @@
 V=$(. ../chroot/etc/os-release 2>/dev/null && printf %s "$VERSION_ID")
 [ -n "$V" ] || V=$(sed -n 's/^VERSION=//p' ../config/hooks/live/0400-prestium-system.hook.chroot 2>/dev/null | head -1)
 [ -n "$V" ] || { echo "E: Prestium version not found for the boot menu"; exit 1; }
-# quick_qubes: the variant goes into the labels too ("Prestium 2.1 quick_qubes"); labels only, the kernel
+# quick_qubes: the variant goes into the labels too ("Prestium 2.1.1 quick_qubes"); labels only, the kernel
 # command lines (and so cmdline.policy and hook 9030) are unchanged
 VAR=$(. ../chroot/etc/os-release 2>/dev/null && printf %s "$VARIANT_ID")
 [ -n "$VAR" ] || VAR=$(sed -n 's/^VARIANT_ID=\([a-z0-9_]*\)$/\1/p' ../config/hooks/live/0400-prestium-system.hook.chroot 2>/dev/null | head -1)

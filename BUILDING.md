@@ -5,7 +5,7 @@ images use. Everything that makes it Prestium is in this repository: the package
 customised files, the setup hooks and the pinned third-party downloads.
 
 **quick_qubes branch:** this branch builds the VM / Qubes OS variant,
-`Prestium-2.1-quick_qubes-amd64.iso`, with no bare-metal firmware (see the quick_qubes section of
+`Prestium-2.1.1-quick_qubes-amd64.iso`, with no bare-metal firmware (see the quick_qubes section of
 [README.md](README.md)). The build steps, requirements and checks are the same as on `main`. Only the
 package set, the archive areas and the output names differ, as described below.
 
@@ -69,7 +69,7 @@ which works but is several times slower.
    Browser Updater, and keeps `/usr/share/prestium/opt-overlay`; when a key or `sigcheck.sh` changes,
    update both copies; `tests/test_browser_install.py` and `tests/test_sigcheck.sh` compare them)
 2. runs `lb config` (options in `auto/config`);
-3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1-quick_qubes-amd64.iso`, `Prestium-2.1-quick_qubes-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
+3. runs `lb bootstrap`, `lb chroot`, `lb installer` and `lb binary` (the final apt sources go in between chroot and installer) and writes `Prestium-2.1.1-quick_qubes-amd64.iso`, `Prestium-2.1.1-quick_qubes-amd64.iso.sha256`, `SHA256SUMS`, the `.manifest`, the `.roothash` (the image's dm-verity root hash) and the `.packages` list.
 
 **Secure Boot.** The UEFI boot chain is Debian's signed one, the same as Debian's live images:
 firmware → shim → GRUB → kernel. live-build installs `shim-signed` and `grub-efi-amd64-signed`
@@ -138,14 +138,14 @@ services, and the test suite. Four tests need a real Wayland session, bwrap and 
 | `config/includes.chroot/` | Prestium's own files and the package files it changes, carried over from the earlier Prestium root filesystem as a diff against the packaged files (see below), plus the 2.0 changes |
 | `config/includes.chroot/usr/share/prestium/build/` | build-only data used by the hooks (owners/modes manifest, enabled units, optional packages, final apt sources); deleted from the image |
 | `config/hooks/live/*.hook.chroot` | setup steps, in order (below) |
-| `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels ("Prestium 2.1 quick_qubes, VM only": version and os-release `VARIANT_ID`; review F-08) |
+| `config/hooks/live/9000-prestium-boot-menu.hook.binary` | boot menu labels ("Prestium 2.1.1 quick_qubes, VM only": version and os-release `VARIANT_ID`; review F-08) |
 | `config/hooks/live/9020-prestium-boot-lock.hook.binary` | locks the boot menus: GRUB superuser (PBKDF2 hash, exported for submenus, also in the EFI image's and per-platform grub.cfg; needs mtools), every entry `--unrestricted`; isolinux `allowoptions 0`; every kernel line checked against a banned list (shells, init, security modules, debug, persistence, findiso=) and must have exactly one `lockdown=confidentiality` (review F-16); findiso= and loopback.cfg removed |
 | `scripts/grub-pbkdf2.py` | makes the GRUB password hash (`--random` for one nobody knows) |
 | `scripts/efi-inspect.py` | read-only facts about an EFI file for hook 9040: SBAT, a built-in certificate (shim's vendor CA), a GRUB image's built-in modules, prefix and objects |
 | `config/hooks/live/9010-prestium-verity-boot.hook.binary` | checks the image against its dm-verity hash tree and puts the root hash and `panic=10` (no initramfs shell) on every boot entry |
 | `config/hooks/live/9030-prestium-boot-cmdline.hook.binary` | only the image's own kernel command line: GRUB's EFI config searches for this build's `/.disk/prestium-<id>` on the boot disk first (no other disk's `/.disk/info`), reboots when it's missing; every boot entry checked against `cmdline.policy` with the initramfs's own code; no chainloader/loopback/load_env/foreign search or kernel; policy = `LB_BOOTAPPEND_LIVE`; no built-in kernel command line; the initrd runs the guard (needs mtools) |
 | `config/hooks/live/9040-prestium-secure-boot.hook.binary` | Secure Boot chain: `LB_UEFI_SECURE_BOOT="enable"`; the only EFI programs are `EFI/boot/bootx64.efi` and `grubx64.efi`, the same in the ISO tree and efi.img; shim signed for Microsoft's UEFI CA with Debian's CA built in, GRUB and every `live/vmlinuz*` signed by Debian (sbverify, CA certificates in `thirdparty/keys/secure-boot/`), GRUB's built-in modules, the kernel from `linux-signed-*` (needs sbsigntool, mtools) |
-| `config/bootloaders/` | boot menu entries: Prestium 2.1, nomodeset, camera and microphone off |
+| `config/bootloaders/` | boot menu entries: Prestium 2.1.1, nomodeset, camera and microphone off |
 | `thirdparty/` | pinned versions/SHA-256 (`versions.sh`), publisher keys, The Lounge's npm lockfile, the Secure Boot CA certificates (`keys/secure-boot/`: Microsoft UEFI CA 2011 and 2023, Debian Secure Boot CA; pinned in hook 9040) |
 | `scripts/fetch-thirdparty.sh` | download + verify + stage third-party software |
 | `scripts/amo-latest.py` | newest uBlock Origin from addons.mozilla.org: AMO hash, Mozilla signature, id, version, `strict_min_version` |

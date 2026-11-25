@@ -6,19 +6,21 @@ PrestiumOS is a privacy-focused live operating system for USB sticks, with Tor a
 is built with Debian's **live-build** on Debian 13 "trixie" (amd64), with broad hardware
 support: the current Debian release, kernel line and firmware set, with Secure Boot through shim and GRUB.
 
-> **This is the `quick_qubes` branch:** a variant of 2.1 made to run as a virtual machine guest
+> **This is the `quick_qubes` branch:** a variant of 2.1.1 made to run as a virtual machine guest
 > (KVM/QEMU, VirtualBox, VMware) or in **Qubes OS**, without bare-metal firmware. It builds
-> `Prestium-2.1-quick_qubes-amd64.iso`. See [quick_qubes: Prestium in a VM or Qubes OS](#quick_qubes-prestium-in-a-vm-or-qubes-os)
+> `Prestium-2.1.1-quick_qubes-amd64.iso`. See [quick_qubes: Prestium in a VM or Qubes OS](#quick_qubes-prestium-in-a-vm-or-qubes-os)
 > for what is different and how to run it. For real hardware (a USB stick), use the `main` branch.
 
-**Status:** Prestium **2.1** is the current release. It builds on **Prestium 2.0**, a full
-modernization of the 2023 Prestium build, with tighter security and new features.
+**Status:** Prestium **2.1.1** is the current release: Prestium **2.1** with the fixes of the November
+2026 security review and the changes listed in the [CHANGELOG](CHANGELOG.md). Prestium 2.1 builds on
+**Prestium 2.0**, a full modernization of the 2023 Prestium build, with tighter security and new
+features.
 
-- **Download:** the 2.1 ISO (the bare-metal image from `main`) is available through
-  [`Prestium-2.1-amd64.iso.torrent`](Prestium-2.1-amd64.iso.torrent), or build it yourself with
-  [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). The quick_qubes ISO has no published download yet:
-  build it from this branch. Check a download as [Verify a download](#verify-a-download) says
-  before you write it to a USB stick.
+- **Download:** the 2.1.1 quick_qubes ISO through
+  [`Prestium-2.1.1-quick_qubes-amd64.iso.torrent`](Prestium-2.1.1-quick_qubes-amd64.iso.torrent), or
+  build it yourself with [BUILDING.md](BUILDING.md) (`sudo ./build.sh`). The bare-metal image for a USB
+  stick is on the `main` branch. Check a download as [Verify a download](#verify-a-download) says
+  before you use it.
 - **What changed:** [CHANGELOG.md](CHANGELOG.md)
 
 ## Highlights
@@ -179,7 +181,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
   `/run` (bridge lines, Tor's control cookie, IRC sign-in tokens and more) are deleted and checked; a
   failure is logged as "session wipe FAILED", never as success.
 - **Network Logs, only when you ask:** in the default boot Tor and i2pd keep no logs. The boot menu
-  entry *Prestium 2.1 (Network Logs)* turns on their logs and *Network > Network Logs*, a read-only
+  entry *Prestium 2.1.1 (Network Logs)* turns on their logs and *Network > Network Logs*, a read-only
   view of the Tor, I2P and control-port filter logs of that boot.
 - **Apps:** besides the above, OnionShare, KeePassXC, Kleopatra, LibreOffice, Evince (Document Viewer,
   the default for PDF, PostScript, DjVu, XPS and comic books), Audacity, VLC, Loupe, Metadata Cleaner, Feather (Monero, on I2P) and *Unlock Encrypted Volume* for LUKS, VeraCrypt,
@@ -193,7 +195,7 @@ modernization of the 2023 Prestium build, with tighter security and new features
 
 ## quick_qubes: Prestium in a VM or Qubes OS
 
-The `quick_qubes` branch builds Prestium 2.1 for running **as a guest** in a virtual machine
+The `quick_qubes` branch builds Prestium 2.1.1 for running **as a guest** in a virtual machine
 (KVM/QEMU with virt-manager, GNOME Boxes or Proxmox; VirtualBox; VMware) or as a **Qubes OS**
 standalone HVM qube that boots the ISO. The hypervisor owns the real hardware, so the image leaves out
 what only real hardware needs. It is smaller and quicker to build, and it boots a little faster from a
@@ -232,7 +234,7 @@ Removed (a VM never touches the hardware these drive):
   handle "no backlight".
 
 Changed:
-- **Name:** `Prestium-2.1-quick_qubes-amd64.iso`. The boot menus say "Prestium 2.1 quick_qubes", and
+- **Name:** `Prestium-2.1.1-quick_qubes-amd64.iso`. The boot menus say "Prestium 2.1.1 quick_qubes", and
   os-release has `VARIANT_ID=quick_qubes`. Only the labels changed: the kernel command line is the same
   as on `main`, so the boot command line guard and its policy are unchanged.
 - **The "running in a virtual machine" notice is information, not a warning.** On this build the VM is
@@ -290,7 +292,7 @@ Kept on purpose:
 Example (libvirt, NAT network, no disk):
 
     virt-install --name prestium --memory 4096 --vcpus 2 --osinfo linux2022 \
-        --cdrom Prestium-2.1-quick_qubes-amd64.iso --disk none --livecd \
+        --cdrom Prestium-2.1.1-quick_qubes-amd64.iso --disk none --livecd \
         --network network=default --graphics spice --video virtio
 
 ### Running it in Qubes OS
@@ -310,7 +312,7 @@ shows up as one window with its own desktop.
    Qubes tools). Give it at least 3 GB. The qube's disk volumes stay empty and unused.
 2. **Boot the ISO**, kept in another qube (never copy it to dom0):
 
-       qvm-start prestium --cdrom=<qube-with-the-iso>:/home/user/Prestium-2.1-quick_qubes-amd64.iso
+       qvm-start prestium --cdrom=<qube-with-the-iso>:/home/user/Prestium-2.1.1-quick_qubes-amd64.iso
 
    Do this on every start: it is a live system, and nothing is kept between boots. In the Qube Manager,
    use "Boot qube from CD-ROM" in the qube's settings.
@@ -407,15 +409,14 @@ Check a download before you write it to a USB stick.
   certified is normal. The second must say `OK` for the ISO.
 - **Release key** (security review F-11): a release is only verifiable once its signing key's full
   40-hex fingerprint is published here and on prestium.org, and `SHA256SUMS` and `SHA256SUMS.asc` are
-  published next to the ISO or torrent. No fingerprint has been published for 2.1 yet, so the 2.1
+  published next to the ISO or torrent. No fingerprint has been published for 2.1.1 yet, so the 2.1.1
   torrent can't be checked against a signature: the torrent's piece hashes only check that the data
   matches the torrent file in this repository, not who made it. Until a fingerprint is listed here, treat
   the torrent as unverified, or build the ISO yourself.
 
   Release key fingerprint: *not yet published*
 - **2.0** has no signed checksum file. Compare `sha256sum Prestium-2.0-amd64.iso` with the SHA-256 on
-  prestium.org. Its torrent is no longer in this repository (it was replaced by
-  `Prestium-2.1-amd64.iso.torrent`). A torrent's piece hashes check the data as it downloads, but don't
+  prestium.org. Its torrent is no longer in this repository. A torrent's piece hashes check the data as it downloads, but don't
   prove who made the image.
 
 To build the same image yourself, see [BUILDING.md](BUILDING.md); each build writes a manifest of what
@@ -426,7 +427,8 @@ went into it.
 - `auto/`, `config/`, `build.sh`, `scripts/`, `thirdparty/`: the live-build configuration
   (see [BUILDING.md](BUILDING.md)); `thirdparty/` holds the pinned versions, hashes and publisher keys.
 - `i2pseeds.su3`: the signed I2P reseed file the build ships.
-- `Prestium-2.1-amd64.iso.torrent`: the torrent for the 2.1 release (the bare-metal image from `main`).
+- `Prestium-2.1.1-quick_qubes-amd64.iso.torrent`: the torrent for the 2.1.1 quick_qubes ISO (see Verify a
+  download).
 - `tests/`: checks for the boot chain (dm-verity, boot menu lock, command line policy, Secure Boot),
   the firewall, sandboxes and AppArmor profiles, the Wayland broker and its dialogs, the MAC guard,
   the Tor and I2P helpers, The Lounge, the Browser Updater, Gajim OpenPGP Keys, Prestium Translate and the desktop's design; `tests/ci.sh`

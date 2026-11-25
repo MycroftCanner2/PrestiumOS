@@ -5,7 +5,7 @@
 set -u; R=$(cd "$(dirname "$0")/.." && pwd); fail=0
 ok(){ echo "OK   $1"; }; bad(){ echo "FAIL $1"; fail=1; }
 M=$R/README.md
-refs=$(grep -o 'Prestium-[0-9.]*-amd64\.iso\.torrent' "$M" | sort -u)
+refs=$(grep -oE 'Prestium-[0-9.]*(-quick_qubes)?-amd64\.iso\.torrent' "$M" | sort -u)
 [ -n "$refs" ] && ok "README names a torrent" || bad "README names no torrent"
 for t in $refs; do [ -f "$R/$t" ] && ok "README's $t is in the repository" || bad "README names $t, which is not in the repository"; done
 for f in "$R"/*.torrent; do [ -f "$f" ] || continue; b=${f##*/}

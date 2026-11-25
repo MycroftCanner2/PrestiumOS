@@ -144,12 +144,12 @@ if command -v mkfs.msdos >/dev/null && command -v mcopy >/dev/null && command -v
       "$T/b/chroot/usr/share/prestium/boot" "$T/b/chroot/boot" "$T/b/binary/live"
     cp "$R/scripts/grub-pbkdf2.py" "$T/b/scripts/"; cp "$R/config/binary" "$T/b/config/binary"; cp "$LIB" "$POL" "$T/b/chroot/usr/share/prestium/boot/"
     printf '# CONFIG_CMDLINE_BOOL is not set\nCONFIG_BOOT_CONFIG=y\n# CONFIG_BOOT_CONFIG_FORCE is not set\n' > "$T/b/chroot/boot/config-6.12.0-amd64"
-    echo "$HASH" > "$T/b/prestium-roothash.tmp"; echo "Prestium 2.1" > "$T/b/binary/.disk/info"
+    echo "$HASH" > "$T/b/prestium-roothash.tmp"; echo "Prestium 2.1.1" > "$T/b/binary/.disk/info"
     VC=$(echo "$LIVE" | sed 's/ quiet//; s/ splash//')
-    live=$(printf 'menuentry "Prestium 2.1" --hotkey=l {\n\tlinux\t/live/vmlinuz-6.12.0-amd64 %s findiso=${iso_path}\n\tinitrd\t/live/initrd.img-6.12.0-amd64\n}\nmenuentry "Prestium 2.1 (nomodeset)" {\n\tlinux\t/live/vmlinuz-6.12.0-amd64 %s nomodeset\n\tinitrd\t/live/initrd.img-6.12.0-amd64\n}' "$LIVE" "$LIVE")
+    live=$(printf 'menuentry "Prestium 2.1.1" --hotkey=l {\n\tlinux\t/live/vmlinuz-6.12.0-amd64 %s findiso=${iso_path}\n\tinitrd\t/live/initrd.img-6.12.0-amd64\n}\nmenuentry "Prestium 2.1.1 (nomodeset)" {\n\tlinux\t/live/vmlinuz-6.12.0-amd64 %s nomodeset\n\tinitrd\t/live/initrd.img-6.12.0-amd64\n}' "$LIVE" "$LIVE")
     awk -v live="$live" '/^@LINUX_LIVE@$/{print live; next} {print}' "$R/config/bootloaders/grub-pc/grub.cfg" \
       | sed -e "s|@KERNEL_LIVE@|/live/vmlinuz-6.12.0-amd64|g; s|@INITRD_LIVE@|/live/initrd.img-6.12.0-amd64|g; s|@APPEND_LIVE@|$LIVE|g; s|@APPEND_VERIFY_CHECKSUMS@|$VC verify-checksums|g" \
-            -e 's|@PRESTIUM_VERSION@|2.1|g; s|@ENABLE_INSTALL_MENU@|false|; s|@ENABLE_MEMTEST@|false|; s|@ENABLE_VERIFY_CHECKSUMS@|true|' > "$T/b/binary/boot/grub/grub.cfg"
+            -e 's|@PRESTIUM_VERSION@|2.1.1|g; s|@ENABLE_INSTALL_MENU@|false|; s|@ENABLE_MEMTEST@|false|; s|@ENABLE_VERIFY_CHECKSUMS@|true|' > "$T/b/binary/boot/grub/grub.cfg"
     printf 'set default=0\nset timeout=3\n' > "$T/b/binary/boot/grub/config.cfg"
     printf 'if [ x$grub_platform == xefi -a x$lockdown != xy ] ; then\n    insmod part_gpt\nfi\nsource /boot/grub/grub.cfg\n' > "$T/b/binary/boot/grub/x86_64-efi/grub.cfg"
     printf 'include menu.cfg\ndefault vesamenu.c32\nprompt 0\ntimeout 30\n' > "$T/b/binary/isolinux/isolinux.cfg"

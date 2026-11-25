@@ -3,7 +3,7 @@
 # CA list, dconf, plymouth, locale, version strings) plus the 2.0 audio stack.
 set -e
 B=/usr/share/prestium/build
-VERSION=2.1
+VERSION=2.1.1
 # quick_qubes: the VM / Qubes OS variant (os-release VARIANT_ID; hook 9000 adds it to the boot menu labels)
 VARIANT_ID=quick_qubes
 

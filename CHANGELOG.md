@@ -1,9 +1,9 @@
 # Changelog
 
-## quick_qubes branch: Prestium 2.1 for VMs and Qubes OS
+## quick_qubes branch: Prestium 2.1.1 for VMs and Qubes OS
 
-A variant of 2.1 that runs as a virtual machine guest (KVM/QEMU, VirtualBox, VMware) or as a Qubes OS
-standalone HVM booting the ISO. It builds `Prestium-2.1-quick_qubes-amd64.iso`. The hypervisor owns
+A variant of 2.1.1 that runs as a virtual machine guest (KVM/QEMU, VirtualBox, VMware) or as a Qubes OS
+standalone HVM booting the ISO. It builds `Prestium-2.1.1-quick_qubes-amd64.iso`. The hypervisor owns
 the hardware, so bare-metal support is left out. The security layers are unchanged: firewall, AppArmor,
 sandboxes, Tor/I2P isolation, dm-verity, lockdown and the kernel command line with its guard. How to
 run it is in the README's quick_qubes section.
@@ -25,8 +25,8 @@ run it is in the README's quick_qubes section.
   VM; the tools stay, hidden).
 
 ### Changed
-- **Name:** the ISO is `Prestium-2.1-quick_qubes-amd64.iso`, os-release has
-  `VARIANT_ID=quick_qubes`, and hook 9000 labels the boot entries "Prestium 2.1 quick_qubes". Only the
+- **Name:** the ISO is `Prestium-2.1.1-quick_qubes-amd64.iso`, os-release has
+  `VARIANT_ID=quick_qubes`, and hook 9000 labels the boot entries "Prestium 2.1.1 quick_qubes". Only the
   labels changed: the command lines, `cmdline.policy` and hook 9030 are the same as on `main`.
 - **VM notice:** "running in a virtual machine" is now information (normal urgency, the usual timeout,
   no warning icon), since the VM is the expected environment. It still says what the host can see.
@@ -55,185 +55,24 @@ run it is in the README's quick_qubes section.
 - README: a quick_qubes section covering what changed and why, plus how to run it in KVM/QEMU,
   VirtualBox, VMware and Qubes OS (standalone HVM, `kernel=''`, `maxmem=0`, `--cdrom`, static
   address, sys-firewall rather than sys-whonix). The Download, Verify and Repository layout sections
-  now point to `Prestium-2.1-amd64.iso.torrent`; the 2.0 torrent was deleted on `main`. BUILDING.md
-  covers the firmware-free package set, the archive areas, the output name and hook 9980.
+  now point to `Prestium-2.1.1-quick_qubes-amd64.iso.torrent`, the quick_qubes ISO's own torrent.
+  BUILDING.md covers the firmware-free package set, the archive areas, the output name and hook 9980.
 - New `tests/test_quick_qubes.sh`. `test_vm_check.sh`, `test_mac_spoof_udev.sh`,
   `test_mac_guard_policy.py` and `test_mac_guard_dbus.py` are updated for the changes above.
-## Unreleased: fixes from the November 2026 security review
+## 2.1.1: changes since Prestium 2.1 (2026-11-25)
 
-Each entry names the review finding (F-xx) it fixes.
+Prestium 2.1.1 is a security and bug-fix release on top of Prestium 2.1. It fixes the findings of the
+November 2026 security review (each entry names the finding, F-xx, it fixes), confines the desktop
+applications in namespaces of their own, adds Gajim OpenPGP Keys and Prestium Translate, and fixes
+the problems found since. This section is one summary of everything since the 2.1 release, not the
+order the work was done in.
 
-- **PRE-9: Claws Mail's "Generate a new key pair" makes Ed25519 and Curve25519 keys instead of RSA-2048.**
-  Claws (4.3.1, pgpcore plugin) hands gpg a fixed parameter list that asks for RSA-2048. That list
-  names the key type, so no gpg.conf setting can change it. The new build hook
-  `0470-prestium-claws-keygen.hook.chroot` replaces the list in `pgpcore.so` with one of the same
-  length: an Ed25519 primary key (sign and certify) and a Curve25519 encryption subkey, with no expiry
-  date as before. Debian's file stays recorded by dpkg as `pgpcore.so.debian` (dpkg-divert, so
-  `dpkg -V` is clean). The build fails if the old list is not found exactly once, so a new Claws
-  version can't ship unpatched or wrongly patched. The empty-name fix (the launcher drops an empty
-  `name=`, so Claws uses the address) is unchanged. Checked with the image's gpg 2.4.7 and gpgme,
-  using the exact list from the patched plugin: ed25519 + cv25519 keys, user ID from the address, and
-  sign + encrypt then decrypt + verify work. Test: `tests/test_claws_pgp_keygen.sh`.
+The quick_qubes-only changes are at the end of this section; what the quick_qubes variant is, and how
+it differs from `main`, is in the section above.
 
-- **PRE-8: Prestium Translate said "The translation engine stopped." on a live boot and never
-  translated.** The engine runs in bubblewrap, and bubblewrap's AppArmor child profile
-  (`prestium_translate//engine`) denied AF_UNIX datagram sockets. Bubblewrap brings up `lo` in the
-  engine's new, empty network namespace, and glibc's `if_nametoindex("lo")` needs such a socket for
-  its ioctl. So every start ended with "bwrap: loopback: Failed to look up lo" before the engine ran.
-  The app hides the engine's stderr, so only "stopped" showed. The build's own test translation runs the
-  engine without bubblewrap or AppArmor, so it passed. This was not caused by app-confine (F-01): it
-  failed the same way without it. The child profile now allows `network unix dgram` (as the viewers'
-  bubblewrap abstraction does). Inet and inet6 stay denied there, and the engine's own profile still
-  denies all networking. Reproduced and verified on the image's Debian 13 kernel (6.12, AppArmor
-  enforcing, the image's profiles loaded) in a VM: before, a translation failed with and without
-  app-confine; after, "The weather is good today." → "Погода сегодня хорошая." both with and without it. Test:
-  `tests/test_apparmor_translate.sh`.
-
-- **PRE-7: Gajim said "Not Trusted: There was no trusted and active key found" when sending OpenPGP, and Gajim
-  OpenPGP Keys showed two "Revoke…" buttons.** Prestium did not cause the Gajim message. Checked with the
-  shipped gajim-openpgp 1.7.1: the key store and GnuPG import and encrypt for two local accounts, with an
-  strace replayed against usr.bin.gajim and its gpg child profile, gave no denial. A key with a second,
-  non-xmpp user ID is accepted. The plugin encrypts only to a contact's published keys that it trusts. It
-  trusts a contact's first key by itself (Blind Trust). A key that replaces an earlier one (the contact
-  made or imported a new key) is "Not Decided" until it is marked Verified. A contact that never
-  published a key, or whose key Gajim has not fetched yet, has none. Gajim's own place to fix it is the
-  shield button next to the message box (Public Keys for the contact; click the key's icon, Verified).
-  The plugin has no "blind trust" setting, so nothing is shipped for it. Gajim OpenPGP Keys now has a
-  **Contacts' keys** section. It lists every contact key Gajim has received, with Gajim's trust, whether
-  the key is still published and whether the public key arrived. It explains why Gajim would refuse a
-  contact, and its **Trust…** button marks a current key Verified after a fingerprint comparison (only
-  while Gajim is closed, because Gajim keeps that record in memory). The same appears in the checks and
-  in `--check`. Its AppArmor profile may now read and update the plugin's contacts.db (and its sqlite
-  journal); its gpg child still may not. The user ID buttons now read **Revoke user ID…**. The user ID
-  Gajim needs (`xmpp:` plus the account) has none, and revoking it is refused. The whole-key action is
-  **Delete key…**. Tests: `tests/test_gajim_keys.py` (ContactKeys, RevokeButtons, and the plugin's own
-  key store), `tests/test_apparmor_gajim_keys.sh`.
-
-- **PRE-6: Feather said a new wallet "already exists", then "wallet_1.keys is opened by another wallet program".**
-  Two Feather processes were running. Feather's own single-instance check (a lock file plus a socket in
-  /tmp) races when two starts overlap: the later start finds the lock before the first has its socket,
-  calls the lock invalid, takes it over and runs too. One then created wallet_1 under the other, and the
-  other held monero's lock on the keys file. The confined start (F-01) is slower, so a second click on the
-  launcher made the overlap common (reproduced: two starts at once gave two Feather windows). The earlier
-  fix (AppArmor rules for Feather's config and the ring database) was about something else, so it did not
-  cover this. app-confine now serialises Feather's starts. The first start holds a lock in the confine
-  base directory, which no app can see, for as long as Feather runs. A later start waits until the
-  running Feather listens on its socket, so the Feather it starts hands over (the window is raised) and
-  exits. If the first never listens, the later start refuses. Nothing in the confinement changes. Test:
-  `tests/test_feather_single_instance.py`.
-
-- **PRE-5 (2): `build.sh --resume` (or a second run without `--clean`) threw the built chroot away.**
-  `lb bootstrap`'s cache step puts `cache/bootstrap` back over `chroot/` whenever that cache exists and
-  its "restore" stage file does not, and a fresh build never writes that file. The chroot stage's stage
-  files then skipped the package install, so the image was the bare Debian bootstrap (found resuming the
-  failed build above: `lb binary` stopped at `binary_linux-image`, no kernel). build.sh now marks the
-  restore done when the bootstrap stage is complete and the chroot exists. Test:
-  `tests/test_build_resume_bootstrap.sh`.
-
-- **PRE-5: the build stopped after the chroot stage ("Failed to parse keyring /etc/apt/keyrings/prestium-*.gpg").**
-  `lb installer` and `lb binary` build their tool chroot from a fresh copy of live-build's bootstrap cache
-  (`cache/bootstrap`) and run `chroot_archives chroot install` there, which copies the build-time lists
-  (`config/archives/*.list.chroot`) and runs `apt-get update`. F-06 put the Tor Project and LibreWolf
-  keyrings only in the image chroot, so apt refused both repositories as unsigned in that copy. build.sh now
-  installs the same pinned keyrings in `cache/bootstrap/etc/apt/keyrings` too (on every run, so
-  `--resume` repairs an older cache) and checks for them before `lb installer`. The keys stay scoped
-  with signed-by, none goes to `trusted.gpg.d` (build.sh checks again after `lb installer`), and the image's
-  final lists are unchanged. Test: `tests/test_apt_keyrings.sh` runs build.sh's keyring block on a stand-in
-  tree, makes the tool chroots the way live-build does, and checks every signed-by file in each one.
-
-- **Launch check: every menu application opens, three start-up errors fixed.** All 55 menu, panel and
-  desktop entries were started the way the menu does in a booted image chroot (labwc session, the
-  Wayland broker, PipeWire, the portals, app-confine), with a window check and screenshot each, and every
-  file each one opened was compared with its compiled AppArmor profile (denials replayed as EACCES to see
-  which ones matter). All open. Fixed:
-  - *Gajim:* its profile's rule for GStreamer's plugin scanner had the wrong path (Debian installs it in
-    `/usr/lib/<multiarch>/gstreamer1.0/gstreamer-1.0/`), so GStreamer loaded every plugin inside Gajim
-    itself instead; that path is now allowed (ix, nothing else there).
-  - *Local Firefox (I2P console, I2P Torrents, IRC pages):* Firefox's Wayland proxy needs a socket in
-    `$XDG_RUNTIME_DIR` its profile does not allow and printed a `bind() error` at every start;
-    `prestium-localfox` now turns the proxy off (`MOZ_DISABLE_WAYLAND_PROXY=1`, as the browser sandbox
-    already does). The profile is unchanged.
-  - *Metadata Cleaner:* GTK's file chooser asked each GVfs volume monitor, D-Bus services app-confine keeps
-    off its bus, and printed five D-Bus errors at every start; its policy now sets `env gio-local`
-    (`GVFS_REMOTE_VOLUME_MONITOR_IGNORE=1`: local mounts only). `org.gtk.vfs.*` stays forbidden.
-  Test: `tests/test_app_launch_check.py`.
-
-- **Gajim stores account passwords in its own settings, never in GNOME Keyring.** With `use_keyring` on
-  (Gajim's default) Gajim could not save a password at all, since app-confine keeps
-  `org.freedesktop.secrets` out of its bus, and asked for it at every start. `/etc/gajim/app-overrides.json`
-  (`{"use_keyring": false}`, Gajim's own override mechanism) now applies to every profile at each start,
-  new and existing, without rewriting their other settings; Gajim's profile may read it. A saved password
-  is in `~/.config/gajim/settings.sqlite` (account settings, not encrypted; the other confined apps' profiles
-  don't allow reading it, unconfined programs of the desktop user can). Test: `tests/test_gajim_no_keyring.py`
-  (Gajim's own settings and password code on a profile with `use_keyring` on).
-
-- **Compatibility audit of the F-01/F-05 namespaces: passphrase prompts, Qt tray icons, later volumes and
-  Gajim's links work again.** A second review ran the applications under app-confine on a test system:
-  - *GnuPG passphrase prompts.* gpg passes the application's `DBUS_SESSION_BUS_ADDRESS`
-    (`$XDG_RUNTIME_DIR/prestium-bus`, which existed only inside the namespace) to gpg-agent for
-    pinentry-gnome3. Claws Mail and Kleopatra use the session's agent, outside every namespace, so signing,
-    decrypting with a protected key or creating a key with a passphrase failed with "pinentry error".
-    app-confine now also links `prestium-bus` to `bus` in the real runtime directory (the pinentry
-    profile may read it). Gajim and the Gajim keys tool run their own agent inside: their filtered bus
-    may now talk to GCR's prompter only (`pinentry.inc`: `talk org.gnome.keyring.SystemPrompter`; the
-    keyring and `org.freedesktop.secrets` stay refused, and no other policy may name the prompter). The
-    keys tool therefore has a bus again (that one name), so keys with a passphrase can be made, backed up
-    and edited.
-  - *Qt 5 tray icons (VLC, KeePassXC).* Qt 5 registers `org.kde.StatusNotifierItem-<pid>-<n>`, which no
-    policy allowed, so the icon was missing (KeePassXC set to start minimised to the tray had no window
-    and no icon). `tray.inc` adds `tray-items`: the proxy, now started after the application's process
-    exists, may own those names for that process id only (n = 1..16).
-  - *Volumes mounted after an application started* (USB stick, VeraCrypt) were invisible in it: the
-    namespace's mounts are now slaves of the host's (`MS_SLAVE`, still nothing propagates back).
-  - *Links in Gajim did nothing.* Gajim opens links with GIO, which outside Flatpak does not use the
-    OpenURI portal; its only web handler was the I2P Browser, which Gajim's profile may not start, and the
-    profile could not read the entry or run GIO's `gio-launch-desktop`. `env links-tor` makes Tor Browser
-    GIO's default for Gajim (`/usr/share/prestium/links-tor/mimeapps.list`), and the profile allows that
-    one entry and the wrapper.
-  Not changed (security tradeoffs): GNOME Keyring stays out of Gajim's bus (the Secret Service cannot be
-  filtered per item; see the next entry), KeePassXC's SSH agent integration (no `SSH_AUTH_SOCK`), dconf
-  writes, the accessibility bus.
-  Tests: `tests/test_app_confine_compat.py` (policy refusals, a real `xdg-dbus-proxy` and gpg-agent
-  with a stand-in prompter, mount propagation, GIO's link handler), `tests/test_app_confine_policy.py`.
-
-- **F-03: DHCP no longer sends the hostname.** NetworkManager sent `prestium` to every DHCP server
-  (DHCPv4 option 12/FQDN, DHCPv6), naming Prestium on the local network. The new global defaults in
-  `NetworkManager/conf.d/45-prestium-dhcp.conf` set `ipv4.dhcp-send-hostname=false` and
-  `ipv6.dhcp-send-hostname=false`, pin NetworkManager's internal DHCP client, and derive the client
-  identifiers from the (random, per-boot) MAC address only (`dhcp-client-id=mac`, `dhcp-iaid=mac`,
-  `dhcp-duid=ll`). Hook 0400 also comments out `send host-name` in dhclient.conf and fails the build if
-  either setting is missing. Test: `tests/test_nm_dhcp_privacy.sh` (also checks NetworkManager's own
-  merged configuration when it is installed).
-
-- **F-02: Gajim's GnuPG no longer gets Kleopatra's agent.** The `gpg` child profiles of `gajim` and
-  `prestium_gajim_keys` allowed every socket under `$XDG_RUNTIME_DIR/gnupg/`, including the sockets of
-  `~/.gnupg`'s agent (Kleopatra's and Claws Mail's secret keys). They now allow only their own
-  `gnupg/d.<hash>/` directory and deny `gnupg/S.*`. Because the 6.12 kernel does not mediate
-  `connect()` by socket path, the effective fix is app-confine (F-01): Gajim and the Gajim keys tool
-  get their own `$XDG_RUNTIME_DIR`, in which `~/.gnupg`'s agent does not exist. Tests:
-  `test_apparmor_gajim.sh` and `test_apparmor_gajim_keys.sh` (compiled-profile checks).
-
-- **F-04: kernel pointers are hashed again.** `slub_debug=FZP` made the 6.12 kernel switch off
-  pointer hashing (`no_hash_pointers` is forced by slub_debug before 6.17), so `%p` printed real kernel
-  addresses. It is gone from APPEND, `cmdline.policy` and `config/binary`. Its hardening is still covered
-  by `slab_nomerge`, `init_on_alloc=1`, `init_on_free=1` and `page_poison=1`; the slab consistency checks
-  (`F`) and red zones (`Z`) are lost. Test: `tests/test_cmdline_hardening.sh`.
-- **F-15: all CPU mitigations, SMT off.** `mitigations=auto,nosmt` is added to APPEND and required by
-  `cmdline.policy` (the per-issue options such as `mds=full,nosmt` stay), so every mitigation the kernel
-  knows is on and SMT is disabled for all the issues that need it. On CPUs with SMT this halves the
-  logical CPU count, as `mds=full,nosmt` already did on affected Intel CPUs. Test:
-  `tests/test_cmdline_hardening.sh`.
-
-- **F-06: third-party apt keys are trusted for their own repository only.** live-build put the Tor
-  Project and LibreWolf build-time keys (`config/archives/*.key.chroot`) in `/etc/apt/trusted.gpg.d`,
-  where apt trusts a key for every source, Debian's included, during the build. The keys moved to
-  `config/apt-keyrings/`; `build.sh` installs them in `/etc/apt/keyrings/` after `lb bootstrap`, the
-  build-time lists name them with `signed-by`, and the build stops if a `.key` file reappears in
-  `config/archives` or a Prestium key lands in `trusted.gpg.d`. The final image's sources were already
-  scoped (`/usr/share/keyrings`). Test: `tests/test_apt_keyrings.sh` (also pins both fingerprints).
-
-- **F-01: confined applications no longer reach the session bus, the system bus or the Wayland
-  broker.** On the 6.12 kernel AppArmor does not mediate `connect()` on a Unix socket path and enforces
+### Security
+- **Confined applications no longer reach the session bus, the system bus or the Wayland broker
+  (F-01).** On the 6.12 kernel AppArmor does not mediate `connect()` on a Unix socket path and enforces
   no D-Bus rules, so the `deny` rules for `/run/user/*/bus`, the system bus and
   `/run/prestium-wl/broker` did not stop a confined application from, for example, asking
   `systemd --user` (StartTransientUnit) to run any program outside every profile. The new
@@ -256,74 +95,9 @@ Each entry names the review finding (F-xx) it fixes.
   `tests/test_app_confine.py` (table vs. profiles, launch paths, and a functional run in a real
   namespace with a private bus, fake system bus and broker), `tests/test_app_confine_hook.sh`,
   `tests/test_audacity_netns.sh`. Needs a live-boot check of every application (see the review page).
-- **F-05: a private `/tmp` and `/dev/shm` for each confined application.** app-confine gives each
-  application group its own `/tmp` (`/tmp/.prestium-confine-<uid>/<group>`, shared by its own
-  instances for single-instance sockets, with Xwayland's `/tmp/.X11-unix` bound in read-only) and a new
-  `/dev/shm` for each start, so the profiles' `owner /tmp/** rwk` and `owner /dev/shm/** rwk` rules
-  no longer reach other applications' files (the Gajim keys tool's keyring copies, LibreOffice and
-  KeePassXC sockets, Feather's temporary files).
 
-- **Clock and I2P reseed need a confirmation at the screen (security review F-07).** The NOPASSWD
-  sudo rules for `prestium-set-clock` and `prestium-i2p-reseed` are gone: any program of the user
-  could run them silently (move the clock within the build-date bounds, or bootstrap i2pd from a
-  .su3 file it chose). Both now go through the Wayland broker like Tor's and I2P's settings: a dialog
-  on the compositor's full socket (accessibility off) shows the exact time, or the file, and who asked;
-  only after *Set clock* / *Reseed* does the broker run the helper as root in a transient service.
-  `sudo prestium-set-clock` is replaced by `prestium-wl set-clock YYYY-MM-DD HH:MM`; the I2P reseed
-  button works as before, with one extra confirmation. The helpers refuse to run without root and no
-  longer re-run themselves through sudo. Tests: `tests/test_broker_confirm_f07.py`, updated
-  `test_set_clock.sh` and `test_i2p_reseed.py`.
-
-- **The screen lock asks for its password at the start of the session (security review F-10).**
-  Without a session password the idle lock and the lock before suspend could only show a
-  notification, so a laptop left alone or closed came back unlocked. The broker now opens the
-  password dialog once when the session starts; *Not now* skips it (Lock Screen… or Super+L asks
-  again, and the automatic locks keep notifying). Test: `tests/test_session_lock.sh`.
-
-- **The README points at the 2.1 torrent and says what is verifiable (security review F-11).** It
-  named `Prestium-2.0-amd64.iso.torrent`, which is no longer in the repository, while
-  `Prestium-2.1-amd64.iso.torrent` was undocumented. *Verify a download* now has a *Release key
-  fingerprint* line, marked *not yet published* until the key holder publishes the full fingerprint
-  with `SHA256SUMS.asc` (`scripts/sign-release.sh`); until then the torrent is described as unverified.
-  Test: `tests/test_readme_release.sh`.
-
-- **Kernel lockdown is confidentiality, not integrity (security review F-16).** `lockdown=confidentiality`
-  replaces `lockdown=integrity` on every live entry (`auto/config`, `config/binary`, the command-line
-  policy and hook 9020, which accepts no other value). On top of integrity's refusals it stops root
-  reading kernel memory (`/proc/kcore`, kprobes, BPF and perf reads of kernel memory, tracefs), which
-  protects for example the keys of unlocked volumes after a root compromise. Prestium has no swap or
-  hibernation and uses none of these. The safety notifier now raises *Protection NOT active* when the
-  kernel is locked down only to integrity. Tests: `test_boot_lock.sh`, `test_boot_cmdline_guard.sh`,
-  `test_secure_boot.sh`, `test_safety_notify_apparmor.sh`.
-
-- **Release checklist and documented limits (security review F-12, F-13, F-14).** BUILDING.md has a
-  *Release checklist*: raise `TB_MIN_VERSION` and `FEATHER_MIN_VERSION` each release and pin both for
-  release builds after a second-source check (the "newest at build time" floor otherwise allows a
-  signed rollback chosen by whoever answers the update query); re-pin i2pd only after comparing
-  GitHub's asset digest, ideally a second download, and reading its maintainer scripts. Known limit
-  (F-14): options the kernel consumes itself (`rdinit=`, `init=`) act before the initramfs
-  command-line guard; hook 9020 bans them at build time and getting one onto the command line needs
-  the GRUB password or write access to the stick (the USB-writer limit; the fix is a signed UKI).
-  BUILDING.md also records why the kernel stays on Debian 13's 6.12 line: trixie-backports' signed
-  7.3 kernel would need AppArmor 5 (not in trixie) for Unix-socket path mediation.
-  Test: `tests/test_release_docs.sh`.
-
-- **quick_qubes warns on real hardware (security review F-08, quick_qubes only).** This build has no
-  CPU microcode or hardware firmware, which is right in a VM (the hypervisor loads the microcode) but
-  leaves a real computer without its CPU security fixes. `prestium-bare-metal.service`
-  (`ConditionVirtualization=!vm`, root without capabilities, writes only the safety-flag directory)
-  raises a *Protection NOT active* warning for the session when no VM is found, and the boot menu
-  labels read "Prestium 2.1 quick_qubes, VM only". Test: `tests/test_quick_qubes_bare_metal.sh`.
-
-- **The Xen MAC exemption is limited to Qubes OS (security review F-09, quick_qubes only).** The MAC
-  spoofing script and the MAC guard kept the host-assigned address of every Xen paravirtual card; on
-  XCP-ng or another Xen host with bridged networking that persistent address reached the LAN and linked
-  sessions. They now keep it only when it is in Qubes OS's range (`00:16:3e:5e:6c:xx`); any other Xen card
-  is spoofed and guarded like an emulated card. A qube with a custom `mac` loses its network unless
-  started with *MAC address spoofing off*. Tests: `test_mac_spoof_udev.sh`, `test_mac_guard_policy.py`,
-  `test_mac_guard_dbus.py`.
-- **F-01 (follow-up): each confined application gets its own filtered session bus, and the desktop
-  portal's file chooser and links come back.** app-confine's bus permissions moved from a table in the
+- **Each confined application gets its own filtered session bus, and the desktop portal's file
+  chooser and links come back (F-01).** app-confine's bus permissions moved from a table in the
   script to one policy file per application (`/usr/share/prestium/app-confine/<policy>.policy`, an
   allowlist for `xdg-dbus-proxy`, default deny; `bus none` for no bus at all). app-confine refuses any
   policy that names systemd, logind, dconf, the bus driver, Flatpak, a portal back end, the keyring or
@@ -358,6 +132,345 @@ Each entry names the review finding (F-xx) it fixes.
   portal and permission store and a fake back end: identity, a picked file read through the document
   portal, another document invisible, an https link reaching the handler and nothing else, every
   forbidden call refused), `test_app_confine.py` and `test_app_confine_hook.sh` updated.
+
+- **A private `/tmp` and `/dev/shm` for each confined application (F-05).** app-confine gives each
+  application group its own `/tmp` (`/tmp/.prestium-confine-<uid>/<group>`, shared by its own
+  instances for single-instance sockets, with Xwayland's `/tmp/.X11-unix` bound in read-only) and a new
+  `/dev/shm` for each start, so the profiles' `owner /tmp/** rwk` and `owner /dev/shm/** rwk` rules
+  no longer reach other applications' files (the Gajim keys tool's keyring copies, LibreOffice and
+  KeePassXC sockets, Feather's temporary files).
+
+- **Gajim's GnuPG no longer gets Kleopatra's agent (F-02).** The `gpg` child profiles of `gajim` and
+  `prestium_gajim_keys` allowed every socket under `$XDG_RUNTIME_DIR/gnupg/`, including the sockets of
+  `~/.gnupg`'s agent (Kleopatra's and Claws Mail's secret keys). They now allow only their own
+  `gnupg/d.<hash>/` directory and deny `gnupg/S.*`. Because the 6.12 kernel does not mediate
+  `connect()` by socket path, the effective fix is app-confine (F-01): Gajim and the Gajim keys tool
+  get their own `$XDG_RUNTIME_DIR`, in which `~/.gnupg`'s agent does not exist. Tests:
+  `test_apparmor_gajim.sh` and `test_apparmor_gajim_keys.sh` (compiled-profile checks).
+
+- **DHCP no longer sends the hostname (F-03).** NetworkManager sent `prestium` to every DHCP server
+  (DHCPv4 option 12/FQDN, DHCPv6), naming Prestium on the local network. The new global defaults in
+  `NetworkManager/conf.d/45-prestium-dhcp.conf` set `ipv4.dhcp-send-hostname=false` and
+  `ipv6.dhcp-send-hostname=false`, pin NetworkManager's internal DHCP client, and derive the client
+  identifiers from the (random, per-boot) MAC address only (`dhcp-client-id=mac`, `dhcp-iaid=mac`,
+  `dhcp-duid=ll`). Hook 0400 also comments out `send host-name` in dhclient.conf and fails the build if
+  either setting is missing. Test: `tests/test_nm_dhcp_privacy.sh` (also checks NetworkManager's own
+  merged configuration when it is installed).
+
+- **Kernel pointers are hashed again (F-04).** `slub_debug=FZP` made the 6.12 kernel switch off
+  pointer hashing (`no_hash_pointers` is forced by slub_debug before 6.17), so `%p` printed real kernel
+  addresses. It is gone from APPEND, `cmdline.policy` and `config/binary`. Its hardening is still covered
+  by `slab_nomerge`, `init_on_alloc=1`, `init_on_free=1` and `page_poison=1`; the slab consistency checks
+  (`F`) and red zones (`Z`) are lost. Test: `tests/test_cmdline_hardening.sh`.
+
+- **All CPU mitigations, SMT off (F-15).** `mitigations=auto,nosmt` is added to APPEND and required by
+  `cmdline.policy` (the per-issue options such as `mds=full,nosmt` stay), so every mitigation the kernel
+  knows is on and SMT is disabled for all the issues that need it. On CPUs with SMT this halves the
+  logical CPU count, as `mds=full,nosmt` already did on affected Intel CPUs. Test:
+  `tests/test_cmdline_hardening.sh`.
+
+- **Kernel lockdown is confidentiality, not integrity (F-16).** `lockdown=confidentiality`
+  replaces `lockdown=integrity` on every live entry (`auto/config`, `config/binary`, the command-line
+  policy and hook 9020, which accepts no other value). On top of integrity's refusals it stops root
+  reading kernel memory (`/proc/kcore`, kprobes, BPF and perf reads of kernel memory, tracefs), which
+  protects for example the keys of unlocked volumes after a root compromise. Prestium has no swap or
+  hibernation and uses none of these. The safety notifier now raises *Protection NOT active* when the
+  kernel is locked down only to integrity. Tests: `test_boot_lock.sh`, `test_boot_cmdline_guard.sh`,
+  `test_secure_boot.sh`, `test_safety_notify_apparmor.sh`.
+
+- **Third-party apt keys are trusted for their own repository only (F-06).** live-build put the Tor
+  Project and LibreWolf build-time keys (`config/archives/*.key.chroot`) in `/etc/apt/trusted.gpg.d`,
+  where apt trusts a key for every source, Debian's included, during the build. The keys moved to
+  `config/apt-keyrings/`; `build.sh` installs them in `/etc/apt/keyrings/` after `lb bootstrap`, the
+  build-time lists name them with `signed-by`, and the build stops if a `.key` file reappears in
+  `config/archives` or a Prestium key lands in `trusted.gpg.d`. The final image's sources were already
+  scoped (`/usr/share/keyrings`). Test: `tests/test_apt_keyrings.sh` (also pins both fingerprints).
+
+- **Clock and I2P reseed need a confirmation at the screen (F-07).** The NOPASSWD
+  sudo rules for `prestium-set-clock` and `prestium-i2p-reseed` are gone: any program of the user
+  could run them silently (move the clock within the build-date bounds, or bootstrap i2pd from a
+  .su3 file it chose). Both now go through the Wayland broker like Tor's and I2P's settings: a dialog
+  on the compositor's full socket (accessibility off) shows the exact time, or the file, and who asked;
+  only after *Set clock* / *Reseed* does the broker run the helper as root in a transient service.
+  `sudo prestium-set-clock` is replaced by `prestium-wl set-clock YYYY-MM-DD HH:MM`; the I2P reseed
+  button works as before, with one extra confirmation. The helpers refuse to run without root and no
+  longer re-run themselves through sudo. Tests: `tests/test_broker_confirm_f07.py`, updated
+  `test_set_clock.sh` and `test_i2p_reseed.py`.
+
+- **The screen lock asks for its password at the start of the session (F-10).**
+  Without a session password the idle lock and the lock before suspend could only show a
+  notification, so a laptop left alone or closed came back unlocked. The broker now opens the
+  password dialog once when the session starts; *Not now* skips it (Lock Screen… or Super+L asks
+  again, and the automatic locks keep notifying). Test: `tests/test_session_lock.sh`.
+
+- **The README points at the 2.1 torrent and says what is verifiable (F-11).** It
+  named `Prestium-2.0-amd64.iso.torrent`, which is no longer in the repository, while
+  `Prestium-2.1-amd64.iso.torrent` was undocumented. *Verify a download* now has a *Release key
+  fingerprint* line, marked *not yet published* until the key holder publishes the full fingerprint
+  with `SHA256SUMS.asc` (`scripts/sign-release.sh`); until then the torrent is described as unverified.
+  Test: `tests/test_readme_release.sh`.
+
+- **Release checklist and documented limits (F-12, F-13, F-14).** BUILDING.md has a
+  *Release checklist*: raise `TB_MIN_VERSION` and `FEATHER_MIN_VERSION` each release and pin both for
+  release builds after a second-source check (the "newest at build time" floor otherwise allows a
+  signed rollback chosen by whoever answers the update query); re-pin i2pd only after comparing
+  GitHub's asset digest, ideally a second download, and reading its maintainer scripts. Known limit
+  (F-14): options the kernel consumes itself (`rdinit=`, `init=`) act before the initramfs
+  command-line guard; hook 9020 bans them at build time and getting one onto the command line needs
+  the GRUB password or write access to the stick (the USB-writer limit; the fix is a signed UKI).
+  BUILDING.md also records why the kernel stays on Debian 13's 6.12 line: trixie-backports' signed
+  7.3 kernel would need AppArmor 5 (not in trixie) for Unix-socket path mediation.
+  Test: `tests/test_release_docs.sh`.
+
+### New
+- **Gajim OpenPGP Keys** (`/usr/local/bin/prestium-gajim-keys`, *Communication* menu after Gajim),
+  a GTK 3 window for the keys of Gajim's OpenPGP plugin. gajim-openpgp keeps one keyring per account
+  (`~/.local/share/gajim/openpgp/<address>/`), uses its first secret key, accepts it only if its first
+  `xmpp:` user ID is exactly `xmpp:<address>`, and ignores (and asks GnuPG to delete) keys with no
+  `xmpp:` user ID, so a key made in Kleopatra could not be used and there was no way to see why. The
+  window lists Gajim's accounts (read from `settings.sqlite` in memory, never locked or written; any
+  address can be typed), shows each key's fingerprint, user IDs, expiry and status, and runs the checks
+  with a fix for each (clock, keyring folder 700, one secret key, revoked, expired, created in the future,
+  secret key present, the `xmpp:` user ID Gajim reads, encryption and signing, ownertrust; whether the
+  server has the key is not checked, the tool has no network). It generates a key as the plugin does
+  (GnuPG's default Ed25519/Curve25519, no expiry, optional passphrase), imports one from Kleopatra and
+  adds the `xmpp:` user ID to Gajim's copy, adds, revokes and promotes user IDs (with a warning before
+  revoking the `xmpp:` one), sets ultimate ownertrust, deletes a key, and backs a key up to a new
+  `*.gajim-key.asc` file (a key with no passphrase is wrapped in AES-256 with a passphrase GnuPG asks
+  for) and restores it. It warns before a change while Gajim is running. `--check [address]` prints
+  the same report. All of it is the system gpg with `--homedir` (no new crypto library; the logic is in
+  `/usr/local/lib/prestium-keys/gajim_keys.py`, no GTK) and a passphrase is only ever typed into
+  pinentry. The import never runs gpg on `~/.gnupg`: the public keyring (or keyboxd's database) is
+  copied into a private `/tmp/prestium-keys-*` directory for gpg, and the secret key files are copied
+  byte for byte, still protected by their passphrase, so nothing in `~/.gnupg` is written, locked or
+  started. Its enforced profile `usr.local.bin.prestium-gajim-keys` allows no TCP/UDP or bus, reads
+  `~/.gnupg`'s public keyring and secret key files only, reads and writes Gajim's keyrings (never their
+  `*.conf`, the plugin's `contacts.db` or Gajim's messages), reads Gajim's settings, and writes only new
+  `*.gajim-key.asc` files in `~/Documents` or under `/media`; its gpg runs in a child profile that may
+  not touch `~/.gnupg` at all, with pinentry in `prestium_pinentry`. Gajim's own profile is unchanged.
+  Tested by `tests/test_gajim_keys.py` (real gpg in temporary keyrings: every status, the Kleopatra
+  import from a `pubring.kbx` and a keyboxd keyring left unchanged, backups and restores, the command
+  line, and Gajim's own plugin backend accepting the keys) and `tests/test_apparmor_gajim_keys.sh`
+  (paths from an strace of every flow, against the compiled profile). Not yet tested on a booted ISO.
+
+- **Prestium Translate** (`/usr/local/bin/prestium-translate`, *Accessories* menu after QR
+  Generator, also listed under Office), offline English↔Russian translation and a style rewriter in one
+  GTK 3 window in the style of Gajim OpenPGP Keys. The engine is bergamot-translator (Firefox
+  Translations' engine; Debian 13 packages neither it nor translateLocally), built by the new hook 0210
+  from a pinned source tar with a small pipe front end (`thirdparty/translate/prestium-translate-engine.cpp`)
+  for x86-64 with SSE4.1 and no BLAS library (11 MB, links only the C/C++ runtime). The models are
+  Mozilla's English→Russian and Russian→English models, version 2.1 of each (69 MB together), taken
+  from the records of Mozilla's signed Remote Settings collection (content signature checked against
+  the pinned AMO root by `scripts/translate-models.py`) and pinned by SHA-256; engine and models add
+  about 52 MB to the compressed image. Hook 0210 fails closed on a missing, extra or changed file,
+  installs them read-only in `/usr/share/prestium-translate/`, and stops the build if the engine
+  can't translate a test sentence both ways. The engine starts once (on first use) and is fed
+  through a pipe, inside bubblewrap (every namespace unshared, no network, no home, read-only
+  libraries and models, private `/tmp`). Translate runs as you pause or on Ctrl+Enter, with a
+  direction button and Cyrillic auto-detect. Rewrite has Light (invisible and look-alike characters,
+  emoji and emoticons, fillers, slang and British spellings, punctuation, quotes, dashes, case and
+  contractions evened out, with some choices random) and Strong (Light, then a round trip through the
+  other language, then Light again), *Show changes* (word diff), and a *Check before sending* list of
+  names, places, times, dates, numbers, addresses and repeated rare words a rewrite can't hide, with an
+  honest note. Paste & go (Ctrl+Shift+V), Copy, Copy & clear (Ctrl+Shift+C), Clear, an optional
+  60-second clipboard clear (only if the clipboard still holds the copied text). Status line
+  "Offline, nothing saved": no history, no temporary files, no recent-files entries; only the mode,
+  direction, strength and two switches go to `~/.config/prestium-translate/settings.json`, and the
+  boxes are emptied on Clear and on close. The logic is in `/usr/local/lib/prestium-translate/core.py`
+  (no GTK), also behind `--translate en-ru|ru-en|auto` and `--rewrite light|strong [--leftovers]` (stdin
+  to stdout). Its enforced profile `usr.local.bin.prestium-translate` allows only a unix stream
+  socket (Wayland; no TCP/UDP, netlink or bus), nothing of the home but its settings file, and no
+  writes in `/tmp`; bubblewrap runs in the child profile `engine`, and the engine program, stacked
+  (bubblewrap sets no_new_privs), in `prestium_translate_engine`, which denies all networking, user
+  namespaces, mounts and capabilities and reads only its models and the runtime. On a recent
+  processor a long paragraph takes about 0.5 seconds on one core and both models use about 300 MB.
+  Tested by `tests/test_translate.py` (Light rules, leftovers, diff, settings, command line, and with
+  the real engine and models: both directions, auto-detect, Strong keeps numbers and varies, the
+  bubblewrap sandbox), `tests/test_translate_hook.sh` (pins, fetch steps, hook 0210 refusing changed,
+  missing and extra files) and `tests/test_apparmor_translate.sh` (paths from an strace, against the
+  compiled profiles). The button labels are in sentence case ("Paste & go", "Copy & clear") as the
+  rest of Prestium. The engine's bubblewrap child profile allows AF_UNIX datagram sockets (inet and
+  inet6 stay denied), which bubblewrap needs to bring up `lo` in the engine's empty network namespace; without
+  them every start ended with "The translation engine stopped." on a live boot. Checked in a VM on the
+  image's 6.12 kernel with AppArmor enforcing and the image's profiles loaded.
+
+### Changes
+- **Claws Mail's "Generate a new key pair" makes Ed25519 and Curve25519 keys instead of RSA-2048.**
+  Claws (4.3.1, pgpcore plugin) hands gpg a fixed parameter list that asks for RSA-2048. That list
+  names the key type, so no gpg.conf setting can change it. The new build hook
+  `0470-prestium-claws-keygen.hook.chroot` replaces the list in `pgpcore.so` with one of the same
+  length: an Ed25519 primary key (sign and certify) and a Curve25519 encryption subkey, with no expiry
+  date as before. Debian's file stays recorded by dpkg as `pgpcore.so.debian` (dpkg-divert, so
+  `dpkg -V` is clean). The build fails if the old list is not found exactly once, so a new Claws
+  version can't ship unpatched or wrongly patched. The empty-name fix (the launcher drops an empty
+  `name=`, so Claws uses the address) is unchanged. Checked with the image's gpg 2.4.7 and gpgme,
+  using the exact list from the patched plugin: ed25519 + cv25519 keys, user ID from the address, and
+  sign + encrypt then decrypt + verify work. Test: `tests/test_claws_pgp_keygen.sh`.
+
+- **Feather and i2pd are downloaded from GitHub, and Feather is the newest signed release at build
+  time.** Versions: Feather newest signed (2.9.1 or later), i2pd 3.0.0 (PurpleI2P's pinned GitHub
+  `.deb`); LibreWolf still from its repository at build time. i2pd is no longer installed from the
+  repo.i2pd.xyz apt repository: `scripts/fetch-thirdparty.sh` downloads PurpleI2P's
+  `i2pd_3.0.0-1trixie1_amd64.deb` from `github.com/PurpleI2P/i2pd` releases, checks it against the
+  SHA-256 pinned in `thirdparty/versions.sh` and its package name, version and architecture, and stages
+  it; hook 0005 checks it again and installs it, with its dependencies from Debian. PurpleI2P publishes
+  no signature for the `.deb`, so the pinned SHA-256 is its only trust anchor (the apt repository was
+  signed, but unpinned). The i2pd version is now pinned instead of "newest at build time", and Debian's
+  own older i2pd is pinned out. The repository's apt source, key, keyring (`purplei2p.gpg`) and origin
+  pins are removed; the i2pd user, its uid 2000 and the config set up by hooks 0100 and 0700 are
+  unchanged. Feather, like Tor Browser (`scripts/feather-latest.sh`): each build asks GitHub for
+  feather-wallet/feather's latest release (never a draft or prerelease; the tag must be a plain
+  version), downloads its zip and `.asc` from the GitHub release (no longer featherwallet.org) and
+  requires a valid signature by Feather's key in a keyring holding only that key. That signature is now
+  Feather's trust anchor instead of a pinned SHA-256, with `FEATHER_MIN_VERSION` (2.9.1) as a floor so
+  an older, still validly signed release stops the build; the signed zip must hold `feather-<that
+  version>`. The build log and the image manifest record the version and SHA-256 shipped, and
+  `PRESTIUM_FEATHER_VERSION`/`PRESTIUM_FEATHER_SHA256` pin one release for reproducible builds.
+
+- **Gajim stores account passwords in its own settings, never in GNOME Keyring.** With `use_keyring` on
+  (Gajim's default) Gajim could not save a password at all, since app-confine keeps
+  `org.freedesktop.secrets` out of its bus, and asked for it at every start. `/etc/gajim/app-overrides.json`
+  (`{"use_keyring": false}`, Gajim's own override mechanism) now applies to every profile at each start,
+  new and existing, without rewriting their other settings; Gajim's profile may read it. A saved password
+  is in `~/.config/gajim/settings.sqlite` (account settings, not encrypted; the other confined apps' profiles
+  don't allow reading it, unconfined programs of the desktop user can). Test: `tests/test_gajim_no_keyring.py`
+  (Gajim's own settings and password code on a profile with `use_keyring` on).
+
+### Fixes
+- **Gajim: "GPGME: Invalid crypto engine" when connecting an account.** The OpenPGP plugin
+  (gajim-openpgp) uses GPGME, which runs `gpgconf`, `gpg --version` and `gpgsm --version` to check the
+  engine. Gajim's profile let it run none of them, so the engine check failed and the plugin raised
+  `GPGMEError` at connect. GnuPG now runs in a child profile `gajim//gpg`, as Claws Mail's does: it may
+  use only Gajim's own keyrings (`~/.local/share/gajim/openpgp/<account>/`, never `~/.gnupg`) and the
+  agent's sockets, has no TCP/UDP and no dirmngr (the plugin runs gpg offline), may not write or
+  hard-link GnuPG's `*.conf` there (neither may Gajim), and a passphrase prompt runs in
+  `prestium_pinentry`. Tested by `tests/test_apparmor_gajim.sh` and new start-up checks in
+  `tests/test_apparmor_startup.sh` (paths from an strace of the plugin's GPGME calls).
+
+- **Gajim said "Not Trusted: There was no trusted and active key found" when sending OpenPGP, and Gajim
+  OpenPGP Keys showed two "Revoke…" buttons.** Prestium did not cause the Gajim message. Checked with the
+  shipped gajim-openpgp 1.7.1: the key store and GnuPG import and encrypt for two local accounts, with an
+  strace replayed against usr.bin.gajim and its gpg child profile, gave no denial. A key with a second,
+  non-xmpp user ID is accepted. The plugin encrypts only to a contact's published keys that it trusts. It
+  trusts a contact's first key by itself (Blind Trust). A key that replaces an earlier one (the contact
+  made or imported a new key) is "Not Decided" until it is marked Verified. A contact that never
+  published a key, or whose key Gajim has not fetched yet, has none. Gajim's own place to fix it is the
+  shield button next to the message box (Public Keys for the contact; click the key's icon, Verified).
+  The plugin has no "blind trust" setting, so nothing is shipped for it. Gajim OpenPGP Keys now has a
+  **Contacts' keys** section. It lists every contact key Gajim has received, with Gajim's trust, whether
+  the key is still published and whether the public key arrived. It explains why Gajim would refuse a
+  contact, and its **Trust…** button marks a current key Verified after a fingerprint comparison (only
+  while Gajim is closed, because Gajim keeps that record in memory). The same appears in the checks and
+  in `--check`. Its AppArmor profile may now read and update the plugin's contacts.db (and its sqlite
+  journal); its gpg child still may not. The user ID buttons now read **Revoke user ID…**. The user ID
+  Gajim needs (`xmpp:` plus the account) has none, and revoking it is refused. The whole-key action is
+  **Delete key…**. Tests: `tests/test_gajim_keys.py` (ContactKeys, RevokeButtons, and the plugin's own
+  key store), `tests/test_apparmor_gajim_keys.sh`.
+
+- **Feather said a new wallet "already exists", then "wallet_1.keys is opened by another wallet program".**
+  Two Feather processes were running. Feather's own single-instance check (a lock file plus a socket in
+  /tmp) races when two starts overlap: the later start finds the lock before the first has its socket,
+  calls the lock invalid, takes it over and runs too. One then created wallet_1 under the other, and the
+  other held monero's lock on the keys file. The confined start (F-01) is slower, so a second click on the
+  launcher made the overlap common (reproduced: two starts at once gave two Feather windows). The earlier
+  fix (AppArmor rules for Feather's config and the ring database) was about something else, so it did not
+  cover this. app-confine now serialises Feather's starts. The first start holds a lock in the confine
+  base directory, which no app can see, for as long as Feather runs. A later start waits until the
+  running Feather listens on its socket, so the Feather it starts hands over (the window is raised) and
+  exits. If the first never listens, the later start refuses. Nothing in the confinement changes. Test:
+  `tests/test_feather_single_instance.py`.
+
+- **Compatibility audit of the F-01/F-05 namespaces: passphrase prompts, Qt tray icons, later volumes and
+  Gajim's links work again.** A second review ran the applications under app-confine on a test system:
+  - *GnuPG passphrase prompts.* gpg passes the application's `DBUS_SESSION_BUS_ADDRESS`
+    (`$XDG_RUNTIME_DIR/prestium-bus`, which existed only inside the namespace) to gpg-agent for
+    pinentry-gnome3. Claws Mail and Kleopatra use the session's agent, outside every namespace, so signing,
+    decrypting with a protected key or creating a key with a passphrase failed with "pinentry error".
+    app-confine now also links `prestium-bus` to `bus` in the real runtime directory (the pinentry
+    profile may read it). Gajim and the Gajim keys tool run their own agent inside: their filtered bus
+    may now talk to GCR's prompter only (`pinentry.inc`: `talk org.gnome.keyring.SystemPrompter`; the
+    keyring and `org.freedesktop.secrets` stay refused, and no other policy may name the prompter). The
+    keys tool therefore has a bus again (that one name), so keys with a passphrase can be made, backed up
+    and edited.
+  - *Qt 5 tray icons (VLC, KeePassXC).* Qt 5 registers `org.kde.StatusNotifierItem-<pid>-<n>`, which no
+    policy allowed, so the icon was missing (KeePassXC set to start minimised to the tray had no window
+    and no icon). `tray.inc` adds `tray-items`: the proxy, now started after the application's process
+    exists, may own those names for that process id only (n = 1..16).
+  - *Volumes mounted after an application started* (USB stick, VeraCrypt) were invisible in it: the
+    namespace's mounts are now slaves of the host's (`MS_SLAVE`, still nothing propagates back).
+  - *Links in Gajim did nothing.* Gajim opens links with GIO, which outside Flatpak does not use the
+    OpenURI portal; its only web handler was the I2P Browser, which Gajim's profile may not start, and the
+    profile could not read the entry or run GIO's `gio-launch-desktop`. `env links-tor` makes Tor Browser
+    GIO's default for Gajim (`/usr/share/prestium/links-tor/mimeapps.list`), and the profile allows that
+    one entry and the wrapper.
+  Not changed (security tradeoffs): GNOME Keyring stays out of Gajim's bus (the Secret Service cannot be
+  filtered per item; see the next entry), KeePassXC's SSH agent integration (no `SSH_AUTH_SOCK`), dconf
+  writes, the accessibility bus.
+  Tests: `tests/test_app_confine_compat.py` (policy refusals, a real `xdg-dbus-proxy` and gpg-agent
+  with a stand-in prompter, mount propagation, GIO's link handler), `tests/test_app_confine_policy.py`.
+
+- **Launch check: every menu application opens, three start-up errors fixed.** All 55 menu, panel and
+  desktop entries were started the way the menu does in a booted image chroot (labwc session, the
+  Wayland broker, PipeWire, the portals, app-confine), with a window check and screenshot each, and every
+  file each one opened was compared with its compiled AppArmor profile (denials replayed as EACCES to see
+  which ones matter). All open. Fixed:
+  - *Gajim:* its profile's rule for GStreamer's plugin scanner had the wrong path (Debian installs it in
+    `/usr/lib/<multiarch>/gstreamer1.0/gstreamer-1.0/`), so GStreamer loaded every plugin inside Gajim
+    itself instead; that path is now allowed (ix, nothing else there).
+  - *Local Firefox (I2P console, I2P Torrents, IRC pages):* Firefox's Wayland proxy needs a socket in
+    `$XDG_RUNTIME_DIR` its profile does not allow and printed a `bind() error` at every start;
+    `prestium-localfox` now turns the proxy off (`MOZ_DISABLE_WAYLAND_PROXY=1`, as the browser sandbox
+    already does). The profile is unchanged.
+  - *Metadata Cleaner:* GTK's file chooser asked each GVfs volume monitor, D-Bus services app-confine keeps
+    off its bus, and printed five D-Bus errors at every start; its policy now sets `env gio-local`
+    (`GVFS_REMOTE_VOLUME_MONITOR_IGNORE=1`: local mounts only). `org.gtk.vfs.*` stays forbidden.
+  Test: `tests/test_app_launch_check.py`.
+
+### Build
+- **The build stopped after the chroot stage ("Failed to parse keyring /etc/apt/keyrings/prestium-*.gpg").**
+  `lb installer` and `lb binary` build their tool chroot from a fresh copy of live-build's bootstrap cache
+  (`cache/bootstrap`) and run `chroot_archives chroot install` there, which copies the build-time lists
+  (`config/archives/*.list.chroot`) and runs `apt-get update`. F-06 put the Tor Project and LibreWolf
+  keyrings only in the image chroot, so apt refused both repositories as unsigned in that copy. build.sh now
+  installs the same pinned keyrings in `cache/bootstrap/etc/apt/keyrings` too (on every run, so
+  `--resume` repairs an older cache) and checks for them before `lb installer`. The keys stay scoped
+  with signed-by, none goes to `trusted.gpg.d` (build.sh checks again after `lb installer`), and the image's
+  final lists are unchanged. Test: `tests/test_apt_keyrings.sh` runs build.sh's keyring block on a stand-in
+  tree, makes the tool chroots the way live-build does, and checks every signed-by file in each one.
+
+- **`build.sh --resume` (or a second run without `--clean`) threw the built chroot away.** `lb
+  bootstrap`'s cache step puts `cache/bootstrap` back over `chroot/` whenever that cache exists and its
+  "restore" stage file does not, and a fresh build never writes that file. The chroot stage's stage
+  files then skipped the package install, so the image was the bare Debian bootstrap (found resuming a
+  build that had stopped as in the entry above: `lb binary` stopped at `binary_linux-image`, no
+  kernel). build.sh now marks the restore done when the bootstrap stage is complete and the chroot
+  exists. Test: `tests/test_build_resume_bootstrap.sh`.
+
+- **Hook 0700 stopped with "/var/lib/i2pd/i2pd.conf is still the package symlink".** PurpleI2P's
+  `.deb` ships `/var/lib/i2pd/i2pd.conf` and `tunnels.conf` as symlinks to `/etc/i2pd` (not conffiles, so
+  `--force-confold` doesn't cover them). The apt package used to be installed before live-build copied
+  `config/includes.chroot`, which then replaced the symlinks; hook 0005 installs the `.deb` after the
+  copy, so dpkg replaced Prestium's files with the symlinks instead. Hook 0005 now keeps a copy of
+  `/var/lib/i2pd` as the includes left it, puts every entry back after the install, and stops the build
+  if anything still differs (the package's extra `certificates` symlink, which 0700 sets anyway, may
+  stay). 0700's check and all the `.deb` checks are unchanged. Tested by `tests/test_i2pd_deb.sh`
+  (a package with the same symlinks, and a `/var/lib/i2pd` that can't be put back stops the build).
+
+### quick_qubes only
+- **quick_qubes warns on real hardware (F-08).** This build has no
+  CPU microcode or hardware firmware, which is right in a VM (the hypervisor loads the microcode) but
+  leaves a real computer without its CPU security fixes. `prestium-bare-metal.service`
+  (`ConditionVirtualization=!vm`, root without capabilities, writes only the safety-flag directory)
+  raises a *Protection NOT active* warning for the session when no VM is found, and the boot menu
+  labels read "Prestium 2.1.1 quick_qubes, VM only". Test: `tests/test_quick_qubes_bare_metal.sh`.
+
+- **The Xen MAC exemption is limited to Qubes OS (F-09).** The MAC
+  spoofing script and the MAC guard kept the host-assigned address of every Xen paravirtual card; on
+  XCP-ng or another Xen host with bridged networking that persistent address reached the LAN and linked
+  sessions. They now keep it only when it is in Qubes OS's range (`00:16:3e:5e:6c:xx`); any other Xen card
+  is spoofed and guarded like an emulated card. A qube with a custom `mac` loses its network unless
+  started with *MAC address spoofing off*. Tests: `test_mac_spoof_udev.sh`, `test_mac_guard_policy.py`,
+  `test_mac_guard_dbus.py`.
 
 ## 2.1: changes since Prestium 2.0
 
@@ -711,8 +824,7 @@ done in).
   (`scripts/sigcheck.sh`). Node.js must be signed by a current releaser's primary key.
 - **Versions:** Tor Browser newest signed (16.0.1 or later), system Tor 0.4.9.16 from
   deb.torproject.org, Node.js 24.22.3 (November 2026 security release), The Lounge 4.5.2, Feather
-  newest signed (2.9.1 or later), Firefox 159.0.1, i2pd 3.0.0 (PurpleI2P's pinned GitHub `.deb`); LibreWolf from its repository
-  at build time.
+  2.9.1, Firefox 159.0.1; LibreWolf and i2pd from their repositories at build time.
 - **The Lounge's `npm ci` works on Debian 13's npm 9**; irc-framework is installed from a `git
   archive` of the pinned commit with a pinned SHA-256, so npm never packs it or runs build tools.
 - **The I2P reseed file ships in the repository** (`i2pseeds.su3`, signer certificate in
@@ -793,111 +905,6 @@ done in).
   signer; a server that is down, slow, has a bad certificate or serves a bad, wrongly signed or stale
   file is skipped with a reason, and when all fail the dialog lists each server's reason. There is no
   clearnet fallback.
-- **Feather and i2pd are downloaded from GitHub.** Feather's zip and `.asc` come from
-  `github.com/feather-wallet/feather` releases instead of featherwallet.org, still checked against
-  Feather's signing key and the pinned SHA-256 (unchanged: the GitHub file is the same). i2pd is no
-  longer installed from the repo.i2pd.xyz apt repository: `scripts/fetch-thirdparty.sh` downloads
-  PurpleI2P's `i2pd_3.0.0-1trixie1_amd64.deb` from `github.com/PurpleI2P/i2pd` releases, checks it
-  against the SHA-256 pinned in `thirdparty/versions.sh` and its package name, version and
-  architecture, and stages it; hook 0005 checks it again and installs it, with its dependencies from
-  Debian. PurpleI2P publishes no signature for the `.deb`, so the pinned SHA-256 is its only trust
-  anchor (the apt repository was signed, but unpinned). The i2pd version is now pinned instead of
-  "newest at build time", and Debian's own older i2pd is pinned out. The repository's apt source,
-  key, keyring (`purplei2p.gpg`) and origin pins are removed; the i2pd user, its uid 2000 and the
-  config set up by hooks 0100 and 0700 are unchanged.
-- **Feather is the newest signed release at build time**, like Tor Browser (`scripts/feather-latest.sh`).
-  Each build asks GitHub for feather-wallet/feather's latest release (never a draft or prerelease; the
-  tag must be a plain version), downloads its zip and `.asc` from the GitHub release and requires a valid
-  signature by Feather's key in a keyring holding only that key. That signature is now Feather's trust
-  anchor instead of a pinned SHA-256, with `FEATHER_MIN_VERSION` (2.9.1) as a floor so an older, still
-  validly signed release stops the build; the signed zip must hold `feather-<that version>`. The build
-  log and the image manifest record the version and SHA-256 shipped, and
-  `PRESTIUM_FEATHER_VERSION`/`PRESTIUM_FEATHER_SHA256` pin one release for reproducible builds. i2pd stays
-  pinned.
-- **Gajim: "GPGME: Invalid crypto engine" when connecting an account.** The OpenPGP plugin
-  (gajim-openpgp) uses GPGME, which runs `gpgconf`, `gpg --version` and `gpgsm --version` to check the
-  engine. Gajim's profile let it run none of them, so the engine check failed and the plugin raised
-  `GPGMEError` at connect. GnuPG now runs in a child profile `gajim//gpg`, as Claws Mail's does: it may
-  use only Gajim's own keyrings (`~/.local/share/gajim/openpgp/<account>/`, never `~/.gnupg`) and the
-  agent's sockets, has no TCP/UDP and no dirmngr (the plugin runs gpg offline), may not write or
-  hard-link GnuPG's `*.conf` there (neither may Gajim), and a passphrase prompt runs in
-  `prestium_pinentry`. Tested by `tests/test_apparmor_gajim.sh` and new start-up checks in
-  `tests/test_apparmor_startup.sh` (paths from an strace of the plugin's GPGME calls).
-- **Build: hook 0700 stopped with "/var/lib/i2pd/i2pd.conf is still the package symlink".** PurpleI2P's
-  `.deb` ships `/var/lib/i2pd/i2pd.conf` and `tunnels.conf` as symlinks to `/etc/i2pd` (not conffiles, so
-  `--force-confold` doesn't cover them). The apt package used to be installed before live-build copied
-  `config/includes.chroot`, which then replaced the symlinks; hook 0005 installs the `.deb` after the
-  copy, so dpkg replaced Prestium's files with the symlinks instead. Hook 0005 now keeps a copy of
-  `/var/lib/i2pd` as the includes left it, puts every entry back after the install, and stops the build
-  if anything still differs (the package's extra `certificates` symlink, which 0700 sets anyway, may
-  stay). 0700's check and all the `.deb` checks are unchanged. Tested by `tests/test_i2pd_deb.sh`
-  (a package with the same symlinks, and a `/var/lib/i2pd` that can't be put back stops the build).
-- **New: Gajim OpenPGP Keys** (`/usr/local/bin/prestium-gajim-keys`, *Communication* menu after Gajim),
-  a GTK 3 window for the keys of Gajim's OpenPGP plugin. gajim-openpgp keeps one keyring per account
-  (`~/.local/share/gajim/openpgp/<address>/`), uses its first secret key, accepts it only if its first
-  `xmpp:` user ID is exactly `xmpp:<address>`, and ignores (and asks GnuPG to delete) keys with no
-  `xmpp:` user ID, so a key made in Kleopatra could not be used and there was no way to see why. The
-  window lists Gajim's accounts (read from `settings.sqlite` in memory, never locked or written; any
-  address can be typed), shows each key's fingerprint, user IDs, expiry and status, and runs the checks
-  with a fix for each (clock, keyring folder 700, one secret key, revoked, expired, created in the future,
-  secret key present, the `xmpp:` user ID Gajim reads, encryption and signing, ownertrust; whether the
-  server has the key is not checked, the tool has no network). It generates a key as the plugin does
-  (GnuPG's default Ed25519/Curve25519, no expiry, optional passphrase), imports one from Kleopatra and
-  adds the `xmpp:` user ID to Gajim's copy, adds, revokes and promotes user IDs (with a warning before
-  revoking the `xmpp:` one), sets ultimate ownertrust, deletes a key, and backs a key up to a new
-  `*.gajim-key.asc` file (a key with no passphrase is wrapped in AES-256 with a passphrase GnuPG asks
-  for) and restores it. It warns before a change while Gajim is running. `--check [address]` prints
-  the same report. All of it is the system gpg with `--homedir` (no new crypto library; the logic is in
-  `/usr/local/lib/prestium-keys/gajim_keys.py`, no GTK) and a passphrase is only ever typed into
-  pinentry. The import never runs gpg on `~/.gnupg`: the public keyring (or keyboxd's database) is
-  copied into a private `/tmp/prestium-keys-*` directory for gpg, and the secret key files are copied
-  byte for byte, still protected by their passphrase, so nothing in `~/.gnupg` is written, locked or
-  started. Its enforced profile `usr.local.bin.prestium-gajim-keys` allows no TCP/UDP or bus, reads
-  `~/.gnupg`'s public keyring and secret key files only, reads and writes Gajim's keyrings (never their
-  `*.conf`, the plugin's `contacts.db` or Gajim's messages), reads Gajim's settings, and writes only new
-  `*.gajim-key.asc` files in `~/Documents` or under `/media`; its gpg runs in a child profile that may
-  not touch `~/.gnupg` at all, with pinentry in `prestium_pinentry`. Gajim's own profile is unchanged.
-  Tested by `tests/test_gajim_keys.py` (real gpg in temporary keyrings: every status, the Kleopatra
-  import from a `pubring.kbx` and a keyboxd keyring left unchanged, backups and restores, the command
-  line, and Gajim's own plugin backend accepting the keys) and `tests/test_apparmor_gajim_keys.sh`
-  (paths from an strace of every flow, against the compiled profile). Not yet tested on a booted ISO.
-- **New: Prestium Translate** (`/usr/local/bin/prestium-translate`, *Accessories* menu after QR
-  Generator, also listed under Office), offline English↔Russian translation and a style rewriter in one
-  GTK 3 window in the style of Gajim OpenPGP Keys. The engine is bergamot-translator (Firefox
-  Translations' engine; Debian 13 packages neither it nor translateLocally), built by the new hook 0210
-  from a pinned source tar with a small pipe front end (`thirdparty/translate/prestium-translate-engine.cpp`)
-  for x86-64 with SSE4.1 and no BLAS library (11 MB, links only the C/C++ runtime). The models are
-  Mozilla's English→Russian and Russian→English models, version 2.1 of each (69 MB together), taken
-  from the records of Mozilla's signed Remote Settings collection (content signature checked against
-  the pinned AMO root by `scripts/translate-models.py`) and pinned by SHA-256; engine and models add
-  about 52 MB to the compressed image. Hook 0210 fails closed on a missing, extra or changed file,
-  installs them read-only in `/usr/share/prestium-translate/`, and stops the build if the engine
-  can't translate a test sentence both ways. The engine starts once (on first use) and is fed
-  through a pipe, inside bubblewrap (every namespace unshared, no network, no home, read-only
-  libraries and models, private `/tmp`). Translate runs as you pause or on Ctrl+Enter, with a
-  direction button and Cyrillic auto-detect. Rewrite has Light (invisible and look-alike characters,
-  emoji and emoticons, fillers, slang and British spellings, punctuation, quotes, dashes, case and
-  contractions evened out, with some choices random) and Strong (Light, then a round trip through the
-  other language, then Light again), *Show changes* (word diff), and a *Check before sending* list of
-  names, places, times, dates, numbers, addresses and repeated rare words a rewrite can't hide, with an
-  honest note. Paste & go (Ctrl+Shift+V), Copy, Copy & clear (Ctrl+Shift+C), Clear, an optional
-  60-second clipboard clear (only if the clipboard still holds the copied text). Status line
-  "Offline, nothing saved": no history, no temporary files, no recent-files entries; only the mode,
-  direction, strength and two switches go to `~/.config/prestium-translate/settings.json`, and the
-  boxes are emptied on Clear and on close. The logic is in `/usr/local/lib/prestium-translate/core.py`
-  (no GTK), also behind `--translate en-ru|ru-en|auto` and `--rewrite light|strong [--leftovers]` (stdin
-  to stdout). Its enforced profile `usr.local.bin.prestium-translate` allows only a unix stream
-  socket (Wayland; no TCP/UDP, netlink or bus), nothing of the home but its settings file, and no
-  writes in `/tmp`; bubblewrap runs in the child profile `engine`, and the engine program, stacked
-  (bubblewrap sets no_new_privs), in `prestium_translate_engine`, which denies all networking, user
-  namespaces, mounts and capabilities and reads only its models and the runtime. On a recent
-  processor a long paragraph takes about 0.5 seconds on one core and both models use about 300 MB.
-  Tested by `tests/test_translate.py` (Light rules, leftovers, diff, settings, command line, and with
-  the real engine and models: both directions, auto-detect, Strong keeps numbers and varies, the
-  bubblewrap sandbox), `tests/test_translate_hook.sh` (pins, fetch steps, hook 0210 refusing changed,
-  missing and extra files) and `tests/test_apparmor_translate.sh` (paths from an strace, against the
-  compiled profiles). The button labels are in sentence case ("Paste & go", "Copy & clear") as the
-  rest of Prestium. Not yet tested on a booted ISO.
 
 ### Known security limits
 - **A kernel memory-corruption bug can be turned into an escape through the vDSO** (Phrack 73):
